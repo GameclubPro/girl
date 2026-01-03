@@ -4,11 +4,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background:
-    radial-gradient(110% 120% at 50% -10%, #ffffff 0%, #fbf5f2 48%, #f0e2dc 100%),
-    radial-gradient(90% 100% at 10% 85%, rgba(201, 168, 222, 0.18), transparent 60%),
-    radial-gradient(80% 80% at 90% 90%, rgba(252, 208, 118, 0.16), transparent 62%),
-    linear-gradient(180deg, #ffffff 0%, #f6efeb 100%);
+  background: #ffffff;
   padding: calc(18px + env(safe-area-inset-top)) 22px
     calc(30px + env(safe-area-inset-bottom));
   box-sizing: border-box;
@@ -105,7 +101,7 @@ h2 {
 .illustration {
   width: 100%;
   height: auto;
-  filter: drop-shadow(0 14px 20px rgba(122, 92, 81, 0.15));
+  filter: none;
   animation: float 6s ease-in-out infinite;
 }
 
