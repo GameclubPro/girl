@@ -170,15 +170,15 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding-bottom: 14px;
+  padding-bottom: 6px;
 }
 
 .pin-stars {
   position: absolute;
   left: 50%;
-  bottom: 0;
-  width: 64px;
-  height: 28px;
+  top: 50%;
+  width: 70px;
+  height: 34px;
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -193,8 +193,8 @@ h2 {
 
 .pin-star {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   background: var(--star-color);
   clip-path: polygon(
     50% 0%,
