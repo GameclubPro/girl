@@ -163,6 +163,8 @@ h2 {
   width: 48px;
   height: auto;
   object-fit: contain;
+  position: relative;
+  z-index: 2;
 }
 
 .pin-wrap {
@@ -176,11 +178,12 @@ h2 {
 .pin-stars {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: 38%;
   width: 70px;
   height: 34px;
   transform: translateX(-50%);
   pointer-events: none;
+  z-index: 1;
 }
 
 .pin-stars--lavender {
