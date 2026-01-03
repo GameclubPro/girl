@@ -1,10 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap');
 
 :root {
   font-family: 'Manrope', 'Segoe UI', sans-serif;
-  --font-title: 'Montserrat', 'Segoe UI', sans-serif;
-  color: #2b2522;
-  background-color: #f7f2ef;
+  --font-title: 'Sora', 'Segoe UI', sans-serif;
+  --ink: #2b2522;
+  --muted: #6f635e;
+  --cream: #f7f2ef;
+  --paper: #fff7f2;
+  --lavender: #d8c7ff;
+  --sun: #ffd26a;
+  color: var(--ink);
+  background-color: var(--cream);
+  color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -18,7 +25,8 @@
 body {
   margin: 0;
   min-height: 100dvh;
-  background-color: #f7f2ef;
+  background-color: var(--cream);
+  color: var(--ink);
 }
 
 #root {
@@ -33,4 +41,9 @@ a {
 button {
   font-family: inherit;
   -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg {
+  display: block;
 }
