@@ -174,24 +174,17 @@ h2 {
 
 .footer-decor {
   position: absolute;
-  left: -12px;
-  right: -12px;
+  left: 50%;
   bottom: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  width: 100vw;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 
-.decor {
-  width: 140px;
+.footer-image {
+  width: 100%;
   height: auto;
-  opacity: 0.95;
-  filter: drop-shadow(0 8px 18px rgba(96, 74, 65, 0.15));
-}
-
-.decor--beauty {
-  width: 150px;
+  display: block;
 }
 
 .animate {
@@ -251,13 +244,6 @@ h2 {
     padding: 16px 12px;
   }
 
-  .decor {
-    width: 120px;
-  }
-
-  .decor--beauty {
-    width: 130px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

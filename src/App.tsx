@@ -1,4 +1,5 @@
 import { useEffect, useId } from 'react'
+import decorImage from './assets/kiven-decor.webp'
 import logoImage from './assets/kiven-logo.webp'
 import girlsImage from './assets/kiven-girls.webp'
 import './App.css'
@@ -29,29 +30,6 @@ const StarPin = ({ tone }: { tone: 'lavender' | 'sun' }) => {
     </svg>
   )
 }
-
-const PlantDecor = () => (
-  <svg className="decor decor--plant" viewBox="0 0 140 120" aria-hidden="true">
-    <path d="M34 88c0-24 14-40 26-44-2 12-6 22-6 40 0 8 3 18 8 24-11 4-28 2-28-20Z" fill="#8ab47b" />
-    <path d="M62 92c0-18 10-34 22-40-3 16-4 26-2 38 2 12 6 18 10 24-12 5-30 0-30-22Z" fill="#6aa179" />
-    <path d="M80 88c6-18 16-30 28-34-2 14-2 22 2 34 3 10 6 16 10 22-12 6-32 4-40-22Z" fill="#8fbf8b" />
-    <path d="M18 90h70c10 0 18 8 18 18v8H0v-8c0-10 8-18 18-18Z" fill="#8d76a8" />
-    <path d="M20 90h66c8 0 14 6 14 14v6H6v-6c0-8 6-14 14-14Z" fill="#a38ac2" />
-  </svg>
-)
-
-const BeautyDecor = () => (
-  <svg className="decor decor--beauty" viewBox="0 0 170 120" aria-hidden="true">
-    <circle cx="110" cy="46" r="34" fill="#f4d3dd" />
-    <circle cx="110" cy="46" r="26" fill="#ffffff" />
-    <rect x="98" y="80" width="24" height="28" rx="10" fill="#e7b5c7" />
-    <path d="M20 94h70c8 0 14 6 14 14v8H6v-8c0-8 6-14 14-14Z" fill="#e8d7c8" />
-    <rect x="30" y="72" width="34" height="14" rx="6" fill="#f0c3a6" />
-    <rect x="70" y="66" width="22" height="28" rx="6" fill="#d9c0a8" />
-    <rect x="132" y="60" width="28" height="10" rx="5" fill="#c79ab0" />
-    <rect x="140" y="44" width="8" height="18" rx="4" fill="#a97a93" />
-  </svg>
-)
 
 function App() {
   useEffect(() => {
@@ -107,8 +85,12 @@ function App() {
         </p>
 
         <div className="footer-decor" aria-hidden="true">
-          <PlantDecor />
-          <BeautyDecor />
+          <img
+            className="footer-image"
+            src={decorImage}
+            alt=""
+            aria-hidden="true"
+          />
         </div>
       </main>
     </div>
