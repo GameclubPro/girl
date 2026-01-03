@@ -1,34 +1,16 @@
-import { useEffect, useId } from 'react'
+import { useEffect } from 'react'
 import decorImage from './assets/kiven-decor.webp'
 import logoImage from './assets/kiven-logo.webp'
 import girlsImage from './assets/kiven-girls.webp'
+import pinLeftImage from './assets/kiven-pin-left.webp'
+import pinRightImage from './assets/kiven-pin-right.webp'
 import './App.css'
 
 const StarPin = ({ tone }: { tone: 'lavender' | 'sun' }) => {
-  const gradientId = useId()
-  const fillStart = tone === 'lavender' ? '#d5b7ff' : '#ffd86c'
-  const fillEnd = tone === 'lavender' ? '#bba4ff' : '#f7b244'
-  const starFill = tone === 'lavender' ? '#7b4db8' : '#9b5c00'
+  const src = tone === 'lavender' ? pinLeftImage : pinRightImage
+  const alt = tone === 'lavender' ? 'Метка услуги' : 'Метка исполнительницы'
 
-  return (
-    <svg className="card-pin" viewBox="0 0 70 80" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={fillStart} />
-          <stop offset="100%" stopColor={fillEnd} />
-        </linearGradient>
-      </defs>
-      <path
-        d="M35 4C23.1 4 13.5 13.6 13.5 25.5c0 16.9 21.5 45.5 21.5 45.5s21.5-28.6 21.5-45.5C56.5 13.6 46.9 4 35 4Z"
-        fill={`url(#${gradientId})`}
-      />
-      <circle cx="35" cy="27" r="13" fill="#fff6e4" />
-      <path
-        d="M35 20.2l2.5 5.5 6 .5-4.6 4 1.4 5.8-5.3-3-5.3 3 1.4-5.8-4.6-4 6-.5 2.5-5.5Z"
-        fill={starFill}
-      />
-    </svg>
-  )
+  return <img className="card-pin" src={src} alt={alt} />
 }
 
 function App() {

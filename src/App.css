@@ -162,7 +162,7 @@ h2 {
 .card-pin {
   width: 48px;
   height: auto;
-  filter: drop-shadow(0 8px 12px rgba(96, 70, 58, 0.2));
+  object-fit: contain;
 }
 
 .footer-copy {
