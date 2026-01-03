@@ -165,6 +165,76 @@ h2 {
   object-fit: contain;
 }
 
+.pin-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 14px;
+}
+
+.pin-stars {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 64px;
+  height: 28px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pin-stars--lavender {
+  --star-color: #8c5ad5;
+}
+
+.pin-stars--sun {
+  --star-color: #f0b33f;
+}
+
+.pin-star {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--star-color);
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+}
+
+.pin-star:nth-child(1) {
+  left: 6%;
+  top: 56%;
+}
+
+.pin-star:nth-child(2) {
+  left: 22%;
+  top: 36%;
+}
+
+.pin-star:nth-child(3) {
+  left: 46%;
+  top: 20%;
+}
+
+.pin-star:nth-child(4) {
+  left: 68%;
+  top: 36%;
+}
+
+.pin-star:nth-child(5) {
+  left: 84%;
+  top: 56%;
+}
+
 .footer-copy {
   margin: 8px auto 0;
   max-width: 260px;
