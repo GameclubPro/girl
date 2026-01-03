@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #f6eee9 100%);
   padding: calc(18px + env(safe-area-inset-top)) 22px
     calc(30px + env(safe-area-inset-bottom));
   box-sizing: border-box;
