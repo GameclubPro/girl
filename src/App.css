@@ -63,10 +63,10 @@
   margin-top: 6px;
 }
 
-.brand-pin {
+.brand-logo {
   width: 66px;
   height: auto;
-  filter: drop-shadow(0 10px 18px rgba(120, 88, 57, 0.22));
+  object-fit: contain;
 }
 
 h1 {

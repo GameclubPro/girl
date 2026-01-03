@@ -1,35 +1,7 @@
 import { useEffect, useId } from 'react'
+import logoImage from './assets/kiven-logo.webp'
 import girlsImage from './assets/kiven-girls.webp'
 import './App.css'
-
-const BrandPin = () => {
-  const gradientId = useId()
-  return (
-    <svg
-      className="brand-pin"
-      viewBox="0 0 64 76"
-      role="img"
-      aria-label="KIVEN GIRL"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#f8d07a" />
-          <stop offset="100%" stopColor="#f0b84c" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M32 3C20.4 3 11 12.4 11 24c0 16.4 21 46 21 46s21-29.6 21-46C53 12.4 43.6 3 32 3Z"
-        fill={`url(#${gradientId})`}
-      />
-      <circle cx="32" cy="25" r="13.2" fill="#fff5e3" />
-      <circle cx="32" cy="22" r="4.6" fill="#f0b84c" />
-      <path
-        d="M22.5 36.5c2.7-4.3 6.7-6.5 9.5-6.5s6.8 2.2 9.5 6.5"
-        fill="#f0b84c"
-      />
-    </svg>
-  )
-}
 
 const StarPin = ({ tone }: { tone: 'lavender' | 'sun' }) => {
   const gradientId = useId()
@@ -104,7 +76,7 @@ function App() {
 
       <main className="content">
         <div className="title-block animate delay-1">
-          <BrandPin />
+          <img className="brand-logo" src={logoImage} alt="KIVEN GIRL" />
           <h1>KIVEN GIRL</h1>
           <p className="subtitle">Услуги от девушек для девушек</p>
         </div>
