@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import decorImage from './assets/kiven-decor.webp'
 import logoImage from './assets/kiven-logo.webp'
 import girlsImage from './assets/kiven-girls.webp'
@@ -251,6 +251,9 @@ const CollectionCarousel = () => {
   const setWidthRef = useRef(0)
   const stepRef = useRef(0)
   const pauseRef = useRef(false)
+  const readyRef = useRef(false)
+  const hasCenteredRef = useRef(false)
+  const [isReady, setIsReady] = useState(false)
 
   const measure = useCallback(() => {
     const cards = cardRefs.current
@@ -279,14 +282,22 @@ const CollectionCarousel = () => {
     const setWidth = setWidthRef.current
     if (!track || !setWidth) return
 
-    if (track.scrollLeft < setWidth * 0.5) {
+    if (track.scrollLeft < setWidth * 0.2) {
       track.scrollLeft += setWidth
-    } else if (track.scrollLeft > setWidth * 1.5) {
+    } else if (track.scrollLeft > setWidth * 1.8) {
       track.scrollLeft -= setWidth
     }
   }, [])
 
+  const markReady = useCallback(() => {
+    if (readyRef.current) return
+    if (!setWidthRef.current || !stepRef.current) return
+    readyRef.current = true
+    setIsReady(true)
+  }, [])
+
   const handleScroll = () => {
+    if (!readyRef.current) return
     if (rafRef.current) return
     rafRef.current = window.requestAnimationFrame(() => {
       rafRef.current = 0
@@ -294,28 +305,35 @@ const CollectionCarousel = () => {
     })
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false
+    let layoutRaf = 0
 
     const applyLayout = () => {
       if (cancelled) return
       measure()
-      centerMiddle()
+      if (!hasCenteredRef.current) {
+        const track = trackRef.current
+        const middle = cardRefs.current[collectionBaseIndex]
+        if (track && middle) {
+          centerMiddle()
+          hasCenteredRef.current = true
+        }
+      }
       normalizePosition()
+      markReady()
     }
+
+    applyLayout()
 
     const scheduleLayout = () => {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(applyLayout)
-      })
+      if (layoutRaf) {
+        window.cancelAnimationFrame(layoutRaf)
+      }
+      layoutRaf = window.requestAnimationFrame(applyLayout)
     }
 
-    scheduleLayout()
-
-    const handleResize = () => {
-      scheduleLayout()
-    }
-    window.addEventListener('resize', handleResize)
+    window.addEventListener('resize', scheduleLayout)
 
     const fontsReady = document.fonts?.ready
     if (fontsReady) {
@@ -326,16 +344,20 @@ const CollectionCarousel = () => {
 
     return () => {
       cancelled = true
+      if (layoutRaf) {
+        window.cancelAnimationFrame(layoutRaf)
+      }
       if (rafRef.current) {
         window.cancelAnimationFrame(rafRef.current)
       }
-      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('resize', scheduleLayout)
     }
-  }, [centerMiddle, measure, normalizePosition])
+  }, [centerMiddle, markReady, measure, normalizePosition])
 
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
+    if (!isReady) return
 
     const prefersReducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -351,14 +373,13 @@ const CollectionCarousel = () => {
       if (autoStarted) return
       autoStarted = true
       measure()
-      centerMiddle()
       normalizePosition()
       pauseRef.current = false
       intervalId = window.setInterval(() => {
         if (pauseRef.current) return
         if (!stepRef.current) {
           measure()
-          centerMiddle()
+          normalizePosition()
         }
         normalizePosition()
         if (stepRef.current) {
