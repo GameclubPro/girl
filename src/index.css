@@ -14,6 +14,7 @@
     var(--tg-safe-area-inset-top, 0px),
     var(--tg-viewport-safe-area-inset-top, 0px)
   );
+  --tg-top-offset: 12px;
   color: var(--ink);
   background-color: var(--cream);
   color-scheme: light;
