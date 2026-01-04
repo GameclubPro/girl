@@ -456,7 +456,7 @@ h2 {
   font-weight: 600;
   color: #2f2731;
   text-align: center;
-  height: calc(var(--popular-text-height) + var(--popular-image-height));
+  min-height: calc(var(--popular-text-height) + var(--popular-image-height));
   box-shadow: 0 10px 16px rgba(93, 73, 119, 0.16);
   cursor: pointer;
   scroll-snap-align: start;
@@ -477,7 +477,8 @@ h2 {
 }
 
 .popular-label {
-  flex: 0 0 var(--popular-text-height);
+  flex: 0 1 auto;
+  min-height: var(--popular-text-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -489,6 +490,7 @@ h2 {
   line-height: 1.15;
   word-break: break-word;
   hyphens: auto;
+  text-wrap: balance;
 }
 
 .collection-carousel {
