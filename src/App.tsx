@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import decorImage from './assets/kiven-decor.webp'
 import logoImage from './assets/kiven-logo.webp'
 import girlsImage from './assets/kiven-girls.webp'
@@ -147,6 +147,49 @@ const IconUser = () => (
   </svg>
 )
 
+const collectionItems = [
+  {
+    id: 'verified',
+    badge: '✅',
+    label: 'Проверено',
+    title: 'Проверенные мастера',
+    meta: '4.9 ★ и выше',
+    tone: 'lavender',
+  },
+  {
+    id: 'visit',
+    badge: '🚗',
+    label: 'Сегодня',
+    title: 'Выезд сегодня',
+    meta: 'Ближайшие 2 часа',
+    tone: 'sun',
+  },
+  {
+    id: 'budget',
+    badge: '₽',
+    label: 'Бюджет',
+    title: 'До 2000 ₽',
+    meta: 'Фиксированные цены',
+    tone: 'mint',
+  },
+  {
+    id: 'express',
+    badge: '⚡',
+    label: 'Срочно',
+    title: 'Экспресс-сервис',
+    meta: 'Ответ за 10 минут',
+    tone: 'rose',
+  },
+  {
+    id: 'stars',
+    badge: '⭐',
+    label: 'Топ недели',
+    title: 'Звезды недели',
+    meta: 'Лучшие отзывы',
+    tone: 'sky',
+  },
+] as const
+
 const StartScreen = ({ onClient }: { onClient: () => void }) => (
   <div className="screen screen--start">
     <div className="topbar">
@@ -193,6 +236,132 @@ const StartScreen = ({ onClient }: { onClient: () => void }) => (
     </main>
   </div>
 )
+
+const CollectionCarousel = () => {
+  const trackRef = useRef<HTMLDivElement | null>(null)
+  const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const rafRef = useRef(0)
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  const updateActiveIndex = () => {
+    const track = trackRef.current
+    if (!track) return
+
+    const target = track.scrollLeft + track.clientWidth / 2
+    let closestIndex = 0
+    let closestDistance = Number.POSITIVE_INFINITY
+
+    cardRefs.current.forEach((card, index) => {
+      if (!card) return
+      const center = card.offsetLeft + card.offsetWidth / 2
+      const distance = Math.abs(target - center)
+      if (distance < closestDistance) {
+        closestDistance = distance
+        closestIndex = index
+      }
+    })
+
+    setActiveIndex((prev) => (prev === closestIndex ? prev : closestIndex))
+  }
+
+  const handleScroll = () => {
+    if (rafRef.current) return
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = 0
+      updateActiveIndex()
+    })
+  }
+
+  const scrollToIndex = (nextIndex: number) => {
+    const track = trackRef.current
+    const safeIndex = Math.max(0, Math.min(collectionItems.length - 1, nextIndex))
+    const card = cardRefs.current[safeIndex]
+    if (!track || !card) return
+
+    const left = card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
+    track.scrollTo({ left, behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    updateActiveIndex()
+    const handleResize = () => updateActiveIndex()
+    window.addEventListener('resize', handleResize)
+    return () => {
+      if (rafRef.current) {
+        window.cancelAnimationFrame(rafRef.current)
+      }
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  return (
+    <div
+      className="collection-carousel"
+      role="region"
+      aria-label="Подборки для вас"
+      aria-roledescription="carousel"
+    >
+      <div className="collection-track" ref={trackRef} onScroll={handleScroll}>
+        {collectionItems.map((item, index) => (
+          <button
+            className={`collection-card collection-card--${item.tone}`}
+            key={item.id}
+            type="button"
+            ref={(element) => {
+              cardRefs.current[index] = element
+            }}
+          >
+            <span className="collection-tag">
+              <span className="collection-badge" aria-hidden="true">
+                {item.badge}
+              </span>
+              {item.label}
+            </span>
+            <span className="collection-body">
+              <span className="collection-title">{item.title}</span>
+              <span className="collection-meta">{item.meta}</span>
+            </span>
+            <span className="collection-cta" aria-hidden="true">
+              Смотреть <span className="collection-cta-arrow">›</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <button
+        className="carousel-nav carousel-nav--prev"
+        type="button"
+        aria-label="Предыдущая подборка"
+        onClick={() => scrollToIndex(activeIndex - 1)}
+        disabled={activeIndex === 0}
+      >
+        ‹
+      </button>
+      <button
+        className="carousel-nav carousel-nav--next"
+        type="button"
+        aria-label="Следующая подборка"
+        onClick={() => scrollToIndex(activeIndex + 1)}
+        disabled={activeIndex === collectionItems.length - 1}
+      >
+        ›
+      </button>
+
+      <div className="carousel-dots" role="tablist" aria-label="Переключение подборок">
+        {collectionItems.map((item, index) => (
+          <button
+            key={item.id}
+            className={`carousel-dot${index === activeIndex ? ' is-active' : ''}`}
+            type="button"
+            aria-label={`Подборка: ${item.title}`}
+            aria-current={index === activeIndex ? 'true' : undefined}
+            onClick={() => scrollToIndex(index)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const ClientScreen = () => (
   <div className="screen screen--client">
@@ -278,26 +447,7 @@ const ClientScreen = () => (
             ›
           </button>
         </div>
-        <div className="collection-grid">
-          <button className="collection-card collection-card--verified" type="button">
-            <span className="collection-badge" aria-hidden="true">
-              ✅
-            </span>
-            <span className="collection-title">Проверенные мастера</span>
-          </button>
-          <button className="collection-card collection-card--visit" type="button">
-            <span className="collection-badge" aria-hidden="true">
-              🚗
-            </span>
-            <span className="collection-title">Выезд сегодня</span>
-          </button>
-          <button className="collection-card collection-card--budget" type="button">
-            <span className="collection-badge" aria-hidden="true">
-              ₽
-            </span>
-            <span className="collection-title">До 2000 ₽</span>
-          </button>
-        </div>
+        <CollectionCarousel />
       </section>
 
       <section className="client-section">
