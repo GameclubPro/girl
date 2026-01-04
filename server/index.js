@@ -34,6 +34,18 @@ const pool = createPool()
 
 const ensureSchema = async () => {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      user_id TEXT PRIMARY KEY,
+      first_name TEXT,
+      last_name TEXT,
+      username TEXT,
+      language_code TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS cities (
       id SERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL
@@ -114,6 +126,48 @@ const seedLocations = async () => {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
+})
+
+app.post('/api/user', async (req, res) => {
+  const { userId, firstName, lastName, username, languageCode } = req.body ?? {}
+  const normalizedUserId = typeof userId === 'string' ? userId.trim() : ''
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const normalizeOptional = (value) => {
+    const trimmed = typeof value === 'string' ? value.trim() : ''
+    return trimmed.length ? trimmed : null
+  }
+
+  try {
+    await pool.query(
+      `
+        INSERT INTO users (user_id, first_name, last_name, username, language_code)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (user_id) DO UPDATE
+        SET first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            username = EXCLUDED.username,
+            language_code = EXCLUDED.language_code,
+            updated_at = NOW()
+      `,
+      [
+        normalizedUserId,
+        normalizeOptional(firstName),
+        normalizeOptional(lastName),
+        normalizeOptional(username),
+        normalizeOptional(languageCode),
+      ]
+    )
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/user failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
 })
 
 app.get('/api/cities', async (_req, res) => {

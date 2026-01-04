@@ -223,8 +223,9 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   /\/$/,
   ''
 )
+const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
 const getTelegramUserId = () =>
-  window.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString() ?? 'local-dev'
+  getTelegramUser()?.id?.toString() ?? 'local-dev'
 
 type City = {
   id: number
@@ -716,7 +717,7 @@ const CollectionCarousel = () => {
   )
 }
 
-const ClientScreen = () => (
+const ClientScreen = ({ clientName }: { clientName: string }) => (
   <div className="screen screen--client">
     <div className="client-shell">
       <header className="client-brand-row">
@@ -725,7 +726,8 @@ const ClientScreen = () => (
 
       <div className="client-top">
         <p className="client-greeting">
-          Привет, Екатерина <span aria-hidden="true">👋</span>
+          Привет{clientName ? `, ${clientName}` : ''}{' '}
+          <span aria-hidden="true">👋</span>
         </p>
         <button className="bell-button" type="button" aria-label="Уведомления">
           <IconBell />
@@ -829,7 +831,8 @@ function App() {
   const [view, setView] = useState<'start' | 'address' | 'client'>('start')
   const [role, setRole] = useState<Role>('client')
   const [address, setAddress] = useState('')
-  const [userId] = useState(() => getTelegramUserId())
+  const [telegramUser] = useState(() => getTelegramUser())
+  const [userId] = useState(() => telegramUser?.id?.toString() ?? 'local-dev')
   const [cities, setCities] = useState<City[]>([])
   const [districts, setDistricts] = useState<District[]>([])
   const [cityId, setCityId] = useState<number | null>(null)
@@ -839,6 +842,11 @@ function App() {
   const [isLoadingCities, setIsLoadingCities] = useState(false)
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const clientName =
+    [telegramUser?.first_name, telegramUser?.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || telegramUser?.username?.trim() || ''
 
   const handleAddressChange = (value: string) => {
     setAddress(value)
@@ -894,6 +902,36 @@ function App() {
       setIsSaving(false)
     }
   }, [address, cityId, districtId, userId])
+
+  useEffect(() => {
+    if (!telegramUser?.id) return
+
+    const payload = {
+      userId,
+      firstName: telegramUser.first_name ?? null,
+      lastName: telegramUser.last_name ?? null,
+      username: telegramUser.username ?? null,
+      languageCode: telegramUser.language_code ?? null,
+    }
+
+    const controller = new AbortController()
+
+    fetch(`${apiBase}/api/user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    }).catch(() => {})
+
+    return () => controller.abort()
+  }, [
+    telegramUser?.id,
+    telegramUser?.first_name,
+    telegramUser?.last_name,
+    telegramUser?.username,
+    telegramUser?.language_code,
+    userId,
+  ])
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp
@@ -1061,7 +1099,7 @@ function App() {
   }, [])
 
   if (view === 'client') {
-    return <ClientScreen />
+    return <ClientScreen clientName={clientName} />
   }
 
   if (view === 'address') {
