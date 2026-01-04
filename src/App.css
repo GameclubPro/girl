@@ -481,7 +481,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 6px;
+  padding: 2px 0;
   font-family: var(--font-title);
   font-size: clamp(11px, 3vw, 13px);
   font-weight: 700;
