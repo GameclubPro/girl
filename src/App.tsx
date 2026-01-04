@@ -256,16 +256,30 @@ const CollectionCarousel = () => {
   const [isReady, setIsReady] = useState(false)
 
   const measure = useCallback(() => {
-    const cards = cardRefs.current
-    const first = cards[0]
-    const middle = cards[collectionBaseIndex]
-    if (!first || !middle) return
+    const track = trackRef.current
+    const middle = cardRefs.current[collectionBaseIndex]
+    if (!track || !middle) return
 
-    const middleNext = cards[collectionBaseIndex + 1]
-    setWidthRef.current = middle.offsetLeft - first.offsetLeft
-    stepRef.current = middleNext
-      ? middleNext.offsetLeft - middle.offsetLeft
-      : middle.offsetWidth
+    const trackStyle = window.getComputedStyle(track)
+    const gapValue = trackStyle.columnGap || trackStyle.gap || '0'
+    const gap = Number.parseFloat(gapValue) || 0
+    const cardWidth = middle.getBoundingClientRect().width
+    const step = cardWidth + gap
+
+    if (!Number.isFinite(step) || step <= 0) return
+
+    stepRef.current = step
+    setWidthRef.current = step * collectionItems.length
+  }, [])
+
+  const setScrollLeftInstant = useCallback((nextLeft: number) => {
+    const track = trackRef.current
+    if (!track) return
+
+    const previousBehavior = track.style.scrollBehavior
+    track.style.scrollBehavior = 'auto'
+    track.scrollLeft = nextLeft
+    track.style.scrollBehavior = previousBehavior
   }, [])
 
   const centerMiddle = useCallback(() => {
@@ -273,9 +287,10 @@ const CollectionCarousel = () => {
     const middle = cardRefs.current[collectionBaseIndex]
     if (!track || !middle) return
 
-    track.scrollLeft =
+    const nextLeft =
       middle.offsetLeft - (track.clientWidth - middle.offsetWidth) / 2
-  }, [])
+    setScrollLeftInstant(nextLeft)
+  }, [setScrollLeftInstant])
 
   const normalizePosition = useCallback(() => {
     const track = trackRef.current
@@ -283,11 +298,11 @@ const CollectionCarousel = () => {
     if (!track || !setWidth) return
 
     if (track.scrollLeft < setWidth * 0.2) {
-      track.scrollLeft += setWidth
+      setScrollLeftInstant(track.scrollLeft + setWidth)
     } else if (track.scrollLeft > setWidth * 1.8) {
-      track.scrollLeft -= setWidth
+      setScrollLeftInstant(track.scrollLeft - setWidth)
     }
-  }, [])
+  }, [setScrollLeftInstant])
 
   const markReady = useCallback(() => {
     if (readyRef.current) return
@@ -377,14 +392,20 @@ const CollectionCarousel = () => {
       pauseRef.current = false
       intervalId = window.setInterval(() => {
         if (pauseRef.current) return
-        if (!stepRef.current) {
+        const setWidth = setWidthRef.current
+        const step = stepRef.current
+        if (!setWidth || !step) {
           measure()
           normalizePosition()
+          return
+        }
+        if (step < setWidth * 0.1 || step > setWidth * 0.4) {
+          measure()
+          normalizePosition()
+          return
         }
         normalizePosition()
-        if (stepRef.current) {
-          track.scrollBy({ left: stepRef.current, behavior: 'smooth' })
-        }
+        track.scrollBy({ left: step, behavior: 'smooth' })
       }, 3200)
     }
 
