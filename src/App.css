@@ -454,7 +454,7 @@ h2 {
   font-weight: 600;
   color: #2f2731;
   text-align: center;
-  height: clamp(150px, 44vw, 190px);
+  height: clamp(160px, 44vw, 200px);
   box-shadow: 0 10px 16px rgba(93, 73, 119, 0.16);
   cursor: pointer;
   scroll-snap-align: start;
@@ -462,29 +462,32 @@ h2 {
 }
 
 .popular-media {
-  flex: 2 0 0;
+  flex: 2.3 0 0;
   width: 100%;
   background: #f2ebfa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .popular-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
 .popular-label {
-  flex: 1 0 0;
+  flex: 0.7 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 10px;
+  padding: 6px 6px;
   font-family: var(--font-title);
-  font-size: 13px;
+  font-size: clamp(11px, 3vw, 13px);
   font-weight: 700;
   letter-spacing: 0.2px;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .collection-carousel {
