@@ -219,7 +219,13 @@ const categoryItems = [
   { id: 'home-family', icon: categoryHomeFamily, label: 'Дом и семья' },
 ] as const
 
-const StartScreen = ({ onClient }: { onClient: () => void }) => (
+type Role = 'client' | 'pro'
+
+const StartScreen = ({
+  onRoleSelect,
+}: {
+  onRoleSelect: (role: Role) => void
+}) => (
   <div className="screen screen--start">
     <div className="topbar">
       <button className="lang-pill" type="button" aria-label="Сменить язык">
@@ -244,12 +250,16 @@ const StartScreen = ({ onClient }: { onClient: () => void }) => (
         <button
           className="role-card role-card--client"
           type="button"
-          onClick={onClient}
+          onClick={() => onRoleSelect('client')}
         >
           <StarPin tone="lavender" />
           <span>Мне нужна услуга</span>
         </button>
-        <button className="role-card role-card--pro" type="button">
+        <button
+          className="role-card role-card--pro"
+          type="button"
+          onClick={() => onRoleSelect('pro')}
+        >
           <StarPin tone="sun" />
           <span>Я исполнительница</span>
         </button>
@@ -265,6 +275,73 @@ const StartScreen = ({ onClient }: { onClient: () => void }) => (
     </main>
   </div>
 )
+
+const AddressScreen = ({
+  role,
+  address,
+  onAddressChange,
+  onBack,
+  onContinue,
+}: {
+  role: Role
+  address: string
+  onAddressChange: (value: string) => void
+  onBack: () => void
+  onContinue: () => void
+}) => {
+  const roleLabel = role === 'client' ? 'Заказчик' : 'Исполнительница'
+
+  return (
+    <div className="screen screen--address">
+      <div className="address-shell">
+        <div className="address-top">
+          <button className="back-pill" type="button" onClick={onBack}>
+            <span className="chev">‹</span>
+            Назад
+          </button>
+          <span className="address-role">{roleLabel}</span>
+        </div>
+
+        <h2 className="address-title">Где вы находитесь?</h2>
+        <p className="address-subtitle">
+          Укажите адрес, чтобы мы показывали предложения рядом.
+        </p>
+
+        <div className="address-card">
+          <label className="address-label" htmlFor="address-input">
+            Адрес
+          </label>
+          <input
+            id="address-input"
+            className="address-input"
+            type="text"
+            value={address}
+            onChange={(event) => onAddressChange(event.target.value)}
+            placeholder="Город, улица, дом"
+            autoComplete="street-address"
+            autoFocus
+          />
+        </div>
+
+        <div className="address-actions">
+          <button
+            className="address-primary"
+            type="button"
+            onClick={onContinue}
+            disabled={!address.trim()}
+          >
+            Продолжить
+          </button>
+          <button className="address-secondary" type="button" onClick={onContinue}>
+            Укажу позже
+          </button>
+        </div>
+
+        <p className="address-hint">Адрес можно изменить в профиле позже.</p>
+      </div>
+    </div>
+  )
+}
 
 const CollectionCarousel = () => {
   const trackRef = useRef<HTMLDivElement | null>(null)
@@ -655,7 +732,9 @@ const ClientScreen = () => (
 )
 
 function App() {
-  const [view, setView] = useState<'start' | 'client'>('start')
+  const [view, setView] = useState<'start' | 'address' | 'client'>('start')
+  const [role, setRole] = useState<Role>('client')
+  const [address, setAddress] = useState('')
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp
@@ -665,8 +744,9 @@ function App() {
     webApp.expand()
     webApp.requestFullscreen?.()
     webApp.disableVerticalSwipes?.()
-    webApp.setHeaderColor?.(view === 'client' ? '#f3edf7' : '#f7f2ef')
-    webApp.setBackgroundColor?.(view === 'client' ? '#f3edf7' : '#f7f2ef')
+    const isClient = view === 'client'
+    webApp.setHeaderColor?.(isClient ? '#f3edf7' : '#f7f2ef')
+    webApp.setBackgroundColor?.(isClient ? '#f3edf7' : '#f7f2ef')
   }, [view])
 
   useEffect(() => {
@@ -697,7 +777,26 @@ function App() {
     return <ClientScreen />
   }
 
-  return <StartScreen onClient={() => setView('client')} />
+  if (view === 'address') {
+    return (
+      <AddressScreen
+        role={role}
+        address={address}
+        onAddressChange={setAddress}
+        onBack={() => setView('start')}
+        onContinue={() => setView('client')}
+      />
+    )
+  }
+
+  return (
+    <StartScreen
+      onRoleSelect={(nextRole) => {
+        setRole(nextRole)
+        setView('address')
+      }}
+    />
+  )
 }
 
 export default App
