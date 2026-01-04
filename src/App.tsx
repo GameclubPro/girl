@@ -714,6 +714,30 @@ function App() {
     webApp.setBackgroundColor?.(view === 'client' ? '#f3edf7' : '#f7f2ef')
   }, [view])
 
+  useEffect(() => {
+    const webApp = window.Telegram?.WebApp
+    if (!webApp) return
+
+    const root = document.documentElement
+    const updateSafeArea = () => {
+      const safe = webApp.safeAreaInset
+      const content = webApp.contentSafeAreaInset
+      root.style.setProperty('--tg-safe-top-js', `${safe?.top ?? 0}px`)
+      root.style.setProperty('--tg-content-safe-top-js', `${content?.top ?? 0}px`)
+    }
+
+    updateSafeArea()
+    webApp.onEvent?.('safeAreaChanged', updateSafeArea)
+    webApp.onEvent?.('contentSafeAreaChanged', updateSafeArea)
+    webApp.onEvent?.('viewportChanged', updateSafeArea)
+
+    return () => {
+      webApp.offEvent?.('safeAreaChanged', updateSafeArea)
+      webApp.offEvent?.('contentSafeAreaChanged', updateSafeArea)
+      webApp.offEvent?.('viewportChanged', updateSafeArea)
+    }
+  }, [])
+
   if (view === 'client') {
     return <ClientScreen />
   }

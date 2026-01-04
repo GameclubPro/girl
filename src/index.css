@@ -12,7 +12,11 @@
   --safe-top: max(
     env(safe-area-inset-top, 0px),
     var(--tg-safe-area-inset-top, 0px),
-    var(--tg-viewport-safe-area-inset-top, 0px)
+    var(--tg-viewport-safe-area-inset-top, 0px),
+    var(--tg-content-safe-area-inset-top, 0px),
+    var(--tg-viewport-content-safe-area-inset-top, 0px),
+    var(--tg-safe-top-js, 0px),
+    var(--tg-content-safe-top-js, 0px)
   );
   --tg-top-offset: 12px;
   color: var(--ink);
