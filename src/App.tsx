@@ -198,10 +198,10 @@ const loopedCollectionItems = [
 ]
 
 const popularItems = [
-  { id: 'nails', image: popularNails, label: 'Маникюр' },
-  { id: 'brows', image: popularBrowsLashes, label: 'Брови и ресницы' },
-  { id: 'cleaning', image: popularCleaning, label: 'Клининг' },
-  { id: 'nanny', image: popularNanny, label: 'Няня' },
+  { id: 'manicure', image: popularNails, label: 'Маникюр' },
+  { id: 'lash-extensions', image: popularBrowsLashes, label: 'Наращивание ресниц' },
+  { id: 'brow-shaping', image: popularCleaning, label: 'Оформление бровей' },
+  { id: 'haircut', image: popularNanny, label: 'Стрижка' },
 ] as const
 
 const categoryItems = [
