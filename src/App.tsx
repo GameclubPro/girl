@@ -537,21 +537,15 @@ const ClientScreen = () => (
         Привет, Екатерина <span aria-hidden="true">👋</span>
       </p>
 
-      <div className="search-bar">
-        <span className="search-icon" aria-hidden="true">
-          <IconSearch />
-        </span>
-        <input
-          className="search-input"
-          type="text"
-          placeholder="Например: маникюр, уборка, няня..."
-          aria-label="Поиск услуг"
-        />
-        <span className="search-divider" aria-hidden="true" />
-        <button className="filter-button" type="button" aria-label="Фильтры">
-          <IconFilter />
-        </button>
-      </div>
+      <section className="client-section">
+        <div className="section-header section-header--action">
+          <h3>Подборки для вас</h3>
+          <button className="section-action" type="button" aria-label="Все подборки">
+            ›
+          </button>
+        </div>
+        <CollectionCarousel />
+      </section>
 
       <div className="cta-row">
         <button className="cta cta--primary" type="button">
@@ -600,15 +594,21 @@ const ClientScreen = () => (
         </div>
       </section>
 
-      <section className="client-section">
-        <div className="section-header section-header--action">
-          <h3>Подборки для вас</h3>
-          <button className="section-action" type="button" aria-label="Все подборки">
-            ›
-          </button>
-        </div>
-        <CollectionCarousel />
-      </section>
+      <div className="search-bar">
+        <span className="search-icon" aria-hidden="true">
+          <IconSearch />
+        </span>
+        <input
+          className="search-input"
+          type="text"
+          placeholder="Например: маникюр, уборка, няня..."
+          aria-label="Поиск услуг"
+        />
+        <span className="search-divider" aria-hidden="true" />
+        <button className="filter-button" type="button" aria-label="Фильтры">
+          <IconFilter />
+        </button>
+      </div>
 
       <section className="client-section">
         <div className="category-grid">
