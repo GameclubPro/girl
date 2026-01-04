@@ -61,18 +61,6 @@ const IconSearch = () => (
   </svg>
 )
 
-const IconFilter = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M4 6h16l-6.2 7v4.4l-3.6 1.6V13L4 6Z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
 const IconHome = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -196,6 +184,13 @@ const loopedCollectionItems = [
   ...collectionItems,
   ...collectionItems,
 ]
+
+const popularItems = [
+  { id: 'nails', icon: '💅', label: 'Маникюр' },
+  { id: 'brows', icon: '👁️', label: 'Брови и ресницы' },
+  { id: 'cleaning', icon: '🧼', label: 'Клининг' },
+  { id: 'nanny', icon: '👩‍👧', label: 'Няня' },
+] as const
 
 const StartScreen = ({ onClient }: { onClient: () => void }) => (
   <div className="screen screen--start">
@@ -562,49 +557,24 @@ const ClientScreen = () => (
         <div className="section-header">
           <h3>Популярное сегодня</h3>
         </div>
-        <div className="popular-grid">
-          <button className="popular-card" type="button">
-            <span className="popular-icon" aria-hidden="true">
-              💅
-            </span>
-            Маникюр
-          </button>
-          <button className="popular-card" type="button">
-            <span className="popular-icon" aria-hidden="true">
-              👁️
-            </span>
-            Брови и ресницы
-          </button>
-          <button className="popular-card" type="button">
-            <span className="popular-icon" aria-hidden="true">
-              🧼
-            </span>
-            Клининг
-          </button>
-          <button className="popular-card" type="button">
-            <span className="popular-icon" aria-hidden="true">
-              👩‍👧
-            </span>
-            Няня
-          </button>
+        <div className="popular-carousel" role="region" aria-label="Популярное сегодня">
+          <div className="popular-track" role="list">
+            {popularItems.map((item) => (
+              <button
+                className="popular-card"
+                type="button"
+                key={item.id}
+                role="listitem"
+              >
+                <span className="popular-icon" aria-hidden="true">
+                  {item.icon}
+                </span>
+                <span className="popular-label">{item.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
-
-      <div className="search-bar">
-        <span className="search-icon" aria-hidden="true">
-          <IconSearch />
-        </span>
-        <input
-          className="search-input"
-          type="text"
-          placeholder="Например: маникюр, уборка, няня..."
-          aria-label="Поиск услуг"
-        />
-        <span className="search-divider" aria-hidden="true" />
-        <button className="filter-button" type="button" aria-label="Фильтры">
-          <IconFilter />
-        </button>
-      </div>
 
       <section className="client-section">
         <div className="category-grid">

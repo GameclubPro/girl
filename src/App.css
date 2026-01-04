@@ -329,66 +329,6 @@ h2 {
   flex: 1;
 }
 
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid #e5d8f0;
-  border-radius: 18px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-.search-icon {
-  width: 20px;
-  height: 20px;
-  color: #8b67d3;
-}
-
-.search-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.search-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  color: #3a2f3d;
-  outline: none;
-}
-
-.search-input::placeholder {
-  color: #8f7f8f;
-}
-
-.search-divider {
-  width: 1px;
-  height: 24px;
-  background: #e3d7ef;
-}
-
-.filter-button {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  border: none;
-  background: #f1e8fb;
-  color: #7b52c8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 6px 12px rgba(116, 89, 155, 0.18);
-}
-
-.filter-button svg {
-  width: 18px;
-  height: 18px;
-}
-
 .cta-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -482,17 +422,31 @@ h2 {
   cursor: pointer;
 }
 
-.popular-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.popular-carousel {
+  width: 100%;
+}
+
+.popular-track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 6px 2px 10px;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.popular-track::-webkit-scrollbar {
+  display: none;
 }
 
 .popular-card {
+  flex: 0 0 clamp(120px, 32vw, 160px);
   border: 1px solid #eadff2;
   background: rgba(255, 255, 255, 0.75);
   border-radius: 18px;
-  padding: 12px 8px 10px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -500,8 +454,11 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   color: #2f2731;
+  text-align: center;
+  min-height: 104px;
   box-shadow: 0 10px 16px rgba(93, 73, 119, 0.16);
   cursor: pointer;
+  scroll-snap-align: start;
 }
 
 .popular-icon {
@@ -513,6 +470,10 @@ h2 {
   align-items: center;
   justify-content: center;
   font-size: 22px;
+}
+
+.popular-label {
+  line-height: 1.2;
 }
 
 .collection-carousel {
@@ -800,8 +761,8 @@ h2 {
     font-size: 17px;
   }
 
-  .popular-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .popular-track {
+    padding: 6px 10px 10px;
   }
 
   .collection-track {
