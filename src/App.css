@@ -147,6 +147,43 @@
   cursor: not-allowed;
 }
 
+.address-suggest {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.suggest-item {
+  border: 1px solid rgba(98, 86, 78, 0.14);
+  background: #ffffff;
+  color: #2f2926;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 12px;
+  box-shadow: 0 6px 12px rgba(74, 60, 55, 0.1);
+  cursor: pointer;
+}
+
+.suggest-item.is-active {
+  border-color: rgba(143, 98, 228, 0.4);
+  color: #6f52ba;
+  background: rgba(230, 218, 250, 0.7);
+}
+
+.suggest-item:focus-visible {
+  outline: 2px solid rgba(143, 98, 228, 0.4);
+  outline-offset: 2px;
+}
+
+.suggest-empty {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a6f6a;
+  padding-left: 2px;
+}
+
 .address-helper {
   margin: 0;
   font-size: 12px;

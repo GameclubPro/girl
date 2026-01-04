@@ -299,11 +299,13 @@ const AddressScreen = ({
   districts,
   cityId,
   districtId,
+  cityQuery,
   address,
   isSaving,
   isLoading,
   saveError,
-  onCityChange,
+  onCityQueryChange,
+  onCitySelect,
   onDistrictChange,
   onAddressChange,
   onBack,
@@ -314,21 +316,32 @@ const AddressScreen = ({
   districts: District[]
   cityId: number | null
   districtId: number | null
+  cityQuery: string
   address: string
   isSaving: boolean
   isLoading: boolean
   saveError: string
-  onCityChange: (value: number | null) => void
+  onCityQueryChange: (value: string) => void
+  onCitySelect: (city: City) => void
   onDistrictChange: (value: number | null) => void
   onAddressChange: (value: string) => void
   onBack: () => void
   onContinue: () => void
 }) => {
+  const [isCityFocused, setIsCityFocused] = useState(false)
   const roleLabel = role === 'client' ? 'Заказчик' : 'Исполнительница'
   const hasCity = cityId !== null
   const hasDistrict = districtId !== null
   const hasAddress = address.trim().length > 0
   const canContinue = hasCity && hasDistrict && hasAddress && !isSaving && !isLoading
+  const normalizedQuery = cityQuery.trim().toLowerCase()
+  const filteredCities = normalizedQuery
+    ? cities.filter((city) =>
+        city.name.toLowerCase().includes(normalizedQuery)
+      )
+    : cities
+  const showSuggestions =
+    (isCityFocused || normalizedQuery.length > 0) && cities.length > 0
 
   return (
     <div className="screen screen--address">
@@ -349,27 +362,45 @@ const AddressScreen = ({
 
         <div className="address-card">
           <div className="address-field">
-            <label className="address-label" htmlFor="city-select">
+            <label className="address-label" htmlFor="city-input">
               Город
             </label>
-            <select
-              id="city-select"
-              className="address-select"
-              value={cityId ?? ''}
-              onChange={(event) => {
-                const nextValue = event.target.value
-                const parsedValue = Number(nextValue)
-                onCityChange(Number.isInteger(parsedValue) ? parsedValue : null)
-              }}
+            <input
+              id="city-input"
+              className="address-input"
+              type="text"
+              value={cityQuery}
+              onChange={(event) => onCityQueryChange(event.target.value)}
+              onFocus={() => setIsCityFocused(true)}
+              onBlur={() => setIsCityFocused(false)}
+              placeholder="Начните вводить город"
+              autoComplete="address-level2"
               autoFocus
-            >
-              <option value="">Выберите город</option>
-              {cities.map((city) => (
-                <option key={city.id} value={city.id}>
-                  {city.name}
-                </option>
-              ))}
-            </select>
+            />
+            {showSuggestions && (
+              <div className="address-suggest" role="listbox">
+                {filteredCities.length > 0 ? (
+                  filteredCities.slice(0, 8).map((city) => (
+                    <button
+                      className={`suggest-item${
+                        cityId === city.id ? ' is-active' : ''
+                      }`}
+                      key={city.id}
+                      type="button"
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        onCitySelect(city)
+                        setIsCityFocused(false)
+                      }}
+                    >
+                      {city.name}
+                    </button>
+                  ))
+                ) : (
+                  <span className="suggest-empty">Город не найден</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="address-field">
@@ -835,6 +866,7 @@ function App() {
   const [districts, setDistricts] = useState<District[]>([])
   const [cityId, setCityId] = useState<number | null>(null)
   const [districtId, setDistrictId] = useState<number | null>(null)
+  const [cityQuery, setCityQuery] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const [isLoadingCities, setIsLoadingCities] = useState(false)
@@ -853,16 +885,39 @@ function App() {
     }
   }
 
-  const handleCityChange = (value: number | null) => {
-    setCityId(value)
-    setDistrictId(null)
+  const handleDistrictChange = (value: number | null) => {
+    setDistrictId(value)
     if (saveError) {
       setSaveError('')
     }
   }
 
-  const handleDistrictChange = (value: number | null) => {
-    setDistrictId(value)
+  const handleCityQueryChange = (value: string) => {
+    const trimmedValue = value.trim()
+    const matchedCity = cities.find(
+      (city) => city.name.toLowerCase() === trimmedValue.toLowerCase()
+    )
+
+    setCityQuery(value)
+
+    if (matchedCity) {
+      setCityId(matchedCity.id)
+      if (matchedCity.id !== cityId) {
+        setDistrictId(null)
+      }
+    } else {
+      setCityId(null)
+      setDistrictId(null)
+    }
+    if (saveError) {
+      setSaveError('')
+    }
+  }
+
+  const handleCitySelect = (city: City) => {
+    setCityId(city.id)
+    setCityQuery(city.name)
+    setDistrictId(null)
     if (saveError) {
       setSaveError('')
     }
@@ -1073,6 +1128,13 @@ function App() {
   }, [cityId])
 
   useEffect(() => {
+    if (!cityId) return
+    const city = cities.find((item) => item.id === cityId)
+    if (!city) return
+    setCityQuery((current) => (current.trim() ? current : city.name))
+  }, [cities, cityId])
+
+  useEffect(() => {
     const webApp = window.Telegram?.WebApp
     if (!webApp) return
 
@@ -1108,11 +1170,13 @@ function App() {
         districts={districts}
         cityId={cityId}
         districtId={districtId}
+        cityQuery={cityQuery}
         address={address}
         isSaving={isSaving}
         isLoading={isLoadingAddress || isLoadingCities || isLoadingDistricts}
         saveError={saveError}
-        onCityChange={handleCityChange}
+        onCityQueryChange={handleCityQueryChange}
+        onCitySelect={handleCitySelect}
         onDistrictChange={handleDistrictChange}
         onAddressChange={handleAddressChange}
         onBack={() => setView('start')}
