@@ -201,18 +201,18 @@ const popularItems = [
 ] as const
 
 const categoryItems = [
-  { id: 'beauty-nails', icon: categoryBeautyNails, label: 'Beauty & Nails' },
-  { id: 'brows-lashes', icon: categoryBrowsLashes, label: 'Brows & Lashes' },
-  { id: 'hair', icon: categoryHair, label: 'Hair' },
-  { id: 'makeup-look', icon: categoryMakeupLook, label: 'Makeup & Look' },
+  { id: 'beauty-nails', icon: categoryBeautyNails, label: 'Красота и ногти' },
+  { id: 'brows-lashes', icon: categoryBrowsLashes, label: 'Брови и ресницы' },
+  { id: 'hair', icon: categoryHair, label: 'Волосы' },
+  { id: 'makeup-look', icon: categoryMakeupLook, label: 'Макияж и образ' },
   {
     id: 'cosmetology-care',
     icon: categoryCosmetologyCare,
-    label: 'Cosmetology & Care',
+    label: 'Косметология и уход',
   },
-  { id: 'massage-body', icon: categoryMassageBody, label: 'Massage & Body' },
-  { id: 'fitness-health', icon: categoryFitnessHealth, label: 'Fitness & Health' },
-  { id: 'home-family', icon: categoryHomeFamily, label: 'Home & Family' },
+  { id: 'massage-body', icon: categoryMassageBody, label: 'Массаж и тело' },
+  { id: 'fitness-health', icon: categoryFitnessHealth, label: 'Фитнес и здоровье' },
+  { id: 'home-family', icon: categoryHomeFamily, label: 'Дом и семья' },
 ] as const
 
 const StartScreen = ({ onClient }: { onClient: () => void }) => (

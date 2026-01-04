@@ -636,9 +636,9 @@ h2 {
 }
 
 .category-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
   background: #f0e7fb;
   display: inline-flex;
   align-items: center;
@@ -646,8 +646,8 @@ h2 {
 }
 
 .category-icon-image {
-  width: 18px;
-  height: 18px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
 }
 
