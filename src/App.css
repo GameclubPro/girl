@@ -636,10 +636,10 @@ h2 {
 }
 
 .category-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 20px;
-  background: #f0e7fb;
+  width: 36px;
+  height: 36px;
+  border-radius: 0;
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
