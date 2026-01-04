@@ -464,16 +464,13 @@ h2 {
 .popular-media {
   flex: 2.3 0 0;
   width: 100%;
-  background: #f2ebfa;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent;
 }
 
 .popular-image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
 }
 
