@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import decorImage from './assets/kiven-decor.webp'
 import logoImage from './assets/kiven-logo.webp'
 import girlsImage from './assets/kiven-girls.webp'
@@ -190,6 +190,13 @@ const collectionItems = [
   },
 ] as const
 
+const collectionBaseIndex = collectionItems.length
+const loopedCollectionItems = [
+  ...collectionItems,
+  ...collectionItems,
+  ...collectionItems,
+]
+
 const StartScreen = ({ onClient }: { onClient: () => void }) => (
   <div className="screen screen--start">
     <div className="topbar">
@@ -241,50 +248,59 @@ const CollectionCarousel = () => {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const rafRef = useRef(0)
-  const [activeIndex, setActiveIndex] = useState(0)
+  const setWidthRef = useRef(0)
+  const stepRef = useRef(0)
+  const pauseRef = useRef(false)
 
-  const updateActiveIndex = () => {
+  const measure = useCallback(() => {
+    const cards = cardRefs.current
+    const first = cards[0]
+    const middle = cards[collectionBaseIndex]
+    if (!first || !middle) return
+
+    const middleNext = cards[collectionBaseIndex + 1]
+    setWidthRef.current = middle.offsetLeft - first.offsetLeft
+    stepRef.current = middleNext
+      ? middleNext.offsetLeft - middle.offsetLeft
+      : middle.offsetWidth
+  }, [])
+
+  const centerMiddle = useCallback(() => {
     const track = trackRef.current
-    if (!track) return
+    const middle = cardRefs.current[collectionBaseIndex]
+    if (!track || !middle) return
 
-    const target = track.scrollLeft + track.clientWidth / 2
-    let closestIndex = 0
-    let closestDistance = Number.POSITIVE_INFINITY
+    track.scrollLeft =
+      middle.offsetLeft - (track.clientWidth - middle.offsetWidth) / 2
+  }, [])
 
-    cardRefs.current.forEach((card, index) => {
-      if (!card) return
-      const center = card.offsetLeft + card.offsetWidth / 2
-      const distance = Math.abs(target - center)
-      if (distance < closestDistance) {
-        closestDistance = distance
-        closestIndex = index
-      }
-    })
+  const normalizePosition = useCallback(() => {
+    const track = trackRef.current
+    const setWidth = setWidthRef.current
+    if (!track || !setWidth) return
 
-    setActiveIndex((prev) => (prev === closestIndex ? prev : closestIndex))
-  }
+    if (track.scrollLeft < setWidth * 0.5) {
+      track.scrollLeft += setWidth
+    } else if (track.scrollLeft > setWidth * 1.5) {
+      track.scrollLeft -= setWidth
+    }
+  }, [])
 
   const handleScroll = () => {
     if (rafRef.current) return
     rafRef.current = window.requestAnimationFrame(() => {
       rafRef.current = 0
-      updateActiveIndex()
+      normalizePosition()
     })
   }
 
-  const scrollToIndex = (nextIndex: number) => {
-    const track = trackRef.current
-    const safeIndex = Math.max(0, Math.min(collectionItems.length - 1, nextIndex))
-    const card = cardRefs.current[safeIndex]
-    if (!track || !card) return
-
-    const left = card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
-    track.scrollTo({ left, behavior: 'smooth' })
-  }
-
   useEffect(() => {
-    updateActiveIndex()
-    const handleResize = () => updateActiveIndex()
+    measure()
+    centerMiddle()
+    const handleResize = () => {
+      measure()
+      centerMiddle()
+    }
     window.addEventListener('resize', handleResize)
     return () => {
       if (rafRef.current) {
@@ -292,7 +308,56 @@ const CollectionCarousel = () => {
       }
       window.removeEventListener('resize', handleResize)
     }
-  }, [])
+  }, [centerMiddle, measure])
+
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track) return
+
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    )
+    if (prefersReducedMotion.matches) return
+
+    let resumeTimer = 0
+
+    const pauseAuto = () => {
+      pauseRef.current = true
+      if (resumeTimer) {
+        window.clearTimeout(resumeTimer)
+      }
+      resumeTimer = window.setTimeout(() => {
+        pauseRef.current = false
+      }, 3500)
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (pauseRef.current) return
+      if (!stepRef.current) {
+        measure()
+      }
+      normalizePosition()
+      if (stepRef.current) {
+        track.scrollBy({ left: stepRef.current, behavior: 'smooth' })
+      }
+    }, 3200)
+
+    track.addEventListener('pointerdown', pauseAuto)
+    track.addEventListener('touchstart', pauseAuto, { passive: true })
+    track.addEventListener('wheel', pauseAuto, { passive: true })
+    track.addEventListener('focusin', pauseAuto)
+
+    return () => {
+      window.clearInterval(intervalId)
+      if (resumeTimer) {
+        window.clearTimeout(resumeTimer)
+      }
+      track.removeEventListener('pointerdown', pauseAuto)
+      track.removeEventListener('touchstart', pauseAuto)
+      track.removeEventListener('wheel', pauseAuto)
+      track.removeEventListener('focusin', pauseAuto)
+    }
+  }, [measure, normalizePosition])
 
   return (
     <div
@@ -302,62 +367,37 @@ const CollectionCarousel = () => {
       aria-roledescription="carousel"
     >
       <div className="collection-track" ref={trackRef} onScroll={handleScroll}>
-        {collectionItems.map((item, index) => (
-          <button
-            className={`collection-card collection-card--${item.tone}`}
-            key={item.id}
-            type="button"
-            ref={(element) => {
-              cardRefs.current[index] = element
-            }}
-          >
-            <span className="collection-tag">
-              <span className="collection-badge" aria-hidden="true">
-                {item.badge}
+        {loopedCollectionItems.map((item, index) => {
+          const isPrimary =
+            index >= collectionBaseIndex &&
+            index < collectionBaseIndex + collectionItems.length
+          return (
+            <button
+              className={`collection-card collection-card--${item.tone}`}
+              key={`${item.id}-${index}`}
+              type="button"
+              aria-hidden={!isPrimary}
+              tabIndex={isPrimary ? 0 : -1}
+              ref={(element) => {
+                cardRefs.current[index] = element
+              }}
+            >
+              <span className="collection-tag">
+                <span className="collection-badge" aria-hidden="true">
+                  {item.badge}
+                </span>
+                {item.label}
               </span>
-              {item.label}
-            </span>
-            <span className="collection-body">
-              <span className="collection-title">{item.title}</span>
-              <span className="collection-meta">{item.meta}</span>
-            </span>
-            <span className="collection-cta" aria-hidden="true">
-              Смотреть <span className="collection-cta-arrow">›</span>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <button
-        className="carousel-nav carousel-nav--prev"
-        type="button"
-        aria-label="Предыдущая подборка"
-        onClick={() => scrollToIndex(activeIndex - 1)}
-        disabled={activeIndex === 0}
-      >
-        ‹
-      </button>
-      <button
-        className="carousel-nav carousel-nav--next"
-        type="button"
-        aria-label="Следующая подборка"
-        onClick={() => scrollToIndex(activeIndex + 1)}
-        disabled={activeIndex === collectionItems.length - 1}
-      >
-        ›
-      </button>
-
-      <div className="carousel-dots" role="tablist" aria-label="Переключение подборок">
-        {collectionItems.map((item, index) => (
-          <button
-            key={item.id}
-            className={`carousel-dot${index === activeIndex ? ' is-active' : ''}`}
-            type="button"
-            aria-label={`Подборка: ${item.title}`}
-            aria-current={index === activeIndex ? 'true' : undefined}
-            onClick={() => scrollToIndex(index)}
-          />
-        ))}
+              <span className="collection-body">
+                <span className="collection-title">{item.title}</span>
+                <span className="collection-meta">{item.meta}</span>
+              </span>
+              <span className="collection-cta" aria-hidden="true">
+                Смотреть <span className="collection-cta-arrow">›</span>
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
