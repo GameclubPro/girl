@@ -113,6 +113,31 @@
   gap: 12px;
 }
 
+.address-detail-card {
+  gap: 10px;
+}
+
+.address-helper {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a6f6a;
+}
+
+.address-status {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a6f6a;
+}
+
+.address-error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b44b4b;
+}
+
 .city-chips {
   display: flex;
   flex-wrap: wrap;
