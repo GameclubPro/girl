@@ -224,8 +224,6 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
-const getTelegramUserId = () =>
-  getTelegramUser()?.id?.toString() ?? 'local-dev'
 
 type City = {
   id: number
