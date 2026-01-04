@@ -9,13 +9,13 @@
 
 .screen--start {
   background: linear-gradient(180deg, #ffffff 0%, #f6eee9 100%);
-  padding: calc(18px + env(safe-area-inset-top)) 22px
+  padding: calc(18px + var(--safe-top)) 22px
     calc(30px + env(safe-area-inset-bottom));
 }
 
 .screen--client {
   background: radial-gradient(120% 140% at 50% -10%, #ffffff 0%, #f4eef8 50%, #efe7f4 100%);
-  padding: calc(20px + env(safe-area-inset-top)) 18px
+  padding: calc(20px + var(--safe-top)) 18px
     calc(120px + env(safe-area-inset-bottom));
 }
 

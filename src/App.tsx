@@ -295,20 +295,43 @@ const CollectionCarousel = () => {
   }
 
   useEffect(() => {
-    measure()
-    centerMiddle()
-    const handleResize = () => {
+    let cancelled = false
+
+    const applyLayout = () => {
+      if (cancelled) return
       measure()
       centerMiddle()
+      normalizePosition()
+    }
+
+    const scheduleLayout = () => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(applyLayout)
+      })
+    }
+
+    scheduleLayout()
+
+    const handleResize = () => {
+      scheduleLayout()
     }
     window.addEventListener('resize', handleResize)
+
+    const fontsReady = document.fonts?.ready
+    if (fontsReady) {
+      fontsReady.then(() => {
+        scheduleLayout()
+      })
+    }
+
     return () => {
+      cancelled = true
       if (rafRef.current) {
         window.cancelAnimationFrame(rafRef.current)
       }
       window.removeEventListener('resize', handleResize)
     }
-  }, [centerMiddle, measure])
+  }, [centerMiddle, measure, normalizePosition])
 
   useEffect(() => {
     const track = trackRef.current
@@ -320,8 +343,32 @@ const CollectionCarousel = () => {
     if (prefersReducedMotion.matches) return
 
     let resumeTimer = 0
+    let startTimer = 0
+    let intervalId = 0
+    let autoStarted = false
+
+    const startAuto = () => {
+      if (autoStarted) return
+      autoStarted = true
+      measure()
+      centerMiddle()
+      normalizePosition()
+      pauseRef.current = false
+      intervalId = window.setInterval(() => {
+        if (pauseRef.current) return
+        if (!stepRef.current) {
+          measure()
+          centerMiddle()
+        }
+        normalizePosition()
+        if (stepRef.current) {
+          track.scrollBy({ left: stepRef.current, behavior: 'smooth' })
+        }
+      }, 3200)
+    }
 
     const pauseAuto = () => {
+      if (!autoStarted) return
       pauseRef.current = true
       if (resumeTimer) {
         window.clearTimeout(resumeTimer)
@@ -331,16 +378,8 @@ const CollectionCarousel = () => {
       }, 3500)
     }
 
-    const intervalId = window.setInterval(() => {
-      if (pauseRef.current) return
-      if (!stepRef.current) {
-        measure()
-      }
-      normalizePosition()
-      if (stepRef.current) {
-        track.scrollBy({ left: stepRef.current, behavior: 'smooth' })
-      }
-    }, 3200)
+    pauseRef.current = true
+    startTimer = window.setTimeout(startAuto, 1400)
 
     track.addEventListener('pointerdown', pauseAuto)
     track.addEventListener('touchstart', pauseAuto, { passive: true })
@@ -348,7 +387,12 @@ const CollectionCarousel = () => {
     track.addEventListener('focusin', pauseAuto)
 
     return () => {
-      window.clearInterval(intervalId)
+      if (startTimer) {
+        window.clearTimeout(startTimer)
+      }
+      if (intervalId) {
+        window.clearInterval(intervalId)
+      }
       if (resumeTimer) {
         window.clearTimeout(resumeTimer)
       }
@@ -357,7 +401,7 @@ const CollectionCarousel = () => {
       track.removeEventListener('wheel', pauseAuto)
       track.removeEventListener('focusin', pauseAuto)
     }
-  }, [measure, normalizePosition])
+  }, [centerMiddle, measure, normalizePosition])
 
   return (
     <div

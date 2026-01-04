@@ -9,6 +9,11 @@
   --paper: #fff7f2;
   --lavender: #d8c7ff;
   --sun: #ffd26a;
+  --safe-top: max(
+    env(safe-area-inset-top, 0px),
+    var(--tg-safe-area-inset-top, 0px),
+    var(--tg-viewport-safe-area-inset-top, 0px)
+  );
   color: var(--ink);
   background-color: var(--cream);
   color-scheme: light;
