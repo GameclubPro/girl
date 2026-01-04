@@ -4,6 +4,14 @@ import logoImage from './assets/kiven-logo.webp'
 import girlsImage from './assets/kiven-girls.webp'
 import pinLeftImage from './assets/kiven-pin-left.webp'
 import pinRightImage from './assets/kiven-pin-right.webp'
+import categoryBeautyNails from './assets/categories/beauty-nails.webp'
+import categoryBrowsLashes from './assets/categories/brows-lashes.webp'
+import categoryHair from './assets/categories/hair.webp'
+import categoryMakeupLook from './assets/categories/makeup-look.webp'
+import categoryCosmetologyCare from './assets/categories/cosmetology-care.webp'
+import categoryMassageBody from './assets/categories/massage-body.webp'
+import categoryFitnessHealth from './assets/categories/fitness-health.webp'
+import categoryHomeFamily from './assets/categories/home-family.webp'
 import './App.css'
 
 const StarPin = ({ tone }: { tone: 'lavender' | 'sun' }) => {
@@ -190,6 +198,21 @@ const popularItems = [
   { id: 'brows', icon: '👁️', label: 'Брови и ресницы' },
   { id: 'cleaning', icon: '🧼', label: 'Клининг' },
   { id: 'nanny', icon: '👩‍👧', label: 'Няня' },
+] as const
+
+const categoryItems = [
+  { id: 'beauty-nails', icon: categoryBeautyNails, label: 'Beauty & Nails' },
+  { id: 'brows-lashes', icon: categoryBrowsLashes, label: 'Brows & Lashes' },
+  { id: 'hair', icon: categoryHair, label: 'Hair' },
+  { id: 'makeup-look', icon: categoryMakeupLook, label: 'Makeup & Look' },
+  {
+    id: 'cosmetology-care',
+    icon: categoryCosmetologyCare,
+    label: 'Cosmetology & Care',
+  },
+  { id: 'massage-body', icon: categoryMassageBody, label: 'Massage & Body' },
+  { id: 'fitness-health', icon: categoryFitnessHealth, label: 'Fitness & Health' },
+  { id: 'home-family', icon: categoryHomeFamily, label: 'Home & Family' },
 ] as const
 
 const StartScreen = ({ onClient }: { onClient: () => void }) => (
@@ -578,78 +601,22 @@ const ClientScreen = () => (
 
       <section className="client-section">
         <div className="category-grid">
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                💅
+          {categoryItems.map((item) => (
+            <button className="category-card" type="button" key={item.id}>
+              <span className="category-left">
+                <span className="category-icon" aria-hidden="true">
+                  <img
+                    className="category-icon-image"
+                    src={item.icon}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                </span>
+                {item.label}
               </span>
-              Красота и ногти
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                👁️
-              </span>
-              Брови и ресницы
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                💇‍♀️
-              </span>
-              Волосы
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                💄
-              </span>
-              Макияж и образ
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                🧴
-              </span>
-              Косметология и уход
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                💆‍♀️
-              </span>
-              Массаж и тело
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                🧘‍♀️
-              </span>
-              Фитнес и здоровье
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                🏠
-              </span>
-              Дом и семья
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
+              <span className="category-arrow">›</span>
+            </button>
+          ))}
         </div>
       </section>
     </div>
