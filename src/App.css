@@ -15,7 +15,8 @@
 
 .screen--client {
   background: radial-gradient(120% 140% at 50% -10%, #ffffff 0%, #f4eef8 50%, #efe7f4 100%);
-  padding: calc(20px + var(--safe-top)) 18px
+  --client-pad-x: 18px;
+  padding: calc(20px + var(--safe-top)) var(--client-pad-x)
     calc(120px + env(safe-area-inset-bottom));
 }
 
@@ -505,6 +506,8 @@ h2 {
 
 .collection-carousel {
   position: relative;
+  width: 100vw;
+  margin: 0 calc(50% - 50vw);
 }
 
 .collection-track {
@@ -512,7 +515,7 @@ h2 {
   gap: 14px;
   overflow-x: auto;
   padding: 6px 18px 12px;
-  margin: 0 -6px;
+  margin: 0;
   scroll-snap-type: x mandatory;
   scroll-padding: 18px;
   -webkit-overflow-scrolling: touch;
