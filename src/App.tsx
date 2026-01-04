@@ -341,7 +341,7 @@ const AddressScreen = ({
       )
     : cities
   const showSuggestions =
-    (isCityFocused || normalizedQuery.length > 0) && cities.length > 0
+    isCityFocused && normalizedQuery.length >= 2 && cities.length > 0
 
   return (
     <div className="screen screen--address">
