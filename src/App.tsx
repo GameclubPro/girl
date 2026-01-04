@@ -226,6 +226,17 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
 const getTelegramUserId = () =>
   window.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString() ?? 'local-dev'
 
+type City = {
+  id: number
+  name: string
+}
+
+type District = {
+  id: number
+  cityId: number
+  name: string
+}
+
 type Role = 'client' | 'pro'
 
 const StartScreen = ({
@@ -285,26 +296,40 @@ const StartScreen = ({
 
 const AddressScreen = ({
   role,
+  cities,
+  districts,
+  cityId,
+  districtId,
   address,
   isSaving,
   isLoading,
   saveError,
+  onCityChange,
+  onDistrictChange,
   onAddressChange,
   onBack,
   onContinue,
 }: {
   role: Role
+  cities: City[]
+  districts: District[]
+  cityId: number | null
+  districtId: number | null
   address: string
   isSaving: boolean
   isLoading: boolean
   saveError: string
+  onCityChange: (value: number | null) => void
+  onDistrictChange: (value: number | null) => void
   onAddressChange: (value: string) => void
   onBack: () => void
   onContinue: () => void
 }) => {
   const roleLabel = role === 'client' ? 'Заказчик' : 'Исполнительница'
+  const hasCity = cityId !== null
+  const hasDistrict = districtId !== null
   const hasAddress = address.trim().length > 0
-  const canContinue = hasAddress && !isSaving && !isLoading
+  const canContinue = hasCity && hasDistrict && hasAddress && !isSaving && !isLoading
 
   return (
     <div className="screen screen--address">
@@ -319,11 +344,63 @@ const AddressScreen = ({
 
         <h2 className="address-title">Ваш адрес</h2>
         <p className="address-subtitle">
-          Укажите точный адрес — мы сохраним его в вашем профиле.
+          Выберите город и район, затем укажите точный адрес для сохранения.
         </p>
-        {isLoading && (
-          <p className="address-status">Загружаем сохраненный адрес...</p>
-        )}
+        {isLoading && <p className="address-status">Загружаем данные...</p>}
+
+        <div className="address-card">
+          <div className="address-field">
+            <label className="address-label" htmlFor="city-select">
+              Город
+            </label>
+            <select
+              id="city-select"
+              className="address-select"
+              value={cityId ?? ''}
+              onChange={(event) => {
+                const nextValue = event.target.value
+                const parsedValue = Number(nextValue)
+                onCityChange(Number.isInteger(parsedValue) ? parsedValue : null)
+              }}
+              autoFocus
+            >
+              <option value="">Выберите город</option>
+              {cities.map((city) => (
+                <option key={city.id} value={city.id}>
+                  {city.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="address-field">
+            <label className="address-label" htmlFor="district-select">
+              Район
+            </label>
+            <select
+              id="district-select"
+              className="address-select"
+              value={districtId ?? ''}
+              onChange={(event) => {
+                const nextValue = event.target.value
+                const parsedValue = Number(nextValue)
+                onDistrictChange(
+                  Number.isInteger(parsedValue) ? parsedValue : null
+                )
+              }}
+              disabled={!hasCity || districts.length === 0}
+            >
+              <option value="">
+                {hasCity ? 'Выберите район' : 'Сначала выберите город'}
+              </option>
+              {districts.map((district) => (
+                <option key={district.id} value={district.id}>
+                  {district.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <div className="address-card">
           <label className="address-label" htmlFor="address-input">
@@ -335,9 +412,8 @@ const AddressScreen = ({
             type="text"
             value={address}
             onChange={(event) => onAddressChange(event.target.value)}
-            placeholder="Город, улица, дом, квартира"
+            placeholder="Улица, дом, квартира"
             autoComplete="street-address"
-            autoFocus
           />
           <p className="address-helper">Нужен точный адрес для выезда.</p>
         </div>
@@ -754,8 +830,14 @@ function App() {
   const [role, setRole] = useState<Role>('client')
   const [address, setAddress] = useState('')
   const [userId] = useState(() => getTelegramUserId())
+  const [cities, setCities] = useState<City[]>([])
+  const [districts, setDistricts] = useState<District[]>([])
+  const [cityId, setCityId] = useState<number | null>(null)
+  const [districtId, setDistrictId] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
+  const [isLoadingCities, setIsLoadingCities] = useState(false)
+  const [isLoadingDistricts, setIsLoadingDistricts] = useState(false)
   const [saveError, setSaveError] = useState('')
 
   const handleAddressChange = (value: string) => {
@@ -765,9 +847,24 @@ function App() {
     }
   }
 
+  const handleCityChange = (value: number | null) => {
+    setCityId(value)
+    setDistrictId(null)
+    if (saveError) {
+      setSaveError('')
+    }
+  }
+
+  const handleDistrictChange = (value: number | null) => {
+    setDistrictId(value)
+    if (saveError) {
+      setSaveError('')
+    }
+  }
+
   const handleSaveAddress = useCallback(async () => {
-    if (!address.trim()) {
-      setSaveError('Укажите адрес.')
+    if (!cityId || !districtId || !address.trim()) {
+      setSaveError('Укажите город, район и адрес.')
       return
     }
 
@@ -780,6 +877,8 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
+          cityId,
+          districtId,
           address: address.trim(),
         }),
       })
@@ -794,7 +893,7 @@ function App() {
     } finally {
       setIsSaving(false)
     }
-  }, [address, userId])
+  }, [address, cityId, districtId, userId])
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp
@@ -814,6 +913,34 @@ function App() {
     if (!userId) return
     let cancelled = false
 
+    const loadCities = async () => {
+      setIsLoadingCities(true)
+      setSaveError('')
+
+      try {
+        const response = await fetch(`${apiBase}/api/cities`)
+        if (!response.ok) {
+          throw new Error('Load cities failed')
+        }
+        const data = (await response.json()) as City[]
+
+        if (cancelled) return
+
+        setCities(data)
+        if (data.length === 1) {
+          setCityId((current) => current ?? data[0].id)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSaveError('Не удалось загрузить города.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingCities(false)
+        }
+      }
+    }
+
     const loadAddress = async () => {
       setIsLoadingAddress(true)
       setSaveError('')
@@ -832,12 +959,20 @@ function App() {
 
         const data = (await response.json()) as {
           address?: string | null
+          cityId?: number | null
+          districtId?: number | null
         }
 
         if (cancelled) return
 
         if (typeof data.address === 'string') {
           setAddress(data.address)
+        }
+        if (typeof data.cityId === 'number') {
+          setCityId(data.cityId)
+        }
+        if (typeof data.districtId === 'number') {
+          setDistrictId(data.districtId)
         }
       } catch (error) {
         if (!cancelled) {
@@ -850,12 +985,56 @@ function App() {
       }
     }
 
+    loadCities()
     loadAddress()
 
     return () => {
       cancelled = true
     }
   }, [userId, view])
+
+  useEffect(() => {
+    if (!cityId) {
+      setDistricts([])
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingDistricts(true)
+    setSaveError('')
+
+    const loadDistricts = async () => {
+      try {
+        const response = await fetch(`${apiBase}/api/cities/${cityId}/districts`)
+        if (!response.ok) {
+          throw new Error('Load districts failed')
+        }
+        const data = (await response.json()) as District[]
+        if (!cancelled) {
+          setDistricts(data)
+          setDistrictId((current) =>
+            current && data.some((district) => district.id === current)
+              ? current
+              : null
+          )
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSaveError('Не удалось загрузить районы.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDistricts(false)
+        }
+      }
+    }
+
+    loadDistricts()
+
+    return () => {
+      cancelled = true
+    }
+  }, [cityId])
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp
@@ -889,10 +1068,16 @@ function App() {
     return (
       <AddressScreen
         role={role}
+        cities={cities}
+        districts={districts}
+        cityId={cityId}
+        districtId={districtId}
         address={address}
         isSaving={isSaving}
-        isLoading={isLoadingAddress}
+        isLoading={isLoadingAddress || isLoadingCities || isLoadingDistricts}
         saveError={saveError}
+        onCityChange={handleCityChange}
+        onDistrictChange={handleDistrictChange}
         onAddressChange={handleAddressChange}
         onBack={() => setView('start')}
         onContinue={handleSaveAddress}

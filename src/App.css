@@ -109,6 +109,44 @@
   box-shadow: 0 12px 20px rgba(63, 48, 44, 0.14);
 }
 
+.address-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.address-select {
+  width: 100%;
+  border: 1px solid rgba(98, 86, 78, 0.18);
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px 38px 12px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #2f2926;
+  outline: none;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(96, 86, 80, 0.7) 50%),
+    linear-gradient(135deg, rgba(96, 86, 80, 0.7) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.address-select:focus {
+  border-color: #b391e8;
+  box-shadow: 0 0 0 3px rgba(179, 145, 232, 0.22);
+}
+
+.address-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .address-helper {
   margin: 0;
   font-size: 12px;
