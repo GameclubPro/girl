@@ -219,18 +219,6 @@ const categoryItems = [
   { id: 'home-family', icon: categoryHomeFamily, label: 'Дом и семья' },
 ] as const
 
-const cityOptions = [
-  { id: 'moscow', label: 'Москва' },
-  { id: 'spb', label: 'Санкт-Петербург' },
-  { id: 'kazan', label: 'Казань' },
-  { id: 'sochi', label: 'Сочи' },
-  { id: 'ekb', label: 'Екатеринбург' },
-] as const
-
-const radiusPresets = [2, 5, 8, 12, 20] as const
-const defaultRadiusKm = 5
-
-const normalizeText = (value: string) => value.trim().toLowerCase()
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(
   /\/$/,
   ''
@@ -295,40 +283,28 @@ const StartScreen = ({
   </div>
 )
 
-const LocationScreen = ({
+const AddressScreen = ({
   role,
-  city,
   address,
-  radiusKm,
   isSaving,
   isLoading,
   saveError,
-  onCityChange,
   onAddressChange,
-  onRadiusChange,
   onBack,
   onContinue,
-  onSkip,
 }: {
   role: Role
-  city: string
   address: string
-  radiusKm: number
   isSaving: boolean
   isLoading: boolean
   saveError: string
-  onCityChange: (value: string) => void
   onAddressChange: (value: string) => void
-  onRadiusChange: (value: number) => void
   onBack: () => void
   onContinue: () => void
-  onSkip: () => void
 }) => {
   const roleLabel = role === 'client' ? 'Заказчик' : 'Исполнительница'
-  const normalizedCity = normalizeText(city)
-  const hasCity = normalizedCity.length > 0
   const hasAddress = address.trim().length > 0
-  const canContinue = hasCity && hasAddress && !isSaving && !isLoading
+  const canContinue = hasAddress && !isSaving && !isLoading
 
   return (
     <div className="screen screen--address">
@@ -341,47 +317,15 @@ const LocationScreen = ({
           <span className="address-role">{roleLabel}</span>
         </div>
 
-        <h2 className="address-title">Город и адрес</h2>
+        <h2 className="address-title">Ваш адрес</h2>
         <p className="address-subtitle">
-          Укажите город и точный адрес — мы сохраним их для подбора мастеров рядом.
+          Укажите точный адрес — мы сохраним его в вашем профиле.
         </p>
         {isLoading && (
           <p className="address-status">Загружаем сохраненный адрес...</p>
         )}
 
-        <div className="address-card location-card">
-          <label className="address-label" htmlFor="city-input">
-            Город
-          </label>
-          <input
-            id="city-input"
-            className="address-input"
-            type="text"
-            value={city}
-            onChange={(event) => onCityChange(event.target.value)}
-            placeholder="Москва, Казань, Сочи"
-            autoComplete="address-level2"
-            autoFocus
-          />
-          <div className="city-chips">
-            {cityOptions.map((option) => {
-              const isActive =
-                normalizeText(option.label) === normalizedCity
-              return (
-                <button
-                  className={`city-chip${isActive ? ' is-active' : ''}`}
-                  key={option.id}
-                  type="button"
-                  onClick={() => onCityChange(option.label)}
-                >
-                  {option.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="address-card address-detail-card">
+        <div className="address-card">
           <label className="address-label" htmlFor="address-input">
             Адрес
           </label>
@@ -391,49 +335,11 @@ const LocationScreen = ({
             type="text"
             value={address}
             onChange={(event) => onAddressChange(event.target.value)}
-            placeholder="Улица, дом, квартира"
+            placeholder="Город, улица, дом, квартира"
             autoComplete="street-address"
+            autoFocus
           />
           <p className="address-helper">Нужен точный адрес для выезда.</p>
-        </div>
-
-        <div className="address-card radius-card">
-          <div className="radius-header">
-            <label className="address-label" htmlFor="radius-input">
-              Радиус
-            </label>
-            <span className="radius-value">{radiusKm} км</span>
-          </div>
-          <input
-            id="radius-input"
-            className="radius-slider"
-            type="range"
-            min={1}
-            max={30}
-            step={1}
-            value={radiusKm}
-            onChange={(event) => onRadiusChange(Number(event.target.value))}
-            disabled={!hasCity}
-          />
-          <div className="radius-chips">
-            {radiusPresets.map((preset) => {
-              const isActive = preset === radiusKm
-              return (
-                <button
-                  className={`radius-chip${isActive ? ' is-active' : ''}`}
-                  key={preset}
-                  type="button"
-                  onClick={() => onRadiusChange(preset)}
-                  disabled={!hasCity}
-                >
-                  {preset} км
-                </button>
-              )
-            })}
-          </div>
-          {!hasCity && (
-            <p className="radius-hint">Сначала выберите город.</p>
-          )}
         </div>
 
         <div className="address-actions">
@@ -443,18 +349,13 @@ const LocationScreen = ({
             onClick={onContinue}
             disabled={!canContinue}
           >
-            {isSaving ? 'Сохраняем...' : 'Продолжить'}
-          </button>
-          <button className="address-secondary" type="button" onClick={onSkip}>
-            Укажу позже
+            {isSaving ? 'Сохраняем...' : 'Сохранить'}
           </button>
         </div>
 
         {saveError && <p className="address-error">{saveError}</p>}
 
-        <p className="address-hint">
-          Город, адрес и радиус можно изменить в профиле позже.
-        </p>
+        <p className="address-hint">Адрес можно изменить в профиле позже.</p>
       </div>
     </div>
   )
@@ -851,20 +752,11 @@ const ClientScreen = () => (
 function App() {
   const [view, setView] = useState<'start' | 'address' | 'client'>('start')
   const [role, setRole] = useState<Role>('client')
-  const [city, setCity] = useState('')
   const [address, setAddress] = useState('')
-  const [radiusKm, setRadiusKm] = useState(defaultRadiusKm)
   const [userId] = useState(() => getTelegramUserId())
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const [saveError, setSaveError] = useState('')
-
-  const handleCityChange = (value: string) => {
-    setCity(value)
-    if (saveError) {
-      setSaveError('')
-    }
-  }
 
   const handleAddressChange = (value: string) => {
     setAddress(value)
@@ -874,8 +766,8 @@ function App() {
   }
 
   const handleSaveAddress = useCallback(async () => {
-    if (!city.trim() || !address.trim()) {
-      setSaveError('Укажите город и адрес.')
+    if (!address.trim()) {
+      setSaveError('Укажите адрес.')
       return
     }
 
@@ -888,9 +780,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          city: city.trim(),
           address: address.trim(),
-          radiusKm,
         }),
       })
 
@@ -904,7 +794,7 @@ function App() {
     } finally {
       setIsSaving(false)
     }
-  }, [address, city, radiusKm, userId])
+  }, [address, userId])
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp
@@ -941,21 +831,13 @@ function App() {
         }
 
         const data = (await response.json()) as {
-          city?: string | null
           address?: string | null
-          radiusKm?: number | null
         }
 
         if (cancelled) return
 
-        if (typeof data.city === 'string') {
-          setCity(data.city)
-        }
         if (typeof data.address === 'string') {
           setAddress(data.address)
-        }
-        if (typeof data.radiusKm === 'number') {
-          setRadiusKm(data.radiusKm)
         }
       } catch (error) {
         if (!cancelled) {
@@ -1005,20 +887,15 @@ function App() {
 
   if (view === 'address') {
     return (
-      <LocationScreen
+      <AddressScreen
         role={role}
-        city={city}
         address={address}
-        radiusKm={radiusKm}
         isSaving={isSaving}
         isLoading={isLoadingAddress}
         saveError={saveError}
-        onCityChange={handleCityChange}
         onAddressChange={handleAddressChange}
-        onRadiusChange={setRadiusKm}
         onBack={() => setView('start')}
         onContinue={handleSaveAddress}
-        onSkip={() => setView('client')}
       />
     )
   }

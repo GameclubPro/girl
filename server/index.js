@@ -36,9 +36,7 @@ const ensureSchema = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_addresses (
       user_id TEXT PRIMARY KEY,
-      city TEXT,
       address TEXT,
-      radius_km INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -62,9 +60,7 @@ app.get('/api/address', async (req, res) => {
       `
         SELECT
           user_id AS "userId",
-          city,
           address,
-          radius_km AS "radiusKm",
           updated_at AS "updatedAt"
         FROM user_addresses
         WHERE user_id = $1
@@ -85,7 +81,7 @@ app.get('/api/address', async (req, res) => {
 })
 
 app.post('/api/address', async (req, res) => {
-  const { userId, city, address, radiusKm } = req.body ?? {}
+  const { userId, address } = req.body ?? {}
   const normalizedUserId = typeof userId === 'string' ? userId.trim() : ''
 
   if (!normalizedUserId) {
@@ -93,30 +89,23 @@ app.post('/api/address', async (req, res) => {
     return
   }
 
-  const normalizedCity = typeof city === 'string' ? city.trim() : ''
   const normalizedAddress = typeof address === 'string' ? address.trim() : ''
-  const parsedRadius = Number(radiusKm)
-  const normalizedRadius = Number.isFinite(parsedRadius)
-    ? Math.round(parsedRadius)
-    : null
+
+  if (!normalizedAddress) {
+    res.status(400).json({ error: 'address_required' })
+    return
+  }
 
   try {
     await pool.query(
       `
-        INSERT INTO user_addresses (user_id, city, address, radius_km)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO user_addresses (user_id, address)
+        VALUES ($1, $2)
         ON CONFLICT (user_id) DO UPDATE
-        SET city = EXCLUDED.city,
-            address = EXCLUDED.address,
-            radius_km = EXCLUDED.radius_km,
+        SET address = EXCLUDED.address,
             updated_at = NOW()
       `,
-      [
-        normalizedUserId,
-        normalizedCity || null,
-        normalizedAddress || null,
-        normalizedRadius,
-      ]
+      [normalizedUserId, normalizedAddress]
     )
 
     res.json({ ok: true })
