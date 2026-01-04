@@ -446,25 +446,24 @@ h2 {
   border: 1px solid #eadff2;
   background: rgba(255, 255, 255, 0.75);
   border-radius: 18px;
-  padding: 10px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   font-size: 12px;
   font-weight: 600;
   color: #2f2731;
   text-align: center;
-  height: clamp(140px, 40vw, 170px);
+  height: clamp(150px, 44vw, 190px);
   box-shadow: 0 10px 16px rgba(93, 73, 119, 0.16);
   cursor: pointer;
   scroll-snap-align: start;
+  overflow: hidden;
 }
 
 .popular-media {
-  flex: 2 0 0;
+  flex: 1 0 50%;
   width: 100%;
-  border-radius: 14px;
-  overflow: hidden;
   background: #f2ebfa;
 }
 
@@ -476,11 +475,11 @@ h2 {
 }
 
 .popular-label {
-  flex: 1 0 0;
+  flex: 1 0 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 2px 0;
+  padding: 12px 10px;
   line-height: 1.2;
 }
 
