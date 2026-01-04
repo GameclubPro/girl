@@ -617,16 +617,61 @@ const ClientScreen = () => (
               <span className="category-icon" aria-hidden="true">
                 💅
               </span>
-              Красота
+              Красота и ногти
             </span>
             <span className="category-arrow">›</span>
           </button>
           <button className="category-card" type="button">
             <span className="category-left">
               <span className="category-icon" aria-hidden="true">
-                🪷
+                👁️
               </span>
-              Здоровье
+              Брови и ресницы
+            </span>
+            <span className="category-arrow">›</span>
+          </button>
+          <button className="category-card" type="button">
+            <span className="category-left">
+              <span className="category-icon" aria-hidden="true">
+                💇‍♀️
+              </span>
+              Волосы
+            </span>
+            <span className="category-arrow">›</span>
+          </button>
+          <button className="category-card" type="button">
+            <span className="category-left">
+              <span className="category-icon" aria-hidden="true">
+                💄
+              </span>
+              Макияж и образ
+            </span>
+            <span className="category-arrow">›</span>
+          </button>
+          <button className="category-card" type="button">
+            <span className="category-left">
+              <span className="category-icon" aria-hidden="true">
+                🧴
+              </span>
+              Косметология и уход
+            </span>
+            <span className="category-arrow">›</span>
+          </button>
+          <button className="category-card" type="button">
+            <span className="category-left">
+              <span className="category-icon" aria-hidden="true">
+                💆‍♀️
+              </span>
+              Массаж и тело
+            </span>
+            <span className="category-arrow">›</span>
+          </button>
+          <button className="category-card" type="button">
+            <span className="category-left">
+              <span className="category-icon" aria-hidden="true">
+                🧘‍♀️
+              </span>
+              Фитнес и здоровье
             </span>
             <span className="category-arrow">›</span>
           </button>
@@ -635,34 +680,7 @@ const ClientScreen = () => (
               <span className="category-icon" aria-hidden="true">
                 🏠
               </span>
-              Дом и уют
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                🧸
-              </span>
-              Дети и семья
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                👗
-              </span>
-              Стиль и медиа
-            </span>
-            <span className="category-arrow">›</span>
-          </button>
-          <button className="category-card" type="button">
-            <span className="category-left">
-              <span className="category-icon" aria-hidden="true">
-                📦
-              </span>
-              Доставка и помощь
+              Дом и семья
             </span>
             <span className="category-arrow">›</span>
           </button>
