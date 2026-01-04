@@ -254,9 +254,11 @@ const CollectionCarousel = () => {
   const readyRef = useRef(false)
   const hasCenteredRef = useRef(false)
   const [isReady, setIsReady] = useState(false)
+  const [fontsReady, setFontsReady] = useState(false)
 
   const measure = useCallback(() => {
     const track = trackRef.current
+    const first = cardRefs.current[0]
     const middle = cardRefs.current[collectionBaseIndex]
     if (!track || !middle) return
 
@@ -264,12 +266,16 @@ const CollectionCarousel = () => {
     const gapValue = trackStyle.columnGap || trackStyle.gap || '0'
     const gap = Number.parseFloat(gapValue) || 0
     const cardWidth = middle.getBoundingClientRect().width
-    const step = cardWidth + gap
+    const middleNext = cardRefs.current[collectionBaseIndex + 1]
+    const offsetStep = middleNext ? middleNext.offsetLeft - middle.offsetLeft : 0
+    const step = offsetStep > 0 ? offsetStep : cardWidth + gap
 
     if (!Number.isFinite(step) || step <= 0) return
 
     stepRef.current = step
-    setWidthRef.current = step * collectionItems.length
+    const offsetSetWidth = first ? middle.offsetLeft - first.offsetLeft : 0
+    setWidthRef.current =
+      offsetSetWidth > 0 ? offsetSetWidth : step * collectionItems.length
   }, [])
 
   const setScrollLeftInstant = useCallback((nextLeft: number) => {
@@ -370,9 +376,37 @@ const CollectionCarousel = () => {
   }, [centerMiddle, markReady, measure, normalizePosition])
 
   useEffect(() => {
+    let cancelled = false
+    let fallbackTimer = 0
+    const readyPromise = document.fonts?.ready
+
+    if (readyPromise) {
+      readyPromise.then(() => {
+        if (!cancelled) {
+          setFontsReady(true)
+        }
+      })
+      fallbackTimer = window.setTimeout(() => {
+        if (!cancelled) {
+          setFontsReady(true)
+        }
+      }, 2000)
+    } else {
+      setFontsReady(true)
+    }
+
+    return () => {
+      cancelled = true
+      if (fallbackTimer) {
+        window.clearTimeout(fallbackTimer)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     const track = trackRef.current
     if (!track) return
-    if (!isReady) return
+    if (!isReady || !fontsReady) return
 
     const prefersReducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -443,7 +477,7 @@ const CollectionCarousel = () => {
       track.removeEventListener('wheel', pauseAuto)
       track.removeEventListener('focusin', pauseAuto)
     }
-  }, [centerMiddle, measure, normalizePosition])
+  }, [measure, normalizePosition, isReady, fontsReady])
 
   return (
     <div
