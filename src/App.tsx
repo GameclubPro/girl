@@ -526,24 +526,16 @@ const CollectionCarousel = () => {
 const ClientScreen = () => (
   <div className="screen screen--client">
     <div className="client-shell">
-      <header className="client-header">
-        <div className="client-brand">KIVEN</div>
+      <div className="client-top">
+        <p className="client-greeting">
+          Привет, Екатерина <span aria-hidden="true">👋</span>
+        </p>
         <button className="bell-button" type="button" aria-label="Уведомления">
           <IconBell />
         </button>
-      </header>
-
-      <p className="client-greeting">
-        Привет, Екатерина <span aria-hidden="true">👋</span>
-      </p>
+      </div>
 
       <section className="client-section">
-        <div className="section-header section-header--action">
-          <h3>Подборки для вас</h3>
-          <button className="section-action" type="button" aria-label="Все подборки">
-            ›
-          </button>
-        </div>
         <CollectionCarousel />
       </section>
 

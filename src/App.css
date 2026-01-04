@@ -16,7 +16,7 @@
 .screen--client {
   background: radial-gradient(120% 140% at 50% -10%, #ffffff 0%, #f4eef8 50%, #efe7f4 100%);
   --client-pad-x: 18px;
-  padding: calc(20px + var(--safe-top) + var(--tg-top-offset)) var(--client-pad-x)
+  padding: calc(12px + var(--safe-top)) var(--client-pad-x)
     calc(120px + env(safe-area-inset-bottom));
 }
 
@@ -277,28 +277,14 @@ h2 {
   gap: 14px;
 }
 
-.client-header {
+.client-top {
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  margin-bottom: 2px;
-}
-
-.client-brand {
-  font-family: var(--font-title);
-  font-size: 26px;
-  letter-spacing: 4px;
-  font-weight: 800;
-  background: linear-gradient(90deg, #8b5de4 0%, #6a41c6 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .bell-button {
-  position: absolute;
-  right: 0;
   width: 36px;
   height: 36px;
   border-radius: 12px;
@@ -309,6 +295,7 @@ h2 {
   justify-content: center;
   color: #b3a3c4;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .bell-button svg {
@@ -321,6 +308,8 @@ h2 {
   font-size: 22px;
   font-weight: 700;
   color: #2f2731;
+  line-height: 1.2;
+  flex: 1;
 }
 
 .search-bar {
