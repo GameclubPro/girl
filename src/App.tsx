@@ -219,6 +219,194 @@ const categoryItems = [
   { id: 'home-family', icon: categoryHomeFamily, label: 'Дом и семья' },
 ] as const
 
+const cityOptions = [
+  { id: 'moscow', label: 'Москва' },
+  { id: 'spb', label: 'Санкт-Петербург' },
+  { id: 'kazan', label: 'Казань' },
+  { id: 'sochi', label: 'Сочи' },
+  { id: 'ekb', label: 'Екатеринбург' },
+] as const
+
+const radiusPresets = [2, 5, 8, 12, 20] as const
+const defaultRadiusKm = 5
+
+type MasterProfile = {
+  id: string
+  name: string
+  city: string
+  specialty: string
+  rating: number
+  reviews: number
+  price: string
+  distanceKm: number
+  tags: string[]
+  status?: string
+  tone: 'lavender' | 'sun' | 'mint' | 'rose' | 'sky'
+}
+
+const masterProfiles: MasterProfile[] = [
+  {
+    id: 'mironova',
+    name: 'Анна Миронова',
+    city: 'Москва',
+    specialty: 'Маникюр и педикюр',
+    rating: 4.9,
+    reviews: 128,
+    price: 'от 1800 ₽',
+    distanceKm: 2.4,
+    tags: ['Маникюр', 'Гель-лак'],
+    status: 'Сегодня',
+    tone: 'lavender',
+  },
+  {
+    id: 'koval',
+    name: 'Мария Коваль',
+    city: 'Москва',
+    specialty: 'Брови и ресницы',
+    rating: 4.8,
+    reviews: 86,
+    price: 'от 1500 ₽',
+    distanceKm: 5.8,
+    tags: ['Ламинирование', 'Архитектура'],
+    status: 'Свободно',
+    tone: 'sun',
+  },
+  {
+    id: 'trifonova',
+    name: 'Елена Трифонова',
+    city: 'Москва',
+    specialty: 'Массаж и тело',
+    rating: 5.0,
+    reviews: 54,
+    price: 'от 2600 ₽',
+    distanceKm: 9.2,
+    tags: ['Релакс', 'Лимфодренаж'],
+    status: 'Выезд',
+    tone: 'mint',
+  },
+  {
+    id: 'lukina',
+    name: 'Дарья Лукина',
+    city: 'Санкт-Петербург',
+    specialty: 'Косметология',
+    rating: 4.7,
+    reviews: 74,
+    price: 'от 2200 ₽',
+    distanceKm: 3.1,
+    tags: ['Уход за лицом', 'Чистка'],
+    status: 'Сегодня',
+    tone: 'rose',
+  },
+  {
+    id: 'isaeva',
+    name: 'Ольга Исаева',
+    city: 'Санкт-Петербург',
+    specialty: 'Макияж и образ',
+    rating: 4.9,
+    reviews: 112,
+    price: 'от 3000 ₽',
+    distanceKm: 6.7,
+    tags: ['Вечерний', 'Свадебный'],
+    status: 'Завтра',
+    tone: 'sky',
+  },
+  {
+    id: 'demina',
+    name: 'София Дёмина',
+    city: 'Казань',
+    specialty: 'Волосы и укладки',
+    rating: 4.8,
+    reviews: 65,
+    price: 'от 1700 ₽',
+    distanceKm: 2.0,
+    tags: ['Стрижка', 'Укладка'],
+    status: 'Сегодня',
+    tone: 'lavender',
+  },
+  {
+    id: 'belova',
+    name: 'Ирина Белова',
+    city: 'Казань',
+    specialty: 'Ногти',
+    rating: 4.9,
+    reviews: 93,
+    price: 'от 1900 ₽',
+    distanceKm: 7.5,
+    tags: ['Гель-лак', 'Дизайн'],
+    status: 'Выезд',
+    tone: 'sun',
+  },
+  {
+    id: 'markova',
+    name: 'Валерия Маркова',
+    city: 'Сочи',
+    specialty: 'Фитнес и здоровье',
+    rating: 4.7,
+    reviews: 48,
+    price: 'от 1400 ₽',
+    distanceKm: 4.3,
+    tags: ['Йога', 'Растяжка'],
+    status: 'Утром',
+    tone: 'mint',
+  },
+  {
+    id: 'safonova',
+    name: 'Наталья Сафонова',
+    city: 'Сочи',
+    specialty: 'Брови и ресницы',
+    rating: 4.9,
+    reviews: 58,
+    price: 'от 1600 ₽',
+    distanceKm: 8.9,
+    tags: ['Ламинирование', 'Окрашивание'],
+    status: 'Сегодня',
+    tone: 'rose',
+  },
+  {
+    id: 'petrova',
+    name: 'Кристина Петрова',
+    city: 'Екатеринбург',
+    specialty: 'Косметология',
+    rating: 4.8,
+    reviews: 71,
+    price: 'от 2100 ₽',
+    distanceKm: 1.4,
+    tags: ['Уход', 'Пилинг'],
+    status: 'Свободно',
+    tone: 'sky',
+  },
+  {
+    id: 'grishina',
+    name: 'Алина Гришина',
+    city: 'Екатеринбург',
+    specialty: 'Дом и семья',
+    rating: 4.6,
+    reviews: 39,
+    price: 'от 1200 ₽',
+    distanceKm: 10.0,
+    tags: ['Няня', 'Сопровождение'],
+    status: 'Сегодня',
+    tone: 'lavender',
+  },
+]
+
+const normalizeText = (value: string) => value.trim().toLowerCase()
+
+const formatDistance = (distanceKm: number) => {
+  const fixed =
+    distanceKm % 1 === 0 ? distanceKm.toFixed(0) : distanceKm.toFixed(1)
+  return `${fixed.replace('.', ',')} км`
+}
+
+const getInitials = (name: string) =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
 type Role = 'client' | 'pro'
 
 const StartScreen = ({
@@ -276,20 +464,38 @@ const StartScreen = ({
   </div>
 )
 
-const AddressScreen = ({
+const LocationScreen = ({
   role,
-  address,
-  onAddressChange,
+  city,
+  radiusKm,
+  onCityChange,
+  onRadiusChange,
   onBack,
   onContinue,
 }: {
   role: Role
-  address: string
-  onAddressChange: (value: string) => void
+  city: string
+  radiusKm: number
+  onCityChange: (value: string) => void
+  onRadiusChange: (value: number) => void
   onBack: () => void
   onContinue: () => void
 }) => {
   const roleLabel = role === 'client' ? 'Заказчик' : 'Исполнительница'
+  const normalizedCity = normalizeText(city)
+  const hasCity = normalizedCity.length > 0
+  const cityLabel =
+    cityOptions.find((option) => normalizeText(option.label) === normalizedCity)
+      ?.label ?? city.trim()
+
+  const mastersInCity = hasCity
+    ? masterProfiles.filter(
+        (master) => normalizeText(master.city) === normalizedCity
+      )
+    : []
+  const filteredMasters = mastersInCity
+    .filter((master) => master.distanceKm <= radiusKm)
+    .sort((a, b) => a.distanceKm - b.distanceKm)
 
   return (
     <div className="screen screen--address">
@@ -302,25 +508,155 @@ const AddressScreen = ({
           <span className="address-role">{roleLabel}</span>
         </div>
 
-        <h2 className="address-title">Где вы находитесь?</h2>
+        <h2 className="address-title">Город и радиус поиска</h2>
         <p className="address-subtitle">
-          Укажите адрес, чтобы мы показывали предложения рядом.
+          Сначала выберите город, затем радиус. Мы покажем анкеты мастеров рядом.
         </p>
 
-        <div className="address-card">
-          <label className="address-label" htmlFor="address-input">
-            Адрес
+        <div className="address-card location-card">
+          <label className="address-label" htmlFor="city-input">
+            Город
           </label>
           <input
-            id="address-input"
+            id="city-input"
             className="address-input"
             type="text"
-            value={address}
-            onChange={(event) => onAddressChange(event.target.value)}
-            placeholder="Город, улица, дом"
-            autoComplete="street-address"
+            value={city}
+            onChange={(event) => onCityChange(event.target.value)}
+            placeholder="Москва, Казань, Сочи"
+            autoComplete="address-level2"
             autoFocus
           />
+          <div className="city-chips">
+            {cityOptions.map((option) => {
+              const isActive =
+                normalizeText(option.label) === normalizedCity
+              return (
+                <button
+                  className={`city-chip${isActive ? ' is-active' : ''}`}
+                  key={option.id}
+                  type="button"
+                  onClick={() => onCityChange(option.label)}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="address-card radius-card">
+          <div className="radius-header">
+            <label className="address-label" htmlFor="radius-input">
+              Радиус
+            </label>
+            <span className="radius-value">{radiusKm} км</span>
+          </div>
+          <input
+            id="radius-input"
+            className="radius-slider"
+            type="range"
+            min={1}
+            max={30}
+            step={1}
+            value={radiusKm}
+            onChange={(event) => onRadiusChange(Number(event.target.value))}
+            disabled={!hasCity}
+          />
+          <div className="radius-chips">
+            {radiusPresets.map((preset) => {
+              const isActive = preset === radiusKm
+              return (
+                <button
+                  className={`radius-chip${isActive ? ' is-active' : ''}`}
+                  key={preset}
+                  type="button"
+                  onClick={() => onRadiusChange(preset)}
+                  disabled={!hasCity}
+                >
+                  {preset} км
+                </button>
+              )
+            })}
+          </div>
+          {!hasCity && (
+            <p className="radius-hint">Сначала выберите город.</p>
+          )}
+        </div>
+
+        <div className="address-card results-card">
+          <div className="results-header">
+            <div>
+              <p className="results-title">Мастера рядом</p>
+              <p className="results-subtitle">
+                {hasCity
+                  ? `${cityLabel} • до ${radiusKm} км`
+                  : 'Выберите город, чтобы увидеть анкеты'}
+              </p>
+            </div>
+            {hasCity && (
+              <span className="results-count">{filteredMasters.length}</span>
+            )}
+          </div>
+
+          {!hasCity && (
+            <div className="results-empty">
+              <p>Сначала выберите город — затем можно задать радиус.</p>
+            </div>
+          )}
+
+          {hasCity && filteredMasters.length === 0 && (
+            <div className="results-empty">
+              <p>В радиусе {radiusKm} км пока нет мастеров.</p>
+              <span>Попробуйте увеличить радиус или выбрать другой город.</span>
+            </div>
+          )}
+
+          {hasCity && filteredMasters.length > 0 && (
+            <div className="results-list">
+              {filteredMasters.map((master) => (
+                <article
+                  className={`master-card master-card--${master.tone}`}
+                  key={master.id}
+                >
+                  <div className="master-avatar" aria-hidden="true">
+                    {getInitials(master.name)}
+                  </div>
+                  <div className="master-info">
+                    <div className="master-top">
+                      <div>
+                        <p className="master-name">{master.name}</p>
+                        <p className="master-specialty">{master.specialty}</p>
+                      </div>
+                      {master.status && (
+                        <span className="master-status">{master.status}</span>
+                      )}
+                    </div>
+                    <div className="master-meta">
+                      <span className="master-rating">
+                        {master.rating} ★
+                      </span>
+                      <span>{master.reviews} отзывов</span>
+                      <span>{formatDistance(master.distanceKm)}</span>
+                    </div>
+                    <div className="master-tags">
+                      {master.tags.map((tag) => (
+                        <span className="master-tag" key={tag}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="master-bottom">
+                      <span className="master-price">{master.price}</span>
+                      <button className="master-cta" type="button">
+                        Анкета <span aria-hidden="true">›</span>
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="address-actions">
@@ -328,7 +664,7 @@ const AddressScreen = ({
             className="address-primary"
             type="button"
             onClick={onContinue}
-            disabled={!address.trim()}
+            disabled={!hasCity}
           >
             Продолжить
           </button>
@@ -337,7 +673,9 @@ const AddressScreen = ({
           </button>
         </div>
 
-        <p className="address-hint">Адрес можно изменить в профиле позже.</p>
+        <p className="address-hint">
+          Город и радиус можно изменить в профиле позже.
+        </p>
       </div>
     </div>
   )
@@ -734,7 +1072,8 @@ const ClientScreen = () => (
 function App() {
   const [view, setView] = useState<'start' | 'address' | 'client'>('start')
   const [role, setRole] = useState<Role>('client')
-  const [address, setAddress] = useState('')
+  const [city, setCity] = useState('')
+  const [radiusKm, setRadiusKm] = useState(defaultRadiusKm)
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp
@@ -779,10 +1118,12 @@ function App() {
 
   if (view === 'address') {
     return (
-      <AddressScreen
+      <LocationScreen
         role={role}
-        address={address}
-        onAddressChange={setAddress}
+        city={city}
+        radiusKm={radiusKm}
+        onCityChange={setCity}
+        onRadiusChange={setRadiusKm}
         onBack={() => setView('start')}
         onContinue={() => setView('client')}
       />
