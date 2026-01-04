@@ -12,6 +12,10 @@ import categoryCosmetologyCare from './assets/categories/cosmetology-care.webp'
 import categoryMassageBody from './assets/categories/massage-body.webp'
 import categoryFitnessHealth from './assets/categories/fitness-health.webp'
 import categoryHomeFamily from './assets/categories/home-family.webp'
+import popularNails from './assets/popular/nails.webp'
+import popularBrowsLashes from './assets/popular/brows-lashes.webp'
+import popularCleaning from './assets/popular/cleaning.webp'
+import popularNanny from './assets/popular/nanny.webp'
 import './App.css'
 
 const StarPin = ({ tone }: { tone: 'lavender' | 'sun' }) => {
@@ -194,10 +198,10 @@ const loopedCollectionItems = [
 ]
 
 const popularItems = [
-  { id: 'nails', icon: '💅', label: 'Маникюр' },
-  { id: 'brows', icon: '👁️', label: 'Брови и ресницы' },
-  { id: 'cleaning', icon: '🧼', label: 'Клининг' },
-  { id: 'nanny', icon: '👩‍👧', label: 'Няня' },
+  { id: 'nails', image: popularNails, label: 'Маникюр' },
+  { id: 'brows', image: popularBrowsLashes, label: 'Брови и ресницы' },
+  { id: 'cleaning', image: popularCleaning, label: 'Клининг' },
+  { id: 'nanny', image: popularNanny, label: 'Няня' },
 ] as const
 
 const categoryItems = [
@@ -589,8 +593,8 @@ const ClientScreen = () => (
                 key={item.id}
                 role="listitem"
               >
-                <span className="popular-icon" aria-hidden="true">
-                  {item.icon}
+                <span className="popular-media" aria-hidden="true">
+                  <img className="popular-image" src={item.image} alt="" />
                 </span>
                 <span className="popular-label">{item.label}</span>
               </button>
