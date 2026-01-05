@@ -7,6 +7,7 @@ import { ProRequestsScreen } from './screens/ProRequestsScreen'
 import { RequestScreen } from './screens/RequestScreen'
 import { StartScreen } from './screens/StartScreen'
 import { categoryItems } from './data/clientData'
+import { isCityAvailable } from './data/cityAvailability'
 import type { City, District, Role } from './types/app'
 import './App.css'
 
@@ -71,7 +72,7 @@ function App() {
 
     setCityQuery(value)
 
-    if (matchedCity) {
+    if (matchedCity && isCityAvailable(matchedCity.name)) {
       setCityId(matchedCity.id)
       if (matchedCity.id !== cityId) {
         setDistrictId(null)
@@ -86,6 +87,9 @@ function App() {
   }
 
   const handleCitySelect = (city: City) => {
+    if (!isCityAvailable(city.name)) {
+      return
+    }
     setCityId(city.id)
     setCityQuery(city.name)
     setDistrictId(null)

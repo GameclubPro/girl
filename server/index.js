@@ -213,6 +213,13 @@ const ensureSchema = async () => {
 
 const seedLocations = async () => {
   const cityName = 'Ростов-на-Дону'
+  const extraCityNames = [
+    'Москва',
+    'Санкт-Петербург',
+    'Казань',
+    'Новосибирск',
+    'Екатеринбург',
+  ]
   const districtNames = [
     'Пролетарский',
     'Октябрьский',
@@ -248,6 +255,17 @@ const seedLocations = async () => {
         ON CONFLICT (city_id, name) DO NOTHING
       `,
       [cityId, districtName]
+    )
+  }
+
+  for (const extraCity of extraCityNames) {
+    await pool.query(
+      `
+        INSERT INTO cities (name)
+        VALUES ($1)
+        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+      `,
+      [extraCity]
     )
   }
 }

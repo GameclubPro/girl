@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isCityAvailable } from '../data/cityAvailability'
 import type { City, District, Role } from '../types/app'
 
 export const AddressScreen = ({
@@ -43,6 +44,12 @@ export const AddressScreen = ({
   const hasAddress = address.trim().length > 0
   const canContinue = hasCity && hasDistrict && hasAddress && !isSaving && !isLoading
   const normalizedQuery = cityQuery.trim().toLowerCase()
+  const matchedCity = cities.find(
+    (city) => city.name.toLowerCase() === normalizedQuery
+  )
+  const isMatchedUnavailable = matchedCity
+    ? !isCityAvailable(matchedCity.name)
+    : false
   const filteredCities = normalizedQuery
     ? cities.filter((city) =>
         city.name.toLowerCase().includes(normalizedQuery)
@@ -83,31 +90,46 @@ export const AddressScreen = ({
               onBlur={() => setIsCityFocused(false)}
               placeholder="Начните вводить город"
               autoComplete="address-level2"
-              autoFocus
             />
             {showSuggestions && (
               <div className="address-suggest" role="listbox">
                 {filteredCities.length > 0 ? (
-                  filteredCities.slice(0, 8).map((city) => (
-                    <button
-                      className={`suggest-item${
-                        cityId === city.id ? ' is-active' : ''
-                      }`}
-                      key={city.id}
-                      type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault()
-                        onCitySelect(city)
-                        setIsCityFocused(false)
-                      }}
-                    >
-                      {city.name}
-                    </button>
-                  ))
+                  filteredCities.slice(0, 8).map((city) => {
+                    const isUnavailable = !isCityAvailable(city.name)
+                    const isActive = !isUnavailable && cityId === city.id
+
+                    return (
+                      <button
+                        className={`suggest-item${
+                          isActive ? ' is-active' : ''
+                        }${isUnavailable ? ' is-disabled' : ''}`}
+                        key={city.id}
+                        type="button"
+                        disabled={isUnavailable}
+                        aria-disabled={isUnavailable}
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          if (isUnavailable) return
+                          onCitySelect(city)
+                          setIsCityFocused(false)
+                        }}
+                      >
+                        <span>{city.name}</span>
+                        {isUnavailable && (
+                          <span className="suggest-badge">Скоро</span>
+                        )}
+                      </button>
+                    )
+                  })
                 ) : (
                   <span className="suggest-empty">Город не найден</span>
                 )}
               </div>
+            )}
+            {isMatchedUnavailable && (
+              <p className="address-unavailable">
+                Этот город пока недоступен. Мы скоро откроемся там.
+              </p>
             )}
           </div>
           <div className="address-field">

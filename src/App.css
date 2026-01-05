@@ -1017,12 +1017,35 @@
   border-radius: 12px;
   box-shadow: 0 6px 12px rgba(74, 60, 55, 0.1);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .suggest-item.is-active {
   border-color: rgba(143, 98, 228, 0.4);
   color: #6f52ba;
   background: rgba(230, 218, 250, 0.7);
+}
+
+.suggest-item.is-disabled {
+  border-color: rgba(98, 86, 78, 0.1);
+  color: #9a908b;
+  background: rgba(255, 255, 255, 0.7);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.suggest-badge {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #9d8ab6 0%, #7b6b91 100%);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .suggest-item:focus-visible {
@@ -1042,6 +1065,13 @@
   font-size: 12px;
   font-weight: 600;
   color: #7a6f6a;
+}
+
+.address-unavailable {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9b5d5d;
 }
 
 .address-status {
