@@ -6,9 +6,11 @@ import { categoryItems, popularItems } from '../data/clientData'
 export const ClientScreen = ({
   clientName,
   onCreateRequest,
+  onViewRequests,
 }: {
   clientName: string
-  onCreateRequest: () => void
+  onCreateRequest: (categoryId?: string | null) => void
+  onViewRequests: () => void
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const selectedCategoryLabel =
@@ -106,7 +108,7 @@ export const ClientScreen = ({
           <button
             className="cta cta--primary cta--wide"
             type="button"
-            onClick={onCreateRequest}
+            onClick={() => onCreateRequest(selectedCategory)}
             disabled={!selectedCategory}
           >
             <span className="cta-icon" aria-hidden="true">
@@ -124,7 +126,7 @@ export const ClientScreen = ({
           </span>
           Главная
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewRequests}>
           <span className="nav-icon" aria-hidden="true">
             <IconUsers />
           </span>

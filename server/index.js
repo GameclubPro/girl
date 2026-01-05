@@ -32,6 +32,58 @@ const createPool = () => {
 
 const pool = createPool()
 
+const normalizeText = (value) => {
+  if (typeof value !== 'string') return ''
+  return value.trim()
+}
+
+const normalizeStringArray = (value) => {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean)
+}
+
+const parseOptionalInt = (value) => {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? value : null
+  }
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  return Number.isInteger(parsed) ? parsed : null
+}
+
+const ensureUser = async (userId) => {
+  await pool.query(
+    `
+      INSERT INTO users (user_id)
+      VALUES ($1)
+      ON CONFLICT (user_id) DO NOTHING
+    `,
+    [userId]
+  )
+}
+
+const loadMasterProfile = async (userId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        user_id AS "userId",
+        city_id AS "cityId",
+        district_id AS "districtId",
+        categories,
+        works_at_client AS "worksAtClient",
+        works_at_master AS "worksAtMaster"
+      FROM master_profiles
+      WHERE user_id = $1
+    `,
+    [userId]
+  )
+
+  return result.rows[0] ?? null
+}
+
 const ensureSchema = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -80,6 +132,82 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE user_addresses
     ADD COLUMN IF NOT EXISTS district_id INTEGER REFERENCES districts(id);
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_profiles (
+      user_id TEXT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+      display_name TEXT NOT NULL,
+      about TEXT,
+      city_id INTEGER REFERENCES cities(id),
+      district_id INTEGER REFERENCES districts(id),
+      experience_years INTEGER,
+      price_from INTEGER,
+      price_to INTEGER,
+      works_at_client BOOLEAN NOT NULL DEFAULT false,
+      works_at_master BOOLEAN NOT NULL DEFAULT false,
+      categories TEXT[] NOT NULL DEFAULT '{}',
+      services TEXT[] NOT NULL DEFAULT '{}',
+      portfolio_urls TEXT[] NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS service_requests (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      city_id INTEGER REFERENCES cities(id),
+      district_id INTEGER REFERENCES districts(id),
+      address TEXT,
+      category_id TEXT NOT NULL,
+      service_name TEXT NOT NULL,
+      tags TEXT[] NOT NULL DEFAULT '{}',
+      location_type TEXT NOT NULL,
+      date_option TEXT NOT NULL,
+      date_time TIMESTAMPTZ,
+      budget TEXT,
+      details TEXT,
+      photo_urls TEXT[] NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS request_responses (
+      id SERIAL PRIMARY KEY,
+      request_id INTEGER NOT NULL REFERENCES service_requests(id) ON DELETE CASCADE,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      price INTEGER,
+      comment TEXT,
+      proposed_time TEXT,
+      status TEXT NOT NULL DEFAULT 'sent',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS request_responses_request_master_idx
+    ON request_responses (request_id, master_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS request_responses_request_idx
+    ON request_responses (request_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_requests_user_idx
+    ON service_requests (user_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_requests_status_created_idx
+    ON service_requests (status, created_at DESC);
   `)
 }
 
@@ -309,6 +437,755 @@ app.post('/api/address', async (req, res) => {
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/address failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/masters', async (req, res) => {
+  const cityId = Number(req.query.cityId)
+  const districtId = Number(req.query.districtId)
+  const categoryId = normalizeText(req.query.categoryId ?? req.query.category)
+
+  const conditions = []
+  const values = []
+  if (Number.isInteger(cityId)) {
+    values.push(cityId)
+    conditions.push(`mp.city_id = $${values.length}`)
+  }
+  if (Number.isInteger(districtId)) {
+    values.push(districtId)
+    conditions.push(`mp.district_id = $${values.length}`)
+  }
+  if (categoryId) {
+    values.push(categoryId)
+    conditions.push(`$${values.length} = ANY(mp.categories)`)
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          mp.user_id AS "userId",
+          mp.display_name AS "displayName",
+          mp.about,
+          mp.city_id AS "cityId",
+          mp.district_id AS "districtId",
+          c.name AS "cityName",
+          d.name AS "districtName",
+          mp.experience_years AS "experienceYears",
+          mp.price_from AS "priceFrom",
+          mp.price_to AS "priceTo",
+          mp.works_at_client AS "worksAtClient",
+          mp.works_at_master AS "worksAtMaster",
+          mp.categories,
+          mp.services,
+          mp.portfolio_urls AS "portfolioUrls",
+          mp.updated_at AS "updatedAt"
+        FROM master_profiles mp
+        LEFT JOIN cities c ON c.id = mp.city_id
+        LEFT JOIN districts d ON d.id = mp.district_id
+        ${whereClause}
+        ORDER BY mp.updated_at DESC
+        LIMIT 50
+      `,
+      values
+    )
+    res.json(result.rows)
+  } catch (error) {
+    console.error('GET /api/masters failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/masters/:userId', async (req, res) => {
+  const normalizedUserId = normalizeText(req.params.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          user_id AS "userId",
+          display_name AS "displayName",
+          about,
+          city_id AS "cityId",
+          district_id AS "districtId",
+          experience_years AS "experienceYears",
+          price_from AS "priceFrom",
+          price_to AS "priceTo",
+          works_at_client AS "worksAtClient",
+          works_at_master AS "worksAtMaster",
+          categories,
+          services,
+          portfolio_urls AS "portfolioUrls",
+          updated_at AS "updatedAt"
+        FROM master_profiles
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    res.json(result.rows[0])
+  } catch (error) {
+    console.error('GET /api/masters/:userId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters', async (req, res) => {
+  const {
+    userId,
+    displayName,
+    about,
+    cityId,
+    districtId,
+    experienceYears,
+    priceFrom,
+    priceTo,
+    worksAtClient,
+    worksAtMaster,
+    categories,
+    services,
+    portfolioUrls,
+  } = req.body ?? {}
+
+  const normalizedUserId = normalizeText(userId)
+  const normalizedName = normalizeText(displayName)
+  const normalizedAbout = normalizeText(about)
+  const categoryList = normalizeStringArray(categories)
+  const serviceList = normalizeStringArray(services)
+  const portfolioList = normalizeStringArray(portfolioUrls)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!normalizedName) {
+    res.status(400).json({ error: 'displayName_required' })
+    return
+  }
+
+  if (categoryList.length === 0) {
+    res.status(400).json({ error: 'categories_required' })
+    return
+  }
+
+  const parsedCityId = Number(cityId)
+  const parsedDistrictId = Number(districtId)
+  const hasCity = Number.isInteger(parsedCityId)
+  const hasDistrict = Number.isInteger(parsedDistrictId)
+
+  if (hasDistrict && !hasCity) {
+    res.status(400).json({ error: 'city_required' })
+    return
+  }
+
+  const parsedExperienceYears = parseOptionalInt(experienceYears)
+  const parsedPriceFrom = parseOptionalInt(priceFrom)
+  const parsedPriceTo = parseOptionalInt(priceTo)
+
+  if (
+    parsedPriceFrom !== null &&
+    parsedPriceTo !== null &&
+    parsedPriceFrom > parsedPriceTo
+  ) {
+    res.status(400).json({ error: 'price_range_invalid' })
+    return
+  }
+
+  const workAtClient = Boolean(worksAtClient)
+  const workAtMaster = Boolean(worksAtMaster)
+
+  if (!workAtClient && !workAtMaster) {
+    res.status(400).json({ error: 'work_format_required' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+
+    if (hasCity) {
+      const cityCheck = await pool.query(`SELECT id FROM cities WHERE id = $1`, [
+        parsedCityId,
+      ])
+      if (cityCheck.rows.length === 0) {
+        res.status(400).json({ error: 'city_not_found' })
+        return
+      }
+    }
+
+    if (hasDistrict) {
+      const districtCheck = await pool.query(
+        `SELECT id FROM districts WHERE id = $1 AND city_id = $2`,
+        [parsedDistrictId, parsedCityId]
+      )
+      if (districtCheck.rows.length === 0) {
+        res.status(400).json({ error: 'district_not_found' })
+        return
+      }
+    }
+
+    await pool.query(
+      `
+        INSERT INTO master_profiles (
+          user_id,
+          display_name,
+          about,
+          city_id,
+          district_id,
+          experience_years,
+          price_from,
+          price_to,
+          works_at_client,
+          works_at_master,
+          categories,
+          services,
+          portfolio_urls
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (user_id) DO UPDATE
+        SET display_name = EXCLUDED.display_name,
+            about = EXCLUDED.about,
+            city_id = EXCLUDED.city_id,
+            district_id = EXCLUDED.district_id,
+            experience_years = EXCLUDED.experience_years,
+            price_from = EXCLUDED.price_from,
+            price_to = EXCLUDED.price_to,
+            works_at_client = EXCLUDED.works_at_client,
+            works_at_master = EXCLUDED.works_at_master,
+            categories = EXCLUDED.categories,
+            services = EXCLUDED.services,
+            portfolio_urls = EXCLUDED.portfolio_urls,
+            updated_at = NOW()
+      `,
+      [
+        normalizedUserId,
+        normalizedName,
+        normalizedAbout || null,
+        hasCity ? parsedCityId : null,
+        hasDistrict ? parsedDistrictId : null,
+        parsedExperienceYears,
+        parsedPriceFrom,
+        parsedPriceTo,
+        workAtClient,
+        workAtMaster,
+        categoryList,
+        serviceList,
+        portfolioList,
+      ]
+    )
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/masters failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/pro/requests', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const profile = await loadMasterProfile(normalizedUserId)
+    if (!profile) {
+      res.status(404).json({ error: 'profile_not_found' })
+      return
+    }
+
+    const { cityId, districtId, categories, worksAtClient, worksAtMaster } = profile
+
+    if (!cityId || !districtId || !Array.isArray(categories) || categories.length === 0) {
+      res.json([])
+      return
+    }
+
+    const result = await pool.query(
+      `
+        SELECT
+          r.id,
+          r.user_id AS "userId",
+          r.city_id AS "cityId",
+          r.district_id AS "districtId",
+          c.name AS "cityName",
+          d.name AS "districtName",
+          r.address,
+          r.category_id AS "categoryId",
+          r.service_name AS "serviceName",
+          r.tags,
+          r.location_type AS "locationType",
+          r.date_option AS "dateOption",
+          r.date_time AS "dateTime",
+          r.budget,
+          r.details,
+          r.photo_urls AS "photoUrls",
+          r.status,
+          r.created_at AS "createdAt",
+          rr.id AS "responseId",
+          rr.status AS "responseStatus",
+          rr.price AS "responsePrice",
+          rr.comment AS "responseComment",
+          rr.created_at AS "responseCreatedAt"
+        FROM service_requests r
+        LEFT JOIN cities c ON c.id = r.city_id
+        LEFT JOIN districts d ON d.id = r.district_id
+        LEFT JOIN request_responses rr
+          ON rr.request_id = r.id AND rr.master_id = $1
+        WHERE r.status = 'open'
+          AND r.user_id <> $1
+          AND r.city_id = $2
+          AND r.district_id = $3
+          AND r.category_id = ANY($4)
+          AND (
+            (r.location_type = 'client' AND $5)
+            OR (r.location_type = 'master' AND $6)
+            OR (r.location_type = 'any' AND ($5 OR $6))
+          )
+        ORDER BY r.created_at DESC
+        LIMIT 50
+      `,
+      [normalizedUserId, cityId, districtId, categories, worksAtClient, worksAtMaster]
+    )
+
+    res.json(result.rows)
+  } catch (error) {
+    console.error('GET /api/pro/requests failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/requests', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          r.id,
+          r.user_id AS "userId",
+          r.city_id AS "cityId",
+          r.district_id AS "districtId",
+          c.name AS "cityName",
+          d.name AS "districtName",
+          r.address,
+          r.category_id AS "categoryId",
+          r.service_name AS "serviceName",
+          r.tags,
+          r.location_type AS "locationType",
+          r.date_option AS "dateOption",
+          r.date_time AS "dateTime",
+          r.budget,
+          r.details,
+          r.photo_urls AS "photoUrls",
+          r.status,
+          r.created_at AS "createdAt",
+          (
+            SELECT COUNT(*)
+            FROM request_responses rr
+            WHERE rr.request_id = r.id
+          )::int AS "responsesCount"
+        FROM service_requests r
+        LEFT JOIN cities c ON c.id = r.city_id
+        LEFT JOIN districts d ON d.id = r.district_id
+        WHERE r.user_id = $1
+        ORDER BY r.created_at DESC
+      `,
+      [normalizedUserId]
+    )
+
+    res.json(result.rows)
+  } catch (error) {
+    console.error('GET /api/requests failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/requests/:id', async (req, res) => {
+  const requestId = Number(req.params.id)
+  if (!Number.isInteger(requestId)) {
+    res.status(400).json({ error: 'requestId_invalid' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          r.id,
+          r.user_id AS "userId",
+          r.city_id AS "cityId",
+          r.district_id AS "districtId",
+          c.name AS "cityName",
+          d.name AS "districtName",
+          r.address,
+          r.category_id AS "categoryId",
+          r.service_name AS "serviceName",
+          r.tags,
+          r.location_type AS "locationType",
+          r.date_option AS "dateOption",
+          r.date_time AS "dateTime",
+          r.budget,
+          r.details,
+          r.photo_urls AS "photoUrls",
+          r.status,
+          r.created_at AS "createdAt"
+        FROM service_requests r
+        LEFT JOIN cities c ON c.id = r.city_id
+        LEFT JOIN districts d ON d.id = r.district_id
+        WHERE r.id = $1
+      `,
+      [requestId]
+    )
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    res.json(result.rows[0])
+  } catch (error) {
+    console.error('GET /api/requests/:id failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/requests/:id/responses', async (req, res) => {
+  const requestId = Number(req.params.id)
+  if (!Number.isInteger(requestId)) {
+    res.status(400).json({ error: 'requestId_invalid' })
+    return
+  }
+
+  const normalizedUserId = normalizeText(req.query.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const requestCheck = await pool.query(
+      `SELECT user_id AS "userId" FROM service_requests WHERE id = $1`,
+      [requestId]
+    )
+    if (requestCheck.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    if (requestCheck.rows[0].userId !== normalizedUserId) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    const result = await pool.query(
+      `
+        SELECT
+          rr.id,
+          rr.request_id AS "requestId",
+          rr.master_id AS "masterId",
+          mp.display_name AS "displayName",
+          mp.experience_years AS "experienceYears",
+          mp.price_from AS "priceFrom",
+          mp.price_to AS "priceTo",
+          rr.price,
+          rr.comment,
+          rr.proposed_time AS "proposedTime",
+          rr.status,
+          rr.created_at AS "createdAt"
+        FROM request_responses rr
+        LEFT JOIN master_profiles mp ON mp.user_id = rr.master_id
+        WHERE rr.request_id = $1
+        ORDER BY rr.created_at DESC
+      `,
+      [requestId]
+    )
+
+    res.json(result.rows)
+  } catch (error) {
+    console.error('GET /api/requests/:id/responses failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/requests/:id/responses', async (req, res) => {
+  const requestId = Number(req.params.id)
+  if (!Number.isInteger(requestId)) {
+    res.status(400).json({ error: 'requestId_invalid' })
+    return
+  }
+
+  const { userId, price, comment, proposedTime } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedComment = normalizeText(comment)
+  const normalizedProposedTime = normalizeText(proposedTime)
+  const parsedPrice = parseOptionalInt(price)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!normalizedComment && parsedPrice === null && !normalizedProposedTime) {
+    res.status(400).json({ error: 'response_required' })
+    return
+  }
+
+  try {
+    const profile = await loadMasterProfile(normalizedUserId)
+    if (!profile) {
+      res.status(404).json({ error: 'profile_not_found' })
+      return
+    }
+
+    const requestResult = await pool.query(
+      `
+        SELECT
+          id,
+          user_id AS "userId",
+          city_id AS "cityId",
+          district_id AS "districtId",
+          category_id AS "categoryId",
+          location_type AS "locationType",
+          status
+        FROM service_requests
+        WHERE id = $1
+      `,
+      [requestId]
+    )
+
+    if (requestResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const request = requestResult.rows[0]
+    if (request.userId === normalizedUserId) {
+      res.status(400).json({ error: 'self_response_not_allowed' })
+      return
+    }
+
+    if (request.status !== 'open') {
+      res.status(400).json({ error: 'request_closed' })
+      return
+    }
+
+    const categoryAllowed =
+      Array.isArray(profile.categories) &&
+      profile.categories.includes(request.categoryId)
+    if (!categoryAllowed) {
+      res.status(403).json({ error: 'category_mismatch' })
+      return
+    }
+
+    if (request.cityId !== profile.cityId || request.districtId !== profile.districtId) {
+      res.status(403).json({ error: 'location_mismatch' })
+      return
+    }
+
+    const acceptsClient = Boolean(profile.worksAtClient)
+    const acceptsMaster = Boolean(profile.worksAtMaster)
+    const locationType = request.locationType
+    const locationAllowed =
+      (locationType === 'client' && acceptsClient) ||
+      (locationType === 'master' && acceptsMaster) ||
+      (locationType === 'any' && (acceptsClient || acceptsMaster))
+
+    if (!locationAllowed) {
+      res.status(403).json({ error: 'location_type_mismatch' })
+      return
+    }
+
+    await ensureUser(normalizedUserId)
+
+    const result = await pool.query(
+      `
+        INSERT INTO request_responses (
+          request_id,
+          master_id,
+          price,
+          comment,
+          proposed_time,
+          status
+        )
+        VALUES ($1, $2, $3, $4, $5, 'sent')
+        ON CONFLICT (request_id, master_id) DO UPDATE
+        SET price = EXCLUDED.price,
+            comment = EXCLUDED.comment,
+            proposed_time = EXCLUDED.proposed_time,
+            status = 'sent',
+            updated_at = NOW()
+        RETURNING id, created_at AS "createdAt"
+      `,
+      [
+        requestId,
+        normalizedUserId,
+        parsedPrice,
+        normalizedComment || null,
+        normalizedProposedTime || null,
+      ]
+    )
+
+    res.json({ ok: true, id: result.rows[0]?.id, createdAt: result.rows[0]?.createdAt })
+  } catch (error) {
+    console.error('POST /api/requests/:id/responses failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/requests', async (req, res) => {
+  const {
+    userId,
+    cityId,
+    districtId,
+    address,
+    categoryId,
+    serviceName,
+    tags,
+    locationType,
+    dateOption,
+    dateTime,
+    budget,
+    details,
+    photoUrls,
+  } = req.body ?? {}
+
+  const normalizedUserId = normalizeText(userId)
+  const normalizedCategoryId = normalizeText(categoryId)
+  const normalizedServiceName = normalizeText(serviceName)
+  const normalizedLocationType = normalizeText(locationType)
+  const normalizedDateOption = normalizeText(dateOption)
+  const normalizedAddress = normalizeText(address)
+  const normalizedBudget = normalizeText(budget)
+  const normalizedDetails = normalizeText(details)
+  const tagList = normalizeStringArray(tags)
+  const photoList = normalizeStringArray(photoUrls)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!normalizedCategoryId || !normalizedServiceName) {
+    res.status(400).json({ error: 'service_required' })
+    return
+  }
+
+  if (!['client', 'master', 'any'].includes(normalizedLocationType)) {
+    res.status(400).json({ error: 'locationType_invalid' })
+    return
+  }
+
+  if (!['today', 'tomorrow', 'choose'].includes(normalizedDateOption)) {
+    res.status(400).json({ error: 'dateOption_invalid' })
+    return
+  }
+
+  const parsedCityId = Number(cityId)
+  const parsedDistrictId = Number(districtId)
+  if (!Number.isInteger(parsedCityId) || !Number.isInteger(parsedDistrictId)) {
+    res.status(400).json({ error: 'location_required' })
+    return
+  }
+
+  if (normalizedLocationType === 'client' && !normalizedAddress) {
+    res.status(400).json({ error: 'address_required' })
+    return
+  }
+
+  let parsedDateTime = null
+  if (normalizedDateOption === 'choose') {
+    if (!normalizeText(dateTime)) {
+      res.status(400).json({ error: 'dateTime_required' })
+      return
+    }
+    const parsedValue = new Date(dateTime)
+    if (Number.isNaN(parsedValue.getTime())) {
+      res.status(400).json({ error: 'dateTime_invalid' })
+      return
+    }
+    parsedDateTime = parsedValue.toISOString()
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+
+    const cityCheck = await pool.query(`SELECT id FROM cities WHERE id = $1`, [
+      parsedCityId,
+    ])
+    if (cityCheck.rows.length === 0) {
+      res.status(400).json({ error: 'city_not_found' })
+      return
+    }
+
+    const districtCheck = await pool.query(
+      `SELECT id FROM districts WHERE id = $1 AND city_id = $2`,
+      [parsedDistrictId, parsedCityId]
+    )
+    if (districtCheck.rows.length === 0) {
+      res.status(400).json({ error: 'district_not_found' })
+      return
+    }
+
+    const result = await pool.query(
+      `
+        INSERT INTO service_requests (
+          user_id,
+          city_id,
+          district_id,
+          address,
+          category_id,
+          service_name,
+          tags,
+          location_type,
+          date_option,
+          date_time,
+          budget,
+          details,
+          photo_urls
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING id, created_at AS "createdAt"
+      `,
+      [
+        normalizedUserId,
+        parsedCityId,
+        parsedDistrictId,
+        normalizedAddress || null,
+        normalizedCategoryId,
+        normalizedServiceName,
+        tagList,
+        normalizedLocationType,
+        normalizedDateOption,
+        parsedDateTime,
+        normalizedBudget || null,
+        normalizedDetails || null,
+        photoList,
+      ]
+    )
+
+    res.json({ ok: true, id: result.rows[0]?.id, createdAt: result.rows[0]?.createdAt })
+  } catch (error) {
+    console.error('POST /api/requests failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

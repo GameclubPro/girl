@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AddressScreen } from './screens/AddressScreen'
+import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
 import { ClientScreen } from './screens/ClientScreen'
+import { ProProfileScreen } from './screens/ProProfileScreen'
+import { ProRequestsScreen } from './screens/ProRequestsScreen'
 import { RequestScreen } from './screens/RequestScreen'
 import { StartScreen } from './screens/StartScreen'
+import { categoryItems } from './data/clientData'
 import type { City, District, Role } from './types/app'
 import './App.css'
 
@@ -13,9 +17,15 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
 
 function App() {
-  const [view, setView] = useState<'start' | 'address' | 'client' | 'request'>(
-    'start'
-  )
+  const [view, setView] = useState<
+    | 'start'
+    | 'address'
+    | 'client'
+    | 'request'
+    | 'requests'
+    | 'pro-profile'
+    | 'pro-requests'
+  >('start')
   const [role, setRole] = useState<Role>('client')
   const [address, setAddress] = useState('')
   const [telegramUser] = useState(() => getTelegramUser())
@@ -30,6 +40,9 @@ function App() {
   const [isLoadingCities, setIsLoadingCities] = useState(false)
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [requestCategoryId, setRequestCategoryId] = useState(
+    categoryItems[0]?.id ?? ''
+  )
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
       .filter(Boolean)
@@ -106,13 +119,13 @@ function App() {
         throw new Error('Save failed')
       }
 
-      setView('client')
+      setView(role === 'pro' ? 'pro-profile' : 'client')
     } catch (error) {
       setSaveError('Не удалось сохранить адрес. Попробуйте еще раз.')
     } finally {
       setIsSaving(false)
     }
-  }, [address, cityId, districtId, userId])
+  }, [address, cityId, districtId, role, userId])
 
   useEffect(() => {
     if (!telegramUser?.id) return
@@ -152,7 +165,12 @@ function App() {
     webApp.expand()
     webApp.requestFullscreen?.()
     webApp.disableVerticalSwipes?.()
-    const isClient = view === 'client' || view === 'request'
+    const isClient =
+      view === 'client' ||
+      view === 'request' ||
+      view === 'requests' ||
+      view === 'pro-profile' ||
+      view === 'pro-requests'
     webApp.setHeaderColor?.(isClient ? '#f3edf7' : '#f7f2ef')
     webApp.setBackgroundColor?.(isClient ? '#f3edf7' : '#f7f2ef')
   }, [view])
@@ -320,13 +338,66 @@ function App() {
     return (
       <ClientScreen
         clientName={clientName}
-        onCreateRequest={() => setView('request')}
+        onCreateRequest={(categoryId) => {
+          setRequestCategoryId(categoryId ?? categoryItems[0]?.id ?? '')
+          setView('request')
+        }}
+        onViewRequests={() => setView('requests')}
       />
     )
   }
 
   if (view === 'request') {
-    return <RequestScreen onBack={() => setView('client')} />
+    const cityName = cities.find((item) => item.id === cityId)?.name ?? ''
+    const districtName =
+      districts.find((item) => item.id === districtId)?.name ?? ''
+
+    return (
+      <RequestScreen
+        apiBase={apiBase}
+        userId={userId}
+        defaultCategoryId={requestCategoryId}
+        cityId={cityId}
+        districtId={districtId}
+        cityName={cityName}
+        districtName={districtName}
+        address={address}
+        onBack={() => setView('client')}
+      />
+    )
+  }
+
+  if (view === 'requests') {
+    return (
+      <ClientRequestsScreen
+        apiBase={apiBase}
+        userId={userId}
+        onBack={() => setView('client')}
+        onCreateRequest={() => setView('request')}
+      />
+    )
+  }
+
+  if (view === 'pro-profile') {
+    return (
+      <ProProfileScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        onBack={() => setView('start')}
+        onViewRequests={() => setView('pro-requests')}
+      />
+    )
+  }
+
+  if (view === 'pro-requests') {
+    return (
+      <ProRequestsScreen
+        apiBase={apiBase}
+        userId={userId}
+        onBack={() => setView('pro-profile')}
+      />
+    )
   }
 
   if (view === 'address') {

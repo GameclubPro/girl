@@ -1,17 +1,160 @@
+import { useMemo, useState } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
+import { categoryItems } from '../data/clientData'
 import {
   requestBudgetOptions,
   requestQuickChoices,
   requestTagChoices,
 } from '../data/requestData'
 
-export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
-  const locationOptions = ['У мастера', 'У меня', 'Не важно'] as const
-  const dateOptions = ['Сегодня', 'Завтра', 'Выбрать'] as const
-  const selectedQuick = 'Маникюр'
-  const selectedLocation = 'У мастера'
-  const selectedDate = 'Выбрать'
-  const selectedBudget = 'до 2000 ₽'
+const locationOptions = [
+  { value: 'master', label: 'У мастера' },
+  { value: 'client', label: 'У меня' },
+  { value: 'any', label: 'Не важно' },
+] as const
+
+const dateOptions = [
+  { value: 'today', label: 'Сегодня' },
+  { value: 'tomorrow', label: 'Завтра' },
+  { value: 'choose', label: 'Выбрать' },
+] as const
+
+type RequestScreenProps = {
+  apiBase: string
+  userId: string
+  defaultCategoryId?: string
+  cityId: number | null
+  districtId: number | null
+  cityName: string
+  districtName: string
+  address: string
+  onBack: () => void
+}
+
+export const RequestScreen = ({
+  apiBase,
+  userId,
+  defaultCategoryId,
+  cityId,
+  districtId,
+  cityName,
+  districtName,
+  address,
+  onBack,
+}: RequestScreenProps) => {
+  const [categoryId, setCategoryId] = useState(
+    defaultCategoryId ?? categoryItems[0]?.id ?? ''
+  )
+  const [serviceName, setServiceName] = useState(
+    requestQuickChoices[0] ?? ''
+  )
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [locationType, setLocationType] = useState<
+    (typeof locationOptions)[number]['value']
+  >('master')
+  const [dateOption, setDateOption] = useState<
+    (typeof dateOptions)[number]['value']
+  >('today')
+  const [dateValue, setDateValue] = useState('')
+  const [timeValue, setTimeValue] = useState('')
+  const [budget, setBudget] = useState(requestBudgetOptions[0] ?? 'не важно')
+  const [details, setDetails] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [submitSuccess, setSubmitSuccess] = useState('')
+
+  const dateLabel = useMemo(() => {
+    const match = dateOptions.find((option) => option.value === dateOption)
+    return match?.label ?? ''
+  }, [dateOption])
+
+  const hasLocation = Boolean(cityId && districtId)
+  const hasAddress = Boolean(address.trim())
+  const hasDateTime =
+    dateOption !== 'choose' || Boolean(dateValue && timeValue)
+  const canSubmit =
+    Boolean(categoryId) &&
+    Boolean(serviceName.trim()) &&
+    hasLocation &&
+    (locationType !== 'client' || hasAddress) &&
+    hasDateTime &&
+    !isSubmitting
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((current) =>
+      current.includes(tag)
+        ? current.filter((item) => item !== tag)
+        : [...current, tag]
+    )
+  }
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return
+    setSubmitError('')
+    setSubmitSuccess('')
+
+    if (!categoryId || !serviceName.trim()) {
+      setSubmitError('Укажите категорию и услугу.')
+      return
+    }
+
+    if (!cityId || !districtId) {
+      setSubmitError('Укажите город и район в профиле.')
+      return
+    }
+
+    if (locationType === 'client' && !address.trim()) {
+      setSubmitError('Для выезда укажите адрес в профиле.')
+      return
+    }
+
+    let dateTime: string | null = null
+    if (dateOption === 'choose') {
+      if (!dateValue || !timeValue) {
+        setSubmitError('Выберите дату и время.')
+        return
+      }
+      const parsedDate = new Date(`${dateValue}T${timeValue}`)
+      if (Number.isNaN(parsedDate.getTime())) {
+        setSubmitError('Некорректная дата или время.')
+        return
+      }
+      dateTime = parsedDate.toISOString()
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch(`${apiBase}/api/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          cityId,
+          districtId,
+          address: address.trim() || null,
+          categoryId,
+          serviceName: serviceName.trim(),
+          tags: selectedTags,
+          locationType,
+          dateOption,
+          dateTime,
+          budget,
+          details: details.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Create request failed')
+      }
+
+      setSubmitSuccess('Заявка опубликована. Ожидайте отклики.')
+    } catch (error) {
+      setSubmitError('Не удалось опубликовать заявку. Попробуйте еще раз.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="screen screen--request">
@@ -35,21 +178,31 @@ export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
           <h2 className="request-card-title">Услуга</h2>
           <div className="request-field">
             <span className="request-label">Категория *</span>
-            <button className="request-select" type="button">
-              <span className="request-select-main">Красота и ногти</span>
-              <span className="request-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
+            <select
+              className="request-select-input"
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+            >
+              {categoryItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="request-field">
             <span className="request-label">Услуга *</span>
-            <button className="request-select" type="button">
-              <span className="request-select-main">Маникюр</span>
-              <span className="request-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
+            <select
+              className="request-select-input"
+              value={serviceName}
+              onChange={(event) => setServiceName(event.target.value)}
+            >
+              {requestQuickChoices.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="request-field">
             <span className="request-label">Быстрый выбор</span>
@@ -57,11 +210,12 @@ export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
               {requestQuickChoices.map((choice) => (
                 <button
                   className={`request-chip${
-                    choice === selectedQuick ? ' is-active' : ''
+                    choice === serviceName ? ' is-active' : ''
                   }`}
                   key={choice}
                   type="button"
-                  aria-pressed={choice === selectedQuick}
+                  onClick={() => setServiceName(choice)}
+                  aria-pressed={choice === serviceName}
                 >
                   {choice}
                 </button>
@@ -72,7 +226,15 @@ export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
             <span className="request-label">Теги (можно несколько)</span>
             <div className="request-chips">
               {requestTagChoices.map((choice) => (
-                <button className="request-chip" key={choice} type="button">
+                <button
+                  className={`request-chip${
+                    selectedTags.includes(choice) ? ' is-active' : ''
+                  }`}
+                  key={choice}
+                  type="button"
+                  onClick={() => toggleTag(choice)}
+                  aria-pressed={selectedTags.includes(choice)}
+                >
                   {choice}
                 </button>
               ))}
@@ -86,43 +248,51 @@ export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
             {locationOptions.map((option) => (
               <button
                 className={`request-segment-button${
-                  option === selectedLocation ? ' is-active' : ''
+                  option.value === locationType ? ' is-active' : ''
                 }`}
-                key={option}
+                key={option.value}
                 type="button"
-                aria-pressed={option === selectedLocation}
+                onClick={() => setLocationType(option.value)}
+                aria-pressed={option.value === locationType}
               >
-                {option}
+                {option.label}
               </button>
             ))}
           </div>
           <div className="request-field">
             <span className="request-label">Город *</span>
-            <button className="request-select request-select--icon" type="button">
+            <div className="request-select request-select--icon request-select--static">
               <span className="request-select-main">
                 <span className="request-select-icon" aria-hidden="true">
                   <IconPin />
                 </span>
-                Москва
+                {cityName || 'Город не указан'}
               </span>
-              <span className="request-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
+            </div>
           </div>
           <div className="request-field">
             <span className="request-label">Район / метро *</span>
-            <button className="request-select request-select--icon" type="button">
+            <div className="request-select request-select--icon request-select--static">
               <span className="request-select-main">
                 <span className="request-select-icon" aria-hidden="true">
                   <IconPin />
                 </span>
-                Выбрать район
+                {districtName || 'Район не указан'}
               </span>
-              <span className="request-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
+            </div>
+          </div>
+          {locationType === 'client' && (
+            <div className="request-field">
+              <span className="request-label">Адрес для выезда *</span>
+              <div className="request-select request-select--static">
+                {address.trim() || 'Адрес не указан'}
+              </div>
+            </div>
+          )}
+          {!hasLocation && (
+            <p className="request-helper">
+              Заполните город и район в профиле, чтобы опубликовать заявку.
+            </p>
           </div>
         </section>
 
@@ -132,29 +302,44 @@ export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
             {dateOptions.map((option) => (
               <button
                 className={`request-segment-button${
-                  option === selectedDate ? ' is-active' : ''
+                  option.value === dateOption ? ' is-active' : ''
                 }`}
-                key={option}
+                key={option.value}
                 type="button"
-                aria-pressed={option === selectedDate}
+                onClick={() => setDateOption(option.value)}
+                aria-pressed={option.value === dateOption}
               >
-                {option}
+                {option.label}
               </button>
             ))}
           </div>
           <div className="request-field">
             <span className="request-label">Дата и время *</span>
-            <button className="request-select request-select--icon" type="button">
-              <span className="request-select-main">
-                <span className="request-select-icon" aria-hidden="true">
-                  <IconClock />
+            {dateOption === 'choose' ? (
+              <div className="request-date-grid">
+                <input
+                  className="request-input"
+                  type="date"
+                  value={dateValue}
+                  onChange={(event) => setDateValue(event.target.value)}
+                />
+                <input
+                  className="request-input"
+                  type="time"
+                  value={timeValue}
+                  onChange={(event) => setTimeValue(event.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="request-select request-select--icon request-select--static">
+                <span className="request-select-main">
+                  <span className="request-select-icon" aria-hidden="true">
+                    <IconClock />
+                  </span>
+                  {dateLabel}
                 </span>
-                Ср, 10 янв • 18:00
-              </span>
-              <span className="request-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -166,16 +351,27 @@ export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
               {requestBudgetOptions.map((option) => (
                 <button
                   className={`request-chip${
-                    option === selectedBudget ? ' is-active' : ''
+                    option === budget ? ' is-active' : ''
                   }`}
                   key={option}
                   type="button"
-                  aria-pressed={option === selectedBudget}
+                  onClick={() => setBudget(option)}
+                  aria-pressed={option === budget}
                 >
                   {option}
                 </button>
               ))}
             </div>
+          </div>
+          <div className="request-field">
+            <span className="request-label">Комментарий</span>
+            <textarea
+              className="request-textarea"
+              placeholder="Пожелания, особенности, что важно для вас"
+              value={details}
+              onChange={(event) => setDetails(event.target.value)}
+              rows={3}
+            />
           </div>
           <div className="request-field">
             <span className="request-label">Фото примера (желательно)</span>
@@ -197,11 +393,18 @@ export const RequestScreen = ({ onBack }: { onBack: () => void }) => {
         <p className="request-disclaimer">
           Нажимая «Опубликовать», вы соглашаетесь с правилами
         </p>
+        {submitError && <p className="request-error">{submitError}</p>}
+        {submitSuccess && <p className="request-success">{submitSuccess}</p>}
       </div>
 
       <div className="request-submit-bar">
-        <button className="request-submit" type="button">
-          Опубликовать заявку
+        <button
+          className="request-submit"
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+        >
+          {isSubmitting ? 'Публикуем...' : 'Опубликовать заявку'}
         </button>
       </div>
     </div>
