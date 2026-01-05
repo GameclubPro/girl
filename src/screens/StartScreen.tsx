@@ -20,7 +20,19 @@ export const StartScreen = ({
       <div className="title-block animate delay-1">
         <img className="brand-logo" src={logoImage} alt="KIVEN GIRL" />
         <h1>KIVEN GIRL</h1>
-        <p className="subtitle">Услуги от девушек для девушек</p>
+        <p className="subtitle">
+          <span className="subtitle-intro">Услуги</span>
+          <span className="subtitle-layout">
+            <span className="subtitle-accent subtitle-side subtitle-side--left">
+              от
+            </span>
+            <span className="subtitle-strong subtitle-top">ДЕВУШЕК</span>
+            <span className="subtitle-strong subtitle-bottom">ДЕВУШЕК</span>
+            <span className="subtitle-accent subtitle-side subtitle-side--right">
+              для
+            </span>
+          </span>
+        </p>
       </div>
 
       <h2 className="animate delay-2">Какая роль вам подходит?</h2>
@@ -44,7 +56,7 @@ export const StartScreen = ({
           onClick={() => onRoleSelect('pro')}
         >
           <StarPin tone="sun" />
-          <span>Я исполнительница</span>
+          <span>Я Мастер</span>
         </button>
       </div>
 
