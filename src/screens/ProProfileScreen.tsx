@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { RefObject } from 'react'
+import type { ChangeEvent, RefObject } from 'react'
 import { categoryItems } from '../data/clientData'
 import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
 import { getProfileStatusSummary } from '../utils/profileStatus'
@@ -62,6 +62,10 @@ export const ProProfileScreen = ({
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [coverUrl, setCoverUrl] = useState('')
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
   const basicRef = useRef<HTMLDivElement>(null)
   const servicesRef = useRef<HTMLDivElement>(null)
   const locationRef = useRef<HTMLDivElement>(null)
@@ -122,6 +126,59 @@ export const ProProfileScreen = ({
     ready: 'Готов к откликам',
     complete: 'Профиль заполнен',
   }
+  const displayNameValue =
+    displayName.trim() || displayNameFallback.trim() || 'Мастер'
+  const profileTone =
+    profileStatus.profileStatus === 'complete'
+      ? 'is-complete'
+      : profileStatus.profileStatus === 'ready'
+        ? 'is-ready'
+        : 'is-draft'
+  const activeTone = isActive ? 'is-active' : 'is-paused'
+  const aboutPreview =
+    about.trim() ||
+    'Добавьте пару слов о своем стиле работы — это повышает доверие.'
+  const profileInitials = useMemo(() => {
+    const source = displayNameValue.trim()
+    if (!source) return 'MK'
+    const parts = source.split(/[\s•|-]+/).filter(Boolean)
+    const initials = parts
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('')
+    return initials || 'MK'
+  }, [displayNameValue])
+  const experienceValue = parseNumber(experienceYears)
+  const priceFromValue = parseNumber(priceFrom)
+  const priceToValue = parseNumber(priceTo)
+  const priceLabel =
+    priceFromValue !== null && priceToValue !== null
+      ? `${priceFromValue}–${priceToValue} ₽`
+      : priceFromValue !== null
+        ? `от ${priceFromValue} ₽`
+        : priceToValue !== null
+          ? `до ${priceToValue} ₽`
+          : 'Цена не указана'
+  const experienceLabel =
+    experienceValue !== null ? `${experienceValue} лет` : 'Опыт не указан'
+  const locationLabel = useMemo(() => {
+    const cityLabel = cityId
+      ? cities.find((city) => city.id === cityId)?.name
+      : ''
+    const districtLabel = districtId
+      ? districts.find((district) => district.id === districtId)?.name
+      : ''
+    return [cityLabel, districtLabel].filter(Boolean).join(', ') || 'Город не указан'
+  }, [cities, cityId, districts, districtId])
+  const categoryLabels = useMemo(
+    () =>
+      categoryItems
+        .filter((category) => categories.includes(category.id))
+        .map((category) => category.label),
+    [categories]
+  )
+  const avatarStorageKey = `pro-avatar-${userId}`
+  const coverStorageKey = `pro-cover-${userId}`
 
   useEffect(() => {
     if (!focusSection) return
@@ -139,6 +196,14 @@ export const ProProfileScreen = ({
     }, 60)
     return () => window.clearTimeout(timeout)
   }, [focusSection])
+
+  useEffect(() => {
+    if (!userId) return
+    const storedAvatar = window.localStorage.getItem(avatarStorageKey)
+    const storedCover = window.localStorage.getItem(coverStorageKey)
+    setAvatarUrl(storedAvatar ?? '')
+    setCoverUrl(storedCover ?? '')
+  }, [avatarStorageKey, coverStorageKey, userId])
 
   useEffect(() => {
     let cancelled = false
@@ -312,6 +377,60 @@ export const ProProfileScreen = ({
     )
   }
 
+  const readImageFile = (file: File, onLoad: (dataUrl: string) => void) => {
+    if (!file.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      if (result) {
+        onLoad(result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    readImageFile(file, (dataUrl) => {
+      setAvatarUrl(dataUrl)
+      window.localStorage.setItem(avatarStorageKey, dataUrl)
+    })
+    event.target.value = ''
+  }
+
+  const handleCoverChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    readImageFile(file, (dataUrl) => {
+      setCoverUrl(dataUrl)
+      window.localStorage.setItem(coverStorageKey, dataUrl)
+    })
+    event.target.value = ''
+  }
+
+  const handleAvatarSelect = () => {
+    avatarInputRef.current?.click()
+  }
+
+  const handleCoverSelect = () => {
+    coverInputRef.current?.click()
+  }
+
+  const handleAvatarClear = () => {
+    setAvatarUrl('')
+    window.localStorage.removeItem(avatarStorageKey)
+  }
+
+  const handleCoverClear = () => {
+    setCoverUrl('')
+    window.localStorage.removeItem(coverStorageKey)
+  }
+
+  const scrollToSection = (ref: RefObject<HTMLDivElement>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const handleSave = async () => {
     if (isSaving) return
     setSaveError('')
@@ -395,21 +514,225 @@ export const ProProfileScreen = ({
   return (
     <div className="screen screen--pro">
       <div className="pro-shell">
-        <header className="pro-header animate delay-1">
-          <button className="request-back" type="button" onClick={onBack}>
-            <span aria-hidden="true">‹</span>
-          </button>
-          <div className="request-headings">
-            <h1 className="request-title">Профиль мастера</h1>
-            <p className="request-subtitle">Настройте профиль и получайте заявки</p>
+        <header className="pro-hero animate delay-1">
+          <div className="pro-hero-top">
+            <button
+              className="pro-back"
+              type="button"
+              onClick={onBack}
+              aria-label="Назад"
+            >
+              <span aria-hidden="true">‹</span>
+            </button>
+            <div className="pro-hero-actions">
+              <button className="pro-ghost" type="button" onClick={onViewRequests}>
+                Заявки
+              </button>
+              <button
+                className="pro-ghost"
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Сохраняем...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+
+          <div
+            className={`pro-hero-cover${coverUrl ? ' has-image' : ''}`}
+            style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
+          >
+            <div className="pro-hero-grid" aria-hidden="true" />
+            <div className="pro-hero-orb pro-hero-orb--one" aria-hidden="true" />
+            <div className="pro-hero-orb pro-hero-orb--two" aria-hidden="true" />
+            <div className="pro-hero-orb pro-hero-orb--three" aria-hidden="true" />
+            <div className="pro-hero-controls">
+              <input
+                ref={coverInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                onChange={handleCoverChange}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <button className="pro-cover-action" type="button" onClick={handleCoverSelect}>
+                Сменить шапку
+              </button>
+              {coverUrl && (
+                <button
+                  className="pro-cover-action is-muted"
+                  type="button"
+                  onClick={handleCoverClear}
+                >
+                  Убрать
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="pro-hero-profile">
+            <div className="pro-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
+              ) : (
+                <span aria-hidden="true">{profileInitials}</span>
+              )}
+              <input
+                ref={avatarInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <button
+                className="pro-avatar-action"
+                type="button"
+                onClick={handleAvatarSelect}
+                aria-label="Обновить аватар"
+              >
+                +
+              </button>
+              {avatarUrl && (
+                <button
+                  className="pro-avatar-clear"
+                  type="button"
+                  onClick={handleAvatarClear}
+                  aria-label="Удалить аватар"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div className="pro-hero-info">
+              <span className="pro-hero-label">Профиль мастера</span>
+              <div className="pro-hero-name">
+                <h1 className="pro-hero-title">{displayNameValue}</h1>
+                <div className="pro-hero-badges">
+                  <span className={`pro-status-chip ${profileTone}`}>
+                    {statusLabelMap[profileStatus.profileStatus]}
+                  </span>
+                  <span className={`pro-status-chip ${activeTone}`}>
+                    {isActive ? 'Принимаю заявки' : 'Пауза'}
+                  </span>
+                </div>
+              </div>
+              <p
+                className={`pro-hero-subtitle${
+                  about.trim() ? '' : ' is-placeholder'
+                }`}
+              >
+                {aboutPreview}
+              </p>
+              <div className="pro-hero-tags">
+                {categoryLabels.length > 0 ? (
+                  <>
+                    {categoryLabels.slice(0, 4).map((label) => (
+                      <span className="pro-tag" key={label}>
+                        {label}
+                      </span>
+                    ))}
+                    {categoryLabels.length > 4 && (
+                      <span className="pro-tag pro-tag--empty">
+                        +{categoryLabels.length - 4}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="pro-tag pro-tag--empty">Добавьте категории</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="pro-hero-metrics">
+            <div className="pro-metric">
+              <span className="pro-metric-label">Локация</span>
+              <strong className="pro-metric-value">{locationLabel}</strong>
+            </div>
+            <div className="pro-metric">
+              <span className="pro-metric-label">Опыт</span>
+              <strong className="pro-metric-value">{experienceLabel}</strong>
+            </div>
+            <div className="pro-metric">
+              <span className="pro-metric-label">Цены</span>
+              <strong className="pro-metric-value">{priceLabel}</strong>
+            </div>
           </div>
         </header>
 
-        {isLoading && <p className="pro-status">Загружаем анкету...</p>}
+        <nav className="pro-section-nav animate delay-2" aria-label="Разделы профиля">
+          <button
+            className="pro-nav-pill"
+            type="button"
+            onClick={() => scrollToSection(basicRef)}
+          >
+            Основное
+          </button>
+          <button
+            className="pro-nav-pill"
+            type="button"
+            onClick={() => scrollToSection(servicesRef)}
+          >
+            Услуги
+          </button>
+          <button
+            className="pro-nav-pill"
+            type="button"
+            onClick={() => scrollToSection(locationRef)}
+          >
+            Локация
+          </button>
+          <button
+            className="pro-nav-pill"
+            type="button"
+            onClick={() => scrollToSection(availabilityRef)}
+          >
+            График
+          </button>
+          <button
+            className="pro-nav-pill"
+            type="button"
+            onClick={() => scrollToSection(portfolioRef)}
+          >
+            Портфолио
+          </button>
+        </nav>
+
+        {isLoading && <p className="pro-status">Загружаем профиль...</p>}
         {loadError && <p className="pro-error">{loadError}</p>}
 
-        <section className="pro-card animate delay-2">
-          <h2 className="pro-card-title">Прогресс профиля</h2>
+        <section className="pro-card pro-card--insight animate delay-2">
+          <div className="pro-card-head">
+            <div>
+              <p className="pro-card-eyebrow">Навигатор профиля</p>
+              <h2 className="pro-card-title">Готовность к заявкам</h2>
+            </div>
+            <span className={`pro-pill ${profileTone}`}>{profileStatus.completeness}%</span>
+          </div>
+          <div className="pro-insight-grid">
+            <div className="pro-insight-item">
+              <span className="pro-insight-label">Статус</span>
+              <strong className="pro-insight-value">
+                {statusLabelMap[profileStatus.profileStatus]}
+              </strong>
+            </div>
+            <div className="pro-insight-item">
+              <span className="pro-insight-label">Отклики</span>
+              <strong className="pro-insight-value">
+                {profileStatus.missingFields.length > 0 ? 'Недоступны' : 'Доступны'}
+              </strong>
+            </div>
+            <div className="pro-insight-item">
+              <span className="pro-insight-label">Фокус</span>
+              <strong className="pro-insight-value">
+                {missingLabels[0] ?? 'Портфолио'}
+              </strong>
+            </div>
+          </div>
           <div className="pro-progress">
             <div className="pro-progress-row">
               <span>Готовность профиля</span>
@@ -418,25 +741,27 @@ export const ProProfileScreen = ({
             <div className="pro-progress-bar" aria-hidden="true">
               <span style={{ width: `${profileStatus.completeness}%` }} />
             </div>
-            <div className="pro-progress-row pro-progress-status">
-              <span>Статус</span>
-              <strong>{statusLabelMap[profileStatus.profileStatus]}</strong>
-            </div>
-            <p className="pro-progress-note">
-              {profileStatus.missingFields.length > 0
-                ? 'Заполните минимум, чтобы откликаться на заявки.'
-                : 'Можно откликаться на заявки. Доведите профиль до 100% для доверия.'}
-            </p>
-            {missingLabels.length > 0 && (
-              <p className="pro-progress-missing">
-                Для отклика заполните: {missingLabels.join(', ')}.
-              </p>
-            )}
           </div>
+          <p className="pro-progress-note">
+            {profileStatus.missingFields.length > 0
+              ? 'Заполните минимум, чтобы откликаться на заявки.'
+              : 'Можно откликаться на заявки. Доведите профиль до 100% для доверия.'}
+          </p>
+          {missingLabels.length > 0 && (
+            <p className="pro-progress-missing">
+              Для отклика заполните: {missingLabels.join(', ')}.
+            </p>
+          )}
         </section>
 
-        <section className="pro-card animate delay-2" ref={basicRef}>
-          <h2 className="pro-card-title">Основное</h2>
+        <section className="pro-card pro-section animate delay-2" ref={basicRef}>
+          <div className="pro-section-head">
+            <div className="pro-section-index">01</div>
+            <div>
+              <h2 className="pro-card-title">Основное</h2>
+              <p className="pro-section-subtitle">Имя, описание и специализации</p>
+            </div>
+          </div>
           <div className="pro-field">
             <label className="pro-label" htmlFor="pro-name">
               Имя и специализация
@@ -483,8 +808,14 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-3" ref={servicesRef}>
-          <h2 className="pro-card-title">Услуги и цены</h2>
+        <section className="pro-card pro-section animate delay-3" ref={servicesRef}>
+          <div className="pro-section-head">
+            <div className="pro-section-index">02</div>
+            <div>
+              <h2 className="pro-card-title">Услуги и цены</h2>
+              <p className="pro-section-subtitle">Что делаете и сколько это стоит</p>
+            </div>
+          </div>
           <div className="pro-field">
             <span className="pro-label">Услуги</span>
             <div className="pro-chip-field">
@@ -553,8 +884,16 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-4" ref={locationRef}>
-          <h2 className="pro-card-title">Локация и опыт</h2>
+        <section className="pro-card pro-section animate delay-4" ref={locationRef}>
+          <div className="pro-section-head">
+            <div className="pro-section-index">03</div>
+            <div>
+              <h2 className="pro-card-title">Локация и опыт</h2>
+              <p className="pro-section-subtitle">
+                Где вы работаете и сколько лет в профессии
+              </p>
+            </div>
+          </div>
           <div className="pro-field pro-field--split">
             <div>
               <label className="pro-label" htmlFor="pro-city">
@@ -639,8 +978,16 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-5" ref={availabilityRef}>
-          <h2 className="pro-card-title">График и доступность</h2>
+        <section className="pro-card pro-section animate delay-5" ref={availabilityRef}>
+          <div className="pro-section-head">
+            <div className="pro-section-index">04</div>
+            <div>
+              <h2 className="pro-card-title">График и доступность</h2>
+              <p className="pro-section-subtitle">
+                Управляйте приемом заявок и расписанием
+              </p>
+            </div>
+          </div>
           <div className="pro-field">
             <span className="pro-label">Статус</span>
             <label className="pro-toggle">
@@ -698,8 +1045,14 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-6" ref={portfolioRef}>
-          <h2 className="pro-card-title">Портфолио</h2>
+        <section className="pro-card pro-section animate delay-6" ref={portfolioRef}>
+          <div className="pro-section-head">
+            <div className="pro-section-index">05</div>
+            <div>
+              <h2 className="pro-card-title">Портфолио</h2>
+              <p className="pro-section-subtitle">Добавьте ссылки на лучшие работы</p>
+            </div>
+          </div>
           <div className="pro-field">
             <span className="pro-label">Ссылки на работы</span>
             <div className="pro-chip-field">
@@ -739,7 +1092,12 @@ export const ProProfileScreen = ({
         </section>
 
         <div className="pro-actions">
-          <button className="pro-primary" type="button" onClick={handleSave}>
+          <button
+            className="pro-primary"
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
             {isSaving ? 'Сохраняем...' : 'Сохранить профиль'}
           </button>
           <button className="pro-secondary" type="button" onClick={onViewRequests}>

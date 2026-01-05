@@ -180,8 +180,9 @@ function App() {
       view === 'pro-cabinet' ||
       view === 'pro-profile' ||
       view === 'pro-requests'
-    webApp.setHeaderColor?.(isClient ? '#f3edf7' : '#f7f2ef')
-    webApp.setBackgroundColor?.(isClient ? '#f3edf7' : '#f7f2ef')
+    const themeColor = view === 'pro-profile' ? '#fff3e8' : isClient ? '#f3edf7' : '#f7f2ef'
+    webApp.setHeaderColor?.(themeColor)
+    webApp.setBackgroundColor?.(themeColor)
   }, [view])
 
   useEffect(() => {
