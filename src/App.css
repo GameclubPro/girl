@@ -1263,21 +1263,43 @@ h1 {
   color: #5f5855;
 }
 
-.subtitle-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
+.subtitle-layout {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-items: center;
+  column-gap: 18px;
+  row-gap: 2px;
   width: max-content;
 }
 
-.subtitle-middle-row {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  width: 100%;
-  padding: 0 14px;
+.subtitle-side {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.subtitle-side--left {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.subtitle-side--right {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.subtitle-top {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.subtitle-bottom {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .subtitle-accent,
@@ -1309,7 +1331,6 @@ h1 {
   font-weight: 800;
   letter-spacing: 0.4px;
   padding: 0 2px;
-  align-self: center;
   line-height: 1.05;
 }
 
