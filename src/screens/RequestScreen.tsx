@@ -42,10 +42,10 @@ export const RequestScreen = ({
   address,
   onBack,
 }: RequestScreenProps) => {
-  const [categoryId, setCategoryId] = useState(
+  const [categoryId, setCategoryId] = useState<string>(
     defaultCategoryId ?? categoryItems[0]?.id ?? ''
   )
-  const [serviceName, setServiceName] = useState(
+  const [serviceName, setServiceName] = useState<string>(
     requestQuickChoices[0] ?? ''
   )
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -57,7 +57,9 @@ export const RequestScreen = ({
   >('today')
   const [dateValue, setDateValue] = useState('')
   const [timeValue, setTimeValue] = useState('')
-  const [budget, setBudget] = useState(requestBudgetOptions[0] ?? 'не важно')
+  const [budget, setBudget] = useState<string>(
+    requestBudgetOptions[0] ?? 'не важно'
+  )
   const [details, setDetails] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')

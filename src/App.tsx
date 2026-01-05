@@ -40,7 +40,7 @@ function App() {
   const [isLoadingCities, setIsLoadingCities] = useState(false)
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [requestCategoryId, setRequestCategoryId] = useState(
+  const [requestCategoryId, setRequestCategoryId] = useState<string>(
     categoryItems[0]?.id ?? ''
   )
   const clientName =
