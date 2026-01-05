@@ -788,19 +788,26 @@ const ClientScreen = ({ clientName }: { clientName: string }) => (
         </div>
         <div className="popular-carousel" role="region" aria-label="Популярное сегодня">
           <div className="popular-track" role="list">
-            {popularItems.map((item) => (
-              <button
-                className="popular-card"
-                type="button"
-                key={item.id}
-                role="listitem"
-              >
-                <span className="popular-media" aria-hidden="true">
-                  <img className="popular-image" src={item.image} alt="" />
-                </span>
-                <span className="popular-label">{item.label}</span>
-              </button>
-            ))}
+            {popularItems.map((item) => {
+              const labelClassName =
+                item.label.length <= 8
+                  ? 'popular-label popular-label--short'
+                  : 'popular-label'
+
+              return (
+                <button
+                  className="popular-card"
+                  type="button"
+                  key={item.id}
+                  role="listitem"
+                >
+                  <span className="popular-media" aria-hidden="true">
+                    <img className="popular-image" src={item.image} alt="" />
+                  </span>
+                  <span className={labelClassName}>{item.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       </section>
