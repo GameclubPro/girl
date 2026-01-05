@@ -467,9 +467,6 @@ function App() {
   if (view === 'pro-cabinet') {
     return (
       <ProCabinetScreen
-        apiBase={apiBase}
-        userId={userId}
-        displayNameFallback={clientName}
         onEditProfile={(section) => {
           setProProfileSection(section ?? 'basic')
           setView('pro-profile')

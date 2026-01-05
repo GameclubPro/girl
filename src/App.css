@@ -557,7 +557,7 @@
   --pro-muted: #7f7386;
   --pro-nav-accent: #8f62e4;
   --pro-nav-accent-2: #6d42cb;
-  background: radial-gradient(120% 140% at 50% -20%, #ffffff 0%, #f3edf7 50%, #efe6f2 100%);
+  background: #ffffff;
   padding: calc(16px + var(--safe-top) + var(--tg-top-offset)) 18px
     calc(120px + env(safe-area-inset-bottom));
 }
