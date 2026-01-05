@@ -692,7 +692,7 @@ h2 {
 .popular-card {
   --popular-text-height: clamp(56px, 14vw, 64px);
   --popular-image-height: calc(var(--popular-text-height) * 1.08);
-  --popular-label-height: calc(var(--popular-text-height) * 1.1);
+  --popular-label-height: calc(var(--popular-text-height) * 1.05);
   flex: 0 0 clamp(138px, 36.8vw, 184px);
   border: 1px solid #eadff2;
   background: rgba(255, 255, 255, 0.75);
@@ -731,7 +731,7 @@ h2 {
   justify-content: center;
   min-height: var(--popular-label-height);
   padding: 2px 0;
-  font-family: var(--font-title);
+  font-family: var(--font-popular);
   font-size: clamp(11px, 3vw, 13px);
   font-weight: 700;
   letter-spacing: 0.2px;
