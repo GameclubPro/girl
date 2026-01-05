@@ -293,7 +293,7 @@ export const RequestScreen = ({
             <p className="request-helper">
               Заполните город и район в профиле, чтобы опубликовать заявку.
             </p>
-          </div>
+          )}
         </section>
 
         <section className="request-card animate delay-4">
