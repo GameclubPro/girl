@@ -127,7 +127,7 @@ function App() {
         throw new Error('Save failed')
       }
 
-      setView(role === 'pro' ? 'pro-cabinet' : 'client')
+      setView(role === 'pro' ? 'pro-profile' : 'client')
     } catch (error) {
       setSaveError('Не удалось сохранить адрес. Попробуйте еще раз.')
     } finally {
@@ -464,7 +464,7 @@ function App() {
         if (nextRole === 'pro') {
           setProProfileSection(null)
         }
-        setView(nextRole === 'pro' ? 'pro-cabinet' : 'address')
+        setView(nextRole === 'pro' ? 'pro-profile' : 'address')
       }}
     />
   )
