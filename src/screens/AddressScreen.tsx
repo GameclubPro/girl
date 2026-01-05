@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { IconAddress, IconCity, IconDistrict } from '../components/icons'
 import { isCityAvailable } from '../data/cityAvailability'
 import type { City, District, Role } from '../types/app'
 
@@ -80,17 +81,22 @@ export const AddressScreen = ({
             <label className="address-label" htmlFor="city-input">
               Город
             </label>
-            <input
-              id="city-input"
-              className="address-input"
-              type="text"
-              value={cityQuery}
-              onChange={(event) => onCityQueryChange(event.target.value)}
-              onFocus={() => setIsCityFocused(true)}
-              onBlur={() => setIsCityFocused(false)}
-              placeholder="Начните вводить город"
-              autoComplete="address-level2"
-            />
+            <div className="address-input-wrap">
+              <span className="address-input-icon" aria-hidden="true">
+                <IconCity />
+              </span>
+              <input
+                id="city-input"
+                className="address-input address-input--icon"
+                type="text"
+                value={cityQuery}
+                onChange={(event) => onCityQueryChange(event.target.value)}
+                onFocus={() => setIsCityFocused(true)}
+                onBlur={() => setIsCityFocused(false)}
+                placeholder="Начните вводить город"
+                autoComplete="address-level2"
+              />
+            </div>
             {showSuggestions && (
               <div className="address-suggest" role="listbox">
                 {filteredCities.length > 0 ? (
@@ -136,28 +142,33 @@ export const AddressScreen = ({
             <label className="address-label" htmlFor="district-select">
               Район
             </label>
-            <select
-              id="district-select"
-              className="address-select"
-              value={districtId ?? ''}
-              onChange={(event) => {
-                const nextValue = event.target.value
-                const parsedValue = Number(nextValue)
-                onDistrictChange(
-                  Number.isInteger(parsedValue) ? parsedValue : null
-                )
-              }}
-              disabled={!hasCity || districts.length === 0}
-            >
-              <option value="">
-                {hasCity ? 'Выберите район' : 'Сначала выберите город'}
-              </option>
-              {districts.map((district) => (
-                <option key={district.id} value={district.id}>
-                  {district.name}
+            <div className="address-input-wrap">
+              <span className="address-input-icon" aria-hidden="true">
+                <IconDistrict />
+              </span>
+              <select
+                id="district-select"
+                className="address-select address-select--icon"
+                value={districtId ?? ''}
+                onChange={(event) => {
+                  const nextValue = event.target.value
+                  const parsedValue = Number(nextValue)
+                  onDistrictChange(
+                    Number.isInteger(parsedValue) ? parsedValue : null
+                  )
+                }}
+                disabled={!hasCity || districts.length === 0}
+              >
+                <option value="">
+                  {hasCity ? 'Выберите район' : 'Сначала выберите город'}
                 </option>
-              ))}
-            </select>
+                {districts.map((district) => (
+                  <option key={district.id} value={district.id}>
+                    {district.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -165,15 +176,20 @@ export const AddressScreen = ({
           <label className="address-label" htmlFor="address-input">
             Адрес
           </label>
-          <input
-            id="address-input"
-            className="address-input"
-            type="text"
-            value={address}
-            onChange={(event) => onAddressChange(event.target.value)}
-            placeholder="Улица, дом, квартира"
-            autoComplete="street-address"
-          />
+          <div className="address-input-wrap">
+            <span className="address-input-icon" aria-hidden="true">
+              <IconAddress />
+            </span>
+            <input
+              id="address-input"
+              className="address-input address-input--icon"
+              type="text"
+              value={address}
+              onChange={(event) => onAddressChange(event.target.value)}
+              placeholder="Улица, дом, квартира"
+              autoComplete="street-address"
+            />
+          </div>
           <p className="address-helper">Нужен точный адрес для выезда.</p>
         </div>
 

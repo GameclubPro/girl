@@ -968,6 +968,26 @@
   gap: 8px;
 }
 
+.address-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.address-input-icon {
+  position: absolute;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  color: #9a8dad;
+  pointer-events: none;
+}
+
+.address-input-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
 .address-select {
   width: 100%;
   border: 1px solid rgba(98, 86, 78, 0.18);
@@ -988,6 +1008,10 @@
   background-size: 6px 6px;
   background-repeat: no-repeat;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.address-select--icon {
+  padding-left: 38px;
 }
 
 .address-select:focus {
@@ -1108,6 +1132,10 @@
   color: #2f2926;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.address-input--icon {
+  padding-left: 38px;
 }
 
 .address-input::placeholder {
