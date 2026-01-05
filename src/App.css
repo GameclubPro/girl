@@ -898,6 +898,11 @@ h2 {
   cursor: pointer;
 }
 
+.cta--wide {
+  width: 100%;
+  justify-content: center;
+}
+
 .cta--primary {
   background: linear-gradient(135deg, #8f62e4 0%, #6d42cb 100%);
   color: #ffffff;
@@ -909,6 +914,12 @@ h2 {
   color: #3d3243;
   border: 1px solid #e6d9ee;
   box-shadow: 0 10px 16px rgba(79, 63, 102, 0.14);
+}
+
+.cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .cta-icon {
@@ -1202,6 +1213,21 @@ h2 {
   font-weight: 600;
   color: #2f2731;
   cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.category-card.is-selected {
+  border-color: #7c5bf1;
+  background: linear-gradient(135deg, #f4edff 0%, #e6dcff 100%);
+  box-shadow: 0 12px 18px rgba(107, 71, 211, 0.2);
+}
+
+.category-helper {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6f616f;
 }
 
 .category-left {

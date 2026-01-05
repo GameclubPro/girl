@@ -53,26 +53,6 @@ const IconBell = () => (
   </svg>
 )
 
-const IconSearch = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <circle
-      cx="11"
-      cy="11"
-      r="6.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    />
-    <path
-      d="M16 16l4 4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
 const IconHome = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -844,122 +824,143 @@ const ClientScreen = ({
 }: {
   clientName: string
   onCreateRequest: () => void
-}) => (
-  <div className="screen screen--client">
-    <div className="client-shell">
-      <header className="client-brand-row">
-        <div className="client-brand">KIVEN</div>
-      </header>
+}) => {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const selectedCategoryLabel =
+    categoryItems.find((item) => item.id === selectedCategory)?.label ?? ''
 
-      <div className="client-top">
-        <p className="client-greeting">
-          Привет{clientName ? `, ${clientName}` : ''}{' '}
-          <span aria-hidden="true">👋</span>
-        </p>
-        <button className="bell-button" type="button" aria-label="Уведомления">
-          <IconBell />
-        </button>
-      </div>
+  return (
+    <div className="screen screen--client">
+      <div className="client-shell">
+        <header className="client-brand-row">
+          <div className="client-brand">KIVEN</div>
+        </header>
 
-      <section className="client-section">
-        <CollectionCarousel />
-      </section>
-
-      <div className="cta-row">
-        <button className="cta cta--primary" type="button" onClick={onCreateRequest}>
-          <span className="cta-icon" aria-hidden="true">
-            +
-          </span>
-          Создать заявку
-        </button>
-        <button className="cta cta--secondary" type="button">
-          <span className="cta-icon cta-icon--ghost" aria-hidden="true">
-            <IconSearch />
-          </span>
-          Найти мастера <span className="cta-arrow">›</span>
-        </button>
-      </div>
-
-      <section className="client-section">
-        <div className="section-header">
-          <h3>Популярное сегодня</h3>
+        <div className="client-top">
+          <p className="client-greeting">
+            Привет{clientName ? `, ${clientName}` : ''}{' '}
+            <span aria-hidden="true">👋</span>
+          </p>
+          <button className="bell-button" type="button" aria-label="Уведомления">
+            <IconBell />
+          </button>
         </div>
-        <div className="popular-carousel" role="region" aria-label="Популярное сегодня">
-          <div className="popular-track" role="list">
-            {popularItems.map((item) => {
-              const labelClassName =
-                item.label.length <= 8
-                  ? 'popular-label popular-label--short'
-                  : 'popular-label'
+
+        <section className="client-section">
+          <CollectionCarousel />
+        </section>
+
+        <section className="client-section">
+          <div className="section-header">
+            <h3>Популярное сегодня</h3>
+          </div>
+          <div
+            className="popular-carousel"
+            role="region"
+            aria-label="Популярное сегодня"
+          >
+            <div className="popular-track" role="list">
+              {popularItems.map((item) => {
+                const labelClassName =
+                  item.label.length <= 8
+                    ? 'popular-label popular-label--short'
+                    : 'popular-label'
+
+                return (
+                  <button
+                    className="popular-card"
+                    type="button"
+                    key={item.id}
+                    role="listitem"
+                  >
+                    <span className="popular-media" aria-hidden="true">
+                      <img className="popular-image" src={item.image} alt="" />
+                    </span>
+                    <span className={labelClassName}>{item.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className="client-section">
+          <div className="category-grid">
+            {categoryItems.map((item) => {
+              const isSelected = item.id === selectedCategory
 
               return (
                 <button
-                  className="popular-card"
+                  className={`category-card${isSelected ? ' is-selected' : ''}`}
                   type="button"
                   key={item.id}
-                  role="listitem"
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedCategory(item.id)}
                 >
-                  <span className="popular-media" aria-hidden="true">
-                    <img className="popular-image" src={item.image} alt="" />
+                  <span className="category-left">
+                    <span className="category-icon" aria-hidden="true">
+                      <img
+                        className="category-icon-image"
+                        src={item.icon}
+                        alt=""
+                        aria-hidden="true"
+                      />
+                    </span>
+                    {item.label}
                   </span>
-                  <span className={labelClassName}>{item.label}</span>
+                  <span className="category-arrow">›</span>
                 </button>
               )
             })}
           </div>
-        </div>
-      </section>
+          <p className="category-helper">
+            {selectedCategoryLabel
+              ? `Выбрана категория: ${selectedCategoryLabel}`
+              : 'Выберите категорию, чтобы создать заявку'}
+          </p>
+          <button
+            className="cta cta--primary cta--wide"
+            type="button"
+            onClick={onCreateRequest}
+            disabled={!selectedCategory}
+          >
+            <span className="cta-icon" aria-hidden="true">
+              +
+            </span>
+            Создать заявку
+          </button>
+        </section>
+      </div>
 
-      <section className="client-section">
-        <div className="category-grid">
-          {categoryItems.map((item) => (
-            <button className="category-card" type="button" key={item.id}>
-              <span className="category-left">
-                <span className="category-icon" aria-hidden="true">
-                  <img
-                    className="category-icon-image"
-                    src={item.icon}
-                    alt=""
-                    aria-hidden="true"
-                  />
-                </span>
-                {item.label}
-              </span>
-              <span className="category-arrow">›</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      <nav className="bottom-nav" aria-label="Навигация">
+        <button className="nav-item is-active" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconHome />
+          </span>
+          Главная
+        </button>
+        <button className="nav-item" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconUsers />
+          </span>
+          Мастера
+        </button>
+        <button className="nav-item" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconList />
+          </span>
+          Мои заявки
+        </button>
+        <button className="nav-item" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconUser />
+          </span>
+          Профиль
+        </button>
+      </nav>
     </div>
-
-    <nav className="bottom-nav" aria-label="Навигация">
-      <button className="nav-item is-active" type="button">
-        <span className="nav-icon" aria-hidden="true">
-          <IconHome />
-        </span>
-        Главная
-      </button>
-      <button className="nav-item" type="button">
-        <span className="nav-icon" aria-hidden="true">
-          <IconUsers />
-        </span>
-        Мастера
-      </button>
-      <button className="nav-item" type="button">
-        <span className="nav-icon" aria-hidden="true">
-          <IconList />
-        </span>
-        Мои заявки
-      </button>
-      <button className="nav-item" type="button">
-        <span className="nav-icon" aria-hidden="true">
-          <IconUser />
-        </span>
-        Профиль
-      </button>
-    </nav>
-  </div>
-)
+  )
+}
 
 const RequestScreen = ({ onBack }: { onBack: () => void }) => {
   const locationOptions = ['У мастера', 'У меня', 'Не важно'] as const
