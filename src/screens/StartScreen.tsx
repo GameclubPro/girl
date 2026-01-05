@@ -10,12 +10,6 @@ export const StartScreen = ({
   onRoleSelect: (role: Role) => void
 }) => (
   <div className="screen screen--start">
-    <div className="topbar">
-      <button className="lang-pill" type="button" aria-label="Сменить язык">
-        RU <span className="chev">›</span>
-      </button>
-    </div>
-
     <main className="content">
       <div className="title-block animate delay-1">
         <img className="brand-logo" src={logoImage} alt="KIVEN GIRL" />
