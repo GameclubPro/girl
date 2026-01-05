@@ -204,7 +204,7 @@ export const ProProfileScreen = ({
 
   useEffect(() => {
     if (!focusSection) return
-    const targetMap: Record<ProProfileSection, RefObject<HTMLDivElement>> = {
+    const targetMap: Record<ProProfileSection, RefObject<HTMLDivElement | null>> = {
       basic: basicRef,
       services: servicesRef,
       location: locationRef,
@@ -549,7 +549,7 @@ export const ProProfileScreen = ({
     }
   }
 
-  const scrollToSection = (ref: RefObject<HTMLDivElement>) => {
+  const scrollToSection = (ref: RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
