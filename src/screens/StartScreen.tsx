@@ -22,11 +22,11 @@ export const StartScreen = ({
         <h1>KIVEN GIRL</h1>
         <p className="subtitle">
           <span className="subtitle-intro">Услуги</span>
-          <span className="subtitle-row">
+          <span className="subtitle-stack">
             <span className="subtitle-strong">ДЕВУШЕК</span>
-            <span className="subtitle-mid">
-              <span className="subtitle-accent">для</span>
+            <span className="subtitle-middle-row">
               <span className="subtitle-accent">от</span>
+              <span className="subtitle-accent">для</span>
             </span>
             <span className="subtitle-strong">ДЕВУШЕК</span>
           </span>
