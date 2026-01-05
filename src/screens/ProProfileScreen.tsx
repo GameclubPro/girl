@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, RefObject } from 'react'
+import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
 import { getProfileStatusSummary } from '../utils/profileStatus'
@@ -1308,6 +1309,13 @@ export const ProProfileScreen = ({
         {saveError && <p className="pro-error">{saveError}</p>}
         {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
       </div>
+
+      <ProBottomNav
+        active="profile"
+        onCabinet={onBack}
+        onRequests={onViewRequests}
+        onProfile={() => {}}
+      />
     </div>
   )
 }

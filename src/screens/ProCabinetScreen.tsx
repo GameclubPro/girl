@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, ProProfileSection, ServiceRequest } from '../types/app'
 import { getProfileStatusSummary } from '../utils/profileStatus'
@@ -452,6 +453,13 @@ export const ProCabinetScreen = ({
           </div>
         </section>
       </div>
+
+      <ProBottomNav
+        active="cabinet"
+        onCabinet={() => {}}
+        onRequests={onViewRequests}
+        onProfile={() => onEditProfile()}
+      />
     </div>
   )
 }
