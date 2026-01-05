@@ -11,6 +11,8 @@ export type District = {
 
 export type Role = 'client' | 'pro'
 
+export type ProfileStatus = 'draft' | 'ready' | 'complete'
+
 export type MasterProfile = {
   userId: string
   displayName: string

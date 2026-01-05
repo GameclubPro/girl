@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { categoryItems } from '../data/clientData'
-import type { ServiceRequest } from '../types/app'
+import type { ProfileStatus, ServiceRequest } from '../types/app'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -51,12 +51,14 @@ type ProRequestsScreenProps = {
   apiBase: string
   userId: string
   onBack: () => void
+  onEditProfile: () => void
 }
 
 export const ProRequestsScreen = ({
   apiBase,
   userId,
   onBack,
+  onEditProfile,
 }: ProRequestsScreenProps) => {
   const [requests, setRequests] = useState<ProRequest[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -65,6 +67,7 @@ export const ProRequestsScreen = ({
   const [submitSuccess, setSubmitSuccess] = useState<Record<number, string>>({})
   const [submittingId, setSubmittingId] = useState<number | null>(null)
   const [drafts, setDrafts] = useState<Record<number, ResponseDraft>>({})
+  const [missingFields, setMissingFields] = useState<string[]>([])
 
   useEffect(() => {
     if (!userId) return
@@ -81,13 +84,23 @@ export const ProRequestsScreen = ({
         if (!response.ok) {
           throw new Error('Load pro requests failed')
         }
-        const data = (await response.json()) as ProRequest[]
+        const data = (await response.json()) as
+          | ProRequest[]
+          | {
+              profileStatus?: ProfileStatus
+              missingFields?: string[]
+              requests?: ProRequest[]
+            }
         if (cancelled) return
 
-        setRequests(data)
+        const requestItems = Array.isArray(data) ? data : data.requests ?? []
+        const nextMissing = Array.isArray(data) ? [] : data.missingFields ?? []
+
+        setRequests(requestItems)
+        setMissingFields(nextMissing)
         setDrafts((current) => {
           const nextDrafts = { ...current }
-          data.forEach((item) => {
+          requestItems.forEach((item) => {
             if (!nextDrafts[item.id]) {
               nextDrafts[item.id] = {
                 price:
@@ -120,6 +133,27 @@ export const ProRequestsScreen = ({
   }, [apiBase, userId])
 
   const items = useMemo(() => requests, [requests])
+  const missingLabels = useMemo(() => {
+    const labels: string[] = []
+    if (missingFields.includes('displayName')) {
+      labels.push('Имя и специализация')
+    }
+    if (missingFields.includes('categories')) {
+      labels.push('Категории услуг')
+    }
+    if (
+      missingFields.includes('cityId') ||
+      missingFields.includes('districtId')
+    ) {
+      labels.push('Город и район')
+    }
+    if (missingFields.includes('workFormat')) {
+      labels.push('Формат работы')
+    }
+    return labels
+  }, [missingFields])
+  const missingSummary =
+    missingLabels.length > 0 ? missingLabels.join(', ') : 'минимум профиля'
 
   const handleDraftChange = (
     requestId: number,
@@ -137,6 +171,13 @@ export const ProRequestsScreen = ({
 
   const handleSubmit = async (requestId: number) => {
     if (submittingId) return
+    if (missingFields.length > 0) {
+      setSubmitError((current) => ({
+        ...current,
+        [requestId]: 'Заполните минимум профиля, чтобы откликаться.',
+      }))
+      return
+    }
     const draft = drafts[requestId]
     if (!draft) return
 
@@ -172,6 +213,20 @@ export const ProRequestsScreen = ({
           }),
         }
       )
+
+      if (response.status === 409) {
+        const data = (await response.json().catch(() => null)) as {
+          missingFields?: string[]
+        } | null
+        setSubmitError((current) => ({
+          ...current,
+          [requestId]: 'Заполните минимум профиля, чтобы откликаться.',
+        }))
+        if (data?.missingFields) {
+          setMissingFields(data.missingFields)
+        }
+        return
+      }
 
       if (!response.ok) {
         throw new Error('Submit response failed')
@@ -218,11 +273,32 @@ export const ProRequestsScreen = ({
         </header>
 
         <section className="requests-card animate delay-2">
+          {missingFields.length > 0 && (
+            <div className="pro-banner">
+              <div>
+                <div className="pro-banner-title">Чтобы откликаться</div>
+                <p className="pro-banner-text">
+                  Заполните профиль: {missingSummary}.
+                </p>
+              </div>
+              <button
+                className="pro-banner-button"
+                type="button"
+                onClick={onEditProfile}
+              >
+                Заполнить
+              </button>
+            </div>
+          )}
           {isLoading && <p className="requests-status">Загружаем заявки...</p>}
           {loadError && <p className="requests-error">{loadError}</p>}
 
           {!isLoading && !items.length && !loadError && (
-            <p className="requests-empty">Пока нет подходящих заявок.</p>
+            <p className="requests-empty">
+              {missingFields.some((field) => field !== 'displayName')
+                ? 'Заполните профиль, чтобы видеть заявки рядом.'
+                : 'Пока нет подходящих заявок.'}
+            </p>
           )}
 
           <div className="requests-list">
@@ -247,6 +323,7 @@ export const ProRequestsScreen = ({
                 proposedTime: '',
               }
               const isSubmitting = submittingId === item.id
+              const canRespond = missingFields.length === 0
 
               return (
                 <div className="pro-request-item" key={item.id}>
@@ -283,6 +360,7 @@ export const ProRequestsScreen = ({
                         handleDraftChange(item.id, 'price', event.target.value)
                       }
                       min="0"
+                      disabled={!canRespond}
                     />
                     <input
                       className="pro-response-input"
@@ -296,6 +374,7 @@ export const ProRequestsScreen = ({
                           event.target.value
                         )
                       }
+                      disabled={!canRespond}
                     />
                     <textarea
                       className="pro-response-textarea"
@@ -305,12 +384,13 @@ export const ProRequestsScreen = ({
                       onChange={(event) =>
                         handleDraftChange(item.id, 'comment', event.target.value)
                       }
+                      disabled={!canRespond}
                     />
                     <button
                       className="pro-response-button"
                       type="button"
                       onClick={() => handleSubmit(item.id)}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !canRespond}
                     >
                       {isSubmitting
                         ? 'Отправляем...'

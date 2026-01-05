@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AddressScreen } from './screens/AddressScreen'
 import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
 import { ClientScreen } from './screens/ClientScreen'
+import { ProCabinetScreen } from './screens/ProCabinetScreen'
 import { ProProfileScreen } from './screens/ProProfileScreen'
 import { ProRequestsScreen } from './screens/ProRequestsScreen'
 import { RequestScreen } from './screens/RequestScreen'
@@ -24,6 +25,7 @@ function App() {
     | 'client'
     | 'request'
     | 'requests'
+    | 'pro-cabinet'
     | 'pro-profile'
     | 'pro-requests'
   >('start')
@@ -123,7 +125,7 @@ function App() {
         throw new Error('Save failed')
       }
 
-      setView(role === 'pro' ? 'pro-profile' : 'client')
+      setView(role === 'pro' ? 'pro-cabinet' : 'client')
     } catch (error) {
       setSaveError('Не удалось сохранить адрес. Попробуйте еще раз.')
     } finally {
@@ -173,6 +175,7 @@ function App() {
       view === 'client' ||
       view === 'request' ||
       view === 'requests' ||
+      view === 'pro-cabinet' ||
       view === 'pro-profile' ||
       view === 'pro-requests'
     webApp.setHeaderColor?.(isClient ? '#f3edf7' : '#f7f2ef')
@@ -388,7 +391,7 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onBack={() => setView('start')}
+        onBack={() => setView('pro-cabinet')}
         onViewRequests={() => setView('pro-requests')}
       />
     )
@@ -399,7 +402,21 @@ function App() {
       <ProRequestsScreen
         apiBase={apiBase}
         userId={userId}
-        onBack={() => setView('pro-profile')}
+        onBack={() => setView('pro-cabinet')}
+        onEditProfile={() => setView('pro-profile')}
+      />
+    )
+  }
+
+  if (view === 'pro-cabinet') {
+    return (
+      <ProCabinetScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        onBack={() => setView('start')}
+        onEditProfile={() => setView('pro-profile')}
+        onViewRequests={() => setView('pro-requests')}
       />
     )
   }
@@ -431,7 +448,7 @@ function App() {
     <StartScreen
       onRoleSelect={(nextRole) => {
         setRole(nextRole)
-        setView('address')
+        setView(nextRole === 'pro' ? 'pro-cabinet' : 'address')
       }}
     />
   )

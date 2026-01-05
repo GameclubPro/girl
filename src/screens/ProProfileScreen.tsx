@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { categoryItems } from '../data/clientData'
 import type { City, District, MasterProfile } from '../types/app'
+import { getProfileStatusSummary } from '../utils/profileStatus'
 
 type ProProfileScreenProps = {
   apiBase: string
@@ -44,6 +45,61 @@ export const ProProfileScreen = ({
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
+  const profileStatus = useMemo(
+    () =>
+      getProfileStatusSummary({
+        displayName,
+        about,
+        cityId,
+        districtId,
+        experienceYears: parseNumber(experienceYears),
+        priceFrom: parseNumber(priceFrom),
+        priceTo: parseNumber(priceTo),
+        worksAtClient,
+        worksAtMaster,
+        categories,
+        services,
+        portfolioUrls,
+      }),
+    [
+      about,
+      categories,
+      cityId,
+      displayName,
+      districtId,
+      experienceYears,
+      portfolioUrls,
+      priceFrom,
+      priceTo,
+      services,
+      worksAtClient,
+      worksAtMaster,
+    ]
+  )
+  const missingLabels = useMemo(() => {
+    const labels: string[] = []
+    if (profileStatus.missingFields.includes('displayName')) {
+      labels.push('Имя и специализация')
+    }
+    if (profileStatus.missingFields.includes('categories')) {
+      labels.push('Категории услуг')
+    }
+    if (
+      profileStatus.missingFields.includes('cityId') ||
+      profileStatus.missingFields.includes('districtId')
+    ) {
+      labels.push('Город и район')
+    }
+    if (profileStatus.missingFields.includes('workFormat')) {
+      labels.push('Формат работы')
+    }
+    return labels
+  }, [profileStatus.missingFields])
+  const statusLabelMap = {
+    draft: 'Черновик',
+    ready: 'Готов к откликам',
+    complete: 'Профиль заполнен',
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -129,7 +185,7 @@ export const ProProfileScreen = ({
         const data = (await response.json()) as MasterProfile
         if (cancelled) return
 
-        setDisplayName(data.displayName || displayNameFallback)
+        setDisplayName(data.displayName ?? displayNameFallback)
         setAbout(data.about ?? '')
         setCityId(data.cityId ?? null)
         setDistrictId(data.districtId ?? null)
@@ -211,25 +267,6 @@ export const ProProfileScreen = ({
     setSaveSuccess('')
 
     const normalizedName = displayName.trim()
-    if (!normalizedName) {
-      setSaveError('Укажите имя для анкеты.')
-      return
-    }
-
-    if (!categories.length) {
-      setSaveError('Выберите хотя бы одну категорию.')
-      return
-    }
-
-    if (!worksAtClient && !worksAtMaster) {
-      setSaveError('Укажите формат работы.')
-      return
-    }
-
-    if (!cityId || !districtId) {
-      setSaveError('Укажите город и район.')
-      return
-    }
 
     const parsedPriceFrom = parseNumber(priceFrom)
     const parsedPriceTo = parseNumber(priceTo)
@@ -269,9 +306,28 @@ export const ProProfileScreen = ({
         throw new Error('Save profile failed')
       }
 
-      setSaveSuccess('Анкета сохранена.')
+      const summary = getProfileStatusSummary({
+        displayName: normalizedName,
+        about,
+        cityId,
+        districtId,
+        experienceYears: parseNumber(experienceYears),
+        priceFrom: parsedPriceFrom,
+        priceTo: parsedPriceTo,
+        worksAtClient,
+        worksAtMaster,
+        categories,
+        services,
+        portfolioUrls,
+      })
+
+      setSaveSuccess(
+        summary.missingFields.length > 0
+          ? 'Профиль сохранен как черновик. Заполните минимум для отклика.'
+          : 'Профиль сохранен. Можно откликаться на заявки.'
+      )
     } catch (error) {
-      setSaveError('Не удалось сохранить анкету. Попробуйте еще раз.')
+      setSaveError('Не удалось сохранить профиль. Попробуйте еще раз.')
     } finally {
       setIsSaving(false)
     }
@@ -285,8 +341,8 @@ export const ProProfileScreen = ({
             <span aria-hidden="true">‹</span>
           </button>
           <div className="request-headings">
-            <h1 className="request-title">Анкета мастера</h1>
-            <p className="request-subtitle">Покажите себя и свои услуги</p>
+            <h1 className="request-title">Профиль мастера</h1>
+            <p className="request-subtitle">Настройте профиль и получайте заявки</p>
           </div>
         </header>
 
@@ -294,10 +350,37 @@ export const ProProfileScreen = ({
         {loadError && <p className="pro-error">{loadError}</p>}
 
         <section className="pro-card animate delay-2">
+          <h2 className="pro-card-title">Прогресс профиля</h2>
+          <div className="pro-progress">
+            <div className="pro-progress-row">
+              <span>Готовность профиля</span>
+              <strong>{profileStatus.completeness}%</strong>
+            </div>
+            <div className="pro-progress-bar" aria-hidden="true">
+              <span style={{ width: `${profileStatus.completeness}%` }} />
+            </div>
+            <div className="pro-progress-row pro-progress-status">
+              <span>Статус</span>
+              <strong>{statusLabelMap[profileStatus.profileStatus]}</strong>
+            </div>
+            <p className="pro-progress-note">
+              {profileStatus.missingFields.length > 0
+                ? 'Заполните минимум, чтобы откликаться на заявки.'
+                : 'Можно откликаться на заявки. Доведите профиль до 100% для доверия.'}
+            </p>
+            {missingLabels.length > 0 && (
+              <p className="pro-progress-missing">
+                Для отклика заполните: {missingLabels.join(', ')}.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="pro-card animate delay-2">
           <h2 className="pro-card-title">Основное</h2>
           <div className="pro-field">
             <label className="pro-label" htmlFor="pro-name">
-              Имя и специализация *
+              Имя и специализация
             </label>
             <input
               id="pro-name"
@@ -322,7 +405,7 @@ export const ProProfileScreen = ({
             />
           </div>
           <div className="pro-field">
-            <span className="pro-label">Категории *</span>
+            <span className="pro-label">Категории</span>
             <div className="request-chips">
               {categoryItems.map((category) => (
                 <button
@@ -416,7 +499,7 @@ export const ProProfileScreen = ({
           <div className="pro-field pro-field--split">
             <div>
               <label className="pro-label" htmlFor="pro-city">
-                Город *
+                Город
               </label>
               <select
                 id="pro-city"
@@ -437,7 +520,7 @@ export const ProProfileScreen = ({
             </div>
             <div>
               <label className="pro-label" htmlFor="pro-district">
-                Район *
+                Район
               </label>
               <select
                 id="pro-district"
@@ -475,7 +558,7 @@ export const ProProfileScreen = ({
             />
           </div>
           <div className="pro-field">
-            <span className="pro-label">Формат работы *</span>
+            <span className="pro-label">Формат работы</span>
             <div className="pro-toggle-grid">
               <label className="pro-toggle">
                 <input
@@ -539,7 +622,7 @@ export const ProProfileScreen = ({
 
         <div className="pro-actions">
           <button className="pro-primary" type="button" onClick={handleSave}>
-            {isSaving ? 'Сохраняем...' : 'Сохранить анкету'}
+            {isSaving ? 'Сохраняем...' : 'Сохранить профиль'}
           </button>
           <button className="pro-secondary" type="button" onClick={onViewRequests}>
             Перейти к заявкам

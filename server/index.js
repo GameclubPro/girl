@@ -54,6 +54,66 @@ const parseOptionalInt = (value) => {
   return Number.isInteger(parsed) ? parsed : null
 }
 
+const getProfileStatusSummary = (profile) => {
+  const safeProfile = profile ?? {}
+  const normalizedName = normalizeText(safeProfile.displayName)
+  const categories = Array.isArray(safeProfile.categories)
+    ? safeProfile.categories.filter(Boolean)
+    : []
+  const worksAtClient = Boolean(safeProfile.worksAtClient)
+  const worksAtMaster = Boolean(safeProfile.worksAtMaster)
+  const hasCity = Number.isInteger(Number(safeProfile.cityId))
+  const hasDistrict = Number.isInteger(Number(safeProfile.districtId))
+  const hasLocation = hasCity && hasDistrict
+
+  const missingFields = []
+  if (!normalizedName) missingFields.push('displayName')
+  if (categories.length === 0) missingFields.push('categories')
+  if (!worksAtClient && !worksAtMaster) missingFields.push('workFormat')
+  if (!hasCity) missingFields.push('cityId')
+  if (!hasDistrict) missingFields.push('districtId')
+
+  const hasAbout =
+    Boolean(normalizeText(safeProfile.about)) ||
+    parseOptionalInt(safeProfile.experienceYears) !== null
+  const hasPrice =
+    parseOptionalInt(safeProfile.priceFrom) !== null ||
+    parseOptionalInt(safeProfile.priceTo) !== null
+  const hasServices = Array.isArray(safeProfile.services) && safeProfile.services.length > 0
+  const hasPortfolio =
+    Array.isArray(safeProfile.portfolioUrls) && safeProfile.portfolioUrls.length > 0
+
+  const checklist = [
+    Boolean(normalizedName),
+    categories.length > 0,
+    worksAtClient || worksAtMaster,
+    hasLocation,
+    hasAbout,
+    hasPrice,
+    hasServices,
+    hasPortfolio,
+  ]
+  const completed = checklist.filter(Boolean).length
+  const completeness = Math.round((completed / checklist.length) * 100)
+  const profileStatus =
+    missingFields.length === 0
+      ? completeness === 100
+        ? 'complete'
+        : 'ready'
+      : 'draft'
+
+  const isFilterReady = categories.length > 0 && (worksAtClient || worksAtMaster) && hasLocation
+  const isResponseReady = isFilterReady && Boolean(normalizedName)
+
+  return {
+    profileStatus,
+    missingFields,
+    completeness,
+    isFilterReady,
+    isResponseReady,
+  }
+}
+
 const ensureUser = async (userId) => {
   await pool.query(
     `
@@ -70,9 +130,16 @@ const loadMasterProfile = async (userId) => {
     `
       SELECT
         user_id AS "userId",
+        display_name AS "displayName",
+        about,
         city_id AS "cityId",
         district_id AS "districtId",
+        experience_years AS "experienceYears",
+        price_from AS "priceFrom",
+        price_to AS "priceTo",
         categories,
+        services,
+        portfolio_urls AS "portfolioUrls",
         works_at_client AS "worksAtClient",
         works_at_master AS "worksAtMaster"
       FROM master_profiles
@@ -553,7 +620,8 @@ app.get('/api/masters/:userId', async (req, res) => {
       return
     }
 
-    res.json(result.rows[0])
+    const summary = getProfileStatusSummary(result.rows[0])
+    res.json({ ...result.rows[0], ...summary })
   } catch (error) {
     console.error('GET /api/masters/:userId failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -589,16 +657,6 @@ app.post('/api/masters', async (req, res) => {
     return
   }
 
-  if (!normalizedName) {
-    res.status(400).json({ error: 'displayName_required' })
-    return
-  }
-
-  if (categoryList.length === 0) {
-    res.status(400).json({ error: 'categories_required' })
-    return
-  }
-
   const parsedCityId = Number(cityId)
   const parsedDistrictId = Number(districtId)
   const hasCity = Number.isInteger(parsedCityId)
@@ -624,11 +682,6 @@ app.post('/api/masters', async (req, res) => {
 
   const workAtClient = Boolean(worksAtClient)
   const workAtMaster = Boolean(worksAtMaster)
-
-  if (!workAtClient && !workAtMaster) {
-    res.status(400).json({ error: 'work_format_required' })
-    return
-  }
 
   try {
     await ensureUser(normalizedUserId)
@@ -704,7 +757,22 @@ app.post('/api/masters', async (req, res) => {
       ]
     )
 
-    res.json({ ok: true })
+    const summary = getProfileStatusSummary({
+      displayName: normalizedName,
+      about: normalizedAbout || null,
+      cityId: hasCity ? parsedCityId : null,
+      districtId: hasDistrict ? parsedDistrictId : null,
+      experienceYears: parsedExperienceYears,
+      priceFrom: parsedPriceFrom,
+      priceTo: parsedPriceTo,
+      worksAtClient: workAtClient,
+      worksAtMaster: workAtMaster,
+      categories: categoryList,
+      services: serviceList,
+      portfolioUrls: portfolioList,
+    })
+
+    res.json({ ok: true, ...summary })
   } catch (error) {
     console.error('POST /api/masters failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -721,15 +789,16 @@ app.get('/api/pro/requests', async (req, res) => {
 
   try {
     const profile = await loadMasterProfile(normalizedUserId)
+    const summary = getProfileStatusSummary(profile)
     if (!profile) {
-      res.status(404).json({ error: 'profile_not_found' })
+      res.json({ ...summary, requests: [] })
       return
     }
 
     const { cityId, districtId, categories, worksAtClient, worksAtMaster } = profile
 
-    if (!cityId || !districtId || !Array.isArray(categories) || categories.length === 0) {
-      res.json([])
+    if (!summary.isFilterReady) {
+      res.json({ ...summary, requests: [] })
       return
     }
 
@@ -780,7 +849,7 @@ app.get('/api/pro/requests', async (req, res) => {
       [normalizedUserId, cityId, districtId, categories, worksAtClient, worksAtMaster]
     )
 
-    res.json(result.rows)
+    res.json({ ...summary, requests: result.rows })
   } catch (error) {
     console.error('GET /api/pro/requests failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -971,7 +1040,14 @@ app.post('/api/requests/:id/responses', async (req, res) => {
   try {
     const profile = await loadMasterProfile(normalizedUserId)
     if (!profile) {
-      res.status(404).json({ error: 'profile_not_found' })
+      const summary = getProfileStatusSummary(null)
+      res.status(409).json({ error: 'profile_incomplete', ...summary })
+      return
+    }
+
+    const summary = getProfileStatusSummary(profile)
+    if (!summary.isResponseReady) {
+      res.status(409).json({ error: 'profile_incomplete', ...summary })
       return
     }
 
