@@ -730,7 +730,7 @@ h2 {
   align-items: center;
   justify-content: center;
   min-height: var(--popular-label-height);
-  padding: 2px 6px;
+  padding: 1px 6px;
   background: linear-gradient(180deg, #f6ecf2 0%, #f2e6ee 100%);
   font-family: var(--font-popular);
   font-size: clamp(11px, 3vw, 13px);

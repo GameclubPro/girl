@@ -199,8 +199,8 @@ const loopedCollectionItems = [
 
 const popularItems = [
   { id: 'manicure', image: popularNails, label: 'Маникюр' },
-  { id: 'haircut', image: popularNanny, label: 'Стрижка' },
   { id: 'brow-shaping', image: popularCleaning, label: 'Оформление бровей' },
+  { id: 'haircut', image: popularNanny, label: 'Стрижка' },
   { id: 'lash-extensions', image: popularBrowsLashes, label: 'Наращивание ресниц' },
 ] as const
 
