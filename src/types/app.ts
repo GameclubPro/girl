@@ -34,6 +34,8 @@ export type MasterProfile = {
   categories: string[]
   services: string[]
   portfolioUrls: string[]
+  avatarUrl?: string | null
+  coverUrl?: string | null
   isActive?: boolean
   scheduleDays?: string[]
   scheduleStart?: string | null

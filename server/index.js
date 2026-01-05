@@ -2,15 +2,22 @@ import dotenv from 'dotenv'
 import cors from 'cors'
 import express from 'express'
 import { Pool } from 'pg'
+import { randomUUID } from 'crypto'
+import fs from 'fs/promises'
+import path from 'path'
 
 dotenv.config()
 
 const app = express()
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 4000)
 const corsOrigin = process.env.CORS_ORIGIN ?? '*'
+const uploadsRoot = path.join(process.cwd(), 'uploads')
+const MAX_UPLOAD_BYTES = 3 * 1024 * 1024
+const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
 app.use(cors({ origin: corsOrigin }))
-app.use(express.json({ limit: '1mb' }))
+app.use(express.json({ limit: '6mb' }))
+app.use('/uploads', express.static(uploadsRoot))
 
 const createPool = () => {
   if (process.env.DATABASE_URL) {
@@ -52,6 +59,38 @@ const parseOptionalInt = (value) => {
   if (!normalized) return null
   const parsed = Number(normalized)
   return Number.isInteger(parsed) ? parsed : null
+}
+
+const sanitizePathSegment = (value) => {
+  const normalized = normalizeText(value)
+  return normalized.replace(/[^a-zA-Z0-9_-]/g, '') || 'user'
+}
+
+const parseImageDataUrl = (dataUrl) => {
+  if (typeof dataUrl !== 'string') return null
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/)
+  if (!match) return null
+  const [, mime, base64] = match
+  if (!allowedImageTypes.has(mime)) return null
+  const buffer = Buffer.from(base64, 'base64')
+  return { mime, buffer }
+}
+
+const getImageExtension = (mime) => {
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpg'
+  if (mime === 'image/png') return 'png'
+  if (mime === 'image/webp') return 'webp'
+  return 'bin'
+}
+
+const buildPublicUrl = (req, relativePath) => {
+  const normalized = normalizeText(relativePath)
+  if (!normalized) return null
+  if (/^https?:\/\//i.test(normalized)) return normalized
+  const baseUrl =
+    process.env.PUBLIC_BASE_URL ?? `${req.protocol}://${req.get('host')}`
+  const safePath = normalized.replace(/^\/+/, '')
+  return `${baseUrl}/uploads/${safePath}`
 }
 
 const getProfileStatusSummary = (profile) => {
@@ -137,6 +176,8 @@ const loadMasterProfile = async (userId) => {
         experience_years AS "experienceYears",
         price_from AS "priceFrom",
         price_to AS "priceTo",
+        avatar_path AS "avatarPath",
+        cover_path AS "coverPath",
         categories,
         services,
         portfolio_urls AS "portfolioUrls",
@@ -215,6 +256,8 @@ const ensureSchema = async () => {
       experience_years INTEGER,
       price_from INTEGER,
       price_to INTEGER,
+      avatar_path TEXT,
+      cover_path TEXT,
       works_at_client BOOLEAN NOT NULL DEFAULT false,
       works_at_master BOOLEAN NOT NULL DEFAULT false,
       categories TEXT[] NOT NULL DEFAULT '{}',
@@ -247,6 +290,16 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS schedule_end TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS avatar_path TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS cover_path TEXT;
   `)
 
   await pool.query(`
@@ -420,7 +473,12 @@ app.get('/api/cities', async (_req, res) => {
         ORDER BY name ASC
       `
     )
-    res.json(result.rows)
+    const enriched = result.rows.map((row) => ({
+      ...row,
+      avatarUrl: buildPublicUrl(req, row.avatarPath),
+      coverUrl: buildPublicUrl(req, row.coverPath),
+    }))
+    res.json(enriched)
   } catch (error) {
     console.error('GET /api/cities failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -590,6 +648,8 @@ app.get('/api/masters', async (req, res) => {
           mp.experience_years AS "experienceYears",
           mp.price_from AS "priceFrom",
           mp.price_to AS "priceTo",
+          mp.avatar_path AS "avatarPath",
+          mp.cover_path AS "coverPath",
           mp.works_at_client AS "worksAtClient",
           mp.works_at_master AS "worksAtMaster",
           mp.categories,
@@ -631,6 +691,8 @@ app.get('/api/masters/:userId', async (req, res) => {
           experience_years AS "experienceYears",
           price_from AS "priceFrom",
           price_to AS "priceTo",
+          avatar_path AS "avatarPath",
+          cover_path AS "coverPath",
           is_active AS "isActive",
           schedule_days AS "scheduleDays",
           schedule_start AS "scheduleStart",
@@ -652,10 +714,156 @@ app.get('/api/masters/:userId', async (req, res) => {
       return
     }
 
-    const summary = getProfileStatusSummary(result.rows[0])
-    res.json({ ...result.rows[0], ...summary })
+    const row = result.rows[0]
+    const summary = getProfileStatusSummary(row)
+    res.json({
+      ...row,
+      avatarUrl: buildPublicUrl(req, row.avatarPath),
+      coverUrl: buildPublicUrl(req, row.coverPath),
+      ...summary,
+    })
   } catch (error) {
     console.error('GET /api/masters/:userId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/media', async (req, res) => {
+  const { userId, kind, dataUrl } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedKind = normalizeText(kind)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (normalizedKind !== 'avatar' && normalizedKind !== 'cover') {
+    res.status(400).json({ error: 'invalid_kind' })
+    return
+  }
+
+  const parsed = parseImageDataUrl(dataUrl)
+  if (!parsed) {
+    res.status(400).json({ error: 'invalid_image' })
+    return
+  }
+
+  if (parsed.buffer.length > MAX_UPLOAD_BYTES) {
+    res.status(413).json({ error: 'image_too_large' })
+    return
+  }
+
+  try {
+    const profileResult = await pool.query(
+      `
+        SELECT avatar_path, cover_path
+        FROM master_profiles
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    if (profileResult.rows.length === 0) {
+      res.status(404).json({ error: 'profile_not_found' })
+      return
+    }
+
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    const ext = getImageExtension(parsed.mime)
+    const filename = `${normalizedKind}-${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`
+    const relativePath = path.posix.join('masters', safeUserId, filename)
+    const absolutePath = path.join(uploadsRoot, relativePath)
+
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true })
+    await fs.writeFile(absolutePath, parsed.buffer)
+
+    const column = normalizedKind === 'avatar' ? 'avatar_path' : 'cover_path'
+    const previousPath =
+      normalizedKind === 'avatar'
+        ? profileResult.rows[0].avatar_path
+        : profileResult.rows[0].cover_path
+
+    await pool.query(
+      `
+        UPDATE master_profiles
+        SET ${column} = $2,
+            updated_at = NOW()
+        WHERE user_id = $1
+      `,
+      [normalizedUserId, relativePath]
+    )
+
+    if (previousPath) {
+      const previousAbsolute = path.join(uploadsRoot, previousPath)
+      fs.unlink(previousAbsolute).catch(() => {})
+    }
+
+    res.json(
+      normalizedKind === 'avatar'
+        ? { ok: true, avatarUrl: buildPublicUrl(req, relativePath) }
+        : { ok: true, coverUrl: buildPublicUrl(req, relativePath) }
+    )
+  } catch (error) {
+    console.error('POST /api/masters/media failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.delete('/api/masters/media', async (req, res) => {
+  const { userId, kind } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedKind = normalizeText(kind)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (normalizedKind !== 'avatar' && normalizedKind !== 'cover') {
+    res.status(400).json({ error: 'invalid_kind' })
+    return
+  }
+
+  try {
+    const profileResult = await pool.query(
+      `
+        SELECT avatar_path, cover_path
+        FROM master_profiles
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    if (profileResult.rows.length === 0) {
+      res.status(404).json({ error: 'profile_not_found' })
+      return
+    }
+
+    const column = normalizedKind === 'avatar' ? 'avatar_path' : 'cover_path'
+    const previousPath =
+      normalizedKind === 'avatar'
+        ? profileResult.rows[0].avatar_path
+        : profileResult.rows[0].cover_path
+
+    await pool.query(
+      `
+        UPDATE master_profiles
+        SET ${column} = NULL,
+            updated_at = NOW()
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    if (previousPath) {
+      const previousAbsolute = path.join(uploadsRoot, previousPath)
+      fs.unlink(previousAbsolute).catch(() => {})
+    }
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('DELETE /api/masters/media failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -1407,6 +1615,7 @@ app.post('/api/requests', async (req, res) => {
 const start = async () => {
   await ensureSchema()
   await seedLocations()
+  await fs.mkdir(uploadsRoot, { recursive: true })
   app.listen(port, () => {
     console.log(`API listening on :${port}`)
   })

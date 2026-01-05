@@ -29,6 +29,9 @@ const scheduleDayOptions = [
   { id: 'sun', label: 'Вс' },
 ]
 
+const MAX_MEDIA_BYTES = 3 * 1024 * 1024
+const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+
 export const ProProfileScreen = ({
   apiBase,
   userId,
@@ -64,6 +67,9 @@ export const ProProfileScreen = ({
   const [saveSuccess, setSaveSuccess] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false)
+  const [isCoverUploading, setIsCoverUploading] = useState(false)
+  const [mediaError, setMediaError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const basicRef = useRef<HTMLDivElement>(null)
@@ -138,6 +144,7 @@ export const ProProfileScreen = ({
   const aboutPreview =
     about.trim() ||
     'Добавьте пару слов о своем стиле работы — это повышает доверие.'
+  const previewAbout = about.trim() || 'Описание пока не добавлено.'
   const profileInitials = useMemo(() => {
     const source = displayNameValue.trim()
     if (!source) return 'MK'
@@ -177,8 +184,23 @@ export const ProProfileScreen = ({
         .map((category) => category.label),
     [categories]
   )
-  const avatarStorageKey = `pro-avatar-${userId}`
-  const coverStorageKey = `pro-cover-${userId}`
+  const workFormatLabel =
+    worksAtClient && worksAtMaster
+      ? 'У мастера и выезд'
+      : worksAtClient
+        ? 'Выезд к клиенту'
+        : worksAtMaster
+          ? 'У мастера'
+          : 'Формат не указан'
+  const previewTags = useMemo(() => {
+    const serviceList = services.filter(Boolean).slice(0, 4)
+    if (serviceList.length > 0) return serviceList
+    return categoryLabels.slice(0, 4)
+  }, [categoryLabels, services])
+  const experienceSummary =
+    experienceValue !== null ? `${experienceValue} лет опыта` : 'Опыт не указан'
+  const portfolioSummary =
+    portfolioUrls.length > 0 ? `${portfolioUrls.length} работ` : 'Портфолио пустое'
 
   useEffect(() => {
     if (!focusSection) return
@@ -196,14 +218,6 @@ export const ProProfileScreen = ({
     }, 60)
     return () => window.clearTimeout(timeout)
   }, [focusSection])
-
-  useEffect(() => {
-    if (!userId) return
-    const storedAvatar = window.localStorage.getItem(avatarStorageKey)
-    const storedCover = window.localStorage.getItem(coverStorageKey)
-    setAvatarUrl(storedAvatar ?? '')
-    setCoverUrl(storedCover ?? '')
-  }, [avatarStorageKey, coverStorageKey, userId])
 
   useEffect(() => {
     let cancelled = false
@@ -317,6 +331,8 @@ export const ProProfileScreen = ({
         setCategories(data.categories ?? [])
         setServices(data.services ?? [])
         setPortfolioUrls(data.portfolioUrls ?? [])
+        setAvatarUrl(data.avatarUrl ?? '')
+        setCoverUrl(data.coverUrl ?? '')
       } catch (error) {
         if (!cancelled) {
           setLoadError('Не удалось загрузить профиль.')
@@ -378,7 +394,6 @@ export const ProProfileScreen = ({
   }
 
   const readImageFile = (file: File, onLoad: (dataUrl: string) => void) => {
-    if (!file.type.startsWith('image/')) return
     const reader = new FileReader()
     reader.onload = () => {
       const result = typeof reader.result === 'string' ? reader.result : ''
@@ -389,42 +404,149 @@ export const ProProfileScreen = ({
     reader.readAsDataURL(file)
   }
 
+  const uploadMedia = async (kind: 'avatar' | 'cover', dataUrl: string) => {
+    if (!userId) return
+    setMediaError('')
+    if (kind === 'avatar') {
+      setIsAvatarUploading(true)
+    } else {
+      setIsCoverUploading(true)
+    }
+
+    try {
+      const response = await fetch(`${apiBase}/api/masters/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          kind,
+          dataUrl,
+        }),
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const message =
+          payload?.error === 'profile_not_found'
+            ? 'Сначала сохраните профиль, чтобы загрузить медиа.'
+            : payload?.error === 'image_too_large'
+              ? 'Файл слишком большой. Максимум 3 МБ.'
+              : payload?.error === 'invalid_image'
+                ? 'Формат изображения не поддерживается.'
+                : 'Не удалось загрузить изображение.'
+        throw new Error(message)
+      }
+      const payload = (await response.json()) as {
+        avatarUrl?: string | null
+        coverUrl?: string | null
+      }
+      if (kind === 'avatar') {
+        setAvatarUrl(payload.avatarUrl ?? '')
+      } else {
+        setCoverUrl(payload.coverUrl ?? '')
+      }
+    } catch (error) {
+      setMediaError(
+        error instanceof Error ? error.message : 'Не удалось загрузить изображение.'
+      )
+    } finally {
+      if (kind === 'avatar') {
+        setIsAvatarUploading(false)
+      } else {
+        setIsCoverUploading(false)
+      }
+    }
+  }
+
   const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    readImageFile(file, (dataUrl) => {
-      setAvatarUrl(dataUrl)
-      window.localStorage.setItem(avatarStorageKey, dataUrl)
-    })
+    setMediaError('')
+    if (!allowedImageTypes.has(file.type)) {
+      setMediaError('Поддерживаются только PNG, JPG или WebP.')
+      event.target.value = ''
+      return
+    }
+    if (file.size > MAX_MEDIA_BYTES) {
+      setMediaError('Файл слишком большой. Максимум 3 МБ.')
+      event.target.value = ''
+      return
+    }
+    readImageFile(file, (dataUrl) => uploadMedia('avatar', dataUrl))
     event.target.value = ''
   }
 
   const handleCoverChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    readImageFile(file, (dataUrl) => {
-      setCoverUrl(dataUrl)
-      window.localStorage.setItem(coverStorageKey, dataUrl)
-    })
+    setMediaError('')
+    if (!allowedImageTypes.has(file.type)) {
+      setMediaError('Поддерживаются только PNG, JPG или WebP.')
+      event.target.value = ''
+      return
+    }
+    if (file.size > MAX_MEDIA_BYTES) {
+      setMediaError('Файл слишком большой. Максимум 3 МБ.')
+      event.target.value = ''
+      return
+    }
+    readImageFile(file, (dataUrl) => uploadMedia('cover', dataUrl))
     event.target.value = ''
   }
 
   const handleAvatarSelect = () => {
+    if (isAvatarUploading) return
     avatarInputRef.current?.click()
   }
 
   const handleCoverSelect = () => {
+    if (isCoverUploading) return
     coverInputRef.current?.click()
   }
 
-  const handleAvatarClear = () => {
-    setAvatarUrl('')
-    window.localStorage.removeItem(avatarStorageKey)
+  const handleAvatarClear = async () => {
+    if (!userId || isAvatarUploading) return
+    setMediaError('')
+    setIsAvatarUploading(true)
+    try {
+      const response = await fetch(`${apiBase}/api/masters/media`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, kind: 'avatar' }),
+      })
+      if (!response.ok) {
+        throw new Error('Не удалось удалить аватар.')
+      }
+      setAvatarUrl('')
+    } catch (error) {
+      setMediaError(
+        error instanceof Error ? error.message : 'Не удалось удалить аватар.'
+      )
+    } finally {
+      setIsAvatarUploading(false)
+    }
   }
 
-  const handleCoverClear = () => {
-    setCoverUrl('')
-    window.localStorage.removeItem(coverStorageKey)
+  const handleCoverClear = async () => {
+    if (!userId || isCoverUploading) return
+    setMediaError('')
+    setIsCoverUploading(true)
+    try {
+      const response = await fetch(`${apiBase}/api/masters/media`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, kind: 'cover' }),
+      })
+      if (!response.ok) {
+        throw new Error('Не удалось удалить шапку.')
+      }
+      setCoverUrl('')
+    } catch (error) {
+      setMediaError(
+        error instanceof Error ? error.message : 'Не удалось удалить шапку.'
+      )
+    } finally {
+      setIsCoverUploading(false)
+    }
   }
 
   const scrollToSection = (ref: RefObject<HTMLDivElement>) => {
@@ -540,8 +662,11 @@ export const ProProfileScreen = ({
           </div>
 
           <div
-            className={`pro-hero-cover${coverUrl ? ' has-image' : ''}`}
+            className={`pro-hero-cover${coverUrl ? ' has-image' : ''}${
+              isCoverUploading ? ' is-loading' : ''
+            }`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
+            aria-busy={isCoverUploading}
           >
             <div className="pro-hero-grid" aria-hidden="true" />
             <div className="pro-hero-orb pro-hero-orb--one" aria-hidden="true" />
@@ -554,17 +679,24 @@ export const ProProfileScreen = ({
                 type="file"
                 accept="image/*"
                 onChange={handleCoverChange}
+                disabled={isCoverUploading}
                 aria-hidden="true"
                 tabIndex={-1}
               />
-              <button className="pro-cover-action" type="button" onClick={handleCoverSelect}>
-                Сменить шапку
+              <button
+                className="pro-cover-action"
+                type="button"
+                onClick={handleCoverSelect}
+                disabled={isCoverUploading}
+              >
+                {isCoverUploading ? 'Загрузка...' : 'Сменить шапку'}
               </button>
               {coverUrl && (
                 <button
                   className="pro-cover-action is-muted"
                   type="button"
                   onClick={handleCoverClear}
+                  disabled={isCoverUploading}
                 >
                   Убрать
                 </button>
@@ -573,7 +705,10 @@ export const ProProfileScreen = ({
           </div>
 
           <div className="pro-hero-profile">
-            <div className="pro-avatar">
+            <div
+              className={`pro-avatar${isAvatarUploading ? ' is-loading' : ''}`}
+              aria-busy={isAvatarUploading}
+            >
               {avatarUrl ? (
                 <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
               ) : (
@@ -585,6 +720,7 @@ export const ProProfileScreen = ({
                 type="file"
                 accept="image/*"
                 onChange={handleAvatarChange}
+                disabled={isAvatarUploading}
                 aria-hidden="true"
                 tabIndex={-1}
               />
@@ -592,6 +728,7 @@ export const ProProfileScreen = ({
                 className="pro-avatar-action"
                 type="button"
                 onClick={handleAvatarSelect}
+                disabled={isAvatarUploading}
                 aria-label="Обновить аватар"
               >
                 +
@@ -601,6 +738,7 @@ export const ProProfileScreen = ({
                   className="pro-avatar-clear"
                   type="button"
                   onClick={handleAvatarClear}
+                  disabled={isAvatarUploading}
                   aria-label="Удалить аватар"
                 >
                   ×
@@ -702,8 +840,70 @@ export const ProProfileScreen = ({
           </button>
         </nav>
 
+        {mediaError && <p className="pro-error">{mediaError}</p>}
+
         {isLoading && <p className="pro-status">Загружаем профиль...</p>}
         {loadError && <p className="pro-error">{loadError}</p>}
+
+        <section className="pro-card pro-preview animate delay-2">
+          <div className="pro-preview-head">
+            <div>
+              <p className="pro-card-eyebrow">Превью</p>
+              <h2 className="pro-card-title">Как видят клиенты</h2>
+            </div>
+            <span className="pro-preview-badge">Live</span>
+          </div>
+          <div className="master-preview-card">
+            <div
+              className={`master-preview-cover${coverUrl ? ' has-image' : ''}`}
+              style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
+            >
+              <span className="master-preview-pill">{workFormatLabel}</span>
+            </div>
+            <div className="master-preview-body">
+              <div className="master-preview-main">
+                <div className="master-preview-avatar">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
+                  ) : (
+                    <span aria-hidden="true">{profileInitials}</span>
+                  )}
+                </div>
+                <div className="master-preview-info">
+                  <div className="master-preview-name">{displayNameValue}</div>
+                  <div className="master-preview-meta">{locationLabel}</div>
+                </div>
+                <div className="master-preview-price">{priceLabel}</div>
+              </div>
+              <p
+                className={`master-preview-about${about.trim() ? '' : ' is-muted'}`}
+              >
+                {previewAbout}
+              </p>
+              <div className="master-preview-tags">
+                {previewTags.length > 0 ? (
+                  previewTags.map((tag, index) => (
+                    <span className="master-preview-tag" key={`${tag}-${index}`}>
+                      {tag}
+                    </span>
+                  ))
+                ) : (
+                  <span className="master-preview-tag is-empty">Добавьте услуги</span>
+                )}
+              </div>
+              <div className="master-preview-stats">
+                <span>{experienceSummary}</span>
+                <span>{portfolioSummary}</span>
+              </div>
+              <div className="master-preview-footer">
+                <span className="master-preview-format">{workFormatLabel}</span>
+                <button className="master-preview-action" type="button" disabled>
+                  Откликнуться
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="pro-card pro-card--insight animate delay-2">
           <div className="pro-card-head">
