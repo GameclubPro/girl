@@ -1251,77 +1251,7 @@ h1 {
   font-weight: 500;
   color: #6c615c;
   max-width: 260px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
 }
-
-.subtitle-intro {
-  font-size: 15px;
-  font-weight: 600;
-  color: #5f5855;
-}
-
-.subtitle-layout {
-  display: grid;
-  grid-template-columns: auto auto auto;
-  grid-template-rows: auto auto;
-  align-items: center;
-  justify-items: center;
-  column-gap: 18px;
-  row-gap: 6px;
-  width: max-content;
-}
-
-.subtitle-side {
-  font-size: 19px;
-  font-weight: 700;
-  text-transform: lowercase;
-}
-
-.subtitle-side--left {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  align-self: center;
-}
-
-.subtitle-side--right {
-  grid-column: 3;
-  grid-row: 1 / span 2;
-  align-self: center;
-}
-
-.subtitle-top {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.subtitle-bottom {
-  grid-column: 2;
-  grid-row: 2;
-}
-
-.subtitle-accent,
-.subtitle-strong {
-  position: relative;
-  display: inline-block;
-  font-weight: 700;
-  color: #2f2926;
-}
-
-.subtitle-accent {
-  padding: 0 4px;
-}
-
-
-.subtitle-strong {
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  padding: 0 2px;
-  line-height: 1.1;
-}
-
 
 h2 {
   margin: 18px 0 8px;
