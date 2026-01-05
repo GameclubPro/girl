@@ -1314,18 +1314,6 @@ h1 {
   padding: 0 4px;
 }
 
-.subtitle-accent::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
-  height: 6px;
-  background: #ffd26a;
-  opacity: 0.6;
-  border-radius: 999px;
-  z-index: -1;
-}
 
 .subtitle-strong {
   font-weight: 600;
@@ -1334,18 +1322,6 @@ h1 {
   line-height: 1.1;
 }
 
-.subtitle-strong::after {
-  content: '';
-  position: absolute;
-  left: -2px;
-  right: -2px;
-  bottom: -1px;
-  height: 8px;
-  background: #ffe7b0;
-  opacity: 0.8;
-  border-radius: 999px;
-  z-index: -1;
-}
 
 h2 {
   margin: 18px 0 8px;
