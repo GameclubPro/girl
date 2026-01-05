@@ -733,23 +733,23 @@ h2 {
   padding: 1px 6px;
   background: linear-gradient(180deg, #f6ecf2 0%, #f2e6ee 100%);
   font-family: var(--font-popular);
-  font-size: clamp(13px, 3.8vw, 16px);
-  font-weight: 500;
+  font-size: clamp(14px, 4.1vw, 17px);
+  font-weight: 400;
   font-synthesis: weight;
   letter-spacing: 0.2px;
   line-height: 1.1;
   text-shadow:
-    -0.2px 0 currentColor,
-    0.2px 0 currentColor,
-    0 0.2px currentColor,
-    0 -0.2px currentColor;
+    -0.15px 0 currentColor,
+    0.15px 0 currentColor,
+    0 0.15px currentColor,
+    0 -0.15px currentColor;
   word-break: break-word;
   hyphens: auto;
   text-wrap: balance;
 }
 
 .popular-label--short {
-  font-size: clamp(14px, 4.4vw, 18px);
+  font-size: clamp(15px, 4.8vw, 19px);
 }
 
 .collection-carousel {
