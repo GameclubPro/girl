@@ -62,11 +62,11 @@ export const ProProfileScreen = ({
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
-  const basicRef = useRef<HTMLDivElement | null>(null)
-  const servicesRef = useRef<HTMLDivElement | null>(null)
-  const locationRef = useRef<HTMLDivElement | null>(null)
-  const availabilityRef = useRef<HTMLDivElement | null>(null)
-  const portfolioRef = useRef<HTMLDivElement | null>(null)
+  const basicRef = useRef<HTMLDivElement>(null)
+  const servicesRef = useRef<HTMLDivElement>(null)
+  const locationRef = useRef<HTMLDivElement>(null)
+  const availabilityRef = useRef<HTMLDivElement>(null)
+  const portfolioRef = useRef<HTMLDivElement>(null)
   const profileStatus = useMemo(
     () =>
       getProfileStatusSummary({
