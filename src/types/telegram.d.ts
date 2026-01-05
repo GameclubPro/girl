@@ -10,6 +10,12 @@ declare global {
         setHeaderColor?: (color: string) => void
         setBackgroundColor?: (color: string) => void
         disableVerticalSwipes?: () => void
+        BackButton?: {
+          show: () => void
+          hide: () => void
+          onClick: (callback: () => void) => void
+          offClick: (callback: () => void) => void
+        }
         initDataUnsafe?: {
           user?: {
             id: number

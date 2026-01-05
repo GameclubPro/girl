@@ -473,12 +473,7 @@ app.get('/api/cities', async (_req, res) => {
         ORDER BY name ASC
       `
     )
-    const enriched = result.rows.map((row) => ({
-      ...row,
-      avatarUrl: buildPublicUrl(req, row.avatarPath),
-      coverUrl: buildPublicUrl(req, row.coverPath),
-    }))
-    res.json(enriched)
+    res.json(result.rows)
   } catch (error) {
     console.error('GET /api/cities failed:', error)
     res.status(500).json({ error: 'server_error' })
