@@ -21,10 +21,15 @@ export const StartScreen = ({
         <img className="brand-logo" src={logoImage} alt="KIVEN GIRL" />
         <h1>KIVEN GIRL</h1>
         <p className="subtitle">
-          Услуги <span className="subtitle-accent">для</span>{' '}
-          <span className="subtitle-strong">ДЕВУШЕК</span>{' '}
-          <span className="subtitle-accent">от</span>{' '}
-          <span className="subtitle-strong">ДЕВУШЕК</span>
+          <span className="subtitle-intro">Услуги</span>
+          <span className="subtitle-row">
+            <span className="subtitle-strong">ДЕВУШЕК</span>
+            <span className="subtitle-mid">
+              <span className="subtitle-accent">для</span>
+              <span className="subtitle-accent">от</span>
+            </span>
+            <span className="subtitle-strong">ДЕВУШЕК</span>
+          </span>
         </p>
       </div>
 

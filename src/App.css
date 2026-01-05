@@ -1251,6 +1251,31 @@ h1 {
   font-weight: 500;
   color: #6c615c;
   max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.subtitle-intro {
+  font-size: 15px;
+  font-weight: 600;
+  color: #5f5855;
+}
+
+.subtitle-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.subtitle-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
 }
 
 .subtitle-accent,
