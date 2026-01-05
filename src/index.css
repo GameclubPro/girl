@@ -1,9 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@600;700;800&family=Tangerine:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Marck+Script&family=Sora:wght@600;700;800&display=swap');
 
 :root {
   font-family: 'Manrope', 'Segoe UI', sans-serif;
   --font-title: 'Sora', 'Segoe UI', sans-serif;
-  --font-popular: 'Tangerine', 'Sora', 'Segoe UI', sans-serif;
+  --font-popular: 'Marck Script', 'Sora', 'Segoe UI', sans-serif;
   --ink: #2b2522;
   --muted: #6f635e;
   --cream: #f7f2ef;

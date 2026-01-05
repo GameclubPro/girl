@@ -735,8 +735,14 @@ h2 {
   font-family: var(--font-popular);
   font-size: clamp(11px, 3vw, 13px);
   font-weight: 700;
+  font-synthesis: weight;
   letter-spacing: 0.2px;
   line-height: 1.1;
+  text-shadow:
+    -0.35px 0 currentColor,
+    0.35px 0 currentColor,
+    0 0.35px currentColor,
+    0 -0.35px currentColor;
   word-break: break-word;
   hyphens: auto;
   text-wrap: balance;
