@@ -1270,12 +1270,12 @@ h1 {
   align-items: center;
   justify-items: center;
   column-gap: 18px;
-  row-gap: 2px;
+  row-gap: 6px;
   width: max-content;
 }
 
 .subtitle-side {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 700;
   text-transform: lowercase;
 }
@@ -1328,10 +1328,10 @@ h1 {
 }
 
 .subtitle-strong {
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.4px;
   padding: 0 2px;
-  line-height: 1.05;
+  line-height: 1.1;
 }
 
 .subtitle-strong::after {
