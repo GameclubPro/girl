@@ -13,6 +13,13 @@ export type Role = 'client' | 'pro'
 
 export type ProfileStatus = 'draft' | 'ready' | 'complete'
 
+export type ProProfileSection =
+  | 'basic'
+  | 'services'
+  | 'location'
+  | 'availability'
+  | 'portfolio'
+
 export type MasterProfile = {
   userId: string
   displayName: string
@@ -27,6 +34,10 @@ export type MasterProfile = {
   categories: string[]
   services: string[]
   portfolioUrls: string[]
+  isActive?: boolean
+  scheduleDays?: string[]
+  scheduleStart?: string | null
+  scheduleEnd?: string | null
 }
 
 export type ServiceRequest = {

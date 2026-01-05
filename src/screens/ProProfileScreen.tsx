@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import { categoryItems } from '../data/clientData'
-import type { City, District, MasterProfile } from '../types/app'
+import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
 import { getProfileStatusSummary } from '../utils/profileStatus'
 
 type ProProfileScreenProps = {
@@ -9,6 +10,7 @@ type ProProfileScreenProps = {
   displayNameFallback: string
   onBack: () => void
   onViewRequests: () => void
+  focusSection?: ProProfileSection | null
 }
 
 const parseNumber = (value: string) => {
@@ -17,12 +19,23 @@ const parseNumber = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const scheduleDayOptions = [
+  { id: 'mon', label: 'Пн' },
+  { id: 'tue', label: 'Вт' },
+  { id: 'wed', label: 'Ср' },
+  { id: 'thu', label: 'Чт' },
+  { id: 'fri', label: 'Пт' },
+  { id: 'sat', label: 'Сб' },
+  { id: 'sun', label: 'Вс' },
+]
+
 export const ProProfileScreen = ({
   apiBase,
   userId,
   displayNameFallback,
   onBack,
   onViewRequests,
+  focusSection,
 }: ProProfileScreenProps) => {
   const [cities, setCities] = useState<City[]>([])
   const [districts, setDistricts] = useState<District[]>([])
@@ -40,11 +53,20 @@ export const ProProfileScreen = ({
   const [portfolioInput, setPortfolioInput] = useState('')
   const [worksAtClient, setWorksAtClient] = useState(true)
   const [worksAtMaster, setWorksAtMaster] = useState(false)
+  const [isActive, setIsActive] = useState(true)
+  const [scheduleDays, setScheduleDays] = useState<string[]>([])
+  const [scheduleStart, setScheduleStart] = useState('')
+  const [scheduleEnd, setScheduleEnd] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
+  const basicRef = useRef<HTMLDivElement | null>(null)
+  const servicesRef = useRef<HTMLDivElement | null>(null)
+  const locationRef = useRef<HTMLDivElement | null>(null)
+  const availabilityRef = useRef<HTMLDivElement | null>(null)
+  const portfolioRef = useRef<HTMLDivElement | null>(null)
   const profileStatus = useMemo(
     () =>
       getProfileStatusSummary({
@@ -100,6 +122,23 @@ export const ProProfileScreen = ({
     ready: 'Готов к откликам',
     complete: 'Профиль заполнен',
   }
+
+  useEffect(() => {
+    if (!focusSection) return
+    const targetMap: Record<ProProfileSection, RefObject<HTMLDivElement>> = {
+      basic: basicRef,
+      services: servicesRef,
+      location: locationRef,
+      availability: availabilityRef,
+      portfolio: portfolioRef,
+    }
+    const target = targetMap[focusSection]?.current
+    if (!target) return
+    const timeout = window.setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 60)
+    return () => window.clearTimeout(timeout)
+  }, [focusSection])
 
   useEffect(() => {
     let cancelled = false
@@ -204,6 +243,10 @@ export const ProProfileScreen = ({
             ? String(data.priceTo)
             : ''
         )
+        setIsActive(data.isActive ?? true)
+        setScheduleDays(data.scheduleDays ?? [])
+        setScheduleStart(data.scheduleStart ?? '')
+        setScheduleEnd(data.scheduleEnd ?? '')
         setWorksAtClient(data.worksAtClient)
         setWorksAtMaster(data.worksAtMaster)
         setCategories(data.categories ?? [])
@@ -261,6 +304,14 @@ export const ProProfileScreen = ({
     setPortfolioUrls((current) => current.filter((item) => item !== url))
   }
 
+  const toggleScheduleDay = (dayId: string) => {
+    setScheduleDays((current) =>
+      current.includes(dayId)
+        ? current.filter((item) => item !== dayId)
+        : [...current, dayId]
+    )
+  }
+
   const handleSave = async () => {
     if (isSaving) return
     setSaveError('')
@@ -294,6 +345,10 @@ export const ProProfileScreen = ({
           experienceYears: parseNumber(experienceYears),
           priceFrom: parsedPriceFrom,
           priceTo: parsedPriceTo,
+          isActive,
+          scheduleDays,
+          scheduleStart: scheduleStart.trim() || null,
+          scheduleEnd: scheduleEnd.trim() || null,
           worksAtClient,
           worksAtMaster,
           categories,
@@ -314,6 +369,10 @@ export const ProProfileScreen = ({
         experienceYears: parseNumber(experienceYears),
         priceFrom: parsedPriceFrom,
         priceTo: parsedPriceTo,
+        isActive,
+        scheduleDays,
+        scheduleStart: scheduleStart.trim() || null,
+        scheduleEnd: scheduleEnd.trim() || null,
         worksAtClient,
         worksAtMaster,
         categories,
@@ -376,7 +435,7 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-2">
+        <section className="pro-card animate delay-2" ref={basicRef}>
           <h2 className="pro-card-title">Основное</h2>
           <div className="pro-field">
             <label className="pro-label" htmlFor="pro-name">
@@ -424,7 +483,7 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-3">
+        <section className="pro-card animate delay-3" ref={servicesRef}>
           <h2 className="pro-card-title">Услуги и цены</h2>
           <div className="pro-field">
             <span className="pro-label">Услуги</span>
@@ -494,7 +553,7 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-4">
+        <section className="pro-card animate delay-4" ref={locationRef}>
           <h2 className="pro-card-title">Локация и опыт</h2>
           <div className="pro-field pro-field--split">
             <div>
@@ -580,7 +639,66 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-card animate delay-5">
+        <section className="pro-card animate delay-5" ref={availabilityRef}>
+          <h2 className="pro-card-title">График и доступность</h2>
+          <div className="pro-field">
+            <span className="pro-label">Статус</span>
+            <label className="pro-toggle">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(event) => setIsActive(event.target.checked)}
+              />
+              Принимаю заявки
+            </label>
+          </div>
+          <div className="pro-field">
+            <span className="pro-label">Дни работы</span>
+            <div className="request-chips">
+              {scheduleDayOptions.map((day) => (
+                <button
+                  className={`request-chip${
+                    scheduleDays.includes(day.id) ? ' is-active' : ''
+                  }`}
+                  key={day.id}
+                  type="button"
+                  onClick={() => toggleScheduleDay(day.id)}
+                  aria-pressed={scheduleDays.includes(day.id)}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="pro-field pro-field--split">
+            <div>
+              <label className="pro-label" htmlFor="schedule-start">
+                Начало
+              </label>
+              <input
+                id="schedule-start"
+                className="pro-input"
+                type="time"
+                value={scheduleStart}
+                onChange={(event) => setScheduleStart(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="pro-label" htmlFor="schedule-end">
+                Окончание
+              </label>
+              <input
+                id="schedule-end"
+                className="pro-input"
+                type="time"
+                value={scheduleEnd}
+                onChange={(event) => setScheduleEnd(event.target.value)}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="pro-card animate delay-6" ref={portfolioRef}>
           <h2 className="pro-card-title">Портфолио</h2>
           <div className="pro-field">
             <span className="pro-label">Ссылки на работы</span>

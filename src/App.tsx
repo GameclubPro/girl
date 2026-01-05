@@ -9,7 +9,7 @@ import { RequestScreen } from './screens/RequestScreen'
 import { StartScreen } from './screens/StartScreen'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
-import type { City, District, Role } from './types/app'
+import type { City, District, ProProfileSection, Role } from './types/app'
 import './App.css'
 
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(
@@ -30,6 +30,8 @@ function App() {
     | 'pro-requests'
   >('start')
   const [role, setRole] = useState<Role>('client')
+  const [proProfileSection, setProProfileSection] =
+    useState<ProProfileSection | null>(null)
   const [address, setAddress] = useState('')
   const [telegramUser] = useState(() => getTelegramUser())
   const [userId] = useState(() => telegramUser?.id?.toString() ?? 'local-dev')
@@ -391,8 +393,12 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onBack={() => setView('pro-cabinet')}
+        onBack={() => {
+          setProProfileSection(null)
+          setView('pro-cabinet')
+        }}
         onViewRequests={() => setView('pro-requests')}
+        focusSection={proProfileSection}
       />
     )
   }
@@ -403,7 +409,10 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         onBack={() => setView('pro-cabinet')}
-        onEditProfile={() => setView('pro-profile')}
+        onEditProfile={(section) => {
+          setProProfileSection(section ?? 'basic')
+          setView('pro-profile')
+        }}
       />
     )
   }
@@ -415,7 +424,10 @@ function App() {
         userId={userId}
         displayNameFallback={clientName}
         onBack={() => setView('start')}
-        onEditProfile={() => setView('pro-profile')}
+        onEditProfile={(section) => {
+          setProProfileSection(section ?? 'basic')
+          setView('pro-profile')
+        }}
         onViewRequests={() => setView('pro-requests')}
       />
     )
@@ -448,6 +460,9 @@ function App() {
     <StartScreen
       onRoleSelect={(nextRole) => {
         setRole(nextRole)
+        if (nextRole === 'pro') {
+          setProProfileSection(null)
+        }
         setView(nextRole === 'pro' ? 'pro-cabinet' : 'address')
       }}
     />

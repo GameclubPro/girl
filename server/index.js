@@ -140,6 +140,10 @@ const loadMasterProfile = async (userId) => {
         categories,
         services,
         portfolio_urls AS "portfolioUrls",
+        is_active AS "isActive",
+        schedule_days AS "scheduleDays",
+        schedule_start AS "scheduleStart",
+        schedule_end AS "scheduleEnd",
         works_at_client AS "worksAtClient",
         works_at_master AS "worksAtMaster"
       FROM master_profiles
@@ -216,9 +220,33 @@ const ensureSchema = async () => {
       categories TEXT[] NOT NULL DEFAULT '{}',
       services TEXT[] NOT NULL DEFAULT '{}',
       portfolio_urls TEXT[] NOT NULL DEFAULT '{}',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      schedule_days TEXT[] NOT NULL DEFAULT '{}',
+      schedule_start TEXT,
+      schedule_end TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS schedule_days TEXT[] NOT NULL DEFAULT '{}';
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS schedule_start TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS schedule_end TEXT;
   `)
 
   await pool.query(`
@@ -603,6 +631,10 @@ app.get('/api/masters/:userId', async (req, res) => {
           experience_years AS "experienceYears",
           price_from AS "priceFrom",
           price_to AS "priceTo",
+          is_active AS "isActive",
+          schedule_days AS "scheduleDays",
+          schedule_start AS "scheduleStart",
+          schedule_end AS "scheduleEnd",
           works_at_client AS "worksAtClient",
           works_at_master AS "worksAtMaster",
           categories,
@@ -638,6 +670,10 @@ app.post('/api/masters', async (req, res) => {
     experienceYears,
     priceFrom,
     priceTo,
+    isActive,
+    scheduleDays,
+    scheduleStart,
+    scheduleEnd,
     worksAtClient,
     worksAtMaster,
     categories,
@@ -651,6 +687,9 @@ app.post('/api/masters', async (req, res) => {
   const categoryList = normalizeStringArray(categories)
   const serviceList = normalizeStringArray(services)
   const portfolioList = normalizeStringArray(portfolioUrls)
+  const scheduleDayList = normalizeStringArray(scheduleDays)
+  const normalizedScheduleStart = normalizeText(scheduleStart) || null
+  const normalizedScheduleEnd = normalizeText(scheduleEnd) || null
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -682,6 +721,7 @@ app.post('/api/masters', async (req, res) => {
 
   const workAtClient = Boolean(worksAtClient)
   const workAtMaster = Boolean(worksAtMaster)
+  const activeValue = typeof isActive === 'boolean' ? isActive : true
 
   try {
     await ensureUser(normalizedUserId)
@@ -718,13 +758,17 @@ app.post('/api/masters', async (req, res) => {
           experience_years,
           price_from,
           price_to,
+          is_active,
+          schedule_days,
+          schedule_start,
+          schedule_end,
           works_at_client,
           works_at_master,
           categories,
           services,
           portfolio_urls
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         ON CONFLICT (user_id) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             about = EXCLUDED.about,
@@ -733,6 +777,10 @@ app.post('/api/masters', async (req, res) => {
             experience_years = EXCLUDED.experience_years,
             price_from = EXCLUDED.price_from,
             price_to = EXCLUDED.price_to,
+            is_active = EXCLUDED.is_active,
+            schedule_days = EXCLUDED.schedule_days,
+            schedule_start = EXCLUDED.schedule_start,
+            schedule_end = EXCLUDED.schedule_end,
             works_at_client = EXCLUDED.works_at_client,
             works_at_master = EXCLUDED.works_at_master,
             categories = EXCLUDED.categories,
@@ -749,6 +797,10 @@ app.post('/api/masters', async (req, res) => {
         parsedExperienceYears,
         parsedPriceFrom,
         parsedPriceTo,
+        activeValue,
+        scheduleDayList,
+        normalizedScheduleStart,
+        normalizedScheduleEnd,
         workAtClient,
         workAtMaster,
         categoryList,
@@ -779,6 +831,70 @@ app.post('/api/masters', async (req, res) => {
   }
 })
 
+app.post('/api/masters/status', async (req, res) => {
+  const { userId, isActive, scheduleDays, scheduleStart, scheduleEnd } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const profile = await loadMasterProfile(normalizedUserId)
+    if (!profile) {
+      res.status(404).json({ error: 'profile_not_found' })
+      return
+    }
+
+    const nextActive =
+      typeof isActive === 'boolean' ? isActive : Boolean(profile.isActive)
+    const nextScheduleDays = Array.isArray(scheduleDays)
+      ? normalizeStringArray(scheduleDays)
+      : Array.isArray(profile.scheduleDays)
+        ? profile.scheduleDays
+        : []
+    const normalizedScheduleStart = normalizeText(scheduleStart)
+    const normalizedScheduleEnd = normalizeText(scheduleEnd)
+    const nextScheduleStart =
+      scheduleStart === undefined
+        ? profile.scheduleStart ?? null
+        : normalizedScheduleStart || null
+    const nextScheduleEnd =
+      scheduleEnd === undefined ? profile.scheduleEnd ?? null : normalizedScheduleEnd || null
+
+    await pool.query(
+      `
+        UPDATE master_profiles
+        SET is_active = $2,
+            schedule_days = $3,
+            schedule_start = $4,
+            schedule_end = $5,
+            updated_at = NOW()
+        WHERE user_id = $1
+      `,
+      [
+        normalizedUserId,
+        nextActive,
+        nextScheduleDays,
+        nextScheduleStart,
+        nextScheduleEnd,
+      ]
+    )
+
+    res.json({
+      ok: true,
+      isActive: nextActive,
+      scheduleDays: nextScheduleDays,
+      scheduleStart: nextScheduleStart,
+      scheduleEnd: nextScheduleEnd,
+    })
+  } catch (error) {
+    console.error('POST /api/masters/status failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.get('/api/pro/requests', async (req, res) => {
   const normalizedUserId = normalizeText(req.query.userId)
 
@@ -791,14 +907,14 @@ app.get('/api/pro/requests', async (req, res) => {
     const profile = await loadMasterProfile(normalizedUserId)
     const summary = getProfileStatusSummary(profile)
     if (!profile) {
-      res.json({ ...summary, requests: [] })
+      res.json({ ...summary, isActive: false, requests: [] })
       return
     }
 
     const { cityId, districtId, categories, worksAtClient, worksAtMaster } = profile
 
     if (!summary.isFilterReady) {
-      res.json({ ...summary, requests: [] })
+      res.json({ ...summary, isActive: profile.isActive, requests: [] })
       return
     }
 
@@ -849,7 +965,7 @@ app.get('/api/pro/requests', async (req, res) => {
       [normalizedUserId, cityId, districtId, categories, worksAtClient, worksAtMaster]
     )
 
-    res.json({ ...summary, requests: result.rows })
+    res.json({ ...summary, isActive: profile.isActive, requests: result.rows })
   } catch (error) {
     console.error('GET /api/pro/requests failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -1046,6 +1162,10 @@ app.post('/api/requests/:id/responses', async (req, res) => {
     }
 
     const summary = getProfileStatusSummary(profile)
+    if (profile.isActive === false) {
+      res.status(409).json({ error: 'profile_paused', ...summary })
+      return
+    }
     if (!summary.isResponseReady) {
       res.status(409).json({ error: 'profile_incomplete', ...summary })
       return

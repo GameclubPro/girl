@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { categoryItems } from '../data/clientData'
-import type { ProfileStatus, ServiceRequest } from '../types/app'
+import type { ProfileStatus, ProProfileSection, ServiceRequest } from '../types/app'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -51,7 +51,7 @@ type ProRequestsScreenProps = {
   apiBase: string
   userId: string
   onBack: () => void
-  onEditProfile: () => void
+  onEditProfile: (section?: ProProfileSection) => void
 }
 
 export const ProRequestsScreen = ({
@@ -68,6 +68,7 @@ export const ProRequestsScreen = ({
   const [submittingId, setSubmittingId] = useState<number | null>(null)
   const [drafts, setDrafts] = useState<Record<number, ResponseDraft>>({})
   const [missingFields, setMissingFields] = useState<string[]>([])
+  const [isActive, setIsActive] = useState(true)
 
   useEffect(() => {
     if (!userId) return
@@ -89,15 +90,18 @@ export const ProRequestsScreen = ({
           | {
               profileStatus?: ProfileStatus
               missingFields?: string[]
+              isActive?: boolean
               requests?: ProRequest[]
             }
         if (cancelled) return
 
         const requestItems = Array.isArray(data) ? data : data.requests ?? []
         const nextMissing = Array.isArray(data) ? [] : data.missingFields ?? []
+        const nextActive = Array.isArray(data) ? true : data.isActive ?? true
 
         setRequests(requestItems)
         setMissingFields(nextMissing)
+        setIsActive(nextActive)
         setDrafts((current) => {
           const nextDrafts = { ...current }
           requestItems.forEach((item) => {
@@ -178,6 +182,13 @@ export const ProRequestsScreen = ({
       }))
       return
     }
+    if (!isActive) {
+      setSubmitError((current) => ({
+        ...current,
+        [requestId]: 'Вы на паузе. Включите прием заявок в кабинете.',
+      }))
+      return
+    }
     const draft = drafts[requestId]
     if (!draft) return
 
@@ -215,9 +226,17 @@ export const ProRequestsScreen = ({
       )
 
       if (response.status === 409) {
-        const data = (await response.json().catch(() => null)) as {
-          missingFields?: string[]
-        } | null
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string; missingFields?: string[] }
+          | null
+        if (data?.error === 'profile_paused') {
+          setIsActive(false)
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Вы на паузе. Включите прием заявок в кабинете.',
+          }))
+          return
+        }
         setSubmitError((current) => ({
           ...current,
           [requestId]: 'Заполните минимум профиля, чтобы откликаться.',
@@ -273,6 +292,23 @@ export const ProRequestsScreen = ({
         </header>
 
         <section className="requests-card animate delay-2">
+          {!isActive && (
+            <div className="pro-banner">
+              <div>
+                <div className="pro-banner-title">Вы на паузе</div>
+                <p className="pro-banner-text">
+                  Включите прием заявок в кабинете или в профиле.
+                </p>
+              </div>
+              <button
+                className="pro-banner-button"
+                type="button"
+                onClick={() => onEditProfile('availability')}
+              >
+                Изменить
+              </button>
+            </div>
+          )}
           {missingFields.length > 0 && (
             <div className="pro-banner">
               <div>
@@ -284,7 +320,7 @@ export const ProRequestsScreen = ({
               <button
                 className="pro-banner-button"
                 type="button"
-                onClick={onEditProfile}
+                onClick={() => onEditProfile('basic')}
               >
                 Заполнить
               </button>
@@ -295,7 +331,9 @@ export const ProRequestsScreen = ({
 
           {!isLoading && !items.length && !loadError && (
             <p className="requests-empty">
-              {missingFields.some((field) => field !== 'displayName')
+              {!isActive
+                ? 'Вы на паузе. Включите прием заявок.'
+                : missingFields.some((field) => field !== 'displayName')
                 ? 'Заполните профиль, чтобы видеть заявки рядом.'
                 : 'Пока нет подходящих заявок.'}
             </p>
@@ -323,7 +361,7 @@ export const ProRequestsScreen = ({
                 proposedTime: '',
               }
               const isSubmitting = submittingId === item.id
-              const canRespond = missingFields.length === 0
+              const canRespond = missingFields.length === 0 && isActive
 
               return (
                 <div className="pro-request-item" key={item.id}>
