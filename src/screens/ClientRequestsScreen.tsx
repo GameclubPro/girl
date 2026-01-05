@@ -36,14 +36,12 @@ const formatDateTime = (value?: string | null) => {
 type ClientRequestsScreenProps = {
   apiBase: string
   userId: string
-  onBack: () => void
   onCreateRequest: () => void
 }
 
 export const ClientRequestsScreen = ({
   apiBase,
   userId,
-  onBack,
   onCreateRequest,
 }: ClientRequestsScreenProps) => {
   const [requests, setRequests] = useState<ServiceRequest[]>([])
@@ -137,9 +135,6 @@ export const ClientRequestsScreen = ({
     <div className="screen screen--requests">
       <div className="requests-shell">
         <header className="requests-header animate delay-1">
-          <button className="request-back" type="button" onClick={onBack}>
-            <span aria-hidden="true">‹</span>
-          </button>
           <div className="request-headings">
             <h1 className="request-title">Мои заявки</h1>
             <p className="request-subtitle">История и статус заявок</p>

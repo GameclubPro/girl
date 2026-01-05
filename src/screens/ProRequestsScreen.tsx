@@ -283,9 +283,6 @@ export const ProRequestsScreen = ({
     <div className="screen screen--pro-requests">
       <div className="pro-requests-shell">
         <header className="requests-header animate delay-1">
-          <button className="request-back" type="button" onClick={onBack}>
-            <span aria-hidden="true">‹</span>
-          </button>
           <div className="request-headings">
             <h1 className="request-title">Заявки рядом</h1>
             <p className="request-subtitle">Откликайтесь на подходящие заявки</p>

@@ -28,7 +28,6 @@ type RequestScreenProps = {
   cityName: string
   districtName: string
   address: string
-  onBack: () => void
 }
 
 export const RequestScreen = ({
@@ -40,7 +39,6 @@ export const RequestScreen = ({
   cityName,
   districtName,
   address,
-  onBack,
 }: RequestScreenProps) => {
   const [categoryId, setCategoryId] = useState<string>(
     defaultCategoryId ?? categoryItems[0]?.id ?? ''
@@ -162,14 +160,6 @@ export const RequestScreen = ({
     <div className="screen screen--request">
       <div className="request-shell">
         <header className="request-header animate delay-1">
-          <button
-            className="request-back"
-            type="button"
-            onClick={onBack}
-            aria-label="Назад"
-          >
-            <span aria-hidden="true">‹</span>
-          </button>
           <div className="request-headings">
             <h1 className="request-title">Создать заявку</h1>
             <p className="request-subtitle">Услуга • где • когда • детали</p>

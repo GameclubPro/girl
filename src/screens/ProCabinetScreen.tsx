@@ -42,7 +42,6 @@ type ProCabinetScreenProps = {
   apiBase: string
   userId: string
   displayNameFallback: string
-  onBack: () => void
   onEditProfile: (section?: ProProfileSection) => void
   onViewRequests: () => void
 }
@@ -51,7 +50,6 @@ export const ProCabinetScreen = ({
   apiBase,
   userId,
   displayNameFallback,
-  onBack,
   onEditProfile,
   onViewRequests,
 }: ProCabinetScreenProps) => {
@@ -303,9 +301,6 @@ export const ProCabinetScreen = ({
     <div className="screen screen--pro-cabinet">
       <div className="pro-cabinet-shell">
         <header className="pro-cabinet-header animate delay-1">
-          <button className="request-back" type="button" onClick={onBack}>
-            <span aria-hidden="true">‹</span>
-          </button>
           <div className="request-headings">
             <h1 className="request-title">Кабинет мастера</h1>
             <p className="request-subtitle">Профиль • заявки • отклики</p>

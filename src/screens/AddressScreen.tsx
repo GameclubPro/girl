@@ -18,7 +18,6 @@ export const AddressScreen = ({
   onCitySelect,
   onDistrictChange,
   onAddressChange,
-  onBack,
   onContinue,
 }: {
   role: Role
@@ -35,7 +34,6 @@ export const AddressScreen = ({
   onCitySelect: (city: City) => void
   onDistrictChange: (value: number | null) => void
   onAddressChange: (value: string) => void
-  onBack: () => void
   onContinue: () => void
 }) => {
   const [isCityFocused, setIsCityFocused] = useState(false)
@@ -63,10 +61,6 @@ export const AddressScreen = ({
     <div className="screen screen--address">
       <div className="address-shell">
         <div className="address-top">
-          <button className="back-pill" type="button" onClick={onBack}>
-            <span className="chev">‹</span>
-            Назад
-          </button>
           <span className="address-role">{roleLabel}</span>
         </div>
 

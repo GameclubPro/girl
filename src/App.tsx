@@ -344,6 +344,54 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const backButton = window.Telegram?.WebApp?.BackButton
+    if (!backButton) return
+
+    const shouldShow =
+      view === 'address' ||
+      view === 'request' ||
+      view === 'requests' ||
+      view === 'pro-cabinet' ||
+      view === 'pro-profile' ||
+      view === 'pro-requests'
+
+    const handleBack = () => {
+      switch (view) {
+        case 'address':
+          setView('start')
+          break
+        case 'request':
+        case 'requests':
+          setView('client')
+          break
+        case 'pro-profile':
+          setProProfileSection(null)
+          setView('pro-cabinet')
+          break
+        case 'pro-requests':
+          setView('pro-cabinet')
+          break
+        case 'pro-cabinet':
+          setView('start')
+          break
+        default:
+          break
+      }
+    }
+
+    if (shouldShow) {
+      backButton.show()
+      backButton.onClick(handleBack)
+    } else {
+      backButton.hide()
+    }
+
+    return () => {
+      backButton.offClick(handleBack)
+    }
+  }, [view])
+
   if (view === 'client') {
     return (
       <ClientScreen
@@ -372,7 +420,6 @@ function App() {
         cityName={cityName}
         districtName={districtName}
         address={address}
-        onBack={() => setView('client')}
       />
     )
   }
@@ -382,7 +429,6 @@ function App() {
       <ClientRequestsScreen
         apiBase={apiBase}
         userId={userId}
-        onBack={() => setView('client')}
         onCreateRequest={() => setView('request')}
       />
     )
@@ -424,7 +470,6 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onBack={() => setView('start')}
         onEditProfile={(section) => {
           setProProfileSection(section ?? 'basic')
           setView('pro-profile')
@@ -451,7 +496,6 @@ function App() {
         onCitySelect={handleCitySelect}
         onDistrictChange={handleDistrictChange}
         onAddressChange={handleAddressChange}
-        onBack={() => setView('start')}
         onContinue={handleSaveAddress}
       />
     )

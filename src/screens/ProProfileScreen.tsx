@@ -639,14 +639,6 @@ export const ProProfileScreen = ({
       <div className="pro-shell">
         <header className="pro-hero animate delay-1">
           <div className="pro-hero-top">
-            <button
-              className="pro-back"
-              type="button"
-              onClick={onBack}
-              aria-label="Назад"
-            >
-              <span aria-hidden="true">‹</span>
-            </button>
             <div className="pro-hero-actions">
               <button className="pro-ghost" type="button" onClick={onViewRequests}>
                 Заявки
