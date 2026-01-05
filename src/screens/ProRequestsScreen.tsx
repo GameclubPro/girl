@@ -280,16 +280,19 @@ export const ProRequestsScreen = ({
   }
 
   return (
-    <div className="screen screen--pro-requests">
-      <div className="pro-requests-shell">
-        <header className="requests-header animate delay-1">
-          <div className="request-headings">
-            <h1 className="request-title">Заявки рядом</h1>
-            <p className="request-subtitle">Откликайтесь на подходящие заявки</p>
+    <div className="screen screen--pro screen--pro-requests">
+      <div className="pro-shell">
+        <section className="pro-card pro-requests-hero animate delay-1">
+          <div>
+            <p className="pro-card-eyebrow">Заявки</p>
+            <h1 className="pro-card-title">Заявки рядом</h1>
+            <p className="pro-requests-subtitle">
+              Откликайтесь на подходящие заявки
+            </p>
           </div>
-        </header>
+        </section>
 
-        <section className="requests-card animate delay-2">
+        <section className="pro-card pro-requests-panel animate delay-2">
           {!isActive && (
             <div className="pro-banner">
               <div>

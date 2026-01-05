@@ -109,25 +109,6 @@ export const ProProfileScreen = ({
       worksAtMaster,
     ]
   )
-  const missingLabels = useMemo(() => {
-    const labels: string[] = []
-    if (profileStatus.missingFields.includes('displayName')) {
-      labels.push('Имя и специализация')
-    }
-    if (profileStatus.missingFields.includes('categories')) {
-      labels.push('Категории услуг')
-    }
-    if (
-      profileStatus.missingFields.includes('cityId') ||
-      profileStatus.missingFields.includes('districtId')
-    ) {
-      labels.push('Город и район')
-    }
-    if (profileStatus.missingFields.includes('workFormat')) {
-      labels.push('Формат работы')
-    }
-    return labels
-  }, [profileStatus.missingFields])
   const statusLabelMap = {
     draft: 'Черновик',
     ready: 'Готов к откликам',
@@ -145,7 +126,6 @@ export const ProProfileScreen = ({
   const aboutPreview =
     about.trim() ||
     'Добавьте пару слов о своем стиле работы — это повышает доверие.'
-  const previewAbout = about.trim() || 'Описание пока не добавлено.'
   const profileInitials = useMemo(() => {
     const source = displayNameValue.trim()
     if (!source) return 'MK'
@@ -185,23 +165,6 @@ export const ProProfileScreen = ({
         .map((category) => category.label),
     [categories]
   )
-  const workFormatLabel =
-    worksAtClient && worksAtMaster
-      ? 'У мастера и выезд'
-      : worksAtClient
-        ? 'Выезд к клиенту'
-        : worksAtMaster
-          ? 'У мастера'
-          : 'Формат не указан'
-  const previewTags = useMemo(() => {
-    const serviceList = services.filter(Boolean).slice(0, 4)
-    if (serviceList.length > 0) return serviceList
-    return categoryLabels.slice(0, 4)
-  }, [categoryLabels, services])
-  const experienceSummary =
-    experienceValue !== null ? `${experienceValue} лет опыта` : 'Опыт не указан'
-  const portfolioSummary =
-    portfolioUrls.length > 0 ? `${portfolioUrls.length} работ` : 'Портфолио пустое'
 
   useEffect(() => {
     if (!focusSection) return
@@ -837,115 +800,6 @@ export const ProProfileScreen = ({
 
         {isLoading && <p className="pro-status">Загружаем профиль...</p>}
         {loadError && <p className="pro-error">{loadError}</p>}
-
-        <section className="pro-card pro-preview animate delay-2">
-          <div className="pro-preview-head">
-            <div>
-              <p className="pro-card-eyebrow">Превью</p>
-              <h2 className="pro-card-title">Как видят клиенты</h2>
-            </div>
-            <span className="pro-preview-badge">Live</span>
-          </div>
-          <div className="master-preview-card">
-            <div
-              className={`master-preview-cover${coverUrl ? ' has-image' : ''}`}
-              style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
-            >
-              <span className="master-preview-pill">{workFormatLabel}</span>
-            </div>
-            <div className="master-preview-body">
-              <div className="master-preview-main">
-                <div className="master-preview-avatar">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
-                  ) : (
-                    <span aria-hidden="true">{profileInitials}</span>
-                  )}
-                </div>
-                <div className="master-preview-info">
-                  <div className="master-preview-name">{displayNameValue}</div>
-                  <div className="master-preview-meta">{locationLabel}</div>
-                </div>
-                <div className="master-preview-price">{priceLabel}</div>
-              </div>
-              <p
-                className={`master-preview-about${about.trim() ? '' : ' is-muted'}`}
-              >
-                {previewAbout}
-              </p>
-              <div className="master-preview-tags">
-                {previewTags.length > 0 ? (
-                  previewTags.map((tag, index) => (
-                    <span className="master-preview-tag" key={`${tag}-${index}`}>
-                      {tag}
-                    </span>
-                  ))
-                ) : (
-                  <span className="master-preview-tag is-empty">Добавьте услуги</span>
-                )}
-              </div>
-              <div className="master-preview-stats">
-                <span>{experienceSummary}</span>
-                <span>{portfolioSummary}</span>
-              </div>
-              <div className="master-preview-footer">
-                <span className="master-preview-format">{workFormatLabel}</span>
-                <button className="master-preview-action" type="button" disabled>
-                  Откликнуться
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="pro-card pro-card--insight animate delay-2">
-          <div className="pro-card-head">
-            <div>
-              <p className="pro-card-eyebrow">Навигатор профиля</p>
-              <h2 className="pro-card-title">Готовность к заявкам</h2>
-            </div>
-            <span className={`pro-pill ${profileTone}`}>{profileStatus.completeness}%</span>
-          </div>
-          <div className="pro-insight-grid">
-            <div className="pro-insight-item">
-              <span className="pro-insight-label">Статус</span>
-              <strong className="pro-insight-value">
-                {statusLabelMap[profileStatus.profileStatus]}
-              </strong>
-            </div>
-            <div className="pro-insight-item">
-              <span className="pro-insight-label">Отклики</span>
-              <strong className="pro-insight-value">
-                {profileStatus.missingFields.length > 0 ? 'Недоступны' : 'Доступны'}
-              </strong>
-            </div>
-            <div className="pro-insight-item">
-              <span className="pro-insight-label">Фокус</span>
-              <strong className="pro-insight-value">
-                {missingLabels[0] ?? 'Портфолио'}
-              </strong>
-            </div>
-          </div>
-          <div className="pro-progress">
-            <div className="pro-progress-row">
-              <span>Готовность профиля</span>
-              <strong>{profileStatus.completeness}%</strong>
-            </div>
-            <div className="pro-progress-bar" aria-hidden="true">
-              <span style={{ width: `${profileStatus.completeness}%` }} />
-            </div>
-          </div>
-          <p className="pro-progress-note">
-            {profileStatus.missingFields.length > 0
-              ? 'Заполните минимум, чтобы откликаться на заявки.'
-              : 'Можно откликаться на заявки. Доведите профиль до 100% для доверия.'}
-          </p>
-          {missingLabels.length > 0 && (
-            <p className="pro-progress-missing">
-              Для отклика заполните: {missingLabels.join(', ')}.
-            </p>
-          )}
-        </section>
 
         <section className="pro-card pro-section animate delay-2" ref={basicRef}>
           <div className="pro-section-head">

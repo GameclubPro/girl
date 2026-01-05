@@ -173,14 +173,11 @@ function App() {
     webApp.expand()
     webApp.requestFullscreen?.()
     webApp.disableVerticalSwipes?.()
+    const isPro =
+      view === 'pro-cabinet' || view === 'pro-profile' || view === 'pro-requests'
     const isClient =
-      view === 'client' ||
-      view === 'request' ||
-      view === 'requests' ||
-      view === 'pro-cabinet' ||
-      view === 'pro-profile' ||
-      view === 'pro-requests'
-    const themeColor = view === 'pro-profile' ? '#fff3e8' : isClient ? '#f3edf7' : '#f7f2ef'
+      view === 'client' || view === 'request' || view === 'requests' || isPro
+    const themeColor = isPro ? '#fff3e8' : isClient ? '#f3edf7' : '#f7f2ef'
     webApp.setHeaderColor?.(themeColor)
     webApp.setBackgroundColor?.(themeColor)
   }, [view])
@@ -467,6 +464,9 @@ function App() {
   if (view === 'pro-cabinet') {
     return (
       <ProCabinetScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
         onEditProfile={(section) => {
           setProProfileSection(section ?? 'basic')
           setView('pro-profile')
