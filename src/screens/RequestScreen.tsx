@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import {
   requestBudgetOptions,
-  requestQuickChoices,
-  requestTagChoices,
+  requestServiceCatalog,
 } from '../data/requestData'
 
 const locationOptions = [
@@ -30,6 +29,11 @@ type RequestScreenProps = {
   address: string
 }
 
+const getServiceOptions = (categoryId: string) =>
+  requestServiceCatalog[categoryId] ??
+  requestServiceCatalog[categoryItems[0]?.id ?? ''] ??
+  []
+
 export const RequestScreen = ({
   apiBase,
   userId,
@@ -40,13 +44,12 @@ export const RequestScreen = ({
   districtName,
   address,
 }: RequestScreenProps) => {
-  const [categoryId, setCategoryId] = useState<string>(
-    defaultCategoryId ?? categoryItems[0]?.id ?? ''
-  )
+  const initialCategoryId = defaultCategoryId ?? categoryItems[0]?.id ?? ''
+  const initialServiceOptions = getServiceOptions(initialCategoryId)
+  const [categoryId, setCategoryId] = useState<string>(initialCategoryId)
   const [serviceName, setServiceName] = useState<string>(
-    requestQuickChoices[0] ?? ''
+    initialServiceOptions[0]?.title ?? ''
   )
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [locationType, setLocationType] = useState<
     (typeof locationOptions)[number]['value']
   >('master')
@@ -62,6 +65,19 @@ export const RequestScreen = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
+
+  const serviceOptions = useMemo(
+    () => getServiceOptions(categoryId),
+    [categoryId]
+  )
+
+  useEffect(() => {
+    if (serviceOptions.length === 0) {
+      setServiceName('')
+      return
+    }
+    setServiceName(serviceOptions[0].title)
+  }, [serviceOptions])
 
   const dateLabel = useMemo(() => {
     const match = dateOptions.find((option) => option.value === dateOption)
@@ -79,14 +95,6 @@ export const RequestScreen = ({
     (locationType !== 'client' || hasAddress) &&
     hasDateTime &&
     !isSubmitting
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags((current) =>
-      current.includes(tag)
-        ? current.filter((item) => item !== tag)
-        : [...current, tag]
-    )
-  }
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -135,7 +143,7 @@ export const RequestScreen = ({
           address: address.trim() || null,
           categoryId,
           serviceName: serviceName.trim(),
-          tags: selectedTags,
+          tags: [],
           locationType,
           dateOption,
           dateTime,
@@ -183,54 +191,38 @@ export const RequestScreen = ({
             </select>
           </div>
           <div className="request-field">
-            <span className="request-label">Услуга *</span>
-            <select
-              className="request-select-input"
-              value={serviceName}
-              onChange={(event) => setServiceName(event.target.value)}
-            >
-              {requestQuickChoices.map((choice) => (
-                <option key={choice} value={choice}>
-                  {choice}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="request-field">
-            <span className="request-label">Быстрый выбор</span>
-            <div className="request-chips">
-              {requestQuickChoices.map((choice) => (
+            <span className="request-label">Выберите услугу *</span>
+            <div className="request-service-grid" role="list">
+              {serviceOptions.map((option) => {
+                const isSelected = option.title === serviceName
+                return (
                 <button
-                  className={`request-chip${
-                    choice === serviceName ? ' is-active' : ''
+                  className={`request-service-card${
+                    isSelected ? ' is-active' : ''
                   }`}
-                  key={choice}
+                  key={option.title}
                   type="button"
-                  onClick={() => setServiceName(choice)}
-                  aria-pressed={choice === serviceName}
+                  onClick={() => setServiceName(option.title)}
+                  aria-pressed={isSelected}
                 >
-                  {choice}
+                  <span className="request-service-text">
+                    <span className="request-service-title">
+                      {option.title}
+                    </span>
+                    <span className="request-service-subtitle">
+                      {option.subtitle}
+                    </span>
+                  </span>
+                  <span className="request-service-indicator" aria-hidden="true" />
                 </button>
-              ))}
+                )
+              })}
             </div>
-          </div>
-          <div className="request-field">
-            <span className="request-label">Теги (можно несколько)</span>
-            <div className="request-chips">
-              {requestTagChoices.map((choice) => (
-                <button
-                  className={`request-chip${
-                    selectedTags.includes(choice) ? ' is-active' : ''
-                  }`}
-                  key={choice}
-                  type="button"
-                  onClick={() => toggleTag(choice)}
-                  aria-pressed={selectedTags.includes(choice)}
-                >
-                  {choice}
-                </button>
-              ))}
-            </div>
+            {serviceOptions.length === 0 && (
+              <p className="request-helper">
+                Пока нет шаблонов услуг для этой категории.
+              </p>
+            )}
           </div>
         </section>
 
