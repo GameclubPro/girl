@@ -89,6 +89,26 @@ type ProfileTemplate = {
   worksAtMaster?: boolean
 }
 
+type ProfilePayload = {
+  userId: string
+  displayName: string
+  about: string | null
+  cityId: number | null
+  districtId: number | null
+  experienceYears: number | null
+  priceFrom: number | null
+  priceTo: number | null
+  isActive: boolean
+  scheduleDays: string[]
+  scheduleStart: string | null
+  scheduleEnd: string | null
+  worksAtClient: boolean
+  worksAtMaster: boolean
+  categories: string[]
+  services: string[]
+  portfolioUrls: string[]
+}
+
 const profileTemplates: ProfileTemplate[] = [
   {
     id: 'nails',
@@ -146,6 +166,7 @@ const profileTemplates: ProfileTemplate[] = [
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
 
 export const ProProfileScreen = ({
   apiBase,
@@ -193,6 +214,13 @@ export const ProProfileScreen = ({
   const coverInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<HTMLDivElement>(null)
   const [activeSection, setActiveSection] = useState<ProProfileSection>('basic')
+  const autosaveTimerRef = useRef<number | null>(null)
+  const autosaveSuccessTimerRef = useRef<number | null>(null)
+  const lastSavedRef = useRef('')
+  const lastAttemptedRef = useRef('')
+  const hasLoadedRef = useRef(false)
+  const isSavingRef = useRef(false)
+  const queuedPayloadRef = useRef<ProfilePayload | null>(null)
   const serviceStrings = useMemo(
     () => toServiceStrings(serviceItems),
     [serviceItems]
@@ -200,6 +228,53 @@ export const ProProfileScreen = ({
   const portfolioStrings = useMemo(
     () => toPortfolioStrings(portfolioItems),
     [portfolioItems]
+  )
+  const autosavePayload = useMemo<ProfilePayload | null>(() => {
+    if (!userId) return null
+    const normalizedName = displayName.trim()
+    const parsedPriceFrom = parseNumber(priceFrom)
+    const parsedPriceTo = parseNumber(priceTo)
+    return {
+      userId,
+      displayName: normalizedName,
+      about: about.trim() || null,
+      cityId,
+      districtId,
+      experienceYears: parseNumber(experienceYears),
+      priceFrom: parsedPriceFrom,
+      priceTo: parsedPriceTo,
+      isActive,
+      scheduleDays: [...scheduleDays],
+      scheduleStart: scheduleStart.trim() || null,
+      scheduleEnd: scheduleEnd.trim() || null,
+      worksAtClient,
+      worksAtMaster,
+      categories: [...categories],
+      services: [...serviceStrings],
+      portfolioUrls: [...portfolioStrings],
+    }
+  }, [
+    about,
+    categories,
+    cityId,
+    displayName,
+    districtId,
+    experienceYears,
+    isActive,
+    portfolioStrings,
+    priceFrom,
+    priceTo,
+    scheduleDays,
+    scheduleEnd,
+    scheduleStart,
+    serviceStrings,
+    userId,
+    worksAtClient,
+    worksAtMaster,
+  ])
+  const autosaveKey = useMemo(
+    () => (autosavePayload ? JSON.stringify(autosavePayload) : ''),
+    [autosavePayload]
   )
   const profileStatus = useMemo(
     () =>
@@ -262,6 +337,28 @@ export const ProProfileScreen = ({
   const experienceValue = parseNumber(experienceYears)
   const priceFromValue = parseNumber(priceFrom)
   const priceToValue = parseNumber(priceTo)
+  const hasInvalidPriceRange =
+    priceFromValue !== null &&
+    priceToValue !== null &&
+    priceFromValue > priceToValue
+  const autosaveLabel = hasInvalidPriceRange
+    ? 'Проверьте диапазон цен'
+    : saveError
+      ? 'Не удалось сохранить'
+      : isSaving
+        ? 'Сохраняем...'
+        : saveSuccess
+          ? 'Сохранено'
+          : 'Автосохранение включено'
+  const autosaveTone = hasInvalidPriceRange
+    ? 'is-error'
+    : saveError
+      ? 'is-error'
+      : isSaving
+        ? 'is-saving'
+        : saveSuccess
+          ? 'is-success'
+          : 'is-idle'
   const priceLabel =
     priceFromValue !== null && priceToValue !== null
       ? `${priceFromValue}–${priceToValue} ₽`
@@ -376,6 +473,32 @@ export const ProProfileScreen = ({
     profileSections.find((section) => section.id === activeSection) ?? profileSections[0]
   const activeStepIndex =
     profileSections.findIndex((section) => section.id === activeSection) + 1
+  const persistAutosaveMessage = (message: string) => {
+    if (autosaveSuccessTimerRef.current) {
+      window.clearTimeout(autosaveSuccessTimerRef.current)
+    }
+    setSaveSuccess(message)
+    if (!message) return
+    autosaveSuccessTimerRef.current = window.setTimeout(() => {
+      setSaveSuccess('')
+    }, 2000)
+  }
+
+  useEffect(() => {
+    if (hasInvalidPriceRange) {
+      if (saveError !== PRICE_RANGE_ERROR) {
+        if (autosaveSuccessTimerRef.current) {
+          window.clearTimeout(autosaveSuccessTimerRef.current)
+        }
+        setSaveSuccess('')
+        setSaveError(PRICE_RANGE_ERROR)
+      }
+      return
+    }
+    if (saveError === PRICE_RANGE_ERROR) {
+      setSaveError('')
+    }
+  }, [hasInvalidPriceRange, saveError])
 
   useEffect(() => {
     if (!focusSection) return
@@ -385,6 +508,24 @@ export const ProProfileScreen = ({
     }, 60)
     return () => window.clearTimeout(timeout)
   }, [focusSection])
+
+  useEffect(() => {
+    hasLoadedRef.current = false
+    lastSavedRef.current = ''
+    lastAttemptedRef.current = ''
+    queuedPayloadRef.current = null
+  }, [userId])
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current)
+      }
+      if (autosaveSuccessTimerRef.current) {
+        window.clearTimeout(autosaveSuccessTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -470,37 +611,71 @@ export const ProProfileScreen = ({
         const data = (await response.json()) as MasterProfile
         if (cancelled) return
 
-        setDisplayName(data.displayName ?? displayNameFallback)
-        setAbout(data.about ?? '')
-        setCityId(data.cityId ?? null)
-        setDistrictId(data.districtId ?? null)
-        setExperienceYears(
+        const nextDisplayName = data.displayName ?? displayNameFallback
+        const nextAbout = data.about ?? ''
+        const nextCityId = data.cityId ?? null
+        const nextDistrictId = data.districtId ?? null
+        const nextExperienceYears =
           data.experienceYears !== null && data.experienceYears !== undefined
             ? String(data.experienceYears)
             : ''
-        )
-        setPriceFrom(
+        const nextPriceFrom =
           data.priceFrom !== null && data.priceFrom !== undefined
             ? String(data.priceFrom)
             : ''
-        )
-        setPriceTo(
+        const nextPriceTo =
           data.priceTo !== null && data.priceTo !== undefined
             ? String(data.priceTo)
             : ''
-        )
-        setIsActive(data.isActive ?? true)
-        setScheduleDays(data.scheduleDays ?? [])
-        setScheduleStart(data.scheduleStart ?? '')
-        setScheduleEnd(data.scheduleEnd ?? '')
-        setWorksAtClient(data.worksAtClient)
-        setWorksAtMaster(data.worksAtMaster)
-        setCategories(data.categories ?? [])
-        setServiceItems(parseServiceItems(data.services ?? []))
-        setPortfolioItems(parsePortfolioItems(data.portfolioUrls ?? []))
+        const nextIsActive = data.isActive ?? true
+        const nextScheduleDays = data.scheduleDays ?? []
+        const nextScheduleStart = data.scheduleStart ?? ''
+        const nextScheduleEnd = data.scheduleEnd ?? ''
+        const nextWorksAtClient = data.worksAtClient
+        const nextWorksAtMaster = data.worksAtMaster
+        const nextCategories = data.categories ?? []
+        const nextServiceItems = parseServiceItems(data.services ?? [])
+        const nextPortfolioItems = parsePortfolioItems(data.portfolioUrls ?? [])
+
+        setDisplayName(nextDisplayName)
+        setAbout(nextAbout)
+        setCityId(nextCityId)
+        setDistrictId(nextDistrictId)
+        setExperienceYears(nextExperienceYears)
+        setPriceFrom(nextPriceFrom)
+        setPriceTo(nextPriceTo)
+        setIsActive(nextIsActive)
+        setScheduleDays(nextScheduleDays)
+        setScheduleStart(nextScheduleStart)
+        setScheduleEnd(nextScheduleEnd)
+        setWorksAtClient(nextWorksAtClient)
+        setWorksAtMaster(nextWorksAtMaster)
+        setCategories(nextCategories)
+        setServiceItems(nextServiceItems)
+        setPortfolioItems(nextPortfolioItems)
         setShowAllPortfolio(false)
         setAvatarUrl(data.avatarUrl ?? '')
         setCoverUrl(data.coverUrl ?? '')
+
+        lastSavedRef.current = JSON.stringify({
+          userId,
+          displayName: nextDisplayName.trim(),
+          about: nextAbout.trim() || null,
+          cityId: nextCityId,
+          districtId: nextDistrictId,
+          experienceYears: parseNumber(nextExperienceYears),
+          priceFrom: parseNumber(nextPriceFrom),
+          priceTo: parseNumber(nextPriceTo),
+          isActive: nextIsActive,
+          scheduleDays: [...nextScheduleDays],
+          scheduleStart: nextScheduleStart.trim() || null,
+          scheduleEnd: nextScheduleEnd.trim() || null,
+          worksAtClient: nextWorksAtClient,
+          worksAtMaster: nextWorksAtMaster,
+          categories: [...nextCategories],
+          services: toServiceStrings(nextServiceItems),
+          portfolioUrls: toPortfolioStrings(nextPortfolioItems),
+        })
       } catch (error) {
         if (!cancelled) {
           setLoadError('Не удалось загрузить профиль.')
@@ -508,6 +683,7 @@ export const ProProfileScreen = ({
       } finally {
         if (!cancelled) {
           setIsLoading(false)
+          hasLoadedRef.current = true
         }
       }
     }
@@ -518,6 +694,83 @@ export const ProProfileScreen = ({
       cancelled = true
     }
   }, [apiBase, displayNameFallback, userId])
+
+  useEffect(() => {
+    if (!hasLoadedRef.current || lastSavedRef.current || !autosaveKey) return
+    lastSavedRef.current = autosaveKey
+  }, [autosaveKey])
+
+  const saveProfile = async (payload: ProfilePayload) => {
+    if (!payload.userId) return
+    if (isSavingRef.current) {
+      queuedPayloadRef.current = payload
+      return
+    }
+    if (
+      payload.priceFrom !== null &&
+      payload.priceTo !== null &&
+      payload.priceFrom > payload.priceTo
+    ) {
+      setSaveError(PRICE_RANGE_ERROR)
+      persistAutosaveMessage('')
+      return
+    }
+
+    const payloadKey = JSON.stringify(payload)
+    if (payloadKey === lastSavedRef.current) return
+
+    lastAttemptedRef.current = payloadKey
+    setSaveError('')
+    persistAutosaveMessage('')
+    setIsSaving(true)
+    isSavingRef.current = true
+
+    try {
+      const response = await fetch(`${apiBase}/api/masters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        throw new Error('Save profile failed')
+      }
+
+      const summary = getProfileStatusSummary(payload)
+      persistAutosaveMessage(
+        summary.missingFields.length > 0 ? 'Черновик сохранен' : 'Сохранено'
+      )
+      lastSavedRef.current = payloadKey
+    } catch (error) {
+      setSaveError('Не удалось сохранить профиль. Попробуйте еще раз.')
+    } finally {
+      setIsSaving(false)
+      isSavingRef.current = false
+      if (queuedPayloadRef.current) {
+        const nextPayload = queuedPayloadRef.current
+        queuedPayloadRef.current = null
+        void saveProfile(nextPayload)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!autosavePayload || !hasLoadedRef.current || isLoading) return
+    if (autosaveKey === lastSavedRef.current) return
+    if (autosaveKey === lastAttemptedRef.current) return
+    if (hasInvalidPriceRange) return
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current)
+    }
+    autosaveTimerRef.current = window.setTimeout(() => {
+      void saveProfile(autosavePayload)
+    }, 700)
+    return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current)
+      }
+    }
+  }, [autosaveKey, autosavePayload, hasInvalidPriceRange, isLoading])
 
   const toggleCategory = (categoryId: string) => {
     setCategories((current) =>
@@ -823,86 +1076,6 @@ export const ProProfileScreen = ({
   const jumpToEditor = (section: ProProfileSection) => {
     setActiveSection(section)
     editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
-  const handleSave = async () => {
-    if (isSaving) return
-    setSaveError('')
-    setSaveSuccess('')
-
-    const normalizedName = displayName.trim()
-
-    const parsedPriceFrom = parseNumber(priceFrom)
-    const parsedPriceTo = parseNumber(priceTo)
-    if (
-      parsedPriceFrom !== null &&
-      parsedPriceTo !== null &&
-      parsedPriceFrom > parsedPriceTo
-    ) {
-      setSaveError('Минимальная цена не может быть выше максимальной.')
-      return
-    }
-
-    setIsSaving(true)
-
-    try {
-      const response = await fetch(`${apiBase}/api/masters`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          displayName: normalizedName,
-          about: about.trim() || null,
-          cityId,
-          districtId,
-          experienceYears: parseNumber(experienceYears),
-          priceFrom: parsedPriceFrom,
-          priceTo: parsedPriceTo,
-          isActive,
-          scheduleDays,
-          scheduleStart: scheduleStart.trim() || null,
-          scheduleEnd: scheduleEnd.trim() || null,
-          worksAtClient,
-          worksAtMaster,
-          categories,
-          services: serviceStrings,
-          portfolioUrls: portfolioStrings,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Save profile failed')
-      }
-
-      const summary = getProfileStatusSummary({
-        displayName: normalizedName,
-        about,
-        cityId,
-        districtId,
-        experienceYears: parseNumber(experienceYears),
-        priceFrom: parsedPriceFrom,
-        priceTo: parsedPriceTo,
-        isActive,
-        scheduleDays,
-        scheduleStart: scheduleStart.trim() || null,
-        scheduleEnd: scheduleEnd.trim() || null,
-        worksAtClient,
-        worksAtMaster,
-        categories,
-        services: serviceStrings,
-        portfolioUrls: portfolioStrings,
-      })
-
-      setSaveSuccess(
-        summary.missingFields.length > 0
-          ? 'Профиль сохранен как черновик. Заполните минимум для отклика.'
-          : 'Профиль сохранен. Можно откликаться на заявки.'
-      )
-    } catch (error) {
-      setSaveError('Не удалось сохранить профиль. Попробуйте еще раз.')
-    } finally {
-      setIsSaving(false)
-    }
   }
 
   return (
@@ -1725,14 +1898,10 @@ export const ProProfileScreen = ({
         </section>
 
         <div className="pro-actions">
-          <button
-            className="pro-primary"
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Сохраняем...' : 'Сохранить профиль'}
-          </button>
+          <div className={`pro-autosave ${autosaveTone}`}>
+            <span className="pro-autosave-dot" aria-hidden="true" />
+            <span className="pro-autosave-text">{autosaveLabel}</span>
+          </div>
           <button className="pro-secondary" type="button" onClick={onViewRequests}>
             Перейти к заявкам
           </button>
