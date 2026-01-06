@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent } from 'react'
+import type { ChangeEvent, CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
+import { requestServiceCatalog } from '../data/requestData'
 import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
 import {
   formatServiceMeta,
@@ -94,9 +95,9 @@ export const ProProfileScreen = ({
   const [priceTo, setPriceTo] = useState('')
   const [categories, setCategories] = useState<string[]>([])
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([])
-  const [serviceInput, setServiceInput] = useState('')
-  const [servicePriceInput, setServicePriceInput] = useState('')
-  const [serviceDurationInput, setServiceDurationInput] = useState('')
+  const [serviceCategoryId, setServiceCategoryId] = useState(
+    () => categoryItems[0]?.id ?? ''
+  )
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [portfolioInput, setPortfolioInput] = useState('')
   const [portfolioTitleInput, setPortfolioTitleInput] = useState('')
@@ -295,6 +296,22 @@ export const ProProfileScreen = ({
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
   const previewTagRemainder = previewTagSource.length - previewTags.length
+  const normalizeServiceKey = (value: string) => value.trim().toLowerCase()
+  const selectedServiceKeys = useMemo(
+    () => new Set(serviceItems.map((item) => normalizeServiceKey(item.name))),
+    [serviceItems]
+  )
+  const selectedServiceCategory = useMemo(
+    () => categoryItems.find((item) => item.id === serviceCategoryId),
+    [serviceCategoryId]
+  )
+  const serviceCategoryIconStyle = selectedServiceCategory?.icon
+    ? ({ '--request-category-icon': `url(${selectedServiceCategory.icon})` } as CSSProperties)
+    : undefined
+  const serviceCatalogOptions = useMemo(
+    () => requestServiceCatalog[serviceCategoryId] ?? [],
+    [serviceCategoryId]
+  )
   const normalizeSection = (section: ProProfileSection): InlineSection =>
     section === 'availability' ? 'location' : section
   const isSectionOpen = (section: ProProfileSection) =>
@@ -490,6 +507,7 @@ export const ProProfileScreen = ({
         setWorksAtClient(nextWorksAtClient)
         setWorksAtMaster(nextWorksAtMaster)
         setCategories(nextCategories)
+        setServiceCategoryId(nextCategories[0] ?? categoryItems[0]?.id ?? '')
         setServiceItems(nextServiceItems)
         setPortfolioItems(nextPortfolioItems)
         setShowAllPortfolio(false)
@@ -611,48 +629,45 @@ export const ProProfileScreen = ({
     }
   }, [autosaveKey, autosavePayload, hasInvalidPriceRange, isLoading])
 
-  const toggleCategory = (categoryId: string) => {
-    setCategories((current) =>
-      current.includes(categoryId)
-        ? current.filter((item) => item !== categoryId)
-        : [...current, categoryId]
-    )
+  const handleServiceCategoryChange = (categoryId: string) => {
+    setServiceCategoryId(categoryId)
   }
 
-  const normalizeServiceKey = (value: string) => value.trim().toLowerCase()
+  const syncCategorySelection = (categoryId: string, nextItems: ServiceItem[]) => {
+    if (!categoryId) return
+    const optionNames = new Set(
+      (requestServiceCatalog[categoryId] ?? []).map((option) =>
+        normalizeServiceKey(option.title)
+      )
+    )
+    const hasAny = nextItems.some((item) =>
+      optionNames.has(normalizeServiceKey(item.name))
+    )
+    setCategories((current) => {
+      const next = new Set(current)
+      if (hasAny) {
+        next.add(categoryId)
+      } else {
+        next.delete(categoryId)
+      }
+      return Array.from(next)
+    })
+  }
 
-  const addService = () => {
-    const trimmed = serviceInput.trim()
-    if (!trimmed) return
-    const priceValue = parseNumber(servicePriceInput)
-    const durationValue = parseNumber(serviceDurationInput)
+  const toggleCatalogService = (serviceTitle: string) => {
+    if (!serviceTitle.trim()) return
     setServiceItems((current) => {
-      const key = normalizeServiceKey(trimmed)
+      const key = normalizeServiceKey(serviceTitle)
       const index = current.findIndex(
         (item) => normalizeServiceKey(item.name) === key
       )
-      if (index === -1) {
-        return [
-          ...current,
-          {
-            name: trimmed,
-            price: priceValue,
-            duration: durationValue,
-          },
-        ]
-      }
-      const next = [...current]
-      const existing = next[index]
-      next[index] = {
-        ...existing,
-        price: existing.price ?? priceValue ?? null,
-        duration: existing.duration ?? durationValue ?? null,
-      }
+      const next =
+        index === -1
+          ? [...current, { name: serviceTitle, price: null, duration: null }]
+          : current.filter((_, itemIndex) => itemIndex !== index)
+      syncCategorySelection(serviceCategoryId, next)
       return next
     })
-    setServiceInput('')
-    setServicePriceInput('')
-    setServiceDurationInput('')
   }
 
   const updateServiceItem = (
@@ -667,7 +682,23 @@ export const ProProfileScreen = ({
   }
 
   const removeService = (index: number) => {
-    setServiceItems((current) => current.filter((_, itemIndex) => itemIndex !== index))
+    setServiceItems((current) => {
+      const removed = current[index]
+      const next = current.filter((_, itemIndex) => itemIndex !== index)
+      if (removed) {
+        const removedKey = normalizeServiceKey(removed.name)
+        const matchedCategory = Object.entries(requestServiceCatalog).find(
+          ([, options]) =>
+            options.some(
+              (option) => normalizeServiceKey(option.title) === removedKey
+            )
+        )?.[0]
+        if (matchedCategory) {
+          syncCategorySelection(matchedCategory, next)
+        }
+      }
+      return next
+    })
   }
 
   const addPortfolio = () => {
@@ -1278,71 +1309,61 @@ export const ProProfileScreen = ({
             {isSectionOpen('services') && (
               <div className="pro-profile-card-edit">
                 <div className="pro-field">
-                  <span className="pro-label">Категории</span>
-                  <div className="request-chips">
-                    {categoryItems.map((category) => (
-                      <button
-                        className={`request-chip${
-                          categories.includes(category.id) ? ' is-active' : ''
-                        }`}
-                        key={category.id}
-                        type="button"
-                        onClick={() => toggleCategory(category.id)}
-                        aria-pressed={categories.includes(category.id)}
-                      >
-                        {category.label}
-                      </button>
+                  <span className="pro-label">Категория</span>
+                  <select
+                    className="request-select-input"
+                    value={serviceCategoryId}
+                    onChange={(event) => handleServiceCategoryChange(event.target.value)}
+                    style={serviceCategoryIconStyle}
+                    aria-label="Категория"
+                  >
+                    {categoryItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </div>
                 <div className="pro-field">
-                  <span className="pro-label">Добавить услугу</span>
-                  <div className="pro-service-add">
-                    <input
-                      className="pro-input"
-                      type="text"
-                      value={serviceInput}
-                      onChange={(event) => setServiceInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addService()
-                        }
-                      }}
-                      placeholder="Название"
-                    />
-                    <input
-                      className="pro-input"
-                      type="number"
-                      value={servicePriceInput}
-                      onChange={(event) => setServicePriceInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addService()
-                        }
-                      }}
-                      placeholder="Цена"
-                      min="0"
-                    />
-                    <input
-                      className="pro-input"
-                      type="number"
-                      value={serviceDurationInput}
-                      onChange={(event) => setServiceDurationInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addService()
-                        }
-                      }}
-                      placeholder="Мин"
-                      min="0"
-                    />
-                    <button className="pro-add" type="button" onClick={addService}>
-                      Добавить
-                    </button>
+                  <div
+                    className="request-service-grid"
+                    role="list"
+                    aria-label="Выберите услуги"
+                  >
+                    {serviceCatalogOptions.map((option) => {
+                      const optionKey = normalizeServiceKey(option.title)
+                      const isSelected = selectedServiceKeys.has(optionKey)
+                      return (
+                        <button
+                          className={`request-service-card${
+                            isSelected ? ' is-active' : ''
+                          }`}
+                          key={option.title}
+                          type="button"
+                          onClick={() => toggleCatalogService(option.title)}
+                          aria-pressed={isSelected}
+                        >
+                          <span className="request-service-text">
+                            <span className="request-service-title">
+                              {option.title}
+                            </span>
+                            <span className="request-service-subtitle">
+                              {option.subtitle}
+                            </span>
+                          </span>
+                          <span
+                            className="request-service-indicator"
+                            aria-hidden="true"
+                          />
+                        </button>
+                      )
+                    })}
                   </div>
+                  {serviceCatalogOptions.length === 0 && (
+                    <p className="request-helper">
+                      Пока нет услуг для этой категории.
+                    </p>
+                  )}
                 </div>
                 <div className="pro-service-grid">
                   {serviceItems.length > 0 ? (
@@ -1354,17 +1375,7 @@ export const ProProfileScreen = ({
                           key={`${service.name}-${index}`}
                         >
                           <div className="pro-service-card-head">
-                            <input
-                              className="pro-service-name"
-                              type="text"
-                              value={service.name}
-                              onChange={(event) =>
-                                updateServiceItem(index, {
-                                  name: event.target.value,
-                                })
-                              }
-                              placeholder="Название услуги"
-                            />
+                            <span className="pro-service-name">{service.name}</span>
                             <button
                               className="pro-service-remove"
                               type="button"

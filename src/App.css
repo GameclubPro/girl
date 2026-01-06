@@ -1486,6 +1486,7 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--pro-ink);
+  display: block;
 }
 
 .pro-service-name:focus-visible {
