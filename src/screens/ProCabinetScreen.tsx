@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
+import { parsePortfolioItems, parseServiceItems } from '../utils/profileContent'
 import { getProfileStatusSummary } from '../utils/profileStatus'
 
 type ProCabinetScreenProps = {
@@ -159,9 +160,14 @@ export const ProCabinetScreen = ({
 
   const categories = Array.isArray(profile?.categories) ? profile?.categories : []
   const services = Array.isArray(profile?.services) ? profile?.services : []
+  const serviceItems = useMemo(() => parseServiceItems(services), [services])
   const portfolioUrls = Array.isArray(profile?.portfolioUrls)
     ? profile?.portfolioUrls
     : []
+  const portfolioItems = useMemo(
+    () => parsePortfolioItems(portfolioUrls),
+    [portfolioUrls]
+  )
   const categoryLabels = useMemo(
     () =>
       categoryItems
@@ -170,10 +176,13 @@ export const ProCabinetScreen = ({
     [categories]
   )
   const previewTags = useMemo(() => {
-    const serviceList = services.filter(Boolean).slice(0, 4)
+    const serviceList = serviceItems
+      .map((item) => item.name)
+      .filter(Boolean)
+      .slice(0, 4)
     if (serviceList.length > 0) return serviceList
     return categoryLabels.slice(0, 4)
-  }, [categoryLabels, services])
+  }, [categoryLabels, serviceItems])
 
   const workFormatLabel =
     profile?.worksAtClient && profile?.worksAtMaster
@@ -206,7 +215,7 @@ export const ProCabinetScreen = ({
       : 'Опыт не указан'
 
   const portfolioSummary =
-    portfolioUrls.length > 0 ? `${portfolioUrls.length} работ` : 'Портфолио пустое'
+    portfolioItems.length > 0 ? `${portfolioItems.length} работ` : 'Портфолио пустое'
 
   const locationLabel = useMemo(() => {
     const cityLabel = cityId

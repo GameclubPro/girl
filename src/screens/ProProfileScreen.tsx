@@ -3,6 +3,15 @@ import type { ChangeEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
+import {
+  formatServiceMeta,
+  isImageUrl,
+  parsePortfolioItems,
+  parseServiceItems,
+  toPortfolioStrings,
+  toServiceStrings,
+} from '../utils/profileContent'
+import type { PortfolioItem, ServiceItem } from '../utils/profileContent'
 import { getProfileStatusSummary } from '../utils/profileStatus'
 
 type ProProfileScreenProps = {
@@ -68,6 +77,73 @@ const profileSections: Array<{
   },
 ]
 
+type ProfileTemplate = {
+  id: string
+  label: string
+  categories: string[]
+  services: ServiceItem[]
+  priceFrom?: number
+  priceTo?: number
+  about?: string
+  worksAtClient?: boolean
+  worksAtMaster?: boolean
+}
+
+const profileTemplates: ProfileTemplate[] = [
+  {
+    id: 'nails',
+    label: 'Маникюр',
+    categories: ['beauty-nails'],
+    services: [
+      { name: 'Маникюр комбинированный', price: 1800, duration: 90 },
+      { name: 'Покрытие гель-лак', price: 2200, duration: 120 },
+      { name: 'Снятие + уход', price: 800, duration: 30 },
+    ],
+    priceFrom: 1500,
+    priceTo: 3500,
+    worksAtMaster: true,
+  },
+  {
+    id: 'brows',
+    label: 'Брови/ресницы',
+    categories: ['brows-lashes'],
+    services: [
+      { name: 'Оформление бровей', price: 1200, duration: 40 },
+      { name: 'Ламинирование бровей', price: 2200, duration: 75 },
+      { name: 'Ламинирование ресниц', price: 2400, duration: 80 },
+    ],
+    priceFrom: 1200,
+    priceTo: 3000,
+    worksAtMaster: true,
+  },
+  {
+    id: 'hair',
+    label: 'Стрижка',
+    categories: ['hair'],
+    services: [
+      { name: 'Женская стрижка', price: 2000, duration: 60 },
+      { name: 'Мужская стрижка', price: 1500, duration: 45 },
+      { name: 'Укладка', price: 1800, duration: 50 },
+    ],
+    priceFrom: 1500,
+    priceTo: 4000,
+    worksAtMaster: true,
+  },
+  {
+    id: 'massage',
+    label: 'Массаж',
+    categories: ['massage-body'],
+    services: [
+      { name: 'Классический массаж', price: 2500, duration: 60 },
+      { name: 'Антистресс массаж', price: 2800, duration: 70 },
+      { name: 'Спортивный массаж', price: 3200, duration: 70 },
+    ],
+    priceFrom: 2200,
+    priceTo: 4500,
+    worksAtClient: true,
+  },
+]
+
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
@@ -89,10 +165,14 @@ export const ProProfileScreen = ({
   const [priceFrom, setPriceFrom] = useState('')
   const [priceTo, setPriceTo] = useState('')
   const [categories, setCategories] = useState<string[]>([])
-  const [services, setServices] = useState<string[]>([])
+  const [serviceItems, setServiceItems] = useState<ServiceItem[]>([])
   const [serviceInput, setServiceInput] = useState('')
-  const [portfolioUrls, setPortfolioUrls] = useState<string[]>([])
+  const [servicePriceInput, setServicePriceInput] = useState('')
+  const [serviceDurationInput, setServiceDurationInput] = useState('')
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [portfolioInput, setPortfolioInput] = useState('')
+  const [portfolioTitleInput, setPortfolioTitleInput] = useState('')
+  const [showAllPortfolio, setShowAllPortfolio] = useState(false)
   const [worksAtClient, setWorksAtClient] = useState(true)
   const [worksAtMaster, setWorksAtMaster] = useState(false)
   const [isActive, setIsActive] = useState(true)
@@ -113,6 +193,14 @@ export const ProProfileScreen = ({
   const coverInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<HTMLDivElement>(null)
   const [activeSection, setActiveSection] = useState<ProProfileSection>('basic')
+  const serviceStrings = useMemo(
+    () => toServiceStrings(serviceItems),
+    [serviceItems]
+  )
+  const portfolioStrings = useMemo(
+    () => toPortfolioStrings(portfolioItems),
+    [portfolioItems]
+  )
   const profileStatus = useMemo(
     () =>
       getProfileStatusSummary({
@@ -126,8 +214,8 @@ export const ProProfileScreen = ({
         worksAtClient,
         worksAtMaster,
         categories,
-        services,
-        portfolioUrls,
+        services: serviceStrings,
+        portfolioUrls: portfolioStrings,
       }),
     [
       about,
@@ -136,10 +224,10 @@ export const ProProfileScreen = ({
       displayName,
       districtId,
       experienceYears,
-      portfolioUrls,
       priceFrom,
       priceTo,
-      services,
+      portfolioStrings,
+      serviceStrings,
       worksAtClient,
       worksAtMaster,
     ]
@@ -184,6 +272,14 @@ export const ProProfileScreen = ({
           : 'Цена не указана'
   const experienceLabel =
     experienceValue !== null ? `${experienceValue} лет` : 'Опыт не указан'
+  const workFormatLabel =
+    worksAtClient && worksAtMaster
+      ? 'У мастера и выезд'
+      : worksAtClient
+        ? 'Выезд к клиенту'
+        : worksAtMaster
+          ? 'У мастера'
+          : 'Формат не указан'
   const locationLabel = useMemo(() => {
     const cityLabel = cityId
       ? cities.find((city) => city.id === cityId)?.name
@@ -200,6 +296,22 @@ export const ProProfileScreen = ({
         .map((category) => category.label),
     [categories]
   )
+  const serviceNames = useMemo(
+    () => serviceItems.filter((item) => item.name.trim()).map((item) => item.name),
+    [serviceItems]
+  )
+  const portfolioPreview = useMemo(
+    () => portfolioItems.filter((item) => item.url.trim()).slice(0, 3),
+    [portfolioItems]
+  )
+  const visiblePortfolio = showAllPortfolio
+    ? portfolioItems
+    : portfolioItems.slice(0, 6)
+  const hasMorePortfolio = portfolioItems.length > 6
+  const previewTagSource =
+    serviceNames.length > 0 ? serviceNames : categoryLabels
+  const previewTags = previewTagSource.slice(0, 3)
+  const previewTagRemainder = previewTagSource.length - previewTags.length
   const missingLabels = useMemo(() => {
     const labels: string[] = []
     if (profileStatus.missingFields.includes('displayName')) {
@@ -242,10 +354,10 @@ export const ProProfileScreen = ({
     ) {
       return { section: 'location', label: 'Локация и формат' }
     }
-    if (services.length === 0 && priceFromValue === null && priceToValue === null) {
+    if (serviceStrings.length === 0 && priceFromValue === null && priceToValue === null) {
       return { section: 'services', label: 'Услуги и цены' }
     }
-    if (portfolioUrls.length === 0) {
+    if (portfolioStrings.length === 0) {
       return { section: 'portfolio', label: 'Портфолио' }
     }
     if (!about.trim()) {
@@ -254,11 +366,11 @@ export const ProProfileScreen = ({
     return null
   }, [
     about,
-    portfolioUrls.length,
+    portfolioStrings.length,
     priceFromValue,
     priceToValue,
     profileStatus.missingFields,
-    services.length,
+    serviceStrings.length,
   ])
   const activeSectionMeta =
     profileSections.find((section) => section.id === activeSection) ?? profileSections[0]
@@ -384,8 +496,9 @@ export const ProProfileScreen = ({
         setWorksAtClient(data.worksAtClient)
         setWorksAtMaster(data.worksAtMaster)
         setCategories(data.categories ?? [])
-        setServices(data.services ?? [])
-        setPortfolioUrls(data.portfolioUrls ?? [])
+        setServiceItems(parseServiceItems(data.services ?? []))
+        setPortfolioItems(parsePortfolioItems(data.portfolioUrls ?? []))
+        setShowAllPortfolio(false)
         setAvatarUrl(data.avatarUrl ?? '')
         setCoverUrl(data.coverUrl ?? '')
       } catch (error) {
@@ -414,30 +527,133 @@ export const ProProfileScreen = ({
     )
   }
 
+  const normalizeServiceKey = (value: string) => value.trim().toLowerCase()
+
+  const applyTemplate = (template: ProfileTemplate) => {
+    setCategories((current) => {
+      const next = new Set(current)
+      template.categories.forEach((category) => next.add(category))
+      return Array.from(next)
+    })
+    setServiceItems((current) => {
+      const byName = new Map(
+        current.map((item) => [normalizeServiceKey(item.name), item])
+      )
+      template.services.forEach((item) => {
+        const key = normalizeServiceKey(item.name)
+        const existing = byName.get(key)
+        if (existing) {
+          byName.set(key, {
+            ...existing,
+            price: existing.price ?? item.price ?? null,
+            duration: existing.duration ?? item.duration ?? null,
+          })
+        } else {
+          byName.set(key, { ...item })
+        }
+      })
+      return Array.from(byName.values())
+    })
+    setPriceFrom((current) =>
+      current.trim()
+        ? current
+        : template.priceFrom !== undefined
+          ? String(template.priceFrom)
+          : ''
+    )
+    setPriceTo((current) =>
+      current.trim()
+        ? current
+        : template.priceTo !== undefined
+          ? String(template.priceTo)
+          : ''
+    )
+    if (!about.trim() && template.about) {
+      setAbout(template.about)
+    }
+    if (!worksAtClient && !worksAtMaster) {
+      setWorksAtClient(Boolean(template.worksAtClient))
+      setWorksAtMaster(Boolean(template.worksAtMaster))
+    }
+  }
+
   const addService = () => {
     const trimmed = serviceInput.trim()
     if (!trimmed) return
-    setServices((current) =>
-      current.includes(trimmed) ? current : [...current, trimmed]
-    )
+    const priceValue = parseNumber(servicePriceInput)
+    const durationValue = parseNumber(serviceDurationInput)
+    setServiceItems((current) => {
+      const key = normalizeServiceKey(trimmed)
+      const index = current.findIndex(
+        (item) => normalizeServiceKey(item.name) === key
+      )
+      if (index === -1) {
+        return [
+          ...current,
+          {
+            name: trimmed,
+            price: priceValue,
+            duration: durationValue,
+          },
+        ]
+      }
+      const next = [...current]
+      const existing = next[index]
+      next[index] = {
+        ...existing,
+        price: existing.price ?? priceValue ?? null,
+        duration: existing.duration ?? durationValue ?? null,
+      }
+      return next
+    })
     setServiceInput('')
+    setServicePriceInput('')
+    setServiceDurationInput('')
   }
 
-  const removeService = (service: string) => {
-    setServices((current) => current.filter((item) => item !== service))
+  const updateServiceItem = (
+    index: number,
+    updates: Partial<ServiceItem>
+  ) => {
+    setServiceItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...updates } : item
+      )
+    )
+  }
+
+  const removeService = (index: number) => {
+    setServiceItems((current) => current.filter((_, itemIndex) => itemIndex !== index))
   }
 
   const addPortfolio = () => {
     const trimmed = portfolioInput.trim()
     if (!trimmed) return
-    setPortfolioUrls((current) =>
-      current.includes(trimmed) ? current : [...current, trimmed]
+    const title = portfolioTitleInput.trim()
+    setPortfolioItems((current) =>
+      current.some((item) => item.url === trimmed)
+        ? current
+        : [{ url: trimmed, title: title || null }, ...current]
     )
     setPortfolioInput('')
+    setPortfolioTitleInput('')
   }
 
-  const removePortfolio = (url: string) => {
-    setPortfolioUrls((current) => current.filter((item) => item !== url))
+  const updatePortfolioItem = (
+    index: number,
+    updates: Partial<PortfolioItem>
+  ) => {
+    setPortfolioItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...updates } : item
+      )
+    )
+  }
+
+  const removePortfolio = (index: number) => {
+    setPortfolioItems((current) =>
+      current.filter((_, itemIndex) => itemIndex !== index)
+    )
   }
 
   const toggleScheduleDay = (dayId: string) => {
@@ -649,8 +865,8 @@ export const ProProfileScreen = ({
           worksAtClient,
           worksAtMaster,
           categories,
-          services,
-          portfolioUrls,
+          services: serviceStrings,
+          portfolioUrls: portfolioStrings,
         }),
       })
 
@@ -673,8 +889,8 @@ export const ProProfileScreen = ({
         worksAtClient,
         worksAtMaster,
         categories,
-        services,
-        portfolioUrls,
+        services: serviceStrings,
+        portfolioUrls: portfolioStrings,
       })
 
       setSaveSuccess(
@@ -934,6 +1150,73 @@ export const ProProfileScreen = ({
               </button>
             ))}
           </div>
+          <div className="pro-editor-preview">
+            <div className="pro-editor-preview-head">
+              <span className="pro-editor-preview-label">Клиентский взгляд</span>
+              <span className="pro-preview-badge">Live</span>
+            </div>
+            <div className="pro-editor-preview-card">
+              <div className="pro-editor-preview-main">
+                <div className="pro-editor-preview-avatar">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
+                  ) : (
+                    <span aria-hidden="true">{profileInitials}</span>
+                  )}
+                </div>
+                <div className="pro-editor-preview-info">
+                  <div className="pro-editor-preview-name">{displayNameValue}</div>
+                  <div className="pro-editor-preview-meta">{locationLabel}</div>
+                </div>
+                <div className="pro-editor-preview-price">{priceLabel}</div>
+              </div>
+              <div className="pro-editor-preview-tags">
+                {previewTags.length > 0 ? (
+                  <>
+                    {previewTags.map((label, index) => (
+                      <span className="pro-editor-preview-tag" key={`${label}-${index}`}>
+                        {label}
+                      </span>
+                    ))}
+                    {previewTagRemainder > 0 && (
+                      <span className="pro-editor-preview-tag is-muted">
+                        +{previewTagRemainder}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="pro-editor-preview-tag is-muted">
+                    Добавьте услуги
+                  </span>
+                )}
+              </div>
+              <div className="pro-editor-preview-stats">
+                <span>{experienceLabel}</span>
+                <span>{workFormatLabel}</span>
+              </div>
+              {portfolioPreview.length > 0 && (
+                <div className="pro-editor-preview-gallery">
+                  {portfolioPreview.map((item, index) => {
+                    const showImage = isImageUrl(item.url)
+                    return (
+                      <div
+                        key={`${item.url}-${index}`}
+                        className={`pro-editor-preview-thumb${
+                          showImage ? ' has-image' : ''
+                        }`}
+                        style={
+                          showImage
+                            ? { backgroundImage: `url(${item.url})` }
+                            : undefined
+                        }
+                        aria-hidden="true"
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
           <div
             className="pro-editor-panel"
             role="tabpanel"
@@ -1000,8 +1283,26 @@ export const ProProfileScreen = ({
             {activeSection === 'services' && (
               <>
                 <div className="pro-field">
-                  <span className="pro-label">Услуги</span>
-                  <div className="pro-chip-field">
+                  <span className="pro-label">Шаблоны</span>
+                  <div className="pro-template-row">
+                    {profileTemplates.map((template) => (
+                      <button
+                        className="pro-template-chip"
+                        key={template.id}
+                        type="button"
+                        onClick={() => applyTemplate(template)}
+                      >
+                        {template.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="pro-template-hint">
+                    Добавляет услуги и цены, не удаляя ваши данные.
+                  </p>
+                </div>
+                <div className="pro-field">
+                  <span className="pro-label">Добавить услугу</span>
+                  <div className="pro-service-add">
                     <input
                       className="pro-input"
                       type="text"
@@ -1013,27 +1314,110 @@ export const ProProfileScreen = ({
                           addService()
                         }
                       }}
-                      placeholder="Добавить услугу"
+                      placeholder="Название"
+                    />
+                    <input
+                      className="pro-input"
+                      type="number"
+                      value={servicePriceInput}
+                      onChange={(event) => setServicePriceInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addService()
+                        }
+                      }}
+                      placeholder="Цена"
+                      min="0"
+                    />
+                    <input
+                      className="pro-input"
+                      type="number"
+                      value={serviceDurationInput}
+                      onChange={(event) => setServiceDurationInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addService()
+                        }
+                      }}
+                      placeholder="Мин"
+                      min="0"
                     />
                     <button className="pro-add" type="button" onClick={addService}>
                       Добавить
                     </button>
                   </div>
-                  <div className="pro-chip-list">
-                    {services.map((service) => (
-                      <span className="pro-chip" key={service}>
-                        {service}
-                        <button
-                          className="pro-chip-remove"
-                          type="button"
-                          onClick={() => removeService(service)}
-                          aria-label={`Удалить ${service}`}
+                </div>
+                <div className="pro-service-grid">
+                  {serviceItems.length > 0 ? (
+                    serviceItems.map((service, index) => {
+                      const metaLabel = formatServiceMeta(service)
+                      return (
+                        <div
+                          className="pro-service-card"
+                          key={`${service.name}-${index}`}
                         >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
+                          <div className="pro-service-card-head">
+                            <input
+                              className="pro-service-name"
+                              type="text"
+                              value={service.name}
+                              onChange={(event) =>
+                                updateServiceItem(index, {
+                                  name: event.target.value,
+                                })
+                              }
+                              placeholder="Название услуги"
+                            />
+                            <button
+                              className="pro-service-remove"
+                              type="button"
+                              onClick={() => removeService(index)}
+                              aria-label={`Удалить ${service.name || 'услугу'}`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div className="pro-service-meta">
+                            <input
+                              className="pro-input pro-service-meta-input"
+                              type="number"
+                              value={service.price ?? ''}
+                              onChange={(event) =>
+                                updateServiceItem(index, {
+                                  price: parseNumber(event.target.value),
+                                })
+                              }
+                              placeholder="Цена"
+                              min="0"
+                            />
+                            <input
+                              className="pro-input pro-service-meta-input"
+                              type="number"
+                              value={service.duration ?? ''}
+                              onChange={(event) =>
+                                updateServiceItem(index, {
+                                  duration: parseNumber(event.target.value),
+                                })
+                              }
+                              placeholder="Мин"
+                              min="0"
+                            />
+                          </div>
+                          {metaLabel && (
+                            <div className="pro-service-meta-preview">
+                              {metaLabel}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="pro-service-empty">
+                      Добавьте 2-3 ключевые услуги — так вас быстрее выбирают.
+                    </div>
+                  )}
                 </div>
                 <div className="pro-field pro-field--split">
                   <div>
@@ -1230,8 +1614,8 @@ export const ProProfileScreen = ({
             {activeSection === 'portfolio' && (
               <>
                 <div className="pro-field">
-                  <span className="pro-label">Ссылки на работы</span>
-                  <div className="pro-chip-field">
+                  <span className="pro-label">Витрина работ</span>
+                  <div className="pro-portfolio-add">
                     <input
                       className="pro-input"
                       type="url"
@@ -1243,28 +1627,98 @@ export const ProProfileScreen = ({
                           addPortfolio()
                         }
                       }}
-                      placeholder="https://..."
+                      placeholder="Ссылка на фото или видео"
+                    />
+                    <input
+                      className="pro-input"
+                      type="text"
+                      value={portfolioTitleInput}
+                      onChange={(event) =>
+                        setPortfolioTitleInput(event.target.value)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addPortfolio()
+                        }
+                      }}
+                      placeholder="Подпись (опционально)"
                     />
                     <button className="pro-add" type="button" onClick={addPortfolio}>
                       Добавить
                     </button>
                   </div>
-                  <div className="pro-chip-list">
-                    {portfolioUrls.map((url) => (
-                      <span className="pro-chip" key={url}>
-                        {url}
-                        <button
-                          className="pro-chip-remove"
-                          type="button"
-                          onClick={() => removePortfolio(url)}
-                          aria-label="Удалить ссылку"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
                 </div>
+                <div className="pro-portfolio-grid">
+                  {visiblePortfolio.length > 0 ? (
+                    visiblePortfolio.map((item, index) => {
+                      const showImage = isImageUrl(item.url)
+                      return (
+                        <div
+                          className="pro-portfolio-card"
+                          key={`${item.url}-${index}`}
+                        >
+                          <div
+                            className={`pro-portfolio-thumb${
+                              showImage ? ' has-image' : ''
+                            }`}
+                            style={
+                              showImage
+                                ? { backgroundImage: `url(${item.url})` }
+                                : undefined
+                            }
+                          >
+                            {!showImage && (
+                              <span className="pro-portfolio-thumb-label">LINK</span>
+                            )}
+                          </div>
+                          <div className="pro-portfolio-body">
+                            <input
+                              className="pro-portfolio-title"
+                              type="text"
+                              value={item.title ?? ''}
+                              onChange={(event) =>
+                                updatePortfolioItem(index, {
+                                  title: event.target.value,
+                                })
+                              }
+                              placeholder="Подпись (опционально)"
+                            />
+                            <a
+                              className="pro-portfolio-link"
+                              href={item.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Открыть работу
+                            </a>
+                          </div>
+                          <button
+                            className="pro-portfolio-remove"
+                            type="button"
+                            onClick={() => removePortfolio(index)}
+                            aria-label="Удалить работу"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="pro-portfolio-empty">
+                      Добавьте 3-6 лучших работ, чтобы клиенты сразу видели стиль.
+                    </div>
+                  )}
+                </div>
+                {hasMorePortfolio && (
+                  <button
+                    className="pro-ghost pro-portfolio-toggle"
+                    type="button"
+                    onClick={() => setShowAllPortfolio((current) => !current)}
+                  >
+                    {showAllPortfolio ? 'Свернуть' : 'Показать все'}
+                  </button>
+                )}
               </>
             )}
           </div>
