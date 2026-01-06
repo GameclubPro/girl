@@ -1067,24 +1067,6 @@ export const ProProfileScreen = ({
                     rows={3}
                   />
                 </div>
-                <div className="pro-field">
-                  <span className="pro-label">Категории</span>
-                  <div className="request-chips">
-                    {categoryItems.map((category) => (
-                      <button
-                        className={`request-chip${
-                          categories.includes(category.id) ? ' is-active' : ''
-                        }`}
-                        key={category.id}
-                        type="button"
-                        onClick={() => toggleCategory(category.id)}
-                        aria-pressed={categories.includes(category.id)}
-                      >
-                        {category.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -1295,6 +1277,24 @@ export const ProProfileScreen = ({
             </button>
             {isSectionOpen('services') && (
               <div className="pro-profile-card-edit">
+                <div className="pro-field">
+                  <span className="pro-label">Категории</span>
+                  <div className="request-chips">
+                    {categoryItems.map((category) => (
+                      <button
+                        className={`request-chip${
+                          categories.includes(category.id) ? ' is-active' : ''
+                        }`}
+                        key={category.id}
+                        type="button"
+                        onClick={() => toggleCategory(category.id)}
+                        aria-pressed={categories.includes(category.id)}
+                      >
+                        {category.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="pro-field">
                   <span className="pro-label">Добавить услугу</span>
                   <div className="pro-service-add">
