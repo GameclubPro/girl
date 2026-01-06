@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import {
@@ -70,6 +70,13 @@ export const RequestScreen = ({
     () => getServiceOptions(categoryId),
     [categoryId]
   )
+  const selectedCategory = useMemo(
+    () => categoryItems.find((item) => item.id === categoryId),
+    [categoryId]
+  )
+  const categoryIconStyle = selectedCategory?.icon
+    ? ({ '--request-category-icon': `url(${selectedCategory.icon})` } as CSSProperties)
+    : undefined
 
   useEffect(() => {
     if (serviceOptions.length === 0) {
@@ -174,14 +181,14 @@ export const RequestScreen = ({
           </div>
         </header>
 
-        <section className="request-card animate delay-2">
-          <h2 className="request-card-title">Услуга</h2>
+        <section className="request-card animate delay-2" aria-label="Услуга">
           <div className="request-field">
-            <span className="request-label">Категория *</span>
             <select
               className="request-select-input"
               value={categoryId}
               onChange={(event) => setCategoryId(event.target.value)}
+              style={categoryIconStyle}
+              aria-label="Категория"
             >
               {categoryItems.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -191,8 +198,11 @@ export const RequestScreen = ({
             </select>
           </div>
           <div className="request-field">
-            <span className="request-label">Выберите услугу *</span>
-            <div className="request-service-grid" role="list">
+            <div
+              className="request-service-grid"
+              role="list"
+              aria-label="Выберите услугу"
+            >
               {serviceOptions.map((option) => {
                 const isSelected = option.title === serviceName
                 return (

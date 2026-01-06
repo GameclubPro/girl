@@ -420,19 +420,24 @@
   border: 1px solid rgba(120, 103, 140, 0.18);
   background: #ffffff;
   border-radius: 16px;
-  padding: 12px 38px 12px 14px;
+  padding: 12px 38px 12px 46px;
   font-size: 15px;
   font-weight: 600;
   color: var(--request-ink);
   box-shadow: 0 8px 14px rgba(71, 55, 87, 0.08);
   appearance: none;
   background-image:
+    var(--request-category-icon, none),
     linear-gradient(45deg, transparent 50%, rgba(126, 110, 140, 0.6) 50%),
     linear-gradient(135deg, rgba(126, 110, 140, 0.6) 50%, transparent 50%);
   background-position:
+    14px 50%,
     calc(100% - 18px) 50%,
     calc(100% - 12px) 50%;
-  background-size: 6px 6px;
+  background-size:
+    22px 22px,
+    6px 6px,
+    6px 6px;
   background-repeat: no-repeat;
 }
 
