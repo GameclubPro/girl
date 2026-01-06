@@ -953,8 +953,13 @@ export const ProProfileScreen = ({
                 className="pro-select"
                 value={cityId ?? ''}
                 onChange={(event) => {
-                  const nextValue = Number(event.target.value)
-                  setCityId(Number.isInteger(nextValue) ? nextValue : null)
+                  const nextValue = event.target.value
+                  if (!nextValue) {
+                    setCityId(null)
+                    return
+                  }
+                  const parsedValue = Number(nextValue)
+                  setCityId(Number.isInteger(parsedValue) ? parsedValue : null)
                 }}
               >
                 <option value="">Выберите город</option>
@@ -974,8 +979,13 @@ export const ProProfileScreen = ({
                 className="pro-select"
                 value={districtId ?? ''}
                 onChange={(event) => {
-                  const nextValue = Number(event.target.value)
-                  setDistrictId(Number.isInteger(nextValue) ? nextValue : null)
+                  const nextValue = event.target.value
+                  if (!nextValue) {
+                    setDistrictId(null)
+                    return
+                  }
+                  const parsedValue = Number(nextValue)
+                  setDistrictId(Number.isInteger(parsedValue) ? parsedValue : null)
                 }}
                 disabled={!cityId || districts.length === 0}
               >

@@ -101,8 +101,10 @@ const getProfileStatusSummary = (profile) => {
     : []
   const worksAtClient = Boolean(safeProfile.worksAtClient)
   const worksAtMaster = Boolean(safeProfile.worksAtMaster)
-  const hasCity = Number.isInteger(Number(safeProfile.cityId))
-  const hasDistrict = Number.isInteger(Number(safeProfile.districtId))
+  const parsedCityId = parseOptionalInt(safeProfile.cityId)
+  const parsedDistrictId = parseOptionalInt(safeProfile.districtId)
+  const hasCity = parsedCityId !== null && parsedCityId > 0
+  const hasDistrict = parsedDistrictId !== null && parsedDistrictId > 0
   const hasLocation = hasCity && hasDistrict
 
   const missingFields = []
@@ -899,10 +901,10 @@ app.post('/api/masters', async (req, res) => {
     return
   }
 
-  const parsedCityId = Number(cityId)
-  const parsedDistrictId = Number(districtId)
-  const hasCity = Number.isInteger(parsedCityId)
-  const hasDistrict = Number.isInteger(parsedDistrictId)
+  const parsedCityId = parseOptionalInt(cityId)
+  const parsedDistrictId = parseOptionalInt(districtId)
+  const hasCity = parsedCityId !== null && parsedCityId > 0
+  const hasDistrict = parsedDistrictId !== null && parsedDistrictId > 0
 
   if (hasDistrict && !hasCity) {
     res.status(400).json({ error: 'city_required' })

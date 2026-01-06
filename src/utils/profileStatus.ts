@@ -30,8 +30,14 @@ export const getProfileStatusSummary = (
     : []
   const worksAtClient = Boolean(safeProfile.worksAtClient)
   const worksAtMaster = Boolean(safeProfile.worksAtMaster)
-  const hasCity = Number.isInteger(Number(safeProfile.cityId))
-  const hasDistrict = Number.isInteger(Number(safeProfile.districtId))
+  const parsedCityId = toNumber(safeProfile.cityId)
+  const parsedDistrictId = toNumber(safeProfile.districtId)
+  const hasCity =
+    parsedCityId !== null && Number.isInteger(parsedCityId) && parsedCityId > 0
+  const hasDistrict =
+    parsedDistrictId !== null &&
+    Number.isInteger(parsedDistrictId) &&
+    parsedDistrictId > 0
   const hasLocation = hasCity && hasDistrict
 
   const missingFields: string[] = []
