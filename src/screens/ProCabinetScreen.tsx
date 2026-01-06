@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
-import { categoryItems } from '../data/clientData'
-import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
+import type { MasterProfile, ProProfileSection } from '../types/app'
 import { parsePortfolioItems, parseServiceItems } from '../utils/profileContent'
 import { getProfileStatusSummary } from '../utils/profileStatus'
 
@@ -31,72 +30,9 @@ export const ProCabinetScreen = ({
   onViewRequests,
 }: ProCabinetScreenProps) => {
   const [profile, setProfile] = useState<MasterProfile | null>(null)
-  const [cities, setCities] = useState<City[]>([])
-  const [districts, setDistricts] = useState<District[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadCities = async () => {
-      try {
-        const response = await fetch(`${apiBase}/api/cities`)
-        if (!response.ok) {
-          throw new Error('Load cities failed')
-        }
-        const data = (await response.json()) as City[]
-        if (!cancelled) {
-          setCities(data)
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setLoadError('Не удалось загрузить города.')
-        }
-      }
-    }
-
-    loadCities()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiBase])
-
-  const cityId = profile?.cityId ?? null
-  const districtId = profile?.districtId ?? null
-
-  useEffect(() => {
-    if (!cityId) {
-      setDistricts([])
-      return
-    }
-
-    let cancelled = false
-
-    const loadDistricts = async () => {
-      try {
-        const response = await fetch(`${apiBase}/api/cities/${cityId}/districts`)
-        if (!response.ok) {
-          throw new Error('Load districts failed')
-        }
-        const data = (await response.json()) as District[]
-        if (!cancelled) {
-          setDistricts(data)
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setLoadError('Не удалось загрузить районы.')
-        }
-      }
-    }
-
-    loadDistricts()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiBase, cityId])
+  const [requestsCount, setRequestsCount] = useState<number | null>(null)
 
   useEffect(() => {
     if (!userId) return
@@ -139,12 +75,39 @@ export const ProCabinetScreen = ({
     }
   }, [apiBase, userId])
 
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const loadRequestsCount = async () => {
+      try {
+        const response = await fetch(
+          `${apiBase}/api/pro/requests?userId=${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load pro requests failed')
+        }
+        const data = (await response.json()) as
+          | { requests?: unknown[] }
+          | unknown[]
+        if (cancelled) return
+        const requestItems = Array.isArray(data) ? data : data.requests ?? []
+        setRequestsCount(requestItems.length)
+      } catch (error) {
+        if (!cancelled) {
+          setRequestsCount(null)
+        }
+      }
+    }
+
+    loadRequestsCount()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
+
   const profileStatus = useMemo(() => getProfileStatusSummary(profile), [profile])
-  const statusLabelMap = {
-    draft: 'Черновик',
-    ready: 'Готов к откликам',
-    complete: 'Профиль заполнен',
-  }
   const isActive = profile?.isActive ?? true
   const profileTone =
     profileStatus.profileStatus === 'complete'
@@ -156,16 +119,6 @@ export const ProCabinetScreen = ({
 
   const displayNameValue =
     profile?.displayName?.trim() || displayNameFallback.trim() || 'Мастер'
-  const profileInitials = useMemo(() => {
-    const source = displayNameValue.trim()
-    if (!source) return 'MK'
-    const parts = source.split(/[\s•|-]+/).filter(Boolean)
-    const initials = parts
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join('')
-    return initials || 'MK'
-  }, [displayNameValue])
 
   const categories = Array.isArray(profile?.categories) ? profile?.categories : []
   const services = Array.isArray(profile?.services) ? profile?.services : []
@@ -177,72 +130,24 @@ export const ProCabinetScreen = ({
     () => parsePortfolioItems(portfolioUrls),
     [portfolioUrls]
   )
-  const categoryLabels = useMemo(
-    () =>
-      categoryItems
-        .filter((category) => categories.includes(category.id))
-        .map((category) => category.label),
-    [categories]
-  )
-  const workFormatLabel =
-    profile?.worksAtClient && profile?.worksAtMaster
-      ? 'У мастера и выезд'
-      : profile?.worksAtClient
-        ? 'Выезд к клиенту'
-        : profile?.worksAtMaster
-          ? 'У мастера'
-          : 'Формат не указан'
 
-  const priceLabel = (() => {
-    const priceFrom =
-      profile?.priceFrom !== null && profile?.priceFrom !== undefined
-        ? profile.priceFrom
-        : null
-    const priceTo =
-      profile?.priceTo !== null && profile?.priceTo !== undefined
-        ? profile.priceTo
-        : null
-
-    if (priceFrom !== null && priceTo !== null) return `${priceFrom}–${priceTo} ₽`
-    if (priceFrom !== null) return `от ${priceFrom} ₽`
-    if (priceTo !== null) return `до ${priceTo} ₽`
-    return 'Цена не указана'
-  })()
-
-  const experienceSummary =
+  const hasExperience =
     profile?.experienceYears !== null && profile?.experienceYears !== undefined
-      ? `${profile.experienceYears} лет опыта`
-      : 'Опыт не указан'
-
-  const servicesSummary =
-    serviceItems.length > 0
-      ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
-      : 'Не заполнено'
-
-  const portfolioSummary =
-    portfolioItems.length > 0
-      ? formatCount(portfolioItems.length, 'работа', 'работы', 'работ')
-      : 'Пусто'
+  const hasAbout = Boolean(profile?.about?.trim()) || hasExperience
+  const hasPrice =
+    (profile?.priceFrom !== null && profile?.priceFrom !== undefined) ||
+    (profile?.priceTo !== null && profile?.priceTo !== undefined)
+  const hasServices = serviceItems.length > 0
+  const hasPortfolio = portfolioItems.length > 0
+  const hasLocation = Boolean(profile?.cityId) && Boolean(profile?.districtId)
 
   const scheduleDays = Array.isArray(profile?.scheduleDays)
     ? profile?.scheduleDays
     : []
-  const scheduleSummary =
-    scheduleDays.length > 0
-      ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
-      : isActive
-        ? 'Открыт'
-        : 'Пауза'
-
-  const locationLabel = useMemo(() => {
-    const cityLabel = cityId
-      ? cities.find((city) => city.id === cityId)?.name
-      : ''
-    const districtLabel = districtId
-      ? districts.find((district) => district.id === districtId)?.name
-      : ''
-    return [cityLabel, districtLabel].filter(Boolean).join(', ') || 'Город не указан'
-  }, [cities, cityId, districtId, districts])
+  const hasSchedule =
+    scheduleDays.length > 0 ||
+    Boolean(profile?.scheduleStart?.trim()) ||
+    Boolean(profile?.scheduleEnd?.trim())
 
   const missingLabels = useMemo(() => {
     const labels: string[] = []
@@ -264,183 +169,197 @@ export const ProCabinetScreen = ({
     return labels
   }, [profileStatus.missingFields])
 
-  const avatarUrl = profile?.avatarUrl ?? ''
-  const coverUrl = profile?.coverUrl ?? ''
-  const primaryCategory = categoryLabels[0] ?? ''
+  const responseLabel = profileStatus.isResponseReady
+    ? isActive
+      ? 'Открыты'
+      : 'Пауза'
+    : 'Недоступны'
+  const requestsSummary =
+    requestsCount === null
+      ? 'Нет данных'
+      : formatCount(requestsCount, 'заявка', 'заявки', 'заявок')
+  const nextTasks = useMemo(
+    () => [
+      !profile?.displayName?.trim()
+        ? { id: 'name', label: 'Добавьте имя и специализацию', section: 'basic' }
+        : null,
+      categories.length === 0
+        ? { id: 'categories', label: 'Выберите категории услуг', section: 'basic' }
+        : null,
+      !hasLocation
+        ? { id: 'location', label: 'Добавьте город и район', section: 'location' }
+        : null,
+      !profile?.worksAtClient && !profile?.worksAtMaster
+        ? {
+            id: 'format',
+            label: 'Укажите формат работы',
+            section: 'location',
+          }
+        : null,
+      !hasPrice
+        ? { id: 'price', label: 'Укажите диапазон цен', section: 'services' }
+        : null,
+      !hasServices
+        ? { id: 'services', label: 'Добавьте 2-3 услуги', section: 'services' }
+        : null,
+      !hasPortfolio
+        ? { id: 'portfolio', label: 'Добавьте работы в портфолио', section: 'portfolio' }
+        : null,
+      !hasAbout
+        ? { id: 'about', label: 'Напишите пару строк о себе', section: 'basic' }
+        : null,
+      !hasSchedule
+        ? { id: 'schedule', label: 'Настройте график работы', section: 'availability' }
+        : null,
+    ].filter(Boolean) as Array<{
+      id: string
+      label: string
+      section: ProProfileSection
+    }>,
+    [
+      categories.length,
+      hasAbout,
+      hasLocation,
+      hasPortfolio,
+      hasPrice,
+      hasSchedule,
+      hasServices,
+      profile?.displayName,
+      profile?.worksAtClient,
+      profile?.worksAtMaster,
+    ]
+  )
+  const visibleTasks = nextTasks.slice(0, 4)
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
       <div className="pro-cabinet-shell">
-        <section
-          className={`pro-cabinet-hero animate delay-1${
-            coverUrl ? ' has-image' : ''
-          }`}
-          style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
-        >
-          <div className="pro-cabinet-hero-inner">
-            <div className="pro-cabinet-avatar">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
-              ) : (
-                <span aria-hidden="true">{profileInitials}</span>
-              )}
+        <section className="pro-cabinet-hero animate delay-1">
+          <div className="pro-cabinet-hero-top">
+            <div>
+              <p className="pro-card-eyebrow">Ассистент</p>
+              <h1 className="pro-cabinet-title">Привет, {displayNameValue}</h1>
             </div>
-            <h1 className="pro-cabinet-name">{displayNameValue}</h1>
-            <div className="pro-cabinet-badges">
-              <span className={`pro-status-chip ${activeTone}`}>
-                {isActive ? 'Активен' : 'Пауза'}
-              </span>
-              <span className={`pro-status-chip ${profileTone}`}>
-                {statusLabelMap[profileStatus.profileStatus]}
-              </span>
-              <span
-                className={`pro-status-chip is-neutral${
-                  primaryCategory ? '' : ' is-muted'
-                }`}
-              >
-                {primaryCategory || 'Категории'}
-              </span>
+            <span className={`pro-status-chip ${activeTone}`}>
+              {isActive ? 'Активен' : 'Пауза'}
+            </span>
+          </div>
+          <p className="pro-cabinet-subtitle">
+            Держите профиль и заявки под контролем, не утопая в настройках.
+          </p>
+          <div className="pro-cabinet-summary">
+            <div className="pro-cabinet-summary-item">
+              <span className="pro-cabinet-summary-label">Готовность</span>
+              <strong className="pro-cabinet-summary-value">
+                {profileStatus.completeness}%
+              </strong>
             </div>
-            {missingLabels.length > 0 && (
-              <p className="pro-cabinet-hint">
-                Заполните: {missingLabels.join(', ')}.
-              </p>
-            )}
-            <div className="pro-cabinet-actions">
-              <button
-                className="pro-cabinet-pill is-primary"
-                type="button"
-                onClick={() => onEditProfile()}
-              >
-                Редактировать профиль
-              </button>
-              <button
-                className="pro-cabinet-pill"
-                type="button"
-                onClick={onViewRequests}
-              >
-                Открыть заявки
-              </button>
+            <div className="pro-cabinet-summary-item">
+              <span className="pro-cabinet-summary-label">Отклики</span>
+              <strong className="pro-cabinet-summary-value">{responseLabel}</strong>
             </div>
+            <div className="pro-cabinet-summary-item">
+              <span className="pro-cabinet-summary-label">Заявки</span>
+              <strong className="pro-cabinet-summary-value">{requestsSummary}</strong>
+            </div>
+          </div>
+          {missingLabels.length > 0 && (
+            <p className="pro-cabinet-hint">
+              Для отклика нужно: {missingLabels.join(', ')}.
+            </p>
+          )}
+          <div className="pro-cabinet-actions">
+            <button
+              className="pro-cabinet-pill is-primary"
+              type="button"
+              onClick={() => onEditProfile()}
+            >
+              Редактировать профиль
+            </button>
+            <button
+              className="pro-cabinet-pill"
+              type="button"
+              onClick={onViewRequests}
+            >
+              Открыть заявки
+            </button>
           </div>
         </section>
 
         {isLoading && <p className="pro-status">Загружаем кабинет...</p>}
         {loadError && <p className="pro-error">{loadError}</p>}
 
-        <section className="pro-cabinet-grid animate delay-2">
-          <button
-            className="pro-cabinet-tile is-wide"
-            type="button"
-            onClick={() => onEditProfile('location')}
-          >
-            <span className="pro-cabinet-tile-icon" aria-hidden="true">
-              📍
+        <section className="pro-cabinet-tasks animate delay-2">
+          <div className="pro-card-head">
+            <div>
+              <p className="pro-card-eyebrow">Сегодня</p>
+              <h2 className="pro-card-title">Следующие шаги</h2>
+            </div>
+            <span className={`pro-pill ${profileTone}`}>
+              {profileStatus.completeness}%
             </span>
-            <span className="pro-cabinet-tile-info">
-              <span className="pro-cabinet-tile-title">Локация</span>
-              <span className="pro-cabinet-tile-value">{locationLabel}</span>
-            </span>
-            <span className="pro-cabinet-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-cabinet-tile is-wide"
-            type="button"
-            onClick={() => onEditProfile('location')}
-          >
-            <span className="pro-cabinet-tile-icon" aria-hidden="true">
-              🧳
-            </span>
-            <span className="pro-cabinet-tile-info">
-              <span className="pro-cabinet-tile-title">Опыт</span>
-              <span className="pro-cabinet-tile-value">{experienceSummary}</span>
-            </span>
-            <span className="pro-cabinet-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-cabinet-tile"
-            type="button"
-            onClick={() => onEditProfile('location')}
-          >
-            <span className="pro-cabinet-tile-icon" aria-hidden="true">
-              🧷
-            </span>
-            <span className="pro-cabinet-tile-info">
-              <span className="pro-cabinet-tile-title">Формат</span>
-              <span className="pro-cabinet-tile-value">{workFormatLabel}</span>
-            </span>
-            <span className="pro-cabinet-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-cabinet-tile"
-            type="button"
-            onClick={() => onEditProfile('services')}
-          >
-            <span className="pro-cabinet-tile-icon" aria-hidden="true">
-              💸
-            </span>
-            <span className="pro-cabinet-tile-info">
-              <span className="pro-cabinet-tile-title">Цены</span>
-              <span className="pro-cabinet-tile-value">{priceLabel}</span>
-            </span>
-            <span className="pro-cabinet-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-cabinet-tile"
-            type="button"
-            onClick={() => onEditProfile('services')}
-          >
-            <span className="pro-cabinet-tile-icon" aria-hidden="true">
-              🧴
-            </span>
-            <span className="pro-cabinet-tile-info">
-              <span className="pro-cabinet-tile-title">Услуги</span>
-              <span className="pro-cabinet-tile-value">{servicesSummary}</span>
-            </span>
-            <span className="pro-cabinet-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-cabinet-tile"
-            type="button"
-            onClick={() => onEditProfile('portfolio')}
-          >
-            <span className="pro-cabinet-tile-icon" aria-hidden="true">
-              🖼️
-            </span>
-            <span className="pro-cabinet-tile-info">
-              <span className="pro-cabinet-tile-title">Портфолио</span>
-              <span className="pro-cabinet-tile-value">{portfolioSummary}</span>
-            </span>
-            <span className="pro-cabinet-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-cabinet-tile is-wide"
-            type="button"
-            onClick={() => onEditProfile('availability')}
-          >
-            <span className="pro-cabinet-tile-icon" aria-hidden="true">
-              ⏱️
-            </span>
-            <span className="pro-cabinet-tile-info">
-              <span className="pro-cabinet-tile-title">График</span>
-              <span className="pro-cabinet-tile-value">{scheduleSummary}</span>
-            </span>
-            <span className="pro-cabinet-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
+          </div>
+          <div className="pro-cabinet-task-list">
+            {visibleTasks.length > 0 ? (
+              visibleTasks.map((task) => (
+                <button
+                  className="pro-cabinet-task"
+                  type="button"
+                  key={task.id}
+                  onClick={() => onEditProfile(task.section)}
+                >
+                  <span className="pro-cabinet-task-dot" aria-hidden="true" />
+                  <span className="pro-cabinet-task-text">{task.label}</span>
+                  <span className="pro-cabinet-task-arrow" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              ))
+            ) : (
+              <div className="pro-cabinet-task-empty">
+                Профиль готов. Можно брать заявки без ограничений.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="pro-cabinet-quick animate delay-3">
+          <div className="pro-card-head">
+            <div>
+              <p className="pro-card-eyebrow">Быстрые действия</p>
+              <h2 className="pro-card-title">Ускорить работу</h2>
+            </div>
+          </div>
+          <div className="pro-cabinet-quick-grid">
+            <button
+              className="pro-cabinet-quick-chip"
+              type="button"
+              onClick={onViewRequests}
+            >
+              Заявки
+            </button>
+            <button
+              className="pro-cabinet-quick-chip"
+              type="button"
+              onClick={() => onEditProfile('services')}
+            >
+              Цены и услуги
+            </button>
+            <button
+              className="pro-cabinet-quick-chip"
+              type="button"
+              onClick={() => onEditProfile('portfolio')}
+            >
+              Портфолио
+            </button>
+            <button
+              className="pro-cabinet-quick-chip"
+              type="button"
+              onClick={() => onEditProfile('availability')}
+            >
+              График
+            </button>
+          </div>
         </section>
       </div>
 

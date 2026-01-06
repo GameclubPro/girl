@@ -29,6 +29,16 @@ const parseNumber = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const formatCount = (value: number, one: string, few: string, many: string) => {
+  const mod10 = value % 10
+  const mod100 = value % 100
+  if (mod10 === 1 && mod100 !== 11) return `${value} ${one}`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} ${few}`
+  }
+  return `${value} ${many}`
+}
+
 const scheduleDayOptions = [
   { id: 'mon', label: 'Пн' },
   { id: 'tue', label: 'Вт' },
@@ -214,6 +224,7 @@ export const ProProfileScreen = ({
   const coverInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<HTMLDivElement>(null)
   const [activeSection, setActiveSection] = useState<ProProfileSection>('basic')
+  const [isEditing, setIsEditing] = useState(() => Boolean(focusSection))
   const autosaveTimerRef = useRef<number | null>(null)
   const autosaveSuccessTimerRef = useRef<number | null>(null)
   const lastSavedRef = useRef('')
@@ -377,6 +388,20 @@ export const ProProfileScreen = ({
         : worksAtMaster
           ? 'У мастера'
           : 'Формат не указан'
+  const servicesSummary =
+    serviceItems.length > 0
+      ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
+      : 'Не заполнено'
+  const portfolioSummary =
+    portfolioItems.length > 0
+      ? formatCount(portfolioItems.length, 'работа', 'работы', 'работ')
+      : 'Пусто'
+  const scheduleSummary =
+    scheduleDays.length > 0
+      ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
+      : isActive
+        ? 'Открыт'
+        : 'Пауза'
   const locationLabel = useMemo(() => {
     const cityLabel = cityId
       ? cities.find((city) => city.id === cityId)?.name
@@ -393,6 +418,7 @@ export const ProProfileScreen = ({
         .map((category) => category.label),
     [categories]
   )
+  const primaryCategory = categoryLabels[0] ?? ''
   const serviceNames = useMemo(
     () => serviceItems.filter((item) => item.name.trim()).map((item) => item.name),
     [serviceItems]
@@ -502,6 +528,7 @@ export const ProProfileScreen = ({
 
   useEffect(() => {
     if (!focusSection) return
+    setIsEditing(true)
     setActiveSection(focusSection)
     const timeout = window.setTimeout(() => {
       editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1073,15 +1100,240 @@ export const ProProfileScreen = ({
     }
   }
 
+  const openEditor = (section?: ProProfileSection) => {
+    if (section) {
+      setActiveSection(section)
+    }
+    if (!isEditing) {
+      setIsEditing(true)
+    }
+    window.setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }
+
   const jumpToEditor = (section: ProProfileSection) => {
-    setActiveSection(section)
-    editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    openEditor(section)
   }
 
   return (
     <div className="screen screen--pro">
       <div className="pro-shell">
-        <header className="pro-hero animate delay-1">
+        <section className="pro-profile-compact animate delay-1">
+          <div
+            className={`pro-profile-compact-cover${
+              coverUrl ? ' has-image' : ''
+            }`}
+            style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
+          >
+            <div className="pro-profile-compact-cover-grid" aria-hidden="true" />
+          </div>
+          <div className="pro-profile-compact-body">
+            <div className="pro-profile-compact-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
+              ) : (
+                <span aria-hidden="true">{profileInitials}</span>
+              )}
+            </div>
+            <div className="pro-profile-compact-title">
+              <h1 className="pro-profile-compact-name">{displayNameValue}</h1>
+              <span className={`pro-pill ${profileTone}`}>
+                {profileStatus.completeness}%
+              </span>
+            </div>
+            <div className="pro-profile-compact-badges">
+              <span className={`pro-status-chip ${activeTone}`}>
+                {isActive ? 'Активен' : 'Пауза'}
+              </span>
+              <span className={`pro-status-chip ${profileTone}`}>
+                {statusLabelMap[profileStatus.profileStatus]}
+              </span>
+              <span
+                className={`pro-status-chip is-neutral${
+                  primaryCategory ? '' : ' is-muted'
+                }`}
+              >
+                {primaryCategory || 'Категории'}
+              </span>
+            </div>
+            <p
+              className={`pro-profile-compact-about${
+                about.trim() ? '' : ' is-muted'
+              }`}
+            >
+              {aboutPreview}
+            </p>
+            <div className="pro-profile-compact-tags">
+              {previewTags.length > 0 ? (
+                <>
+                  {previewTags.map((label, index) => (
+                    <span className="pro-profile-tag" key={`${label}-${index}`}>
+                      {label}
+                    </span>
+                  ))}
+                  {previewTagRemainder > 0 && (
+                    <span className="pro-profile-tag is-muted">
+                      +{previewTagRemainder}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="pro-profile-tag is-muted">
+                  Добавьте услуги
+                </span>
+              )}
+            </div>
+            <div className="pro-profile-actions">
+              <button
+                className={`pro-cabinet-pill${isEditing ? '' : ' is-primary'}`}
+                type="button"
+                onClick={() => {
+                  if (isEditing) {
+                    setIsEditing(false)
+                    return
+                  }
+                  openEditor()
+                }}
+              >
+                {isEditing ? 'Свернуть редактор' : 'Редактировать профиль'}
+              </button>
+              <button
+                className="pro-cabinet-pill"
+                type="button"
+                onClick={onViewRequests}
+              >
+                К заявкам
+              </button>
+            </div>
+            {missingLabels.length > 0 && (
+              <p className="pro-profile-compact-hint">
+                Для отклика заполните: {missingLabels.join(', ')}.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="pro-profile-grid animate delay-2">
+          <button
+            className="pro-profile-tile is-wide"
+            type="button"
+            onClick={() => openEditor('location')}
+          >
+            <span className="pro-profile-tile-icon" aria-hidden="true">
+              📍
+            </span>
+            <span className="pro-profile-tile-info">
+              <span className="pro-profile-tile-title">Локация</span>
+              <span className="pro-profile-tile-value">{locationLabel}</span>
+            </span>
+            <span className="pro-profile-tile-arrow" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-tile is-wide"
+            type="button"
+            onClick={() => openEditor('location')}
+          >
+            <span className="pro-profile-tile-icon" aria-hidden="true">
+              🧳
+            </span>
+            <span className="pro-profile-tile-info">
+              <span className="pro-profile-tile-title">Опыт</span>
+              <span className="pro-profile-tile-value">{experienceLabel}</span>
+            </span>
+            <span className="pro-profile-tile-arrow" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-tile"
+            type="button"
+            onClick={() => openEditor('location')}
+          >
+            <span className="pro-profile-tile-icon" aria-hidden="true">
+              🧷
+            </span>
+            <span className="pro-profile-tile-info">
+              <span className="pro-profile-tile-title">Формат</span>
+              <span className="pro-profile-tile-value">{workFormatLabel}</span>
+            </span>
+            <span className="pro-profile-tile-arrow" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-tile"
+            type="button"
+            onClick={() => openEditor('services')}
+          >
+            <span className="pro-profile-tile-icon" aria-hidden="true">
+              💸
+            </span>
+            <span className="pro-profile-tile-info">
+              <span className="pro-profile-tile-title">Цены</span>
+              <span className="pro-profile-tile-value">{priceLabel}</span>
+            </span>
+            <span className="pro-profile-tile-arrow" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-tile"
+            type="button"
+            onClick={() => openEditor('services')}
+          >
+            <span className="pro-profile-tile-icon" aria-hidden="true">
+              🧴
+            </span>
+            <span className="pro-profile-tile-info">
+              <span className="pro-profile-tile-title">Услуги</span>
+              <span className="pro-profile-tile-value">{servicesSummary}</span>
+            </span>
+            <span className="pro-profile-tile-arrow" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-tile"
+            type="button"
+            onClick={() => openEditor('portfolio')}
+          >
+            <span className="pro-profile-tile-icon" aria-hidden="true">
+              🖼️
+            </span>
+            <span className="pro-profile-tile-info">
+              <span className="pro-profile-tile-title">Портфолио</span>
+              <span className="pro-profile-tile-value">{portfolioSummary}</span>
+            </span>
+            <span className="pro-profile-tile-arrow" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-tile is-wide"
+            type="button"
+            onClick={() => openEditor('availability')}
+          >
+            <span className="pro-profile-tile-icon" aria-hidden="true">
+              ⏱️
+            </span>
+            <span className="pro-profile-tile-info">
+              <span className="pro-profile-tile-title">График</span>
+              <span className="pro-profile-tile-value">{scheduleSummary}</span>
+            </span>
+            <span className="pro-profile-tile-arrow" aria-hidden="true">
+              ›
+            </span>
+          </button>
+        </section>
+
+        {isLoading && <p className="pro-status">Загружаем профиль...</p>}
+        {loadError && <p className="pro-error">{loadError}</p>}
+        {isEditing && (
+          <>
+            <header className="pro-hero animate delay-1">
           <div
             className={`pro-hero-cover pro-hero-cover--bleed${
               coverUrl ? ' has-image' : ''
@@ -1290,9 +1542,6 @@ export const ProProfileScreen = ({
         </section>
 
         {mediaError && <p className="pro-error">{mediaError}</p>}
-
-        {isLoading && <p className="pro-status">Загружаем профиль...</p>}
-        {loadError && <p className="pro-error">{loadError}</p>}
 
         <section className="pro-card pro-profile-editor animate delay-3" ref={editorRef}>
           <div className="pro-card-head">
@@ -1897,18 +2146,24 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <div className="pro-actions">
-          <div className={`pro-autosave ${autosaveTone}`}>
-            <span className="pro-autosave-dot" aria-hidden="true" />
-            <span className="pro-autosave-text">{autosaveLabel}</span>
-          </div>
-          <button className="pro-secondary" type="button" onClick={onViewRequests}>
-            Перейти к заявкам
-          </button>
-        </div>
+            <div className="pro-actions">
+              <div className={`pro-autosave ${autosaveTone}`}>
+                <span className="pro-autosave-dot" aria-hidden="true" />
+                <span className="pro-autosave-text">{autosaveLabel}</span>
+              </div>
+              <button
+                className="pro-secondary"
+                type="button"
+                onClick={onViewRequests}
+              >
+                Перейти к заявкам
+              </button>
+            </div>
 
-        {saveError && <p className="pro-error">{saveError}</p>}
-        {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
+            {saveError && <p className="pro-error">{saveError}</p>}
+            {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
+          </>
+        )}
       </div>
 
       <ProBottomNav
