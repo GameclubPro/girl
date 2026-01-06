@@ -599,30 +599,34 @@ export const ProProfileScreen = ({
 
   return (
     <div className="screen screen--pro">
-      <header className="pro-hero pro-hero--bleed animate delay-1">
-          <div className="pro-hero-top">
-            <div className="pro-hero-actions">
-              <button className="pro-ghost" type="button" onClick={onViewRequests}>
-                Заявки
-              </button>
-              <button
-                className="pro-ghost"
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving ? 'Сохраняем...' : 'Сохранить'}
-              </button>
-            </div>
-          </div>
-
+      <div className="pro-shell">
+        <header className="pro-hero animate delay-1">
           <div
-            className={`pro-hero-cover${coverUrl ? ' has-image' : ''}${
-              isCoverUploading ? ' is-loading' : ''
-            }`}
+            className={`pro-hero-cover pro-hero-cover--bleed${
+              coverUrl ? ' has-image' : ''
+            }${isCoverUploading ? ' is-loading' : ''}`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
             aria-busy={isCoverUploading}
           >
+            <div className="pro-hero-top">
+              <div className="pro-hero-actions">
+                <button
+                  className="pro-ghost"
+                  type="button"
+                  onClick={onViewRequests}
+                >
+                  Заявки
+                </button>
+                <button
+                  className="pro-ghost"
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Сохраняем...' : 'Сохранить'}
+                </button>
+              </div>
+            </div>
             <div className="pro-hero-grid" aria-hidden="true" />
             <div className="pro-hero-orb pro-hero-orb--one" aria-hidden="true" />
             <div className="pro-hero-orb pro-hero-orb--two" aria-hidden="true" />
@@ -756,8 +760,6 @@ export const ProProfileScreen = ({
             </div>
           </div>
         </header>
-
-      <div className="pro-shell">
         <nav className="pro-section-nav animate delay-2" aria-label="Разделы профиля">
           <button
             className="pro-nav-pill"
