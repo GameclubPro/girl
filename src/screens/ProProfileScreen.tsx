@@ -332,9 +332,7 @@ export const ProProfileScreen = ({
         ? 'is-ready'
         : 'is-draft'
   const activeTone = isActive ? 'is-active' : 'is-paused'
-  const aboutPreview =
-    about.trim() ||
-    'Добавьте пару слов о своем стиле работы — это повышает доверие.'
+  const aboutPreview = about.trim() || 'Описание пока не добавлено.'
   const profileInitials = useMemo(() => {
     const source = displayNameValue.trim()
     if (!source) return 'MK'
@@ -391,11 +389,11 @@ export const ProProfileScreen = ({
   const servicesSummary =
     serviceItems.length > 0
       ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
-      : 'Не заполнено'
+      : 'Нет услуг'
   const portfolioSummary =
     portfolioItems.length > 0
       ? formatCount(portfolioItems.length, 'работа', 'работы', 'работ')
-      : 'Пусто'
+      : 'Нет работ'
   const scheduleSummary =
     scheduleDays.length > 0
       ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
@@ -418,7 +416,6 @@ export const ProProfileScreen = ({
         .map((category) => category.label),
     [categories]
   )
-  const primaryCategory = categoryLabels[0] ?? ''
   const serviceNames = useMemo(
     () => serviceItems.filter((item) => item.name.trim()).map((item) => item.name),
     [serviceItems]
@@ -1119,212 +1116,164 @@ export const ProProfileScreen = ({
   return (
     <div className="screen screen--pro">
       <div className="pro-shell">
-        <section className="pro-profile-compact animate delay-1">
+        <section className="pro-profile-social animate delay-1">
           <div
-            className={`pro-profile-compact-cover${
-              coverUrl ? ' has-image' : ''
-            }`}
+            className={`pro-profile-social-cover${coverUrl ? ' has-image' : ''}`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
           >
-            <div className="pro-profile-compact-cover-grid" aria-hidden="true" />
+            <div className="pro-profile-social-glow" aria-hidden="true" />
           </div>
-          <div className="pro-profile-compact-body">
-            <div className="pro-profile-compact-avatar">
+          <div className="pro-profile-social-body">
+            <div className="pro-profile-social-avatar">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
               ) : (
                 <span aria-hidden="true">{profileInitials}</span>
               )}
             </div>
-            <div className="pro-profile-compact-title">
-              <h1 className="pro-profile-compact-name">{displayNameValue}</h1>
-              <span className={`pro-pill ${profileTone}`}>
-                {profileStatus.completeness}%
-              </span>
-            </div>
-            <div className="pro-profile-compact-badges">
-              <span className={`pro-status-chip ${activeTone}`}>
-                {isActive ? 'Активен' : 'Пауза'}
-              </span>
-              <span className={`pro-status-chip ${profileTone}`}>
-                {statusLabelMap[profileStatus.profileStatus]}
-              </span>
-              <span
-                className={`pro-status-chip is-neutral${
-                  primaryCategory ? '' : ' is-muted'
+            <div className="pro-profile-social-content">
+              <div className="pro-profile-social-header">
+                <h1 className="pro-profile-social-name">{displayNameValue}</h1>
+                <span className={`pro-profile-social-status ${activeTone}`}>
+                  <span className="pro-profile-social-dot" aria-hidden="true" />
+                  {isActive ? 'Принимаю заявки' : 'Пауза'}
+                </span>
+              </div>
+              <div className="pro-profile-social-tags">
+                {previewTags.length > 0 ? (
+                  <>
+                    {previewTags.map((label, index) => (
+                      <span className="pro-profile-tag" key={`${label}-${index}`}>
+                        {label}
+                      </span>
+                    ))}
+                    {previewTagRemainder > 0 && (
+                      <span className="pro-profile-tag is-muted">
+                        +{previewTagRemainder}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="pro-profile-tag is-muted">
+                    Теги появятся здесь
+                  </span>
+                )}
+              </div>
+              <p
+                className={`pro-profile-social-about${
+                  about.trim() ? '' : ' is-muted'
                 }`}
               >
-                {primaryCategory || 'Категории'}
-              </span>
-            </div>
-            <p
-              className={`pro-profile-compact-about${
-                about.trim() ? '' : ' is-muted'
-              }`}
-            >
-              {aboutPreview}
-            </p>
-            <div className="pro-profile-compact-tags">
-              {previewTags.length > 0 ? (
-                <>
-                  {previewTags.map((label, index) => (
-                    <span className="pro-profile-tag" key={`${label}-${index}`}>
-                      {label}
-                    </span>
-                  ))}
-                  {previewTagRemainder > 0 && (
-                    <span className="pro-profile-tag is-muted">
-                      +{previewTagRemainder}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="pro-profile-tag is-muted">
-                  Добавьте услуги
-                </span>
-              )}
-            </div>
-            <div className="pro-profile-actions">
-              <button
-                className={`pro-cabinet-pill${isEditing ? '' : ' is-primary'}`}
-                type="button"
-                onClick={() => {
-                  if (isEditing) {
-                    setIsEditing(false)
-                    return
-                  }
-                  openEditor()
-                }}
-              >
-                {isEditing ? 'Свернуть редактор' : 'Редактировать профиль'}
-              </button>
-              <button
-                className="pro-cabinet-pill"
-                type="button"
-                onClick={onViewRequests}
-              >
-                К заявкам
-              </button>
-            </div>
-            {missingLabels.length > 0 && (
-              <p className="pro-profile-compact-hint">
-                Для отклика заполните: {missingLabels.join(', ')}.
+                {aboutPreview}
               </p>
-            )}
+            </div>
+          </div>
+          <div className="pro-profile-social-actions">
+            <button
+              className={`pro-profile-action${isEditing ? '' : ' is-primary'}`}
+              type="button"
+              onClick={() => {
+                if (isEditing) {
+                  setIsEditing(false)
+                  return
+                }
+                openEditor()
+              }}
+            >
+              {isEditing ? 'Свернуть редактор' : 'Редактировать профиль'}
+            </button>
+            <button className="pro-profile-action" type="button" onClick={onViewRequests}>
+              К заявкам
+            </button>
           </div>
         </section>
 
-        <section className="pro-profile-grid animate delay-2">
+        <section className="pro-profile-cards animate delay-2">
           <button
-            className="pro-profile-tile is-wide"
+            className="pro-profile-card"
+            type="button"
+            onClick={() => openEditor('basic')}
+          >
+            <span className="pro-profile-card-icon" aria-hidden="true">
+              👤
+            </span>
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">О себе</span>
+              <span
+                className={`pro-profile-card-value${
+                  about.trim() ? '' : ' is-muted'
+                }`}
+              >
+                {aboutPreview}
+              </span>
+              <span className="pro-profile-card-meta">{experienceLabel}</span>
+            </span>
+          </button>
+          <button
+            className="pro-profile-card"
             type="button"
             onClick={() => openEditor('location')}
           >
-            <span className="pro-profile-tile-icon" aria-hidden="true">
+            <span className="pro-profile-card-icon" aria-hidden="true">
               📍
             </span>
-            <span className="pro-profile-tile-info">
-              <span className="pro-profile-tile-title">Локация</span>
-              <span className="pro-profile-tile-value">{locationLabel}</span>
-            </span>
-            <span className="pro-profile-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-profile-tile is-wide"
-            type="button"
-            onClick={() => openEditor('location')}
-          >
-            <span className="pro-profile-tile-icon" aria-hidden="true">
-              🧳
-            </span>
-            <span className="pro-profile-tile-info">
-              <span className="pro-profile-tile-title">Опыт</span>
-              <span className="pro-profile-tile-value">{experienceLabel}</span>
-            </span>
-            <span className="pro-profile-tile-arrow" aria-hidden="true">
-              ›
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">Работа</span>
+              <span className="pro-profile-card-value">{locationLabel}</span>
+              <span className="pro-profile-card-meta">{workFormatLabel}</span>
+              <span className="pro-profile-card-meta">{scheduleSummary}</span>
             </span>
           </button>
           <button
-            className="pro-profile-tile"
-            type="button"
-            onClick={() => openEditor('location')}
-          >
-            <span className="pro-profile-tile-icon" aria-hidden="true">
-              🧷
-            </span>
-            <span className="pro-profile-tile-info">
-              <span className="pro-profile-tile-title">Формат</span>
-              <span className="pro-profile-tile-value">{workFormatLabel}</span>
-            </span>
-            <span className="pro-profile-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-profile-tile"
+            className="pro-profile-card"
             type="button"
             onClick={() => openEditor('services')}
           >
-            <span className="pro-profile-tile-icon" aria-hidden="true">
+            <span className="pro-profile-card-icon" aria-hidden="true">
               💸
             </span>
-            <span className="pro-profile-tile-info">
-              <span className="pro-profile-tile-title">Цены</span>
-              <span className="pro-profile-tile-value">{priceLabel}</span>
-            </span>
-            <span className="pro-profile-tile-arrow" aria-hidden="true">
-              ›
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">Услуги и цены</span>
+              <span className="pro-profile-card-value">{servicesSummary}</span>
+              <span className="pro-profile-card-meta">{priceLabel}</span>
             </span>
           </button>
           <button
-            className="pro-profile-tile"
-            type="button"
-            onClick={() => openEditor('services')}
-          >
-            <span className="pro-profile-tile-icon" aria-hidden="true">
-              🧴
-            </span>
-            <span className="pro-profile-tile-info">
-              <span className="pro-profile-tile-title">Услуги</span>
-              <span className="pro-profile-tile-value">{servicesSummary}</span>
-            </span>
-            <span className="pro-profile-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-profile-tile"
+            className="pro-profile-card"
             type="button"
             onClick={() => openEditor('portfolio')}
           >
-            <span className="pro-profile-tile-icon" aria-hidden="true">
+            <span className="pro-profile-card-icon" aria-hidden="true">
               🖼️
             </span>
-            <span className="pro-profile-tile-info">
-              <span className="pro-profile-tile-title">Портфолио</span>
-              <span className="pro-profile-tile-value">{portfolioSummary}</span>
-            </span>
-            <span className="pro-profile-tile-arrow" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-profile-tile is-wide"
-            type="button"
-            onClick={() => openEditor('availability')}
-          >
-            <span className="pro-profile-tile-icon" aria-hidden="true">
-              ⏱️
-            </span>
-            <span className="pro-profile-tile-info">
-              <span className="pro-profile-tile-title">График</span>
-              <span className="pro-profile-tile-value">{scheduleSummary}</span>
-            </span>
-            <span className="pro-profile-tile-arrow" aria-hidden="true">
-              ›
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">Портфолио</span>
+              <span className="pro-profile-card-value">{portfolioSummary}</span>
+              {portfolioPreview.length > 0 ? (
+                <span className="pro-profile-portfolio">
+                  {portfolioPreview.map((item, index) => {
+                    const showImage = isImageUrl(item.url)
+                    return (
+                      <span
+                        key={`${item.url}-${index}`}
+                        className={`pro-profile-portfolio-thumb${
+                          showImage ? ' has-image' : ''
+                        }`}
+                        style={
+                          showImage
+                            ? { backgroundImage: `url(${item.url})` }
+                            : undefined
+                        }
+                        aria-hidden="true"
+                      />
+                    )
+                  })}
+                </span>
+              ) : (
+                <span className="pro-profile-card-meta is-muted">
+                  Пока нет работ
+                </span>
+              )}
             </span>
           </button>
         </section>
