@@ -420,7 +420,7 @@
   border: 1px solid rgba(120, 103, 140, 0.18);
   background: #ffffff;
   border-radius: 16px;
-  padding: 12px 38px 12px 46px;
+  padding: 13px 38px 13px 56px;
   font-size: 15px;
   font-weight: 600;
   color: var(--request-ink);
@@ -435,7 +435,7 @@
     calc(100% - 18px) 50%,
     calc(100% - 12px) 50%;
   background-size:
-    22px 22px,
+    30px 30px,
     6px 6px,
     6px 6px;
   background-repeat: no-repeat;
