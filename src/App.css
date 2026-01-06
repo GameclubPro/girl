@@ -31,8 +31,9 @@
   --request-border: rgba(120, 103, 140, 0.16);
   --request-ink: #2f2831;
   --request-muted: #9a8ca5;
+  --request-pad-x: 14px;
   background: radial-gradient(120% 140% at 50% -20%, #ffffff 0%, #f3edf7 50%, #efe6f2 100%);
-  padding: calc(16px + var(--safe-top) + var(--tg-top-offset)) 18px
+  padding: calc(16px + var(--safe-top) + var(--tg-top-offset)) var(--request-pad-x)
     calc(160px + env(safe-area-inset-bottom));
 }
 
@@ -379,7 +380,7 @@
   bottom: 0;
   transform: translateX(-50%);
   width: min(440px, 100%);
-  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  padding: 12px var(--request-pad-x) calc(12px + env(safe-area-inset-bottom));
   background: linear-gradient(
     180deg,
     rgba(248, 246, 252, 0.4) 0%,
@@ -3621,12 +3622,11 @@ h2 {
   }
 
   .screen--request {
-    padding-left: 16px;
-    padding-right: 16px;
+    --request-pad-x: 12px;
   }
 
   .request-submit-bar {
-    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    padding: 12px var(--request-pad-x) calc(12px + env(safe-area-inset-bottom));
   }
 
   .request-date-grid {
