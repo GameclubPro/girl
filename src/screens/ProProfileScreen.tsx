@@ -51,6 +51,7 @@ const scheduleDayOptions = [
 ]
 
 type InlineSection = Exclude<ProProfileSection, 'availability'>
+type CategoryId = (typeof categoryItems)[number]['id']
 
 type ProfilePayload = {
   userId: string
@@ -95,8 +96,8 @@ export const ProProfileScreen = ({
   const [priceTo, setPriceTo] = useState('')
   const [categories, setCategories] = useState<string[]>([])
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([])
-  const [serviceCategoryId, setServiceCategoryId] = useState(
-    () => categoryItems[0]?.id ?? ''
+  const [serviceCategoryId, setServiceCategoryId] = useState<CategoryId>(
+    categoryItems[0]?.id ?? 'beauty-nails'
   )
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [portfolioInput, setPortfolioInput] = useState('')
@@ -507,7 +508,12 @@ export const ProProfileScreen = ({
         setWorksAtClient(nextWorksAtClient)
         setWorksAtMaster(nextWorksAtMaster)
         setCategories(nextCategories)
-        setServiceCategoryId(nextCategories[0] ?? categoryItems[0]?.id ?? '')
+        const fallbackCategoryId = categoryItems[0]?.id ?? 'beauty-nails'
+        const nextServiceCategoryId =
+          nextCategories.find((categoryId) =>
+            categoryItems.some((item) => item.id === categoryId)
+          ) ?? fallbackCategoryId
+        setServiceCategoryId(nextServiceCategoryId)
         setServiceItems(nextServiceItems)
         setPortfolioItems(nextPortfolioItems)
         setShowAllPortfolio(false)
@@ -629,7 +635,7 @@ export const ProProfileScreen = ({
     }
   }, [autosaveKey, autosavePayload, hasInvalidPriceRange, isLoading])
 
-  const handleServiceCategoryChange = (categoryId: string) => {
+  const handleServiceCategoryChange = (categoryId: CategoryId) => {
     setServiceCategoryId(categoryId)
   }
 
@@ -1313,7 +1319,9 @@ export const ProProfileScreen = ({
                   <select
                     className="request-select-input"
                     value={serviceCategoryId}
-                    onChange={(event) => handleServiceCategoryChange(event.target.value)}
+                    onChange={(event) =>
+                      handleServiceCategoryChange(event.target.value as CategoryId)
+                    }
                     style={serviceCategoryIconStyle}
                     aria-label="Категория"
                   >
