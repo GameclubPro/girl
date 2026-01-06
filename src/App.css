@@ -683,7 +683,8 @@
 }
 
 .pro-hero-cover--bleed {
-  margin: calc(-1 * (16px + var(--safe-top) + var(--tg-top-offset))) -18px 0;
+  margin: calc(-1 * (32px + var(--safe-top) + var(--tg-top-offset)))
+    calc(-1 * 34px) 0;
   border-radius: 0 0 24px 24px;
 }
 
@@ -3585,6 +3586,11 @@ h2 {
 
   .pro-hero {
     padding: 14px;
+  }
+
+  .pro-hero-cover--bleed {
+    margin: calc(-1 * (30px + var(--safe-top) + var(--tg-top-offset)))
+      calc(-1 * 32px) 0;
   }
 
   .pro-hero-cover {
