@@ -52,6 +52,8 @@ const scheduleDayOptions = [
 
 type InlineSection = Exclude<ProProfileSection, 'availability'>
 type CategoryId = (typeof categoryItems)[number]['id']
+const isCategoryId = (value: string): value is CategoryId =>
+  categoryItems.some((item) => item.id === value)
 
 type ProfilePayload = {
   userId: string
@@ -510,9 +512,8 @@ export const ProProfileScreen = ({
         setCategories(nextCategories)
         const fallbackCategoryId = categoryItems[0]?.id ?? 'beauty-nails'
         const nextServiceCategoryId =
-          nextCategories.find((categoryId) =>
-            categoryItems.some((item) => item.id === categoryId)
-          ) ?? fallbackCategoryId
+          nextCategories.find((categoryId) => isCategoryId(categoryId)) ??
+          fallbackCategoryId
         setServiceCategoryId(nextServiceCategoryId)
         setServiceItems(nextServiceItems)
         setPortfolioItems(nextPortfolioItems)
