@@ -49,55 +49,7 @@ const scheduleDayOptions = [
   { id: 'sun', label: 'Вс' },
 ]
 
-const profileSections: Array<{
-  id: ProProfileSection
-  step: string
-  label: string
-  subtitle: string
-}> = [
-  {
-    id: 'basic',
-    step: '01',
-    label: 'Основное',
-    subtitle: 'Имя, описание и специализации',
-  },
-  {
-    id: 'services',
-    step: '02',
-    label: 'Услуги и цены',
-    subtitle: 'Что делаете и сколько это стоит',
-  },
-  {
-    id: 'location',
-    step: '03',
-    label: 'Локация и опыт',
-    subtitle: 'Где вы работаете и сколько лет в профессии',
-  },
-  {
-    id: 'availability',
-    step: '04',
-    label: 'График и доступность',
-    subtitle: 'Управляйте приемом заявок и расписанием',
-  },
-  {
-    id: 'portfolio',
-    step: '05',
-    label: 'Портфолио',
-    subtitle: 'Добавьте ссылки на лучшие работы',
-  },
-]
-
-type ProfileTemplate = {
-  id: string
-  label: string
-  categories: string[]
-  services: ServiceItem[]
-  priceFrom?: number
-  priceTo?: number
-  about?: string
-  worksAtClient?: boolean
-  worksAtMaster?: boolean
-}
+type InlineSection = Exclude<ProProfileSection, 'availability'>
 
 type ProfilePayload = {
   userId: string
@@ -118,61 +70,6 @@ type ProfilePayload = {
   services: string[]
   portfolioUrls: string[]
 }
-
-const profileTemplates: ProfileTemplate[] = [
-  {
-    id: 'nails',
-    label: 'Маникюр',
-    categories: ['beauty-nails'],
-    services: [
-      { name: 'Маникюр комбинированный', price: 1800, duration: 90 },
-      { name: 'Покрытие гель-лак', price: 2200, duration: 120 },
-      { name: 'Снятие + уход', price: 800, duration: 30 },
-    ],
-    priceFrom: 1500,
-    priceTo: 3500,
-    worksAtMaster: true,
-  },
-  {
-    id: 'brows',
-    label: 'Брови/ресницы',
-    categories: ['brows-lashes'],
-    services: [
-      { name: 'Оформление бровей', price: 1200, duration: 40 },
-      { name: 'Ламинирование бровей', price: 2200, duration: 75 },
-      { name: 'Ламинирование ресниц', price: 2400, duration: 80 },
-    ],
-    priceFrom: 1200,
-    priceTo: 3000,
-    worksAtMaster: true,
-  },
-  {
-    id: 'hair',
-    label: 'Стрижка',
-    categories: ['hair'],
-    services: [
-      { name: 'Женская стрижка', price: 2000, duration: 60 },
-      { name: 'Мужская стрижка', price: 1500, duration: 45 },
-      { name: 'Укладка', price: 1800, duration: 50 },
-    ],
-    priceFrom: 1500,
-    priceTo: 4000,
-    worksAtMaster: true,
-  },
-  {
-    id: 'massage',
-    label: 'Массаж',
-    categories: ['massage-body'],
-    services: [
-      { name: 'Классический массаж', price: 2500, duration: 60 },
-      { name: 'Антистресс массаж', price: 2800, duration: 70 },
-      { name: 'Спортивный массаж', price: 3200, duration: 70 },
-    ],
-    priceFrom: 2200,
-    priceTo: 4500,
-    worksAtClient: true,
-  },
-]
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
@@ -222,9 +119,17 @@ export const ProProfileScreen = ({
   const [mediaError, setMediaError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
-  const editorRef = useRef<HTMLDivElement>(null)
-  const [activeSection, setActiveSection] = useState<ProProfileSection>('basic')
-  const [isEditing, setIsEditing] = useState(() => Boolean(focusSection))
+  const [expandedSection, setExpandedSection] = useState<InlineSection | null>(() =>
+    focusSection
+      ? focusSection === 'availability'
+        ? 'location'
+        : focusSection
+      : null
+  )
+  const basicRef = useRef<HTMLDivElement>(null)
+  const locationRef = useRef<HTMLDivElement>(null)
+  const servicesRef = useRef<HTMLDivElement>(null)
+  const portfolioRef = useRef<HTMLDivElement>(null)
   const autosaveTimerRef = useRef<number | null>(null)
   const autosaveSuccessTimerRef = useRef<number | null>(null)
   const lastSavedRef = useRef('')
@@ -287,50 +192,8 @@ export const ProProfileScreen = ({
     () => (autosavePayload ? JSON.stringify(autosavePayload) : ''),
     [autosavePayload]
   )
-  const profileStatus = useMemo(
-    () =>
-      getProfileStatusSummary({
-        displayName,
-        about,
-        cityId,
-        districtId,
-        experienceYears: parseNumber(experienceYears),
-        priceFrom: parseNumber(priceFrom),
-        priceTo: parseNumber(priceTo),
-        worksAtClient,
-        worksAtMaster,
-        categories,
-        services: serviceStrings,
-        portfolioUrls: portfolioStrings,
-      }),
-    [
-      about,
-      categories,
-      cityId,
-      displayName,
-      districtId,
-      experienceYears,
-      priceFrom,
-      priceTo,
-      portfolioStrings,
-      serviceStrings,
-      worksAtClient,
-      worksAtMaster,
-    ]
-  )
-  const statusLabelMap = {
-    draft: 'Черновик',
-    ready: 'Готов к откликам',
-    complete: 'Профиль заполнен',
-  }
   const displayNameValue =
     displayName.trim() || displayNameFallback.trim() || 'Мастер'
-  const profileTone =
-    profileStatus.profileStatus === 'complete'
-      ? 'is-complete'
-      : profileStatus.profileStatus === 'ready'
-        ? 'is-ready'
-        : 'is-draft'
   const activeTone = isActive ? 'is-active' : 'is-paused'
   const aboutPreview = about.trim() || 'Описание пока не добавлено.'
   const profileInitials = useMemo(() => {
@@ -432,70 +295,14 @@ export const ProProfileScreen = ({
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
   const previewTagRemainder = previewTagSource.length - previewTags.length
-  const missingLabels = useMemo(() => {
-    const labels: string[] = []
-    if (profileStatus.missingFields.includes('displayName')) {
-      labels.push('Имя и специализация')
-    }
-    if (profileStatus.missingFields.includes('categories')) {
-      labels.push('Категории услуг')
-    }
-    if (
-      profileStatus.missingFields.includes('cityId') ||
-      profileStatus.missingFields.includes('districtId')
-    ) {
-      labels.push('Город и район')
-    }
-    if (profileStatus.missingFields.includes('workFormat')) {
-      labels.push('Формат работы')
-    }
-    return labels
-  }, [profileStatus.missingFields])
-  const responseLabel = profileStatus.isResponseReady
-    ? isActive
-      ? 'Открыты'
-      : 'Пауза'
-    : 'Недоступны'
-  const nextFocus = useMemo<
-    | {
-        section: ProProfileSection
-        label: string
-      }
-    | null
-  >(() => {
-    const missing = profileStatus.missingFields
-    if (missing.includes('displayName') || missing.includes('categories')) {
-      return { section: 'basic', label: 'Имя и категории' }
-    }
-    if (
-      missing.includes('cityId') ||
-      missing.includes('districtId') ||
-      missing.includes('workFormat')
-    ) {
-      return { section: 'location', label: 'Локация и формат' }
-    }
-    if (serviceStrings.length === 0 && priceFromValue === null && priceToValue === null) {
-      return { section: 'services', label: 'Услуги и цены' }
-    }
-    if (portfolioStrings.length === 0) {
-      return { section: 'portfolio', label: 'Портфолио' }
-    }
-    if (!about.trim()) {
-      return { section: 'basic', label: 'О себе' }
-    }
-    return null
-  }, [
-    about,
-    portfolioStrings.length,
-    priceFromValue,
-    priceToValue,
-    profileStatus.missingFields,
-    serviceStrings.length,
-  ])
-  const activeSectionMeta =
-    profileSections.find((section) => section.id === activeSection) ?? profileSections[0]
-  const activeStepIndex =
-    profileSections.findIndex((section) => section.id === activeSection) + 1
+  const normalizeSection = (section: ProProfileSection): InlineSection =>
+    section === 'availability' ? 'location' : section
+  const isSectionOpen = (section: ProProfileSection) =>
+    expandedSection === normalizeSection(section)
+  const toggleSection = (section: ProProfileSection) => {
+    const normalized = normalizeSection(section)
+    setExpandedSection((current) => (current === normalized ? null : normalized))
+  }
   const persistAutosaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
       window.clearTimeout(autosaveSuccessTimerRef.current)
@@ -525,10 +332,18 @@ export const ProProfileScreen = ({
 
   useEffect(() => {
     if (!focusSection) return
-    setIsEditing(true)
-    setActiveSection(focusSection)
+    const normalized = focusSection === 'availability' ? 'location' : focusSection
+    setExpandedSection(normalized)
     const timeout = window.setTimeout(() => {
-      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const target =
+        normalized === 'basic'
+          ? basicRef
+          : normalized === 'services'
+            ? servicesRef
+            : normalized === 'location'
+              ? locationRef
+              : portfolioRef
+      target.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 60)
     return () => window.clearTimeout(timeout)
   }, [focusSection])
@@ -806,54 +621,6 @@ export const ProProfileScreen = ({
 
   const normalizeServiceKey = (value: string) => value.trim().toLowerCase()
 
-  const applyTemplate = (template: ProfileTemplate) => {
-    setCategories((current) => {
-      const next = new Set(current)
-      template.categories.forEach((category) => next.add(category))
-      return Array.from(next)
-    })
-    setServiceItems((current) => {
-      const byName = new Map(
-        current.map((item) => [normalizeServiceKey(item.name), item])
-      )
-      template.services.forEach((item) => {
-        const key = normalizeServiceKey(item.name)
-        const existing = byName.get(key)
-        if (existing) {
-          byName.set(key, {
-            ...existing,
-            price: existing.price ?? item.price ?? null,
-            duration: existing.duration ?? item.duration ?? null,
-          })
-        } else {
-          byName.set(key, { ...item })
-        }
-      })
-      return Array.from(byName.values())
-    })
-    setPriceFrom((current) =>
-      current.trim()
-        ? current
-        : template.priceFrom !== undefined
-          ? String(template.priceFrom)
-          : ''
-    )
-    setPriceTo((current) =>
-      current.trim()
-        ? current
-        : template.priceTo !== undefined
-          ? String(template.priceTo)
-          : ''
-    )
-    if (!about.trim() && template.about) {
-      setAbout(template.about)
-    }
-    if (!worksAtClient && !worksAtMaster) {
-      setWorksAtClient(Boolean(template.worksAtClient))
-      setWorksAtMaster(Boolean(template.worksAtMaster))
-    }
-  }
-
   const addService = () => {
     const trimmed = serviceInput.trim()
     if (!trimmed) return
@@ -1097,221 +864,40 @@ export const ProProfileScreen = ({
     }
   }
 
-  const openEditor = (section?: ProProfileSection) => {
-    if (section) {
-      setActiveSection(section)
-    }
-    if (!isEditing) {
-      setIsEditing(true)
-    }
-    window.setTimeout(() => {
-      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 80)
-  }
-
-  const jumpToEditor = (section: ProProfileSection) => {
-    openEditor(section)
-  }
-
   return (
     <div className="screen screen--pro">
       <div className="pro-shell">
         <section className="pro-profile-social animate delay-1">
           <div
-            className={`pro-profile-social-cover${coverUrl ? ' has-image' : ''}`}
-            style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
-          >
-            <div className="pro-profile-social-glow" aria-hidden="true" />
-          </div>
-          <div className="pro-profile-social-body">
-            <div className="pro-profile-social-avatar">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
-              ) : (
-                <span aria-hidden="true">{profileInitials}</span>
-              )}
-            </div>
-            <div className="pro-profile-social-content">
-              <div className="pro-profile-social-header">
-                <h1 className="pro-profile-social-name">{displayNameValue}</h1>
-                <span className={`pro-profile-social-status ${activeTone}`}>
-                  <span className="pro-profile-social-dot" aria-hidden="true" />
-                  {isActive ? 'Принимаю заявки' : 'Пауза'}
-                </span>
-              </div>
-              <div className="pro-profile-social-tags">
-                {previewTags.length > 0 ? (
-                  <>
-                    {previewTags.map((label, index) => (
-                      <span className="pro-profile-tag" key={`${label}-${index}`}>
-                        {label}
-                      </span>
-                    ))}
-                    {previewTagRemainder > 0 && (
-                      <span className="pro-profile-tag is-muted">
-                        +{previewTagRemainder}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="pro-profile-tag is-muted">
-                    Теги появятся здесь
-                  </span>
-                )}
-              </div>
-              <p
-                className={`pro-profile-social-about${
-                  about.trim() ? '' : ' is-muted'
-                }`}
-              >
-                {aboutPreview}
-              </p>
-            </div>
-          </div>
-          <div className="pro-profile-social-actions">
-            <button
-              className={`pro-profile-action${isEditing ? '' : ' is-primary'}`}
-              type="button"
-              onClick={() => {
-                if (isEditing) {
-                  setIsEditing(false)
-                  return
-                }
-                openEditor()
-              }}
-            >
-              {isEditing ? 'Свернуть редактор' : 'Редактировать профиль'}
-            </button>
-            <button className="pro-profile-action" type="button" onClick={onViewRequests}>
-              К заявкам
-            </button>
-          </div>
-        </section>
-
-        <section className="pro-profile-cards animate delay-2">
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={() => openEditor('basic')}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              👤
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">О себе</span>
-              <span
-                className={`pro-profile-card-value${
-                  about.trim() ? '' : ' is-muted'
-                }`}
-              >
-                {aboutPreview}
-              </span>
-              <span className="pro-profile-card-meta">{experienceLabel}</span>
-            </span>
-          </button>
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={() => openEditor('location')}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              📍
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Работа</span>
-              <span className="pro-profile-card-value">{locationLabel}</span>
-              <span className="pro-profile-card-meta">{workFormatLabel}</span>
-              <span className="pro-profile-card-meta">{scheduleSummary}</span>
-            </span>
-          </button>
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={() => openEditor('services')}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              💸
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Услуги и цены</span>
-              <span className="pro-profile-card-value">{servicesSummary}</span>
-              <span className="pro-profile-card-meta">{priceLabel}</span>
-            </span>
-          </button>
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={() => openEditor('portfolio')}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              🖼️
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Портфолио</span>
-              <span className="pro-profile-card-value">{portfolioSummary}</span>
-              {portfolioPreview.length > 0 ? (
-                <span className="pro-profile-portfolio">
-                  {portfolioPreview.map((item, index) => {
-                    const showImage = isImageUrl(item.url)
-                    return (
-                      <span
-                        key={`${item.url}-${index}`}
-                        className={`pro-profile-portfolio-thumb${
-                          showImage ? ' has-image' : ''
-                        }`}
-                        style={
-                          showImage
-                            ? { backgroundImage: `url(${item.url})` }
-                            : undefined
-                        }
-                        aria-hidden="true"
-                      />
-                    )
-                  })}
-                </span>
-              ) : (
-                <span className="pro-profile-card-meta is-muted">
-                  Пока нет работ
-                </span>
-              )}
-            </span>
-          </button>
-        </section>
-
-        {isLoading && <p className="pro-status">Загружаем профиль...</p>}
-        {loadError && <p className="pro-error">{loadError}</p>}
-        {isEditing && (
-          <>
-            <header className="pro-hero animate delay-1">
-          <div
-            className={`pro-hero-cover pro-hero-cover--bleed${
-              coverUrl ? ' has-image' : ''
-            }${isCoverUploading ? ' is-loading' : ''}`}
+            className={`pro-profile-social-cover${coverUrl ? ' has-image' : ''}${
+              isCoverUploading ? ' is-loading' : ''
+            }`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
             aria-busy={isCoverUploading}
           >
-            <div className="pro-hero-grid" aria-hidden="true" />
-            <div className="pro-hero-orb pro-hero-orb--one" aria-hidden="true" />
-            <div className="pro-hero-orb pro-hero-orb--two" aria-hidden="true" />
-            <div className="pro-hero-orb pro-hero-orb--three" aria-hidden="true" />
-            <div className="pro-hero-controls">
-              <input
-                ref={coverInputRef}
-                className="pro-file-input"
-                type="file"
-                accept="image/*"
-                onChange={handleCoverChange}
-                disabled={isCoverUploading}
-                aria-hidden="true"
-                tabIndex={-1}
-              />
+            <div className="pro-profile-social-glow" aria-hidden="true" />
+            <input
+              ref={coverInputRef}
+              className="pro-file-input"
+              type="file"
+              accept="image/*"
+              onChange={handleCoverChange}
+              disabled={isCoverUploading}
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+            <div className="pro-profile-cover-actions">
               <button
                 className="pro-cover-action"
                 type="button"
                 onClick={handleCoverSelect}
                 disabled={isCoverUploading}
               >
-                {isCoverUploading ? 'Загрузка...' : 'Сменить шапку'}
+                {isCoverUploading
+                  ? 'Загрузка...'
+                  : coverUrl
+                    ? 'Сменить обложку'
+                    : 'Добавить обложку'}
               </button>
               {coverUrl && (
                 <button
@@ -1325,10 +911,11 @@ export const ProProfileScreen = ({
               )}
             </div>
           </div>
-
-          <div className="pro-hero-profile">
+          <div className="pro-profile-social-body">
             <div
-              className={`pro-avatar${isAvatarUploading ? ' is-loading' : ''}`}
+              className={`pro-profile-social-avatar${
+                isAvatarUploading ? ' is-loading' : ''
+              }`}
               aria-busy={isAvatarUploading}
             >
               {avatarUrl ? (
@@ -1367,243 +954,93 @@ export const ProProfileScreen = ({
                 </button>
               )}
             </div>
-            <div className="pro-hero-info">
-              <span className="pro-hero-label">Профиль мастера</span>
-              <div className="pro-hero-name">
-                <h1 className="pro-hero-title">{displayNameValue}</h1>
-                <div className="pro-hero-badges">
-                  <span className={`pro-status-chip ${profileTone}`}>
-                    {statusLabelMap[profileStatus.profileStatus]}
-                  </span>
-                  <span className={`pro-status-chip ${activeTone}`}>
-                    {isActive ? 'Принимаю заявки' : 'Пауза'}
-                  </span>
-                </div>
+            <div className="pro-profile-social-content">
+              <div className="pro-profile-social-header">
+                <h1 className="pro-profile-social-name">{displayNameValue}</h1>
+                <button
+                  className={`pro-profile-social-status ${activeTone}`}
+                  type="button"
+                  onClick={() => setIsActive((current) => !current)}
+                >
+                  <span className="pro-profile-social-dot" aria-hidden="true" />
+                  {isActive ? 'Принимаю заявки' : 'Пауза'}
+                </button>
               </div>
-              <p
-                className={`pro-hero-subtitle${
-                  about.trim() ? '' : ' is-placeholder'
-                }`}
-              >
-                {aboutPreview}
-              </p>
-              <div className="pro-hero-tags">
-                {categoryLabels.length > 0 ? (
-                  <>
-                    {categoryLabels.slice(0, 4).map((label) => (
-                      <span className="pro-tag" key={label}>
-                        {label}
-                      </span>
-                    ))}
-                    {categoryLabels.length > 4 && (
-                      <span className="pro-tag pro-tag--empty">
-                        +{categoryLabels.length - 4}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="pro-tag pro-tag--empty">Добавьте категории</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="pro-hero-metrics">
-            <div className="pro-metric">
-              <span className="pro-metric-label">Локация</span>
-              <strong className="pro-metric-value">{locationLabel}</strong>
-            </div>
-            <div className="pro-metric">
-              <span className="pro-metric-label">Опыт</span>
-              <strong className="pro-metric-value">{experienceLabel}</strong>
-            </div>
-            <div className="pro-metric">
-              <span className="pro-metric-label">Цены</span>
-              <strong className="pro-metric-value">{priceLabel}</strong>
-            </div>
-          </div>
-        </header>
-
-        <section className="pro-card pro-card--insight pro-profile-status animate delay-2">
-          <div className="pro-card-head">
-            <div>
-              <p className="pro-card-eyebrow">Статус</p>
-              <h2 className="pro-card-title">Профиль без лишнего</h2>
-            </div>
-            <span className={`pro-pill ${profileTone}`}>
-              {profileStatus.completeness}%
-            </span>
-          </div>
-          <div className="pro-profile-status-grid">
-            <div className="pro-profile-status-item">
-              <span className="pro-insight-label">Статус</span>
-              <strong className="pro-insight-value">
-                {statusLabelMap[profileStatus.profileStatus]}
-              </strong>
-            </div>
-            <div className="pro-profile-status-item">
-              <span className="pro-insight-label">Отклики</span>
-              <strong className="pro-insight-value">{responseLabel}</strong>
-            </div>
-            <div className="pro-profile-status-item">
-              <span className="pro-insight-label">Фокус</span>
-              <strong className="pro-insight-value">
-                {missingLabels[0] ?? 'Портфолио'}
-              </strong>
-            </div>
-          </div>
-          <div className="pro-progress">
-            <div className="pro-progress-row">
-              <span>Готовность</span>
-              <strong>{profileStatus.completeness}%</strong>
-            </div>
-            <div className="pro-progress-bar" aria-hidden="true">
-              <span style={{ width: `${profileStatus.completeness}%` }} />
-            </div>
-          </div>
-          <p className="pro-progress-note">
-            {profileStatus.missingFields.length > 0
-              ? 'Заполните минимум, чтобы откликаться на заявки.'
-              : isActive
-                ? 'Профиль готов. Можно принимать заявки.'
-                : 'Профиль готов. Включите прием заявок, когда будете готовы.'}
-          </p>
-          {missingLabels.length > 0 && (
-            <p className="pro-progress-missing">
-              Для отклика заполните: {missingLabels.join(', ')}.
-            </p>
-          )}
-          {nextFocus && (
-            <div className="pro-profile-focus">
-              <div>
-                <p className="pro-profile-focus-label">Следующий шаг</p>
-                <p className="pro-profile-focus-text">{nextFocus.label}</p>
-              </div>
-              <button
-                className="pro-focus-button"
-                type="button"
-                onClick={() => jumpToEditor(nextFocus.section)}
-              >
-                Перейти
-              </button>
-            </div>
-          )}
-        </section>
-
-        {mediaError && <p className="pro-error">{mediaError}</p>}
-
-        <section className="pro-card pro-profile-editor animate delay-3" ref={editorRef}>
-          <div className="pro-card-head">
-            <div>
-              <p className="pro-card-eyebrow">Редактор</p>
-              <h2 className="pro-card-title">Соберите профиль</h2>
-            </div>
-            <span className="pro-editor-step">
-              Шаг {activeStepIndex} из {profileSections.length}
-            </span>
-          </div>
-          <div className="pro-editor-tabs" role="tablist" aria-label="Разделы профиля">
-            {profileSections.map((section) => (
-              <button
-                key={section.id}
-                id={`section-tab-${section.id}`}
-                className={`pro-editor-tab${
-                  activeSection === section.id ? ' is-active' : ''
-                }`}
-                type="button"
-                role="tab"
-                aria-selected={activeSection === section.id}
-                aria-controls={`section-panel-${section.id}`}
-                onClick={() => setActiveSection(section.id)}
-              >
-                <span className="pro-editor-tab-step">{section.step}</span>
-                {section.label}
-              </button>
-            ))}
-          </div>
-          <div className="pro-editor-preview">
-            <div className="pro-editor-preview-head">
-              <span className="pro-editor-preview-label">Клиентский взгляд</span>
-              <span className="pro-preview-badge">Live</span>
-            </div>
-            <div className="pro-editor-preview-card">
-              <div className="pro-editor-preview-main">
-                <div className="pro-editor-preview-avatar">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
-                  ) : (
-                    <span aria-hidden="true">{profileInitials}</span>
-                  )}
-                </div>
-                <div className="pro-editor-preview-info">
-                  <div className="pro-editor-preview-name">{displayNameValue}</div>
-                  <div className="pro-editor-preview-meta">{locationLabel}</div>
-                </div>
-                <div className="pro-editor-preview-price">{priceLabel}</div>
-              </div>
-              <div className="pro-editor-preview-tags">
+              <div className="pro-profile-social-tags">
                 {previewTags.length > 0 ? (
                   <>
                     {previewTags.map((label, index) => (
-                      <span className="pro-editor-preview-tag" key={`${label}-${index}`}>
+                      <span className="pro-profile-tag" key={`${label}-${index}`}>
                         {label}
                       </span>
                     ))}
                     {previewTagRemainder > 0 && (
-                      <span className="pro-editor-preview-tag is-muted">
+                      <span className="pro-profile-tag is-muted">
                         +{previewTagRemainder}
                       </span>
                     )}
                   </>
                 ) : (
-                  <span className="pro-editor-preview-tag is-muted">
-                    Добавьте услуги
+                  <span className="pro-profile-tag is-muted">
+                    Теги появятся здесь
                   </span>
                 )}
               </div>
-              <div className="pro-editor-preview-stats">
-                <span>{experienceLabel}</span>
-                <span>{workFormatLabel}</span>
-              </div>
-              {portfolioPreview.length > 0 && (
-                <div className="pro-editor-preview-gallery">
-                  {portfolioPreview.map((item, index) => {
-                    const showImage = isImageUrl(item.url)
-                    return (
-                      <div
-                        key={`${item.url}-${index}`}
-                        className={`pro-editor-preview-thumb${
-                          showImage ? ' has-image' : ''
-                        }`}
-                        style={
-                          showImage
-                            ? { backgroundImage: `url(${item.url})` }
-                            : undefined
-                        }
-                        aria-hidden="true"
-                      />
-                    )
-                  })}
-                </div>
-              )}
+              <p
+                className={`pro-profile-social-about${
+                  about.trim() ? '' : ' is-muted'
+                }`}
+              >
+                {aboutPreview}
+              </p>
             </div>
           </div>
-          <div
-            className="pro-editor-panel"
-            role="tabpanel"
-            id={`section-panel-${activeSection}`}
-            aria-labelledby={`section-tab-${activeSection}`}
-          >
-            <div className="pro-section-head">
-              <div className="pro-section-index">{activeSectionMeta.step}</div>
-              <div>
-                <h3 className="pro-card-title">{activeSectionMeta.label}</h3>
-                <p className="pro-section-subtitle">{activeSectionMeta.subtitle}</p>
-              </div>
-            </div>
+          <div className="pro-profile-social-actions">
+            <button
+              className="pro-profile-action is-primary"
+              type="button"
+              onClick={onViewRequests}
+            >
+              К заявкам
+            </button>
+          </div>
+        </section>
 
-            {activeSection === 'basic' && (
-              <>
+        {isLoading && <p className="pro-status">Загружаем профиль...</p>}
+        {loadError && <p className="pro-error">{loadError}</p>}
+        {mediaError && <p className="pro-error">{mediaError}</p>}
+
+        <section className="pro-profile-cards animate delay-2">
+          <div
+            className={`pro-profile-card${isSectionOpen('basic') ? ' is-open' : ''}`}
+            ref={basicRef}
+          >
+            <button
+              className="pro-profile-card-head"
+              type="button"
+              onClick={() => toggleSection('basic')}
+              aria-expanded={isSectionOpen('basic')}
+            >
+              <span className="pro-profile-card-icon" aria-hidden="true">
+                👤
+              </span>
+              <span className="pro-profile-card-content">
+                <span className="pro-profile-card-title">О себе</span>
+                <span
+                  className={`pro-profile-card-value${
+                    about.trim() ? '' : ' is-muted'
+                  }`}
+                >
+                  {aboutPreview}
+                </span>
+                <span className="pro-profile-card-meta">{experienceLabel}</span>
+              </span>
+              <span className="pro-profile-card-chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+            {isSectionOpen('basic') && (
+              <div className="pro-profile-card-edit">
                 <div className="pro-field">
                   <label className="pro-label" htmlFor="pro-name">
                     Имя и специализация
@@ -1648,29 +1085,216 @@ export const ProProfileScreen = ({
                     ))}
                   </div>
                 </div>
-              </>
+              </div>
             )}
+          </div>
 
-            {activeSection === 'services' && (
-              <>
+          <div
+            className={`pro-profile-card${
+              isSectionOpen('location') ? ' is-open' : ''
+            }`}
+            ref={locationRef}
+          >
+            <button
+              className="pro-profile-card-head"
+              type="button"
+              onClick={() => toggleSection('location')}
+              aria-expanded={isSectionOpen('location')}
+            >
+              <span className="pro-profile-card-icon" aria-hidden="true">
+                📍
+              </span>
+              <span className="pro-profile-card-content">
+                <span className="pro-profile-card-title">Работа</span>
+                <span className="pro-profile-card-value">{locationLabel}</span>
+                <span className="pro-profile-card-meta">{workFormatLabel}</span>
+                <span className="pro-profile-card-meta">{scheduleSummary}</span>
+              </span>
+              <span className="pro-profile-card-chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+            {isSectionOpen('location') && (
+              <div className="pro-profile-card-edit">
+                <div className="pro-field pro-field--split">
+                  <div>
+                    <label className="pro-label" htmlFor="pro-city">
+                      Город
+                    </label>
+                    <select
+                      id="pro-city"
+                      className="pro-select"
+                      value={cityId ?? ''}
+                      onChange={(event) => {
+                        const nextValue = event.target.value
+                        if (!nextValue) {
+                          setCityId(null)
+                          return
+                        }
+                        const parsedValue = Number(nextValue)
+                        setCityId(Number.isInteger(parsedValue) ? parsedValue : null)
+                      }}
+                    >
+                      <option value="">Выберите город</option>
+                      {cities.map((city) => (
+                        <option key={city.id} value={city.id}>
+                          {city.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="pro-label" htmlFor="pro-district">
+                      Район
+                    </label>
+                    <select
+                      id="pro-district"
+                      className="pro-select"
+                      value={districtId ?? ''}
+                      onChange={(event) => {
+                        const nextValue = event.target.value
+                        if (!nextValue) {
+                          setDistrictId(null)
+                          return
+                        }
+                        const parsedValue = Number(nextValue)
+                        setDistrictId(
+                          Number.isInteger(parsedValue) ? parsedValue : null
+                        )
+                      }}
+                      disabled={!cityId || districts.length === 0}
+                    >
+                      <option value="">
+                        {cityId ? 'Выберите район' : 'Сначала выберите город'}
+                      </option>
+                      {districts.map((district) => (
+                        <option key={district.id} value={district.id}>
+                          {district.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 <div className="pro-field">
-                  <span className="pro-label">Шаблоны</span>
-                  <div className="pro-template-row">
-                    {profileTemplates.map((template) => (
+                  <label className="pro-label" htmlFor="experience">
+                    Опыт (лет)
+                  </label>
+                  <input
+                    id="experience"
+                    className="pro-input"
+                    type="number"
+                    value={experienceYears}
+                    onChange={(event) => setExperienceYears(event.target.value)}
+                    placeholder="3"
+                    min="0"
+                  />
+                </div>
+                <div className="pro-field">
+                  <span className="pro-label">Формат работы</span>
+                  <div className="pro-toggle-grid">
+                    <label className="pro-toggle">
+                      <input
+                        type="checkbox"
+                        checked={worksAtMaster}
+                        onChange={(event) => setWorksAtMaster(event.target.checked)}
+                      />
+                      У мастера
+                    </label>
+                    <label className="pro-toggle">
+                      <input
+                        type="checkbox"
+                        checked={worksAtClient}
+                        onChange={(event) => setWorksAtClient(event.target.checked)}
+                      />
+                      Выезд к клиенту
+                    </label>
+                  </div>
+                </div>
+                <div className="pro-field">
+                  <span className="pro-label">Статус</span>
+                  <label className="pro-toggle">
+                    <input
+                      type="checkbox"
+                      checked={isActive}
+                      onChange={(event) => setIsActive(event.target.checked)}
+                    />
+                    Принимаю заявки
+                  </label>
+                </div>
+                <div className="pro-field">
+                  <span className="pro-label">Дни работы</span>
+                  <div className="request-chips">
+                    {scheduleDayOptions.map((day) => (
                       <button
-                        className="pro-template-chip"
-                        key={template.id}
+                        className={`request-chip${
+                          scheduleDays.includes(day.id) ? ' is-active' : ''
+                        }`}
+                        key={day.id}
                         type="button"
-                        onClick={() => applyTemplate(template)}
+                        onClick={() => toggleScheduleDay(day.id)}
+                        aria-pressed={scheduleDays.includes(day.id)}
                       >
-                        {template.label}
+                        {day.label}
                       </button>
                     ))}
                   </div>
-                  <p className="pro-template-hint">
-                    Добавляет услуги и цены, не удаляя ваши данные.
-                  </p>
                 </div>
+                <div className="pro-field pro-field--split">
+                  <div>
+                    <label className="pro-label" htmlFor="schedule-start">
+                      Начало
+                    </label>
+                    <input
+                      id="schedule-start"
+                      className="pro-input"
+                      type="time"
+                      value={scheduleStart}
+                      onChange={(event) => setScheduleStart(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="pro-label" htmlFor="schedule-end">
+                      Окончание
+                    </label>
+                    <input
+                      id="schedule-end"
+                      className="pro-input"
+                      type="time"
+                      value={scheduleEnd}
+                      onChange={(event) => setScheduleEnd(event.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div
+            className={`pro-profile-card${
+              isSectionOpen('services') ? ' is-open' : ''
+            }`}
+            ref={servicesRef}
+          >
+            <button
+              className="pro-profile-card-head"
+              type="button"
+              onClick={() => toggleSection('services')}
+              aria-expanded={isSectionOpen('services')}
+            >
+              <span className="pro-profile-card-icon" aria-hidden="true">
+                💸
+              </span>
+              <span className="pro-profile-card-content">
+                <span className="pro-profile-card-title">Услуги и цены</span>
+                <span className="pro-profile-card-value">{servicesSummary}</span>
+                <span className="pro-profile-card-meta">{priceLabel}</span>
+              </span>
+              <span className="pro-profile-card-chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+            {isSectionOpen('services') && (
+              <div className="pro-profile-card-edit">
                 <div className="pro-field">
                   <span className="pro-label">Добавить услугу</span>
                   <div className="pro-service-add">
@@ -1785,9 +1409,7 @@ export const ProProfileScreen = ({
                       )
                     })
                   ) : (
-                    <div className="pro-service-empty">
-                      Добавьте 2-3 ключевые услуги — так вас быстрее выбирают.
-                    </div>
+                    <div className="pro-service-empty">Пока нет услуг.</div>
                   )}
                 </div>
                 <div className="pro-field pro-field--split">
@@ -1820,170 +1442,60 @@ export const ProProfileScreen = ({
                     />
                   </div>
                 </div>
-              </>
+              </div>
             )}
+          </div>
 
-            {activeSection === 'location' && (
-              <>
-                <div className="pro-field pro-field--split">
-                  <div>
-                    <label className="pro-label" htmlFor="pro-city">
-                      Город
-                    </label>
-                    <select
-                      id="pro-city"
-                      className="pro-select"
-                      value={cityId ?? ''}
-                      onChange={(event) => {
-                        const nextValue = event.target.value
-                        if (!nextValue) {
-                          setCityId(null)
-                          return
-                        }
-                        const parsedValue = Number(nextValue)
-                        setCityId(Number.isInteger(parsedValue) ? parsedValue : null)
-                      }}
-                    >
-                      <option value="">Выберите город</option>
-                      {cities.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {city.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="pro-label" htmlFor="pro-district">
-                      Район
-                    </label>
-                    <select
-                      id="pro-district"
-                      className="pro-select"
-                      value={districtId ?? ''}
-                      onChange={(event) => {
-                        const nextValue = event.target.value
-                        if (!nextValue) {
-                          setDistrictId(null)
-                          return
-                        }
-                        const parsedValue = Number(nextValue)
-                        setDistrictId(
-                          Number.isInteger(parsedValue) ? parsedValue : null
-                        )
-                      }}
-                      disabled={!cityId || districts.length === 0}
-                    >
-                      <option value="">
-                        {cityId ? 'Выберите район' : 'Сначала выберите город'}
-                      </option>
-                      {districts.map((district) => (
-                        <option key={district.id} value={district.id}>
-                          {district.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="pro-field">
-                  <label className="pro-label" htmlFor="experience">
-                    Опыт (лет)
-                  </label>
-                  <input
-                    id="experience"
-                    className="pro-input"
-                    type="number"
-                    value={experienceYears}
-                    onChange={(event) => setExperienceYears(event.target.value)}
-                    placeholder="3"
-                    min="0"
-                  />
-                </div>
-                <div className="pro-field">
-                  <span className="pro-label">Формат работы</span>
-                  <div className="pro-toggle-grid">
-                    <label className="pro-toggle">
-                      <input
-                        type="checkbox"
-                        checked={worksAtMaster}
-                        onChange={(event) => setWorksAtMaster(event.target.checked)}
-                      />
-                      У мастера
-                    </label>
-                    <label className="pro-toggle">
-                      <input
-                        type="checkbox"
-                        checked={worksAtClient}
-                        onChange={(event) => setWorksAtClient(event.target.checked)}
-                      />
-                      Выезд к клиенту
-                    </label>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeSection === 'availability' && (
-              <>
-                <div className="pro-field">
-                  <span className="pro-label">Статус</span>
-                  <label className="pro-toggle">
-                    <input
-                      type="checkbox"
-                      checked={isActive}
-                      onChange={(event) => setIsActive(event.target.checked)}
-                    />
-                    Принимаю заявки
-                  </label>
-                </div>
-                <div className="pro-field">
-                  <span className="pro-label">Дни работы</span>
-                  <div className="request-chips">
-                    {scheduleDayOptions.map((day) => (
-                      <button
-                        className={`request-chip${
-                          scheduleDays.includes(day.id) ? ' is-active' : ''
-                        }`}
-                        key={day.id}
-                        type="button"
-                        onClick={() => toggleScheduleDay(day.id)}
-                        aria-pressed={scheduleDays.includes(day.id)}
-                      >
-                        {day.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="pro-field pro-field--split">
-                  <div>
-                    <label className="pro-label" htmlFor="schedule-start">
-                      Начало
-                    </label>
-                    <input
-                      id="schedule-start"
-                      className="pro-input"
-                      type="time"
-                      value={scheduleStart}
-                      onChange={(event) => setScheduleStart(event.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="pro-label" htmlFor="schedule-end">
-                      Окончание
-                    </label>
-                    <input
-                      id="schedule-end"
-                      className="pro-input"
-                      type="time"
-                      value={scheduleEnd}
-                      onChange={(event) => setScheduleEnd(event.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeSection === 'portfolio' && (
-              <>
+          <div
+            className={`pro-profile-card${
+              isSectionOpen('portfolio') ? ' is-open' : ''
+            }`}
+            ref={portfolioRef}
+          >
+            <button
+              className="pro-profile-card-head"
+              type="button"
+              onClick={() => toggleSection('portfolio')}
+              aria-expanded={isSectionOpen('portfolio')}
+            >
+              <span className="pro-profile-card-icon" aria-hidden="true">
+                🖼️
+              </span>
+              <span className="pro-profile-card-content">
+                <span className="pro-profile-card-title">Портфолио</span>
+                <span className="pro-profile-card-value">{portfolioSummary}</span>
+                {portfolioPreview.length > 0 ? (
+                  <span className="pro-profile-portfolio">
+                    {portfolioPreview.map((item, index) => {
+                      const showImage = isImageUrl(item.url)
+                      return (
+                        <span
+                          key={`${item.url}-${index}`}
+                          className={`pro-profile-portfolio-thumb${
+                            showImage ? ' has-image' : ''
+                          }`}
+                          style={
+                            showImage
+                              ? { backgroundImage: `url(${item.url})` }
+                              : undefined
+                          }
+                          aria-hidden="true"
+                        />
+                      )
+                    })}
+                  </span>
+                ) : (
+                  <span className="pro-profile-card-meta is-muted">
+                    Пока нет работ
+                  </span>
+                )}
+              </span>
+              <span className="pro-profile-card-chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+            {isSectionOpen('portfolio') && (
+              <div className="pro-profile-card-edit">
                 <div className="pro-field">
                   <span className="pro-label">Витрина работ</span>
                   <div className="pro-portfolio-add">
@@ -2076,9 +1588,7 @@ export const ProProfileScreen = ({
                       )
                     })
                   ) : (
-                    <div className="pro-portfolio-empty">
-                      Добавьте 3-6 лучших работ, чтобы клиенты сразу видели стиль.
-                    </div>
+                    <div className="pro-portfolio-empty">Пока нет работ.</div>
                   )}
                 </div>
                 {hasMorePortfolio && (
@@ -2090,29 +1600,19 @@ export const ProProfileScreen = ({
                     {showAllPortfolio ? 'Свернуть' : 'Показать все'}
                   </button>
                 )}
-              </>
+              </div>
             )}
           </div>
         </section>
 
-            <div className="pro-actions">
-              <div className={`pro-autosave ${autosaveTone}`}>
-                <span className="pro-autosave-dot" aria-hidden="true" />
-                <span className="pro-autosave-text">{autosaveLabel}</span>
-              </div>
-              <button
-                className="pro-secondary"
-                type="button"
-                onClick={onViewRequests}
-              >
-                Перейти к заявкам
-              </button>
-            </div>
-
-            {saveError && <p className="pro-error">{saveError}</p>}
-            {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
-          </>
-        )}
+        <div className="pro-profile-footer">
+          <div className={`pro-autosave ${autosaveTone}`}>
+            <span className="pro-autosave-dot" aria-hidden="true" />
+            <span className="pro-autosave-text">{autosaveLabel}</span>
+          </div>
+          {saveError && <p className="pro-error">{saveError}</p>}
+          {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
+        </div>
       </div>
 
       <ProBottomNav
