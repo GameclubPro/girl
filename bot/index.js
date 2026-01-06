@@ -6,11 +6,11 @@ import { Telegraf, Markup } from 'telegraf';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, '../env/.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const token = process.env.BOT_TOKEN;
 if (!token) {
-  console.error('BOT_TOKEN is missing in env/.env');
+  console.error('BOT_TOKEN is missing in .env');
   process.exit(1);
 }
 
@@ -25,7 +25,7 @@ const appKeyboard = (url) =>
 
 bot.start(async (ctx) => {
   if (!webAppUrl) {
-    await ctx.reply('WEB_APP_URL is not set. Add it to env/.env and restart.');
+    await ctx.reply('WEB_APP_URL is not set. Add it to .env and restart.');
     return;
   }
   await ctx.reply('Tap to open the mini app:', appKeyboard(webAppUrl));
@@ -33,7 +33,7 @@ bot.start(async (ctx) => {
 
 bot.command('app', async (ctx) => {
   if (!webAppUrl) {
-    await ctx.reply('WEB_APP_URL is not set. Add it to env/.env and restart.');
+    await ctx.reply('WEB_APP_URL is not set. Add it to .env and restart.');
     return;
   }
   await ctx.reply('Tap to open the mini app:', appKeyboard(webAppUrl));
