@@ -126,13 +126,13 @@ export const ClientScreen = ({
           </span>
           Главная
         </button>
-        <button className="nav-item" type="button" onClick={onViewRequests}>
+        <button className="nav-item" type="button">
           <span className="nav-icon" aria-hidden="true">
             <IconUsers />
           </span>
           Мастера
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewRequests}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
           </span>
