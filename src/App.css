@@ -600,6 +600,15 @@
   gap: 16px;
   position: relative;
   overflow: hidden;
+  z-index: 1;
+}
+
+.pro-hero--bleed {
+  align-self: stretch;
+  width: 100%;
+  margin: calc(-1 * (16px + var(--safe-top) + var(--tg-top-offset))) -18px 16px;
+  border-radius: 0 0 28px 28px;
+  padding: calc(16px + var(--safe-top) + var(--tg-top-offset)) 18px 16px;
 }
 
 .pro-hero-top {
@@ -3574,6 +3583,10 @@ h2 {
 
   .pro-hero {
     padding: 14px;
+  }
+
+  .pro-hero--bleed {
+    padding: calc(14px + var(--safe-top) + var(--tg-top-offset)) 18px 14px;
   }
 
   .pro-hero-cover {

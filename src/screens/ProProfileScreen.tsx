@@ -599,8 +599,7 @@ export const ProProfileScreen = ({
 
   return (
     <div className="screen screen--pro">
-      <div className="pro-shell">
-        <header className="pro-hero animate delay-1">
+      <header className="pro-hero pro-hero--bleed animate delay-1">
           <div className="pro-hero-top">
             <div className="pro-hero-actions">
               <button className="pro-ghost" type="button" onClick={onViewRequests}>
@@ -758,6 +757,7 @@ export const ProProfileScreen = ({
           </div>
         </header>
 
+      <div className="pro-shell">
         <nav className="pro-section-nav animate delay-2" aria-label="Разделы профиля">
           <button
             className="pro-nav-pill"
