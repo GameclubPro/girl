@@ -731,7 +731,7 @@
     'c c d d e e'
     'c c d d e e'
     'c c d d f g';
-  aspect-ratio: 7 / 11;
+  aspect-ratio: 6 / 5;
   gap: 6px;
 }
 
@@ -5698,7 +5698,7 @@ h2 {
       'c c d d e e'
       'c c d d e e'
       'c c d d f g';
-    aspect-ratio: 7 / 11;
+    aspect-ratio: 6 / 5;
   }
 
   .pro-cabinet-showcase-panel {
