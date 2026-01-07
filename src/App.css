@@ -4599,36 +4599,10 @@ h2 {
 }
 
 .client-topbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-}
-
-.client-close-button {
-  border: 1px solid rgba(230, 217, 238, 0.9);
-  background: rgba(255, 255, 255, 0.72);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b5a77;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  justify-self: start;
-  box-shadow: 0 12px 18px rgba(85, 63, 104, 0.12);
-}
-
-.client-close-button:focus-visible {
-  outline: 3px solid rgba(143, 98, 228, 0.3);
-  outline-offset: 2px;
-}
-
-.client-close-icon {
-  font-size: 14px;
-  line-height: 1;
 }
 
 .client-brand {
@@ -4638,12 +4612,6 @@ h2 {
   font-weight: 700;
   color: #7a5b60;
   text-transform: uppercase;
-  justify-self: center;
-}
-
-.client-brand-wave {
-  margin-left: 4px;
-  font-size: 16px;
 }
 
 .client-category-indicator {
@@ -4703,15 +4671,6 @@ h2 {
 .bell-button svg {
   width: 20px;
   height: 20px;
-}
-
-.client-greeting {
-  margin: 0;
-  font-size: clamp(22px, 6vw, 26px);
-  font-weight: 700;
-  color: #4e3839;
-  line-height: 1.2;
-  flex: 1;
 }
 
 .cta-row {
@@ -4928,7 +4887,7 @@ h2 {
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 8px;
   align-self: center;
-  height: clamp(150px, 42vw, 200px);
+  height: clamp(130px, 34vw, 170px);
 }
 
 .client-showcase-photo {
@@ -5659,7 +5618,7 @@ h2 {
 
   .client-showcase-gallery {
     width: 100%;
-    height: clamp(160px, 48vw, 210px);
+    height: clamp(140px, 40vw, 180px);
   }
 
   .screen--request {

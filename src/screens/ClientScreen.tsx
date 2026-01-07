@@ -24,21 +24,18 @@ const categoryChips = [
 ]
 
 export const ClientScreen = ({
-  clientName,
   activeCategoryId,
   onCategoryChange,
   onViewShowcase,
   onCreateRequest,
   onViewRequests,
 }: {
-  clientName?: string
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onViewShowcase: () => void
   onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: () => void
 }) => {
-  const displayName = clientName?.trim() ?? ''
   const activeCategoryLabel =
     (activeCategoryId ? categoryLabelOverrides[activeCategoryId] : '') ??
     categoryItems.find((item) => item.id === activeCategoryId)?.label ??
@@ -58,30 +55,16 @@ export const ClientScreen = ({
     const fallback = activeCategoryId ? popularItems : []
     return [...primary, ...fallback].slice(0, 4)
   }, [activeCategoryId])
-  const handleClose = () => {
-    window.Telegram?.WebApp?.close?.()
-  }
 
   return (
     <div className="screen screen--client">
       <div className="client-shell">
         <header className="client-topbar">
-          <button className="client-close-button" type="button" onClick={handleClose}>
-            <span className="client-close-icon" aria-hidden="true">
-              ←
-            </span>
-            Закрыть
-          </button>
-          <div className="client-brand">
-            KIVEN <span className="client-brand-wave">👋</span>
-          </div>
+          <div className="client-brand">KIVEN</div>
           <button className="bell-button" type="button" aria-label="Уведомления">
             <IconBell />
           </button>
         </header>
-        <p className="client-greeting">
-          Привет, {displayName || 'друг'} <span aria-hidden="true">👋</span>
-        </p>
         {activeCategoryId && activeCategoryLabel && (
           <button
             className="client-category-indicator"
