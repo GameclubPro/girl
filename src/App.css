@@ -5010,19 +5010,23 @@ h2 {
 
 .client-work-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: clamp(110px, 42vw, 180px);
-  gap: 10px;
-  grid-auto-flow: dense;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    'a a b'
+    'c d b'
+    'e f f';
+  gap: 6px;
+  height: clamp(300px, 88vw, 420px);
 }
 
 .client-work-card {
   position: relative;
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 14px 22px rgba(100, 72, 124, 0.2);
-  background: rgba(255, 255, 255, 0.7);
+  border: none;
+  box-shadow: 0 14px 20px rgba(90, 66, 110, 0.2);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .client-work-card img {
@@ -5030,14 +5034,6 @@ h2 {
   height: 100%;
   object-fit: cover;
   display: block;
-}
-
-.client-work-card.is-tall {
-  grid-row: span 2;
-}
-
-.client-work-card.is-wide {
-  grid-column: span 2;
 }
 
 .client-work-label {

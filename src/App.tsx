@@ -432,6 +432,7 @@ function App() {
   if (view === 'client-showcase') {
     return (
       <ClientShowcaseScreen
+        apiBase={apiBase}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}

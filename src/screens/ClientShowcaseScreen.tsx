@@ -1,8 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems, popularItems } from '../data/clientData'
+import type { MasterProfile } from '../types/app'
+import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
 type ClientShowcaseScreenProps = {
+  apiBase: string
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onBack: () => void
@@ -24,18 +27,36 @@ const categoryChips = [
   })),
 ]
 
-const showcaseTileClasses = [
-  'is-wide',
-  'is-tall',
-  'is-small',
-  'is-tall',
-  'is-wide',
-  'is-small',
-  'is-tall',
-  'is-small',
-]
+type ShowcaseMedia = {
+  id: string
+  url: string
+  focusX: number
+  focusY: number
+  categories: string[]
+}
+
+const SHOWCASE_SLOTS = 6
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
+
+const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item) => ({
+  id: `fallback-${item.id}`,
+  url: item.image,
+  focusX: 0.5,
+  focusY: 0.5,
+  categories: item.categoryId ? [item.categoryId] : [],
+}))
+
+const shuffleItems = <T,>(items: T[]) => {
+  const result = [...items]
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1))
+    ;[result[index], result[randomIndex]] = [result[randomIndex], result[index]]
+  }
+  return result
+}
 
 export const ClientShowcaseScreen = ({
+  apiBase,
   activeCategoryId,
   onCategoryChange,
   onBack,
@@ -45,20 +66,63 @@ export const ClientShowcaseScreen = ({
     categoryChips.find((chip) => chip.id === activeCategoryId)?.label ??
     categoryItems.find((item) => item.id === activeCategoryId)?.label ??
     ''
-  const baseItems = useMemo(() => {
-    const filtered = activeCategoryId
-      ? popularItems.filter((item) => item.categoryId === activeCategoryId)
-      : popularItems
-    return filtered.length > 0 ? filtered : popularItems
-  }, [activeCategoryId])
-  const showcaseItems = useMemo(
-    () =>
-      Array.from({ length: 10 }, (_, index) => ({
-        ...baseItems[index % baseItems.length],
-        _key: `${baseItems[index % baseItems.length]?.id ?? 'item'}-${index}`,
-      })),
-    [baseItems]
-  )
+  const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadShowcase = async () => {
+      try {
+        const response = await fetch(`${apiBase}/api/masters`)
+        if (!response.ok) {
+          throw new Error('Load showcase failed')
+        }
+        const data = (await response.json()) as MasterProfile[]
+        if (cancelled) return
+
+        const nextPool = data.flatMap((profile) => {
+          const categories = Array.isArray(profile.categories) ? profile.categories : []
+          return parsePortfolioItems(profile.portfolioUrls ?? [])
+            .filter((item) => isImageUrl(item.url))
+            .map((item, index) => ({
+              id: `${profile.userId}-${index}`,
+              url: item.url,
+              focusX: item.focusX ?? 0.5,
+              focusY: item.focusY ?? 0.5,
+              categories,
+            }))
+        })
+        setShowcasePool(nextPool)
+      } catch (error) {
+        if (!cancelled) {
+          setShowcasePool([])
+        }
+      }
+    }
+
+    void loadShowcase()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase])
+
+  const showcaseItems = useMemo(() => {
+    const pool = activeCategoryId
+      ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
+      : showcasePool
+    const basePool =
+      pool.length > 0
+        ? pool
+        : showcasePool.length > 0
+          ? showcasePool
+          : fallbackShowcasePool
+    if (basePool.length === 0) return []
+    const shuffled = shuffleItems(basePool)
+    return Array.from({ length: SHOWCASE_SLOTS }, (_, index) =>
+      shuffled[index % shuffled.length]
+    )
+  }, [activeCategoryId, showcasePool])
 
   return (
     <div className="screen screen--client screen--client-showcase">
@@ -108,11 +172,18 @@ export const ClientShowcaseScreen = ({
           <div className="client-work-grid" aria-label="Витрина работ">
             {showcaseItems.map((item, index) => (
               <article
-                className={`client-work-card ${showcaseTileClasses[index % showcaseTileClasses.length]}`}
-                key={item._key}
+                className="client-work-card"
+                key={`${item.id}-${index}`}
+                style={{ gridArea: showcaseAreas[index % showcaseAreas.length] }}
               >
-                <img src={item.image} alt={item.label} loading="lazy" />
-                <span className="client-work-label">{item.label}</span>
+                <img
+                  src={item.url}
+                  alt=""
+                  loading="lazy"
+                  style={{
+                    objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
+                  }}
+                />
               </article>
             ))}
           </div>
