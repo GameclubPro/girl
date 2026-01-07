@@ -130,10 +130,8 @@ export const ProProfileScreen = ({
         : focusSection
       : null
   )
-  const autosaveTimerRef = useRef<number | null>(null)
   const autosaveSuccessTimerRef = useRef<number | null>(null)
   const lastSavedRef = useRef('')
-  const lastAttemptedRef = useRef('')
   const hasLoadedRef = useRef(false)
   const isSavingRef = useRef(false)
   const queuedPayloadRef = useRef<ProfilePayload | null>(null)
@@ -145,7 +143,7 @@ export const ProProfileScreen = ({
     () => toPortfolioStrings(portfolioItems),
     [portfolioItems]
   )
-  const autosavePayload = useMemo<ProfilePayload | null>(() => {
+  const profilePayload = useMemo<ProfilePayload | null>(() => {
     if (!userId) return null
     const normalizedName = displayName.trim()
     const parsedPriceFrom = parseNumber(priceFrom)
@@ -188,10 +186,6 @@ export const ProProfileScreen = ({
     worksAtClient,
     worksAtMaster,
   ])
-  const autosaveKey = useMemo(
-    () => (autosavePayload ? JSON.stringify(autosavePayload) : ''),
-    [autosavePayload]
-  )
   const displayNameValue =
     displayName.trim() || displayNameFallback.trim() || 'Мастер'
   const activeTone = isActive ? 'is-active' : 'is-paused'
@@ -213,24 +207,8 @@ export const ProProfileScreen = ({
     priceFromValue !== null &&
     priceToValue !== null &&
     priceFromValue > priceToValue
-  const autosaveLabel = hasInvalidPriceRange
-    ? 'Проверьте диапазон цен'
-    : saveError
-      ? 'Не удалось сохранить'
-      : isSaving
-        ? 'Сохраняем...'
-        : saveSuccess
-          ? 'Сохранено'
-          : 'Автосохранение включено'
-  const autosaveTone = hasInvalidPriceRange
-    ? 'is-error'
-    : saveError
-      ? 'is-error'
-      : isSaving
-        ? 'is-saving'
-        : saveSuccess
-          ? 'is-success'
-          : 'is-idle'
+  const saveButtonLabel = isSaving ? 'Сохраняем...' : 'Сохранить'
+  const canSave = Boolean(profilePayload) && !hasInvalidPriceRange && !isSaving
   const priceLabel =
     priceFromValue !== null && priceToValue !== null
       ? `${priceFromValue}–${priceToValue} ₽`
@@ -316,29 +294,7 @@ export const ProProfileScreen = ({
   const openEditor = (section: ProProfileSection) => {
     setEditingSection(normalizeSection(section))
   }
-  const closeEditor = () => {
-    setEditingSection(null)
-  }
-  const editSectionMeta: Record<InlineSection, { title: string; subtitle: string }> = {
-    basic: {
-      title: 'О себе',
-      subtitle: 'Имя, описание и специализации',
-    },
-    services: {
-      title: 'Услуги и цены',
-      subtitle: 'Категория, список услуг и стоимость',
-    },
-    location: {
-      title: 'Работа',
-      subtitle: 'Город, формат, график и статус',
-    },
-    portfolio: {
-      title: 'Портфолио',
-      subtitle: 'Ссылки на ваши работы',
-    },
-  }
-  const activeEditMeta = editingSection ? editSectionMeta[editingSection] : null
-  const persistAutosaveMessage = (message: string) => {
+  const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
       window.clearTimeout(autosaveSuccessTimerRef.current)
     }
@@ -382,15 +338,11 @@ export const ProProfileScreen = ({
   useEffect(() => {
     hasLoadedRef.current = false
     lastSavedRef.current = ''
-    lastAttemptedRef.current = ''
     queuedPayloadRef.current = null
   }, [userId])
 
   useEffect(() => {
     return () => {
-      if (autosaveTimerRef.current) {
-        window.clearTimeout(autosaveTimerRef.current)
-      }
       if (autosaveSuccessTimerRef.current) {
         window.clearTimeout(autosaveSuccessTimerRef.current)
       }
@@ -570,11 +522,6 @@ export const ProProfileScreen = ({
     }
   }, [apiBase, displayNameFallback, userId])
 
-  useEffect(() => {
-    if (!hasLoadedRef.current || lastSavedRef.current || !autosaveKey) return
-    lastSavedRef.current = autosaveKey
-  }, [autosaveKey])
-
   const saveProfile = async (payload: ProfilePayload) => {
     if (!payload.userId) return
     if (isSavingRef.current) {
@@ -587,16 +534,15 @@ export const ProProfileScreen = ({
       payload.priceFrom > payload.priceTo
     ) {
       setSaveError(PRICE_RANGE_ERROR)
-      persistAutosaveMessage('')
+      persistSaveMessage('')
       return
     }
 
     const payloadKey = JSON.stringify(payload)
     if (payloadKey === lastSavedRef.current) return
 
-    lastAttemptedRef.current = payloadKey
     setSaveError('')
-    persistAutosaveMessage('')
+    persistSaveMessage('')
     setIsSaving(true)
     isSavingRef.current = true
 
@@ -612,7 +558,7 @@ export const ProProfileScreen = ({
       }
 
       const summary = getProfileStatusSummary(payload)
-      persistAutosaveMessage(
+      persistSaveMessage(
         summary.missingFields.length > 0 ? 'Черновик сохранен' : 'Сохранено'
       )
       lastSavedRef.current = payloadKey
@@ -629,23 +575,10 @@ export const ProProfileScreen = ({
     }
   }
 
-  useEffect(() => {
-    if (!autosavePayload || !hasLoadedRef.current || isLoading) return
-    if (autosaveKey === lastSavedRef.current) return
-    if (autosaveKey === lastAttemptedRef.current) return
-    if (hasInvalidPriceRange) return
-    if (autosaveTimerRef.current) {
-      window.clearTimeout(autosaveTimerRef.current)
-    }
-    autosaveTimerRef.current = window.setTimeout(() => {
-      void saveProfile(autosavePayload)
-    }, 700)
-    return () => {
-      if (autosaveTimerRef.current) {
-        window.clearTimeout(autosaveTimerRef.current)
-      }
-    }
-  }, [autosaveKey, autosavePayload, hasInvalidPriceRange, isLoading])
+  const handleSave = () => {
+    if (!profilePayload) return
+    void saveProfile(profilePayload)
+  }
 
   const handleServiceCategoryChange = (categoryId: CategoryId) => {
     setServiceCategoryId(categoryId)
@@ -1162,34 +1095,14 @@ export const ProProfileScreen = ({
         </section>
 
         <div className="pro-profile-footer">
-          <div className={`pro-autosave ${autosaveTone}`}>
-            <span className="pro-autosave-dot" aria-hidden="true" />
-            <span className="pro-autosave-text">{autosaveLabel}</span>
-          </div>
           {saveError && <p className="pro-error">{saveError}</p>}
           {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
         </div>
       </div>
 
-      {editingSection && activeEditMeta && (
+      {editingSection && (
         <div className="pro-profile-editor-screen" role="dialog" aria-modal="true">
           <div className="pro-profile-editor-shell">
-            <header className="pro-profile-editor-header">
-              <button className="pro-back" type="button" onClick={closeEditor}>
-                ←
-              </button>
-              <div className="pro-profile-editor-headings">
-                <p className="pro-profile-editor-kicker">Редактирование</p>
-                <h2 className="pro-profile-editor-title">{activeEditMeta.title}</h2>
-                <p className="pro-profile-editor-subtitle">
-                  {activeEditMeta.subtitle}
-                </p>
-              </div>
-              <div className={`pro-autosave ${autosaveTone} pro-profile-editor-autosave`}>
-                <span className="pro-autosave-dot" aria-hidden="true" />
-                <span className="pro-autosave-text">{autosaveLabel}</span>
-              </div>
-            </header>
             <section className="pro-profile-editor-card">
               {editingSection === 'basic' && (
                 <>
@@ -1647,6 +1560,16 @@ export const ProProfileScreen = ({
                 {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
               </div>
             )}
+            <div className="pro-profile-editor-actions">
+              <button
+                className="pro-profile-action is-primary pro-profile-editor-save"
+                type="button"
+                onClick={handleSave}
+                disabled={!canSave}
+              >
+                {saveButtonLabel}
+              </button>
+            </div>
           </div>
         </div>
       )}
