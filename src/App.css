@@ -4595,7 +4595,7 @@ h2 {
   width: min(420px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 11px;
 }
 
 .client-topbar {
@@ -4730,7 +4730,7 @@ h2 {
 .client-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
 }
 
 .client-category-bar {
@@ -4808,7 +4808,7 @@ h2 {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .client-showcase-badge {
@@ -4830,14 +4830,6 @@ h2 {
   font-size: clamp(22px, 6.4vw, 26px);
   font-weight: 700;
   color: #3e2e36;
-}
-
-.client-showcase-copy {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #7c6f86;
-  line-height: 1.45;
 }
 
 .client-showcase-cta {

@@ -72,9 +72,6 @@ export const ClientScreen = ({
             <div className="client-showcase-content">
               <span className="client-showcase-badge">✨ Вдохновение</span>
               <h2 className="client-showcase-title">Витрина работ</h2>
-              <p className="client-showcase-copy">
-                Лучшие работы рядом. Выбирай стиль глазами.
-              </p>
               <button
                 className="client-showcase-cta"
                 type="button"
