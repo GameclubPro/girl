@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   IconHome,
   IconList,
@@ -31,13 +31,14 @@ export const ClientScreen = ({
     (activeCategoryId ? categoryLabelOverrides[activeCategoryId] : '') ??
     categoryItems.find((item) => item.id === activeCategoryId)?.label ??
     ''
+  const [requestCategoryId, setRequestCategoryId] = useState<string | null>(null)
+  const requestCategoryLabel =
+    (requestCategoryId ? categoryLabelOverrides[requestCategoryId] : '') ??
+    categoryItems.find((item) => item.id === requestCategoryId)?.label ??
+    ''
   const visiblePopularItems = useMemo(() => {
     if (!activeCategoryId) return popularItems
     return popularItems.filter((item) => item.categoryId === activeCategoryId)
-  }, [activeCategoryId])
-  const visibleCategoryItems = useMemo(() => {
-    if (!activeCategoryId) return categoryItems
-    return categoryItems.filter((item) => item.id === activeCategoryId)
   }, [activeCategoryId])
   const showcaseItems = useMemo(() => {
     const primary = activeCategoryId
@@ -150,8 +151,8 @@ export const ClientScreen = ({
 
         <section className="client-section">
           <div className="category-grid">
-            {visibleCategoryItems.map((item) => {
-              const isSelected = item.id === activeCategoryId
+            {categoryItems.map((item) => {
+              const isSelected = item.id === requestCategoryId
 
               return (
                 <button
@@ -159,7 +160,11 @@ export const ClientScreen = ({
                   type="button"
                   key={item.id}
                   aria-pressed={isSelected}
-                  onClick={() => onCategoryChange(item.id)}
+                  onClick={() =>
+                    setRequestCategoryId((prev) =>
+                      prev === item.id ? null : item.id
+                    )
+                  }
                 >
                   <span className="category-left">
                     <span className="category-icon" aria-hidden="true">
@@ -178,15 +183,15 @@ export const ClientScreen = ({
             })}
           </div>
           <p className="category-helper">
-            {activeCategoryLabel
-              ? `Выбрана категория: ${activeCategoryLabel}`
+            {requestCategoryLabel
+              ? `Выбрана категория: ${requestCategoryLabel}`
               : 'Выберите категорию, чтобы создать заявку'}
           </p>
           <button
             className="cta cta--primary cta--wide"
             type="button"
-            onClick={() => onCreateRequest(activeCategoryId)}
-            disabled={!activeCategoryId}
+            onClick={() => onCreateRequest(requestCategoryId)}
+            disabled={!requestCategoryId}
           >
             <span className="cta-icon" aria-hidden="true">
               +
