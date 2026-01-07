@@ -42,12 +42,12 @@ const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
 const collageClasses = [
-  'is-large',
-  'is-wide',
   'is-wide',
   'is-small',
-  'is-small',
+  'is-tall',
   'is-wide',
+  'is-small',
+  'is-tall',
 ]
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
