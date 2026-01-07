@@ -48,6 +48,7 @@ type ShowcaseMedia = {
 }
 
 const SHOWCASE_SLOTS = 6
+const INITIAL_BLOCKS = 3
 const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
 const slotShapes: ShowcaseShape[] = [
   'is-large',
@@ -182,7 +183,9 @@ export const ClientShowcaseScreen = ({
       setShowcaseBlocks([])
       return
     }
-    setShowcaseBlocks([buildShowcaseBlock()])
+    setShowcaseBlocks(
+      Array.from({ length: INITIAL_BLOCKS }, () => buildShowcaseBlock())
+    )
   }, [basePool, buildShowcaseBlock])
 
   useEffect(() => {
