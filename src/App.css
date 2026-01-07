@@ -701,7 +701,7 @@
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.75);
   box-shadow: 0 18px 30px rgba(16, 12, 11, 0.14);
-  min-height: calc(100dvh * 7 / 3);
+  min-height: 80dvh;
 }
 
 .pro-cabinet-showcase-edit {
