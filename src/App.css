@@ -5450,6 +5450,16 @@ h2 {
     flex-basis: 84%;
   }
 
+  .client-showcase-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .client-showcase-gallery {
+    width: 100%;
+    height: clamp(170px, 54vw, 230px);
+  }
+
   .screen--request {
     --request-pad-x: 12px;
   }
