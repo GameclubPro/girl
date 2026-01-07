@@ -466,7 +466,7 @@ function App() {
         userId={userId}
         onBack={() => setView('pro-cabinet')}
         onEditProfile={(section) => {
-          setProProfileSection(section ?? 'basic')
+          setProProfileSection(section ?? null)
           setView('pro-profile')
         }}
       />
@@ -480,7 +480,7 @@ function App() {
         userId={userId}
         displayNameFallback={clientName}
         onEditProfile={(section) => {
-          setProProfileSection(section ?? 'basic')
+          setProProfileSection(section ?? null)
           setView('pro-profile')
         }}
         onViewRequests={() => setView('pro-requests')}
