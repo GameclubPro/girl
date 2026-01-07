@@ -605,7 +605,7 @@ export const ProCabinetScreen = ({
               </div>
             </div>
           ) : (
-            <div className="pro-cabinet-showcase-panel is-filled">
+            <div className="pro-cabinet-showcase-panel">
               <div className="pro-cabinet-showcase-grid animate delay-2">
                 {mosaicItems.map((item, index) => {
                   const gridArea = showcaseAreas[index]
