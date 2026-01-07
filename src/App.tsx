@@ -45,6 +45,7 @@ function App() {
   const [isLoadingCities, setIsLoadingCities] = useState(false)
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [clientCategoryId, setClientCategoryId] = useState<string | null>(null)
   const [requestCategoryId, setRequestCategoryId] = useState<string>(
     categoryItems[0]?.id ?? ''
   )
@@ -404,8 +405,12 @@ function App() {
     return (
       <ClientScreen
         clientName={clientName}
+        activeCategoryId={clientCategoryId}
+        onCategoryChange={setClientCategoryId}
         onCreateRequest={(categoryId) => {
-          setRequestCategoryId(categoryId ?? categoryItems[0]?.id ?? '')
+          setRequestCategoryId(
+            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
+          )
           setView('request')
         }}
         onViewRequests={() => setView('requests')}
@@ -437,7 +442,10 @@ function App() {
       <ClientRequestsScreen
         apiBase={apiBase}
         userId={userId}
-        onCreateRequest={() => setView('request')}
+        onCreateRequest={() => {
+          setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
+          setView('request')
+        }}
       />
     )
   }

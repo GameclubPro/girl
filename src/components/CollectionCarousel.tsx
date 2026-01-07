@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { collectionItems } from '../data/clientData'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { collectionItems, type CollectionItem } from '../data/clientData'
 
-const collectionBaseIndex = collectionItems.length
-const loopedCollectionItems = [
-  ...collectionItems,
-  ...collectionItems,
-  ...collectionItems,
-]
+type CollectionCarouselProps = {
+  items?: CollectionItem[]
+}
 
-export const CollectionCarousel = () => {
+export const CollectionCarousel = ({ items }: CollectionCarouselProps) => {
+  const carouselItems =
+    items && items.length > 0 ? items : collectionItems
+  const collectionBaseIndex = carouselItems.length
+  const loopedCollectionItems = useMemo(
+    () => [...carouselItems, ...carouselItems, ...carouselItems],
+    [carouselItems]
+  )
   const trackRef = useRef<HTMLDivElement | null>(null)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const rafRef = useRef(0)
@@ -39,8 +43,8 @@ export const CollectionCarousel = () => {
     stepRef.current = step
     const offsetSetWidth = first ? middle.offsetLeft - first.offsetLeft : 0
     setWidthRef.current =
-      offsetSetWidth > 0 ? offsetSetWidth : step * collectionItems.length
-  }, [])
+      offsetSetWidth > 0 ? offsetSetWidth : step * carouselItems.length
+  }, [carouselItems.length, collectionBaseIndex])
 
   const setScrollLeftInstant = useCallback((nextLeft: number) => {
     const track = trackRef.current
@@ -60,7 +64,7 @@ export const CollectionCarousel = () => {
     const nextLeft =
       middle.offsetLeft - (track.clientWidth - middle.offsetWidth) / 2
     setScrollLeftInstant(nextLeft)
-  }, [setScrollLeftInstant])
+  }, [collectionBaseIndex, setScrollLeftInstant])
 
   const normalizePosition = useCallback(() => {
     const track = trackRef.current
@@ -73,6 +77,15 @@ export const CollectionCarousel = () => {
       setScrollLeftInstant(track.scrollLeft - setWidth)
     }
   }, [setScrollLeftInstant])
+
+  useEffect(() => {
+    cardRefs.current = []
+    setWidthRef.current = 0
+    stepRef.current = 0
+    readyRef.current = false
+    hasCenteredRef.current = false
+    setIsReady(false)
+  }, [carouselItems])
 
   const markReady = useCallback(() => {
     if (readyRef.current) return
@@ -137,7 +150,7 @@ export const CollectionCarousel = () => {
       }
       window.removeEventListener('resize', scheduleLayout)
     }
-  }, [centerMiddle, markReady, measure, normalizePosition])
+  }, [centerMiddle, markReady, measure, normalizePosition, loopedCollectionItems])
 
   useEffect(() => {
     let cancelled = false
@@ -254,7 +267,7 @@ export const CollectionCarousel = () => {
         {loopedCollectionItems.map((item, index) => {
           const isPrimary =
             index >= collectionBaseIndex &&
-            index < collectionBaseIndex + collectionItems.length
+            index < collectionBaseIndex + carouselItems.length
           return (
             <button
               className={`collection-card collection-card--${item.tone}`}

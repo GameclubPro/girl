@@ -11,6 +11,23 @@ import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
 import popularNanny from '../assets/popular/nanny.webp'
 
+export type CollectionItem = {
+  id: string
+  badge: string
+  label: string
+  title: string
+  meta: string
+  tone: 'lavender' | 'sun' | 'mint' | 'rose' | 'sky'
+  categoryId?: string | null
+}
+
+export type PopularItem = {
+  id: string
+  image: string
+  label: string
+  categoryId: string
+}
+
 export const collectionItems = [
   {
     id: 'verified',
@@ -19,6 +36,7 @@ export const collectionItems = [
     title: 'Проверенные мастера',
     meta: '4.9 ★ и выше',
     tone: 'lavender',
+    categoryId: null,
   },
   {
     id: 'visit',
@@ -27,6 +45,7 @@ export const collectionItems = [
     title: 'Выезд сегодня',
     meta: 'Ближайшие 2 часа',
     tone: 'sun',
+    categoryId: null,
   },
   {
     id: 'budget',
@@ -35,6 +54,7 @@ export const collectionItems = [
     title: 'До 2000 ₽',
     meta: 'Фиксированные цены',
     tone: 'mint',
+    categoryId: null,
   },
   {
     id: 'express',
@@ -43,6 +63,7 @@ export const collectionItems = [
     title: 'Экспресс-сервис',
     meta: 'Ответ за 10 минут',
     tone: 'rose',
+    categoryId: null,
   },
   {
     id: 'stars',
@@ -51,15 +72,36 @@ export const collectionItems = [
     title: 'Звезды недели',
     meta: 'Лучшие отзывы',
     tone: 'sky',
+    categoryId: null,
   },
-] as const
+] satisfies CollectionItem[]
 
 export const popularItems = [
-  { id: 'manicure', image: popularNails, label: 'Маникюр' },
-  { id: 'brow-shaping', image: popularCleaning, label: 'Оформление бровей' },
-  { id: 'haircut', image: popularNanny, label: 'Стрижка' },
-  { id: 'lash-extensions', image: popularBrowsLashes, label: 'Наращивание ресниц' },
-] as const
+  {
+    id: 'manicure',
+    image: popularNails,
+    label: 'Маникюр',
+    categoryId: 'beauty-nails',
+  },
+  {
+    id: 'brow-shaping',
+    image: popularCleaning,
+    label: 'Оформление бровей',
+    categoryId: 'brows-lashes',
+  },
+  {
+    id: 'haircut',
+    image: popularNanny,
+    label: 'Стрижка',
+    categoryId: 'hair',
+  },
+  {
+    id: 'lash-extensions',
+    image: popularBrowsLashes,
+    label: 'Наращивание ресниц',
+    categoryId: 'brows-lashes',
+  },
+] satisfies PopularItem[]
 
 export const categoryItems = [
   { id: 'beauty-nails', icon: categoryBeautyNails, label: 'Красота и ногти' },
