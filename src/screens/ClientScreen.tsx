@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { CollectionCarousel } from '../components/CollectionCarousel'
-import { IconBell, IconHome, IconList, IconUser, IconUsers } from '../components/icons'
+import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems, collectionItems, popularItems } from '../data/clientData'
 
 const categoryLabelOverrides: Record<string, string> = {
@@ -19,13 +19,11 @@ const categoryChips = [
 ]
 
 export const ClientScreen = ({
-  clientName,
   activeCategoryId,
   onCategoryChange,
   onCreateRequest,
   onViewRequests,
 }: {
-  clientName: string
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onCreateRequest: (categoryId?: string | null) => void
@@ -82,20 +80,6 @@ export const ClientScreen = ({
           </button>
         )}
 
-        <div className="client-top">
-          <p className="client-greeting">
-            Привет{clientName ? `, ${clientName}` : ''}{' '}
-            <span aria-hidden="true">👋</span>
-          </p>
-          <button className="bell-button" type="button" aria-label="Уведомления">
-            <IconBell />
-          </button>
-        </div>
-
-        <section className="client-section">
-          <CollectionCarousel items={visibleCollectionItems} />
-        </section>
-
         <section className="client-section">
           <div className="client-category-bar" role="tablist" aria-label="Категории">
             {categoryChips.map((chip) => {
@@ -115,6 +99,10 @@ export const ClientScreen = ({
               )
             })}
           </div>
+        </section>
+
+        <section className="client-section">
+          <CollectionCarousel items={visibleCollectionItems} />
         </section>
 
         <section className="client-section">

@@ -404,7 +404,6 @@ function App() {
   if (view === 'client') {
     return (
       <ClientScreen
-        clientName={clientName}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onCreateRequest={(categoryId) => {
