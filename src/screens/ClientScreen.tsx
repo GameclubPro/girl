@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
-import { CollectionCarousel } from '../components/CollectionCarousel'
 import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
-import { categoryItems, collectionItems, popularItems } from '../data/clientData'
+import { categoryItems, popularItems } from '../data/clientData'
 
 const categoryLabelOverrides: Record<string, string> = {
   'beauty-nails': 'Маникюр',
@@ -33,6 +32,12 @@ export const ClientScreen = ({
     categoryChips.find((chip) => chip.id === activeCategoryId)?.label ??
     categoryItems.find((item) => item.id === activeCategoryId)?.label ??
     ''
+  const showcaseTitle = activeCategoryLabel
+    ? `Витрина: ${activeCategoryLabel}`
+    : 'Витрина работ'
+  const showcaseCopy = activeCategoryLabel
+    ? `Лучшие работы в категории ${activeCategoryLabel}.`
+    : 'Лучшие работы рядом. Выбирай стиль глазами.'
   const visiblePopularItems = useMemo(() => {
     if (!activeCategoryId) return popularItems
     return popularItems.filter((item) => item.categoryId === activeCategoryId)
@@ -41,24 +46,17 @@ export const ClientScreen = ({
     if (!activeCategoryId) return categoryItems
     return categoryItems.filter((item) => item.id === activeCategoryId)
   }, [activeCategoryId])
-  const visibleCollectionItems = useMemo(() => {
-    const filtered = activeCategoryId
-      ? collectionItems.filter(
-          (item) => !item.categoryId || item.categoryId === activeCategoryId
-        )
-      : collectionItems
-    if (!activeCategoryId || !activeCategoryLabel) return filtered
-    const focusItem = {
-      id: `focus-${activeCategoryId}`,
-      badge: '✨',
-      label: activeCategoryLabel,
-      title: `${activeCategoryLabel} сегодня`,
-      meta: 'Подборка мастеров',
-      tone: 'rose' as const,
-      categoryId: activeCategoryId,
-    }
-    return [focusItem, ...filtered]
-  }, [activeCategoryId, activeCategoryLabel])
+  const showcaseItems = useMemo(() => {
+    const primary = activeCategoryId
+      ? popularItems.filter((item) => item.categoryId === activeCategoryId)
+      : popularItems
+    const fallback = activeCategoryId ? popularItems : []
+    return [...primary, ...fallback].slice(0, 4)
+  }, [activeCategoryId])
+  const handleShowcaseClick = () => {
+    const target = document.getElementById('client-popular')
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className="screen screen--client">
@@ -102,10 +100,32 @@ export const ClientScreen = ({
         </section>
 
         <section className="client-section">
-          <CollectionCarousel items={visibleCollectionItems} />
+          <div className="client-showcase-card">
+            <div className="client-showcase-content">
+              <span className="client-showcase-badge">
+                ✨ {activeCategoryLabel || 'Вдохновение'}
+              </span>
+              <h2 className="client-showcase-title">{showcaseTitle}</h2>
+              <p className="client-showcase-copy">{showcaseCopy}</p>
+              <button
+                className="client-showcase-cta"
+                type="button"
+                onClick={handleShowcaseClick}
+              >
+                Смотреть →
+              </button>
+            </div>
+            <div className="client-showcase-gallery" aria-label="Витрина работ">
+              {showcaseItems.map((item) => (
+                <span className="client-showcase-photo" key={item.id}>
+                  <img src={item.image} alt={item.label} loading="lazy" />
+                </span>
+              ))}
+            </div>
+          </div>
         </section>
 
-        <section className="client-section">
+        <section className="client-section" id="client-popular">
           <div className="section-header">
             <h3>Популярное сегодня</h3>
           </div>
