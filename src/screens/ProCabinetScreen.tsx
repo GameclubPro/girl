@@ -37,11 +37,11 @@ type ProfilePayload = {
   portfolioUrls: string[]
 }
 
-const MAX_PORTFOLIO_ITEMS = 7
+const MAX_PORTFOLIO_ITEMS = 8
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
-const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 
