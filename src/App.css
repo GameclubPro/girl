@@ -4779,7 +4779,7 @@ h2 {
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
   gap: 14px;
-  padding: 18px;
+  padding: 14px;
   border-radius: 28px;
   background:
     radial-gradient(120% 120% at 0% 0%, rgba(255, 233, 239, 0.95), transparent 55%),
@@ -4867,7 +4867,7 @@ h2 {
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 8px;
   align-self: center;
-  height: clamp(130px, 34vw, 170px);
+  height: clamp(110px, 30vw, 150px);
 }
 
 .client-showcase-photo {
@@ -5593,12 +5593,12 @@ h2 {
   .client-showcase-card {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
     gap: 12px;
-    padding: 16px;
+    padding: 12px;
   }
 
   .client-showcase-gallery {
     width: 100%;
-    height: clamp(140px, 40vw, 180px);
+    height: clamp(120px, 34vw, 160px);
   }
 
   .screen--request {
