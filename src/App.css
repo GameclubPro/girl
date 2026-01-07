@@ -4860,11 +4860,15 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    'a a b'
+    'c d b'
+    'e f f';
   gap: 2px;
   align-self: center;
-  height: clamp(75px, 20vw, 105px);
+  height: clamp(96px, 26vw, 130px);
 }
 
 .client-showcase-photo {
@@ -5595,7 +5599,7 @@ h2 {
 
   .client-showcase-gallery {
     width: 100%;
-    height: clamp(85px, 24vw, 115px);
+    height: clamp(96px, 28vw, 135px);
   }
 
   .screen--request {
