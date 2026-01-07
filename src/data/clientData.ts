@@ -10,6 +10,8 @@ import popularNails from '../assets/popular/nails.webp'
 import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
 import popularNanny from '../assets/popular/nanny.webp'
+import storyAvatarOne from '../assets/kiven-girls.webp'
+import storyAvatarTwo from '../assets/kiven-girls1.webp'
 
 export type CollectionItem = {
   id: string
@@ -26,6 +28,13 @@ export type PopularItem = {
   image: string
   label: string
   categoryId: string
+}
+
+export type StoryItem = {
+  id: string
+  name: string
+  specialty: string
+  avatar: string
 }
 
 export const collectionItems = [
@@ -102,6 +111,15 @@ export const popularItems = [
     categoryId: 'brows-lashes',
   },
 ] satisfies PopularItem[]
+
+export const storyItems = [
+  { id: 'anna', name: 'Анна', specialty: 'Брови', avatar: storyAvatarOne },
+  { id: 'maria-1', name: 'Мария', specialty: 'Маникюр', avatar: storyAvatarTwo },
+  { id: 'maria-2', name: 'Мария', specialty: 'Маникюр', avatar: storyAvatarOne },
+  { id: 'elena-1', name: 'Елена', specialty: 'Косметология', avatar: storyAvatarTwo },
+  { id: 'elena-2', name: 'Елена', specialty: 'Косметология', avatar: storyAvatarOne },
+  { id: 'elena-3', name: 'Елена', specialty: 'Косметология', avatar: storyAvatarTwo },
+] satisfies StoryItem[]
 
 export const categoryItems = [
   { id: 'beauty-nails', icon: categoryBeautyNails, label: 'Красота и ногти' },

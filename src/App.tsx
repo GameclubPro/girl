@@ -414,15 +414,10 @@ function App() {
   if (view === 'client') {
     return (
       <ClientScreen
+        clientName={clientName}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onViewShowcase={() => setView('client-showcase')}
-        onCreateRequest={(categoryId) => {
-          setRequestCategoryId(
-            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
-          )
-          setView('request')
-        }}
         onViewRequests={() => setView('requests')}
       />
     )
