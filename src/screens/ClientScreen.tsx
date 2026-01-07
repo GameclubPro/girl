@@ -45,7 +45,10 @@ export const ClientScreen = ({
     return [...primary, ...fallback].slice(0, 4)
   }, [activeCategoryId])
   const handleClose = () => {
-    window.Telegram?.WebApp?.close?.()
+    const telegram = window.Telegram?.WebApp as
+      | (typeof window.Telegram.WebApp & { close?: () => void })
+      | undefined
+    telegram?.close?.()
   }
 
   return (
