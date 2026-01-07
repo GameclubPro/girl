@@ -29,9 +29,9 @@ const categoryChips = [
 
 const collageShapes = [
   'is-large',
+  'is-wide',
+  'is-wide',
   'is-small',
-  'is-tall',
-  'is-tall',
   'is-small',
   'is-wide',
 ] as const
@@ -50,14 +50,7 @@ type ShowcaseMedia = {
 const SHOWCASE_SLOTS = 6
 const INITIAL_BLOCKS = 3
 const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
-const slotShapes: ShowcaseShape[] = [
-  'is-large',
-  'is-tall',
-  'is-small',
-  'is-tall',
-  'is-small',
-  'is-wide',
-]
+const slotShapes: ShowcaseShape[] = [...collageShapes]
 
 const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
   id: `fallback-${item.id}`,

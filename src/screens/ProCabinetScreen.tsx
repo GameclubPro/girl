@@ -43,9 +43,9 @@ const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'imag
 
 const collageClasses = [
   'is-large',
+  'is-wide',
+  'is-wide',
   'is-small',
-  'is-tall',
-  'is-tall',
   'is-small',
   'is-wide',
 ]

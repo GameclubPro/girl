@@ -4860,15 +4860,15 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
   grid-template-areas:
-    'a a b'
-    'c d b'
-    'e f f';
+    'a a b b'
+    'a a c c'
+    'd e f f';
   gap: 2px;
   align-self: center;
-  height: clamp(96px, 26vw, 130px);
+  height: clamp(92px, 25vw, 120px);
 }
 
 .client-showcase-photo {
@@ -5019,9 +5019,9 @@ h2 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
   grid-template-areas:
-    'a a b c'
-    'a a b d'
-    'e f f d';
+    'a a b b'
+    'a a c c'
+    'd e f f';
   gap: 6px;
   height: clamp(240px, 75vw, 360px);
 }
@@ -5606,7 +5606,7 @@ h2 {
 
   .client-showcase-gallery {
     width: 100%;
-    height: clamp(96px, 28vw, 135px);
+    height: clamp(90px, 26vw, 120px);
   }
 
   .screen--request {
