@@ -14,14 +14,6 @@ const categoryLabelOverrides: Record<string, string> = {
   'fitness-health': 'Фитнес',
 }
 
-const categoryChips = [
-  { id: null, label: 'Все' },
-  ...categoryItems.map((item) => ({
-    id: item.id,
-    label: categoryLabelOverrides[item.id] ?? item.label,
-  })),
-]
-
 export const ClientScreen = ({
   activeCategoryId,
   onCategoryChange,
@@ -74,27 +66,6 @@ export const ClientScreen = ({
             </span>
           </button>
         )}
-
-        <section className="client-section">
-          <div className="client-category-bar" role="tablist" aria-label="Категории">
-            {categoryChips.map((chip) => {
-              const isActive =
-                chip.id === activeCategoryId || (!activeCategoryId && chip.id === null)
-              return (
-                <button
-                  className={`client-category-chip${isActive ? ' is-active' : ''}`}
-                  key={chip.id ?? 'all'}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => onCategoryChange(chip.id)}
-                >
-                  {chip.label}
-                </button>
-              )
-            })}
-          </div>
-        </section>
 
         <section className="client-section">
           <div className="client-showcase-card">
