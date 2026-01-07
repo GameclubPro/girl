@@ -22,6 +22,7 @@ type ProProfileScreenProps = {
   onBack: () => void
   onViewRequests: () => void
   focusSection?: ProProfileSection | null
+  onBackHandlerChange?: ((handler: (() => boolean) | null) => void) | undefined
 }
 
 const parseNumber = (value: string) => {
@@ -86,6 +87,7 @@ export const ProProfileScreen = ({
   onBack,
   onViewRequests,
   focusSection,
+  onBackHandlerChange,
 }: ProProfileScreenProps) => {
   const [cities, setCities] = useState<City[]>([])
   const [districts, setDistricts] = useState<District[]>([])
@@ -130,6 +132,7 @@ export const ProProfileScreen = ({
         : focusSection
       : null
   )
+  const editingSectionRef = useRef<InlineSection | null>(null)
   const autosaveSuccessTimerRef = useRef<number | null>(null)
   const lastSavedRef = useRef('')
   const hasLoadedRef = useRef(false)
@@ -294,6 +297,9 @@ export const ProProfileScreen = ({
   const openEditor = (section: ProProfileSection) => {
     setEditingSection(normalizeSection(section))
   }
+  const closeEditor = () => {
+    setEditingSection(null)
+  }
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
       window.clearTimeout(autosaveSuccessTimerRef.current)
@@ -320,6 +326,25 @@ export const ProProfileScreen = ({
       setSaveError('')
     }
   }, [hasInvalidPriceRange, saveError])
+
+  useEffect(() => {
+    editingSectionRef.current = editingSection
+  }, [editingSection])
+
+  useEffect(() => {
+    if (!onBackHandlerChange) return
+    const handler = () => {
+      if (editingSectionRef.current) {
+        setEditingSection(null)
+        return true
+      }
+      return false
+    }
+    onBackHandlerChange(handler)
+    return () => {
+      onBackHandlerChange(null)
+    }
+  }, [onBackHandlerChange])
 
   useEffect(() => {
     if (!focusSection) return
@@ -523,10 +548,10 @@ export const ProProfileScreen = ({
   }, [apiBase, displayNameFallback, userId])
 
   const saveProfile = async (payload: ProfilePayload) => {
-    if (!payload.userId) return
+    if (!payload.userId) return false
     if (isSavingRef.current) {
       queuedPayloadRef.current = payload
-      return
+      return false
     }
     if (
       payload.priceFrom !== null &&
@@ -535,11 +560,11 @@ export const ProProfileScreen = ({
     ) {
       setSaveError(PRICE_RANGE_ERROR)
       persistSaveMessage('')
-      return
+      return false
     }
 
     const payloadKey = JSON.stringify(payload)
-    if (payloadKey === lastSavedRef.current) return
+    if (payloadKey === lastSavedRef.current) return true
 
     setSaveError('')
     persistSaveMessage('')
@@ -562,8 +587,10 @@ export const ProProfileScreen = ({
         summary.missingFields.length > 0 ? 'Черновик сохранен' : 'Сохранено'
       )
       lastSavedRef.current = payloadKey
+      return true
     } catch (error) {
       setSaveError('Не удалось сохранить профиль. Попробуйте еще раз.')
+      return false
     } finally {
       setIsSaving(false)
       isSavingRef.current = false
@@ -575,9 +602,12 @@ export const ProProfileScreen = ({
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!profilePayload) return
-    void saveProfile(profilePayload)
+    const saved = await saveProfile(profilePayload)
+    if (saved) {
+      closeEditor()
+    }
   }
 
   const handleServiceCategoryChange = (categoryId: CategoryId) => {

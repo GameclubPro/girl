@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AddressScreen } from './screens/AddressScreen'
 import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
 import { ClientScreen } from './screens/ClientScreen'
@@ -48,6 +48,7 @@ function App() {
   const [requestCategoryId, setRequestCategoryId] = useState<string>(
     categoryItems[0]?.id ?? ''
   )
+  const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
       .filter(Boolean)
@@ -363,6 +364,9 @@ function App() {
           setView('client')
           break
         case 'pro-profile':
+          if (proProfileBackHandlerRef.current?.()) {
+            return
+          }
           setProProfileSection(null)
           setView('pro-cabinet')
           break
@@ -388,6 +392,13 @@ function App() {
       backButton.offClick(handleBack)
     }
   }, [view])
+
+  const registerProProfileBackHandler = useCallback(
+    (handler: (() => boolean) | null) => {
+      proProfileBackHandlerRef.current = handler
+    },
+    []
+  )
 
   if (view === 'client') {
     return (
@@ -443,6 +454,7 @@ function App() {
         }}
         onViewRequests={() => setView('pro-requests')}
         focusSection={proProfileSection}
+        onBackHandlerChange={registerProProfileBackHandler}
       />
     )
   }
