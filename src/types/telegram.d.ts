@@ -6,6 +6,7 @@ declare global {
       WebApp: {
         ready: () => void
         expand: () => void
+        close?: () => void
         requestFullscreen?: () => void
         setHeaderColor?: (color: string) => void
         setBackgroundColor?: (color: string) => void
