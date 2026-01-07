@@ -5348,6 +5348,18 @@ h2 {
     grid-auto-rows: clamp(80px, 28vw, 120px);
   }
 
+  .pro-cabinet-showcase-panel {
+    margin-left: -10px;
+    margin-right: -10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 18px;
+  }
+
+  .pro-cabinet-showcase-empty {
+    padding: 0 10px;
+  }
+
   .pro-portfolio-focus-card {
     padding: 12px;
   }
