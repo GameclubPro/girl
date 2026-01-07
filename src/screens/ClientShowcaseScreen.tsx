@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems, popularItems } from '../data/clientData'
 import type { MasterProfile } from '../types/app'
@@ -27,23 +27,44 @@ const categoryChips = [
   })),
 ]
 
+const collageShapes = [
+  'is-large',
+  'is-small',
+  'is-tall',
+  'is-tall',
+  'is-small',
+  'is-wide',
+] as const
+
+type ShowcaseShape = (typeof collageShapes)[number]
+
 type ShowcaseMedia = {
   id: string
   url: string
   focusX: number
   focusY: number
   categories: string[]
+  shape: ShowcaseShape
 }
 
 const SHOWCASE_SLOTS = 6
 const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
+const slotShapes: ShowcaseShape[] = [
+  'is-large',
+  'is-tall',
+  'is-small',
+  'is-tall',
+  'is-small',
+  'is-wide',
+]
 
-const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item) => ({
+const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
   id: `fallback-${item.id}`,
   url: item.image,
   focusX: 0.5,
   focusY: 0.5,
   categories: item.categoryId ? [item.categoryId] : [],
+  shape: collageShapes[index % collageShapes.length],
 }))
 
 const shuffleItems = <T,>(items: T[]) => {
@@ -62,11 +83,14 @@ export const ClientShowcaseScreen = ({
   onBack,
   onViewRequests,
 }: ClientShowcaseScreenProps) => {
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const isAppendingRef = useRef(false)
   const activeCategoryLabel =
     categoryChips.find((chip) => chip.id === activeCategoryId)?.label ??
     categoryItems.find((item) => item.id === activeCategoryId)?.label ??
     ''
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
+  const [showcaseBlocks, setShowcaseBlocks] = useState<ShowcaseMedia[][]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -90,6 +114,7 @@ export const ClientShowcaseScreen = ({
               focusX: item.focusX ?? 0.5,
               focusY: item.focusY ?? 0.5,
               categories,
+              shape: collageShapes[index % collageShapes.length],
             }))
         })
         setShowcasePool(nextPool)
@@ -107,22 +132,79 @@ export const ClientShowcaseScreen = ({
     }
   }, [apiBase])
 
-  const showcaseItems = useMemo(() => {
+  const basePool = useMemo(() => {
     const pool = activeCategoryId
       ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
       : showcasePool
-    const basePool =
-      pool.length > 0
-        ? pool
-        : showcasePool.length > 0
-          ? showcasePool
-          : fallbackShowcasePool
-    if (basePool.length === 0) return []
-    const shuffled = shuffleItems(basePool)
-    return Array.from({ length: SHOWCASE_SLOTS }, (_, index) =>
-      shuffled[index % shuffled.length]
-    )
+    return pool.length > 0
+      ? pool
+      : showcasePool.length > 0
+        ? showcasePool
+        : fallbackShowcasePool
   }, [activeCategoryId, showcasePool])
+
+  const poolByShape = useMemo(() => {
+    const map = {
+      'is-large': [] as ShowcaseMedia[],
+      'is-small': [] as ShowcaseMedia[],
+      'is-tall': [] as ShowcaseMedia[],
+      'is-wide': [] as ShowcaseMedia[],
+    }
+    basePool.forEach((item) => {
+      map[item.shape].push(item)
+    })
+    return map
+  }, [basePool])
+
+  const buildShowcaseBlock = useMemo(() => {
+    return () => {
+      if (basePool.length === 0) return []
+      const used = new Set<string>()
+      const pickRandom = (items: ShowcaseMedia[]) => {
+        const available = items.filter((item) => !used.has(item.id))
+        if (available.length === 0) return null
+        const choice = available[Math.floor(Math.random() * available.length)]
+        used.add(choice.id)
+        return choice
+      }
+      const shuffledPool = shuffleItems(basePool)
+      return slotShapes.map((shape, index) => {
+        const preferred = pickRandom(poolByShape[shape])
+        if (preferred) return preferred
+        const fallback = pickRandom(shuffledPool)
+        return fallback ?? shuffledPool[index % shuffledPool.length]
+      })
+    }
+  }, [basePool, poolByShape])
+
+  useEffect(() => {
+    if (basePool.length === 0) {
+      setShowcaseBlocks([])
+      return
+    }
+    setShowcaseBlocks([buildShowcaseBlock()])
+  }, [basePool, buildShowcaseBlock])
+
+  useEffect(() => {
+    const node = loadMoreRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry?.isIntersecting) return
+        if (basePool.length === 0) return
+        if (isAppendingRef.current) return
+        isAppendingRef.current = true
+        setShowcaseBlocks((current) => [...current, buildShowcaseBlock()])
+        window.setTimeout(() => {
+          isAppendingRef.current = false
+        }, 350)
+      },
+      { rootMargin: '220px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [basePool.length, buildShowcaseBlock])
 
   return (
     <div className="screen screen--client screen--client-showcase">
@@ -169,23 +251,28 @@ export const ClientShowcaseScreen = ({
         </section>
 
         <section className="client-section">
-          <div className="client-work-grid" aria-label="Витрина работ">
-            {showcaseItems.map((item, index) => (
-              <article
-                className="client-work-card"
-                key={`${item.id}-${index}`}
-                style={{ gridArea: showcaseAreas[index % showcaseAreas.length] }}
-              >
-                <img
-                  src={item.url}
-                  alt=""
-                  loading="lazy"
-                  style={{
-                    objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
-                  }}
-                />
-              </article>
+          <div className="client-work-feed" aria-label="Витрина работ">
+            {showcaseBlocks.map((block, blockIndex) => (
+              <div className="client-work-grid" key={`block-${blockIndex}`}>
+                {block.map((item, index) => (
+                  <article
+                    className="client-work-card"
+                    key={`${item.id}-${blockIndex}-${index}`}
+                    style={{ gridArea: showcaseAreas[index % SHOWCASE_SLOTS] }}
+                  >
+                    <img
+                      src={item.url}
+                      alt=""
+                      loading="lazy"
+                      style={{
+                        objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
+                      }}
+                    />
+                  </article>
+                ))}
+              </div>
             ))}
+            <div className="client-work-sentinel" ref={loadMoreRef} aria-hidden="true" />
           </div>
         </section>
       </div>

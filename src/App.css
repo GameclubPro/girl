@@ -5008,16 +5008,22 @@ h2 {
   color: #7a6f8a;
 }
 
+.client-work-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .client-work-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
   grid-template-areas:
-    'a a b'
-    'c d b'
-    'e f f';
+    'a a b c'
+    'a a b d'
+    'e f f d';
   gap: 6px;
-  height: clamp(300px, 88vw, 420px);
+  height: clamp(240px, 75vw, 360px);
 }
 
 .client-work-card {
@@ -5027,6 +5033,11 @@ h2 {
   border: none;
   box-shadow: 0 14px 20px rgba(90, 66, 110, 0.2);
   background: rgba(255, 255, 255, 0.6);
+}
+
+.client-work-sentinel {
+  width: 100%;
+  height: 1px;
 }
 
 .client-work-card img {
