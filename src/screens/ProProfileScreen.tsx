@@ -65,7 +65,7 @@ const scheduleDayOptions = [
   { id: 'sun', label: 'Вс' },
 ]
 
-type InlineSection = Exclude<ProProfileSection, 'availability'>
+type InlineSection = Exclude<ProProfileSection, 'availability' | 'portfolio'>
 type CategoryId = (typeof categoryItems)[number]['id']
 const isCategoryId = (value: string): value is CategoryId =>
   categoryItems.some((item) => item.id === value)
@@ -119,9 +119,6 @@ export const ProProfileScreen = ({
     categoryItems[0]?.id ?? 'beauty-nails'
   )
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
-  const [portfolioInput, setPortfolioInput] = useState('')
-  const [portfolioTitleInput, setPortfolioTitleInput] = useState('')
-  const [showAllPortfolio, setShowAllPortfolio] = useState(false)
   const [worksAtClient, setWorksAtClient] = useState(true)
   const [worksAtMaster, setWorksAtMaster] = useState(false)
   const [isActive, setIsActive] = useState(true)
@@ -133,7 +130,6 @@ export const ProProfileScreen = ({
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
-  const [portfolioError, setPortfolioError] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
@@ -141,20 +137,8 @@ export const ProProfileScreen = ({
   const [mediaError, setMediaError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
-  const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
-  const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
-  const portfolioDragIndexRef = useRef<number | null>(null)
-  const portfolioReplaceIndexRef = useRef<number | null>(null)
-  const portfolioFocusPointerRef = useRef(false)
-  const portfolioFocusIndexRef = useRef<number | null>(null)
-  const [portfolioDragOverIndex, setPortfolioDragOverIndex] = useState<
-    number | null
-  >(null)
-  const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
-    null
-  )
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
-    focusSection
+    focusSection && focusSection !== 'portfolio'
       ? focusSection === 'availability'
         ? 'location'
         : focusSection
@@ -296,15 +280,6 @@ export const ProProfileScreen = ({
     () => portfolioItems.filter((item) => item.url.trim()).slice(0, 3),
     [portfolioItems]
   )
-  const visiblePortfolio = showAllPortfolio
-    ? portfolioItems
-    : portfolioItems.slice(0, MAX_PORTFOLIO_ITEMS)
-  const hasMorePortfolio = portfolioItems.length > MAX_PORTFOLIO_ITEMS
-  const canAddPortfolio = portfolioItems.length < MAX_PORTFOLIO_ITEMS
-  const focusPortfolioItem =
-    portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
-  const focusPortfolioPosition = resolvePortfolioFocus(focusPortfolioItem)
-  const focusPortfolioIndex = portfolioFocusIndex ?? 0
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -325,10 +300,12 @@ export const ProProfileScreen = ({
     () => requestServiceCatalog[serviceCategoryId] ?? [],
     [serviceCategoryId]
   )
-  const normalizeSection = (section: ProProfileSection): InlineSection =>
-    section === 'availability' ? 'location' : section
   const openEditor = (section: ProProfileSection) => {
-    setEditingSection(normalizeSection(section))
+    if (section === 'portfolio') {
+      onBack()
+      return
+    }
+    setEditingSection(section === 'availability' ? 'location' : section)
   }
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
@@ -362,17 +339,8 @@ export const ProProfileScreen = ({
   }, [editingSection])
 
   useEffect(() => {
-    portfolioFocusIndexRef.current = portfolioFocusIndex
-  }, [portfolioFocusIndex])
-
-  useEffect(() => {
     if (!onBackHandlerChange) return
     const handler = () => {
-      if (portfolioFocusIndexRef.current !== null) {
-        setPortfolioFocusIndex(null)
-        portfolioFocusPointerRef.current = false
-        return true
-      }
       if (editingSectionRef.current) {
         setEditingSection(null)
         return true
@@ -387,8 +355,12 @@ export const ProProfileScreen = ({
 
   useEffect(() => {
     if (!focusSection) return
+    if (focusSection === 'portfolio') {
+      onBack()
+      return
+    }
     setEditingSection(focusSection === 'availability' ? 'location' : focusSection)
-  }, [focusSection])
+  }, [focusSection, onBack])
 
   useEffect(() => {
     if (!editingSection) return
@@ -398,18 +370,6 @@ export const ProProfileScreen = ({
       document.body.style.overflow = previousOverflow
     }
   }, [editingSection])
-
-  useEffect(() => {
-    if (editingSection !== 'portfolio') {
-      if (portfolioError) {
-        setPortfolioError('')
-      }
-      if (portfolioFocusIndex !== null) {
-        setPortfolioFocusIndex(null)
-        portfolioFocusPointerRef.current = false
-      }
-    }
-  }, [editingSection, portfolioError, portfolioFocusIndex])
 
   useEffect(() => {
     hasLoadedRef.current = false
@@ -556,7 +516,6 @@ export const ProProfileScreen = ({
         setServiceCategoryId(nextServiceCategoryId)
         setServiceItems(nextServiceItems)
         setPortfolioItems(nextPortfolioItems)
-        setShowAllPortfolio(false)
         setAvatarUrl(data.avatarUrl ?? '')
         setCoverUrl(data.coverUrl ?? '')
 
@@ -731,242 +690,6 @@ export const ProProfileScreen = ({
       }
       return next
     })
-  }
-
-  const addPortfolio = () => {
-    const trimmed = portfolioInput.trim()
-    if (!trimmed) return
-    if (!canAddPortfolio) {
-      setPortfolioError(`Можно добавить максимум ${MAX_PORTFOLIO_ITEMS} работ.`)
-      return
-    }
-    const title = portfolioTitleInput.trim()
-    setPortfolioItems((current) =>
-      current.some((item) => item.url === trimmed)
-        ? current
-        : [
-            { url: trimmed, title: title || null, focusX: 0.5, focusY: 0.5 },
-            ...current,
-          ]
-    )
-    setPortfolioInput('')
-    setPortfolioTitleInput('')
-    setPortfolioError('')
-  }
-
-  const updatePortfolioItem = (
-    index: number,
-    updates: Partial<PortfolioItem>
-  ) => {
-    setPortfolioItems((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, ...updates } : item
-      )
-    )
-  }
-
-  const removePortfolio = (index: number) => {
-    setPortfolioItems((current) =>
-      current.filter((_, itemIndex) => itemIndex !== index)
-    )
-    setPortfolioError('')
-  }
-
-  const validatePortfolioFile = (file: File) => {
-    if (!allowedImageTypes.has(file.type)) {
-      return 'Поддерживаются только PNG, JPG или WebP.'
-    }
-    if (file.size > MAX_MEDIA_BYTES) {
-      return 'Файл слишком большой. Максимум 3 МБ.'
-    }
-    return ''
-  }
-
-  const readImageFileAsync = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const result = typeof reader.result === 'string' ? reader.result : ''
-        if (!result) {
-          reject(new Error('read_failed'))
-          return
-        }
-        resolve(result)
-      }
-      reader.onerror = () => reject(new Error('read_failed'))
-      reader.readAsDataURL(file)
-    })
-
-  const handlePortfolioUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    if (!canAddPortfolio) {
-      setPortfolioError(`Можно добавить максимум ${MAX_PORTFOLIO_ITEMS} работ.`)
-      return
-    }
-    const remaining = MAX_PORTFOLIO_ITEMS - portfolioItems.length
-    const selection = Array.from(files).slice(0, remaining)
-    for (const file of selection) {
-      const errorMessage = validatePortfolioFile(file)
-      if (errorMessage) {
-        setPortfolioError(errorMessage)
-        return
-      }
-    }
-    try {
-      const dataUrls = await Promise.all(
-        selection.map((file) => readImageFileAsync(file))
-      )
-      setPortfolioItems((current) => {
-        const next = [
-          ...dataUrls.map((url) => ({ url, title: null, focusX: 0.5, focusY: 0.5 })),
-          ...current,
-        ]
-        return next.slice(0, MAX_PORTFOLIO_ITEMS)
-      })
-      setPortfolioError('')
-    } catch (error) {
-      setPortfolioError('Не удалось прочитать файл.')
-    }
-  }
-
-  const handlePortfolioReplace = async (file: File, index: number) => {
-    const errorMessage = validatePortfolioFile(file)
-    if (errorMessage) {
-      setPortfolioError(errorMessage)
-      return
-    }
-    try {
-      const dataUrl = await readImageFileAsync(file)
-      setPortfolioItems((current) =>
-        current.map((item, itemIndex) =>
-          itemIndex === index
-            ? { ...item, url: dataUrl, focusX: 0.5, focusY: 0.5 }
-            : item
-        )
-      )
-      setPortfolioError('')
-    } catch (error) {
-      setPortfolioError('Не удалось прочитать файл.')
-    }
-  }
-
-  const handlePortfolioUploadClick = () => {
-    if (!canAddPortfolio) {
-      setPortfolioError(`Можно добавить максимум ${MAX_PORTFOLIO_ITEMS} работ.`)
-      return
-    }
-    portfolioUploadInputRef.current?.click()
-  }
-
-  const handlePortfolioUploadChange = (event: ChangeEvent<HTMLInputElement>) => {
-    void handlePortfolioUpload(event.target.files)
-    event.target.value = ''
-  }
-
-  const handlePortfolioReplaceClick = (index: number) => {
-    portfolioReplaceIndexRef.current = index
-    portfolioReplaceInputRef.current?.click()
-  }
-
-  const handlePortfolioReplaceChange = (
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0]
-    const index = portfolioReplaceIndexRef.current
-    if (!file || index === null || index === undefined) {
-      event.target.value = ''
-      return
-    }
-    void handlePortfolioReplace(file, index)
-    event.target.value = ''
-  }
-
-  const handlePortfolioDragStart = (
-    event: DragEvent<HTMLDivElement>,
-    index: number
-  ) => {
-    portfolioDragIndexRef.current = index
-    event.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handlePortfolioDragOver = (
-    event: DragEvent<HTMLDivElement>,
-    index: number
-  ) => {
-    event.preventDefault()
-    setPortfolioDragOverIndex(index)
-  }
-
-  const handlePortfolioDragLeave = () => {
-    setPortfolioDragOverIndex(null)
-  }
-
-  const handlePortfolioDrop = (index: number) => {
-    const fromIndex = portfolioDragIndexRef.current
-    if (fromIndex === null || fromIndex === index) {
-      setPortfolioDragOverIndex(null)
-      return
-    }
-    setPortfolioItems((current) => {
-      if (fromIndex < 0 || fromIndex >= current.length) return current
-      const next = [...current]
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(index, 0, moved)
-      return next
-    })
-    portfolioDragIndexRef.current = null
-    setPortfolioDragOverIndex(null)
-  }
-
-  const handlePortfolioDragEnd = () => {
-    portfolioDragIndexRef.current = null
-    setPortfolioDragOverIndex(null)
-  }
-
-  const openPortfolioFocusEditor = (index: number) => {
-    const item = portfolioItems[index]
-    if (!item || !isImageUrl(item.url)) return
-    setPortfolioFocusIndex(index)
-  }
-
-  const closePortfolioFocusEditor = () => {
-    setPortfolioFocusIndex(null)
-    portfolioFocusPointerRef.current = false
-  }
-
-  const updatePortfolioFocusFromEvent = (
-    event: PointerEvent<HTMLDivElement>,
-    index: number
-  ) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = clampUnit((event.clientX - rect.left) / rect.width)
-    const y = clampUnit((event.clientY - rect.top) / rect.height)
-    updatePortfolioItem(index, { focusX: x, focusY: y })
-  }
-
-  const handlePortfolioFocusPointerDown = (
-    event: PointerEvent<HTMLDivElement>,
-    index: number
-  ) => {
-    portfolioFocusPointerRef.current = true
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    updatePortfolioFocusFromEvent(event, index)
-  }
-
-  const handlePortfolioFocusPointerMove = (
-    event: PointerEvent<HTMLDivElement>,
-    index: number
-  ) => {
-    if (!portfolioFocusPointerRef.current) return
-    updatePortfolioFocusFromEvent(event, index)
-  }
-
-  const handlePortfolioFocusPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    portfolioFocusPointerRef.current = false
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
   }
 
   const toggleScheduleDay = (dayId: string) => {
@@ -1341,7 +1064,7 @@ export const ProProfileScreen = ({
           <button
             className="pro-profile-card"
             type="button"
-            onClick={() => openEditor('portfolio')}
+            onClick={onBack}
           >
             <span className="pro-profile-card-icon" aria-hidden="true">
               🖼️
@@ -1385,7 +1108,7 @@ export const ProProfileScreen = ({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation()
-                    openEditor('portfolio')
+                    onBack()
                   }}
                 >
                   Добавить
@@ -1749,184 +1472,6 @@ export const ProProfileScreen = ({
                 </>
               )}
 
-              {editingSection === 'portfolio' && (
-                <>
-                  <div className="pro-field">
-                    <span className="pro-label">Витрина работ</span>
-                    <div className="pro-portfolio-actions">
-                      <input
-                        ref={portfolioUploadInputRef}
-                        className="pro-file-input"
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handlePortfolioUploadChange}
-                        aria-hidden="true"
-                        tabIndex={-1}
-                      />
-                      <input
-                        ref={portfolioReplaceInputRef}
-                        className="pro-file-input"
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePortfolioReplaceChange}
-                        aria-hidden="true"
-                        tabIndex={-1}
-                      />
-                      <button
-                        className="pro-add pro-portfolio-upload"
-                        type="button"
-                        onClick={handlePortfolioUploadClick}
-                      >
-                        + Добавить из галереи
-                      </button>
-                      <span className="pro-portfolio-limit">
-                        до {MAX_PORTFOLIO_ITEMS} работ
-                      </span>
-                    </div>
-                    <div className="pro-portfolio-add">
-                      <input
-                        className="pro-input"
-                        type="url"
-                        value={portfolioInput}
-                        onChange={(event) => setPortfolioInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            addPortfolio()
-                          }
-                        }}
-                        placeholder="Ссылка на работу (если нужно)"
-                      />
-                      <input
-                        className="pro-input"
-                        type="text"
-                        value={portfolioTitleInput}
-                        onChange={(event) =>
-                          setPortfolioTitleInput(event.target.value)
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            addPortfolio()
-                          }
-                        }}
-                        placeholder="Подпись (опционально)"
-                      />
-                      <button className="pro-ghost" type="button" onClick={addPortfolio}>
-                        Добавить ссылку
-                      </button>
-                    </div>
-                    {portfolioError && (
-                      <p className="pro-error">{portfolioError}</p>
-                    )}
-                  </div>
-                  <div className="pro-portfolio-grid">
-                    {visiblePortfolio.length > 0 ? (
-                      visiblePortfolio.map((item, index) => {
-                        const showImage = isImageUrl(item.url)
-                        const focus = resolvePortfolioFocus(item)
-                        const isDragOver = portfolioDragOverIndex === index
-                        return (
-                          <div
-                            className={`pro-portfolio-card${
-                              isDragOver ? ' is-drag-over' : ''
-                            }`}
-                            key={`${item.url}-${index}`}
-                            draggable
-                            onDragStart={(event) =>
-                              handlePortfolioDragStart(event, index)
-                            }
-                            onDragOver={(event) =>
-                              handlePortfolioDragOver(event, index)
-                            }
-                            onDragLeave={handlePortfolioDragLeave}
-                            onDrop={() => handlePortfolioDrop(index)}
-                            onDragEnd={handlePortfolioDragEnd}
-                          >
-                            <div
-                              className={`pro-portfolio-thumb${
-                                showImage ? ' has-image' : ''
-                              }`}
-                              style={
-                                showImage
-                                  ? {
-                                      backgroundImage: `url(${item.url})`,
-                                      backgroundPosition: focus.position,
-                                    }
-                                  : undefined
-                              }
-                            >
-                              {!showImage && (
-                                <span className="pro-portfolio-thumb-label">LINK</span>
-                              )}
-                            </div>
-                            <div className="pro-portfolio-body">
-                              <input
-                                className="pro-portfolio-title"
-                                type="text"
-                                value={item.title ?? ''}
-                                onChange={(event) =>
-                                  updatePortfolioItem(index, {
-                                    title: event.target.value,
-                                  })
-                                }
-                                placeholder="Подпись (опционально)"
-                              />
-                              <a
-                                className="pro-portfolio-link"
-                                href={item.url}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Открыть работу
-                              </a>
-                              <div className="pro-portfolio-actions-row">
-                                <button
-                                  className="pro-portfolio-action"
-                                  type="button"
-                                  onClick={() => handlePortfolioReplaceClick(index)}
-                                >
-                                  Заменить
-                                </button>
-                                {showImage && (
-                                  <button
-                                    className="pro-portfolio-action"
-                                    type="button"
-                                    onClick={() => openPortfolioFocusEditor(index)}
-                                  >
-                                    Кадрировать
-                                  </button>
-                                )}
-                                <span className="pro-portfolio-drag">Перетащить</span>
-                              </div>
-                            </div>
-                            <button
-                              className="pro-portfolio-remove"
-                              type="button"
-                              onClick={() => removePortfolio(index)}
-                              aria-label="Удалить работу"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div className="pro-portfolio-empty">Пока нет работ.</div>
-                    )}
-                  </div>
-                  {hasMorePortfolio && (
-                    <button
-                      className="pro-ghost pro-portfolio-toggle"
-                      type="button"
-                      onClick={() => setShowAllPortfolio((current) => !current)}
-                    >
-                      {showAllPortfolio ? 'Свернуть' : 'Показать все'}
-                    </button>
-                  )}
-                </>
-              )}
             </section>
             {(saveError || saveSuccess) && (
               <div className="pro-profile-editor-messages">
@@ -1944,55 +1489,6 @@ export const ProProfileScreen = ({
                 {saveButtonLabel}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {editingSection === 'portfolio' && focusPortfolioItem && (
-        <div className="pro-portfolio-focus-overlay" role="dialog" aria-modal="true">
-          <div className="pro-portfolio-focus-card">
-            <div className="pro-portfolio-focus-header">
-              <div>
-                <p className="pro-portfolio-focus-kicker">Кадрирование</p>
-                <h3 className="pro-portfolio-focus-title">Выберите фокус</h3>
-              </div>
-              <button
-                className="pro-portfolio-focus-close"
-                type="button"
-                onClick={closePortfolioFocusEditor}
-              >
-                Готово
-              </button>
-            </div>
-            <div
-              className="pro-portfolio-focus-preview"
-              onPointerDown={(event) =>
-                handlePortfolioFocusPointerDown(event, focusPortfolioIndex)
-              }
-              onPointerMove={(event) =>
-                handlePortfolioFocusPointerMove(event, focusPortfolioIndex)
-              }
-              onPointerUp={handlePortfolioFocusPointerUp}
-              onPointerLeave={handlePortfolioFocusPointerUp}
-              role="presentation"
-            >
-              <img
-                src={focusPortfolioItem.url}
-                alt={focusPortfolioItem.title ?? 'Фокус'}
-                style={{ objectPosition: focusPortfolioPosition.position }}
-              />
-              <span
-                className="pro-portfolio-focus-point"
-                style={{
-                  left: `${focusPortfolioPosition.x * 100}%`,
-                  top: `${focusPortfolioPosition.y * 100}%`,
-                }}
-                aria-hidden="true"
-              />
-            </div>
-            <p className="pro-portfolio-focus-hint">
-              Перетащите точку, чтобы выбрать главный фокус кадра.
-            </p>
           </div>
         </div>
       )}
