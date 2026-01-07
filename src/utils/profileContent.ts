@@ -7,6 +7,8 @@ export type ServiceItem = {
 export type PortfolioItem = {
   url: string
   title?: string | null
+  focusX?: number | null
+  focusY?: number | null
 }
 
 const SERVICE_PREFIX = 'svc:'
@@ -30,6 +32,13 @@ const parseJson = (value: string) => {
   } catch (error) {
     return null
   }
+}
+
+const clampUnit = (value: unknown, fallback = 0.5) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback
+  if (value < 0) return 0
+  if (value > 1) return 1
+  return value
 }
 
 const parseServiceItem = (value: string): ServiceItem | null => {
@@ -56,12 +65,16 @@ const parsePortfolioItem = (value: string): PortfolioItem | null => {
     const url = normalizeText(payload?.url)
     if (!url) return null
     const title = normalizeText(payload?.title)
+    const focusX = clampUnit(payload?.focusX, 0.5)
+    const focusY = clampUnit(payload?.focusY, 0.5)
     return {
       url,
       title: title || null,
+      focusX,
+      focusY,
     }
   }
-  return { url: raw, title: null }
+  return { url: raw, title: null, focusX: 0.5, focusY: 0.5 }
 }
 
 export const parseServiceItems = (values: string[]) =>
@@ -88,9 +101,13 @@ export const stringifyPortfolioItem = (item: PortfolioItem) => {
   const url = normalizeText(item.url)
   if (!url) return ''
   const title = normalizeText(item.title)
+  const focusX = clampUnit(item.focusX, 0.5)
+  const focusY = clampUnit(item.focusY, 0.5)
   return `${PORTFOLIO_PREFIX}${JSON.stringify({
     url,
     title: title || null,
+    focusX,
+    focusY,
   })}`
 }
 

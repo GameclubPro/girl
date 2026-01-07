@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties, DragEvent } from 'react'
+import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
@@ -39,6 +39,20 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
     return `${value} ${few}`
   }
   return `${value} ${many}`
+}
+
+const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
+
+const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
+  const rawX = typeof item?.focusX === 'number' ? item.focusX : 0.5
+  const rawY = typeof item?.focusY === 'number' ? item.focusY : 0.5
+  const x = clampUnit(rawX)
+  const y = clampUnit(rawY)
+  return {
+    x,
+    y,
+    position: `${x * 100}% ${y * 100}%`,
+  }
 }
 
 const scheduleDayOptions = [
@@ -131,9 +145,14 @@ export const ProProfileScreen = ({
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
   const portfolioDragIndexRef = useRef<number | null>(null)
   const portfolioReplaceIndexRef = useRef<number | null>(null)
+  const portfolioFocusPointerRef = useRef(false)
+  const portfolioFocusIndexRef = useRef<number | null>(null)
   const [portfolioDragOverIndex, setPortfolioDragOverIndex] = useState<
     number | null
   >(null)
+  const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
+    null
+  )
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection
       ? focusSection === 'availability'
@@ -282,6 +301,10 @@ export const ProProfileScreen = ({
     : portfolioItems.slice(0, MAX_PORTFOLIO_ITEMS)
   const hasMorePortfolio = portfolioItems.length > MAX_PORTFOLIO_ITEMS
   const canAddPortfolio = portfolioItems.length < MAX_PORTFOLIO_ITEMS
+  const focusPortfolioItem =
+    portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
+  const focusPortfolioPosition = resolvePortfolioFocus(focusPortfolioItem)
+  const focusPortfolioIndex = portfolioFocusIndex ?? 0
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -306,9 +329,6 @@ export const ProProfileScreen = ({
     section === 'availability' ? 'location' : section
   const openEditor = (section: ProProfileSection) => {
     setEditingSection(normalizeSection(section))
-  }
-  const closeEditor = () => {
-    setEditingSection(null)
   }
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
@@ -342,8 +362,17 @@ export const ProProfileScreen = ({
   }, [editingSection])
 
   useEffect(() => {
+    portfolioFocusIndexRef.current = portfolioFocusIndex
+  }, [portfolioFocusIndex])
+
+  useEffect(() => {
     if (!onBackHandlerChange) return
     const handler = () => {
+      if (portfolioFocusIndexRef.current !== null) {
+        setPortfolioFocusIndex(null)
+        portfolioFocusPointerRef.current = false
+        return true
+      }
       if (editingSectionRef.current) {
         setEditingSection(null)
         return true
@@ -371,10 +400,16 @@ export const ProProfileScreen = ({
   }, [editingSection])
 
   useEffect(() => {
-    if (editingSection !== 'portfolio' && portfolioError) {
-      setPortfolioError('')
+    if (editingSection !== 'portfolio') {
+      if (portfolioError) {
+        setPortfolioError('')
+      }
+      if (portfolioFocusIndex !== null) {
+        setPortfolioFocusIndex(null)
+        portfolioFocusPointerRef.current = false
+      }
     }
-  }, [editingSection, portfolioError])
+  }, [editingSection, portfolioError, portfolioFocusIndex])
 
   useEffect(() => {
     hasLoadedRef.current = false
@@ -622,7 +657,7 @@ export const ProProfileScreen = ({
     if (!profilePayload) return
     const saved = await saveProfile(profilePayload)
     if (saved) {
-      closeEditor()
+      onBack()
     }
   }
 
@@ -709,7 +744,10 @@ export const ProProfileScreen = ({
     setPortfolioItems((current) =>
       current.some((item) => item.url === trimmed)
         ? current
-        : [{ url: trimmed, title: title || null }, ...current]
+        : [
+            { url: trimmed, title: title || null, focusX: 0.5, focusY: 0.5 },
+            ...current,
+          ]
     )
     setPortfolioInput('')
     setPortfolioTitleInput('')
@@ -780,7 +818,7 @@ export const ProProfileScreen = ({
       )
       setPortfolioItems((current) => {
         const next = [
-          ...dataUrls.map((url) => ({ url, title: null })),
+          ...dataUrls.map((url) => ({ url, title: null, focusX: 0.5, focusY: 0.5 })),
           ...current,
         ]
         return next.slice(0, MAX_PORTFOLIO_ITEMS)
@@ -801,7 +839,9 @@ export const ProProfileScreen = ({
       const dataUrl = await readImageFileAsync(file)
       setPortfolioItems((current) =>
         current.map((item, itemIndex) =>
-          itemIndex === index ? { ...item, url: dataUrl } : item
+          itemIndex === index
+            ? { ...item, url: dataUrl, focusX: 0.5, focusY: 0.5 }
+            : item
         )
       )
       setPortfolioError('')
@@ -881,6 +921,52 @@ export const ProProfileScreen = ({
   const handlePortfolioDragEnd = () => {
     portfolioDragIndexRef.current = null
     setPortfolioDragOverIndex(null)
+  }
+
+  const openPortfolioFocusEditor = (index: number) => {
+    const item = portfolioItems[index]
+    if (!item || !isImageUrl(item.url)) return
+    setPortfolioFocusIndex(index)
+  }
+
+  const closePortfolioFocusEditor = () => {
+    setPortfolioFocusIndex(null)
+    portfolioFocusPointerRef.current = false
+  }
+
+  const updatePortfolioFocusFromEvent = (
+    event: PointerEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = clampUnit((event.clientX - rect.left) / rect.width)
+    const y = clampUnit((event.clientY - rect.top) / rect.height)
+    updatePortfolioItem(index, { focusX: x, focusY: y })
+  }
+
+  const handlePortfolioFocusPointerDown = (
+    event: PointerEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    portfolioFocusPointerRef.current = true
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    updatePortfolioFocusFromEvent(event, index)
+  }
+
+  const handlePortfolioFocusPointerMove = (
+    event: PointerEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    if (!portfolioFocusPointerRef.current) return
+    updatePortfolioFocusFromEvent(event, index)
+  }
+
+  const handlePortfolioFocusPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    portfolioFocusPointerRef.current = false
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
   }
 
   const toggleScheduleDay = (dayId: string) => {
@@ -1273,6 +1359,7 @@ export const ProProfileScreen = ({
                 <span className="pro-profile-portfolio">
                   {portfolioPreview.map((item, index) => {
                     const showImage = isImageUrl(item.url)
+                    const focus = resolvePortfolioFocus(item)
                     return (
                       <span
                         key={`${item.url}-${index}`}
@@ -1281,7 +1368,10 @@ export const ProProfileScreen = ({
                         }`}
                         style={
                           showImage
-                            ? { backgroundImage: `url(${item.url})` }
+                            ? {
+                                backgroundImage: `url(${item.url})`,
+                                backgroundPosition: focus.position,
+                              }
                             : undefined
                         }
                         aria-hidden="true"
@@ -1735,6 +1825,7 @@ export const ProProfileScreen = ({
                     {visiblePortfolio.length > 0 ? (
                       visiblePortfolio.map((item, index) => {
                         const showImage = isImageUrl(item.url)
+                        const focus = resolvePortfolioFocus(item)
                         const isDragOver = portfolioDragOverIndex === index
                         return (
                           <div
@@ -1759,7 +1850,10 @@ export const ProProfileScreen = ({
                               }`}
                               style={
                                 showImage
-                                  ? { backgroundImage: `url(${item.url})` }
+                                  ? {
+                                      backgroundImage: `url(${item.url})`,
+                                      backgroundPosition: focus.position,
+                                    }
                                   : undefined
                               }
                             >
@@ -1795,6 +1889,15 @@ export const ProProfileScreen = ({
                                 >
                                   Заменить
                                 </button>
+                                {showImage && (
+                                  <button
+                                    className="pro-portfolio-action"
+                                    type="button"
+                                    onClick={() => openPortfolioFocusEditor(index)}
+                                  >
+                                    Кадрировать
+                                  </button>
+                                )}
                                 <span className="pro-portfolio-drag">Перетащить</span>
                               </div>
                             </div>
@@ -1841,6 +1944,55 @@ export const ProProfileScreen = ({
                 {saveButtonLabel}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editingSection === 'portfolio' && focusPortfolioItem && (
+        <div className="pro-portfolio-focus-overlay" role="dialog" aria-modal="true">
+          <div className="pro-portfolio-focus-card">
+            <div className="pro-portfolio-focus-header">
+              <div>
+                <p className="pro-portfolio-focus-kicker">Кадрирование</p>
+                <h3 className="pro-portfolio-focus-title">Выберите фокус</h3>
+              </div>
+              <button
+                className="pro-portfolio-focus-close"
+                type="button"
+                onClick={closePortfolioFocusEditor}
+              >
+                Готово
+              </button>
+            </div>
+            <div
+              className="pro-portfolio-focus-preview"
+              onPointerDown={(event) =>
+                handlePortfolioFocusPointerDown(event, focusPortfolioIndex)
+              }
+              onPointerMove={(event) =>
+                handlePortfolioFocusPointerMove(event, focusPortfolioIndex)
+              }
+              onPointerUp={handlePortfolioFocusPointerUp}
+              onPointerLeave={handlePortfolioFocusPointerUp}
+              role="presentation"
+            >
+              <img
+                src={focusPortfolioItem.url}
+                alt={focusPortfolioItem.title ?? 'Фокус'}
+                style={{ objectPosition: focusPortfolioPosition.position }}
+              />
+              <span
+                className="pro-portfolio-focus-point"
+                style={{
+                  left: `${focusPortfolioPosition.x * 100}%`,
+                  top: `${focusPortfolioPosition.y * 100}%`,
+                }}
+                aria-hidden="true"
+              />
+            </div>
+            <p className="pro-portfolio-focus-hint">
+              Перетащите точку, чтобы выбрать главный фокус кадра.
+            </p>
           </div>
         </div>
       )}

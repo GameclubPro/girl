@@ -23,6 +23,15 @@ const mosaicClasses = [
   'is-medium',
 ]
 
+const resolveFocusPosition = (
+  item?: { focusX?: number | null; focusY?: number | null } | null
+) => {
+  const rawX = typeof item?.focusX === 'number' ? item.focusX : 0.5
+  const rawY = typeof item?.focusY === 'number' ? item.focusY : 0.5
+  const clamp = (value: number) => Math.min(1, Math.max(0, value))
+  return `${clamp(rawX) * 100}% ${clamp(rawY) * 100}%`
+}
+
 export const ProCabinetScreen = ({
   apiBase,
   userId,
@@ -169,13 +178,14 @@ export const ProCabinetScreen = ({
                         target="_blank"
                         rel="noreferrer"
                       >
-                        {isImage ? (
-                          <img
-                            src={item?.url ?? ''}
-                            alt={caption}
-                            loading="lazy"
-                          />
-                        ) : (
+                      {isImage ? (
+                        <img
+                          src={item?.url ?? ''}
+                          alt={caption}
+                          loading="lazy"
+                          style={{ objectPosition: resolveFocusPosition(item) }}
+                        />
+                      ) : (
                           <span className="pro-cabinet-showcase-link">LINK</span>
                         )}
                         {item?.title?.trim() && (
