@@ -29,11 +29,11 @@ const categoryChips = [
 
 const collageShapes = [
   'is-wide',
-  'is-small',
-  'is-tall',
   'is-wide',
-  'is-small',
   'is-tall',
+  'is-tall',
+  'is-small',
+  'is-small',
 ] as const
 
 type ShowcaseShape = (typeof collageShapes)[number]
@@ -49,6 +49,7 @@ type ShowcaseMedia = {
 
 const INITIAL_BLOCKS = 3
 const slotShapes: ShowcaseShape[] = [...collageShapes]
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
 
 const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
   id: `fallback-${item.id}`,
@@ -288,8 +289,12 @@ export const ClientShowcaseScreen = ({
               <div className="client-work-grid" key={`block-${blockIndex}`}>
                 {block.map((item, index) => (
                   <article
-                    className={`client-work-card ${item.shape}`}
+                    className="client-work-card"
                     key={`${item.id}-${blockIndex}-${index}`}
+                    style={{
+                      gridArea:
+                        showcaseAreas[index % showcaseAreas.length] ?? undefined,
+                    }}
                   >
                     <img
                       src={item.url}

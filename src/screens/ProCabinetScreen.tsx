@@ -41,14 +41,7 @@ const MAX_PORTFOLIO_ITEMS = 6
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
-const collageClasses = [
-  'is-wide',
-  'is-small',
-  'is-tall',
-  'is-wide',
-  'is-small',
-  'is-tall',
-]
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -615,14 +608,13 @@ export const ProCabinetScreen = ({
             <div className="pro-cabinet-showcase-panel">
               <div className="pro-cabinet-showcase-grid animate delay-2">
                 {mosaicItems.map((item, index) => {
-                  const sizeClass = collageClasses[index] ?? 'is-small'
+                  const gridArea = showcaseAreas[index]
                   const hasItem = Boolean(item?.url)
                   const isImage = item?.url ? isImageUrl(item.url) : false
                   const caption = item?.title?.trim() || 'Работа'
                   const focus = resolveFocusPoint(item)
                   const cardClassName = [
                     'pro-cabinet-showcase-card',
-                    sizeClass,
                     portfolioDragOverIndex === index ? 'is-drag-over' : '',
                   ]
                     .filter(Boolean)
@@ -640,6 +632,7 @@ export const ProCabinetScreen = ({
                     <article
                       className={cardClassName}
                       key={`${item?.url ?? 'add'}-${index}`}
+                      style={gridArea ? { gridArea } : undefined}
                     >
                       {hasItem ? (
                         <button

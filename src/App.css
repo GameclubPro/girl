@@ -723,10 +723,13 @@
 
 .pro-cabinet-showcase-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: clamp(96px, 30vw, 160px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, clamp(76px, 24vw, 130px));
+  grid-template-areas:
+    'a a a c'
+    'd e f c'
+    'd b b b';
   gap: 6px;
-  grid-auto-flow: dense;
 }
 
 .pro-cabinet-showcase-card {
@@ -773,20 +776,6 @@
   height: 100%;
   object-fit: cover;
   display: block;
-}
-
-.pro-cabinet-showcase-card.is-large {
-  grid-column: span 2;
-  grid-row: span 2;
-}
-
-.pro-cabinet-showcase-card.is-tall {
-  grid-row: span 2;
-}
-
-.pro-cabinet-showcase-card.is-wide {
-  grid-column: span 2;
-  grid-row: span 1;
 }
 
 .pro-cabinet-showcase-media.is-link {
@@ -4863,9 +4852,9 @@ h2 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
   grid-template-areas:
-    'a a b b'
-    'a a c c'
-    'd e f f';
+    'a a a c'
+    'd e f c'
+    'd b b b';
   gap: 2px;
   align-self: center;
   height: clamp(92px, 25vw, 120px);
@@ -5016,9 +5005,12 @@ h2 {
 
 .client-work-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: clamp(96px, 30vw, 160px);
-  grid-auto-flow: dense;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, clamp(76px, 24vw, 130px));
+  grid-template-areas:
+    'a a a c'
+    'd e f c'
+    'd b b b';
   gap: 6px;
 }
 
@@ -5029,14 +5021,6 @@ h2 {
   border: none;
   box-shadow: 0 14px 20px rgba(90, 66, 110, 0.2);
   background: rgba(255, 255, 255, 0.6);
-}
-
-.client-work-card.is-tall {
-  grid-row: span 2;
-}
-
-.client-work-card.is-wide {
-  grid-column: span 2;
 }
 
 .client-work-sentinel {
@@ -5698,8 +5682,12 @@ h2 {
   }
 
   .pro-cabinet-showcase-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-auto-rows: clamp(106px, 35vw, 180px);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(3, clamp(76px, 24vw, 130px));
+    grid-template-areas:
+      'a a a c'
+      'd e f c'
+      'd b b b';
   }
 
   .pro-cabinet-showcase-panel {
