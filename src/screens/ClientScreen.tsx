@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import {
-  IconBell,
   IconHome,
   IconList,
   IconUser,
@@ -61,9 +60,6 @@ export const ClientScreen = ({
       <div className="client-shell">
         <header className="client-topbar">
           <div className="client-brand">KIVEN</div>
-          <button className="bell-button" type="button" aria-label="Уведомления">
-            <IconBell />
-          </button>
         </header>
         {activeCategoryId && activeCategoryLabel && (
           <button

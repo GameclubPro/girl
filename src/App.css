@@ -4601,7 +4601,7 @@ h2 {
 .client-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
 }
 
@@ -4652,26 +4652,6 @@ h2 {
   gap: 12px;
 }
 
-.bell-button {
-  width: 40px;
-  height: 40px;
-  border-radius: 16px;
-  border: 1px solid rgba(228, 215, 241, 0.9);
-  background: rgba(255, 255, 255, 0.76);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #b09fbc;
-  cursor: pointer;
-  flex-shrink: 0;
-  justify-self: end;
-  box-shadow: 0 12px 18px rgba(85, 63, 104, 0.12);
-}
-
-.bell-button svg {
-  width: 20px;
-  height: 20px;
-}
 
 .cta-row {
   display: grid;
