@@ -734,6 +734,11 @@
   height: 100%;
 }
 
+.pro-cabinet-showcase-card.is-drag-over .pro-cabinet-showcase-media {
+  outline: 2px dashed rgba(255, 107, 61, 0.6);
+  outline-offset: -4px;
+}
+
 .pro-cabinet-showcase-media {
   width: 100%;
   height: 100%;
@@ -753,6 +758,14 @@
   font-family: inherit;
   appearance: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pro-cabinet-showcase-media.is-draggable {
+  cursor: grab;
+}
+
+.pro-cabinet-showcase-media.is-draggable:active {
+  cursor: grabbing;
 }
 
 .pro-cabinet-showcase-media img {
@@ -2039,6 +2052,33 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--pro-muted);
+}
+
+.pro-portfolio-focus-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pro-portfolio-focus-action {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255, 107, 61, 0.12);
+  color: var(--pro-ink);
+  cursor: pointer;
+}
+
+.pro-portfolio-focus-action.is-danger {
+  background: rgba(255, 107, 61, 0.18);
+  color: #8a3a22;
+}
+
+.pro-portfolio-focus-action:focus-visible {
+  outline: 3px solid rgba(255, 107, 61, 0.3);
+  outline-offset: 2px;
 }
 
 .pro-portfolio-remove:focus-visible {
@@ -5504,6 +5544,7 @@ h2 {
   .pro-service-remove,
   .pro-portfolio-remove,
   .pro-portfolio-action,
+  .pro-portfolio-focus-action,
   .pro-focus-button,
   .pro-primary,
   .pro-secondary,
@@ -5534,6 +5575,7 @@ h2 {
   .pro-service-remove:hover,
   .pro-portfolio-remove:hover,
   .pro-portfolio-action:hover,
+  .pro-portfolio-focus-action:hover,
   .pro-focus-button:hover,
   .pro-primary:hover,
   .pro-secondary:hover,
@@ -5560,6 +5602,7 @@ h2 {
   .pro-service-remove:hover,
   .pro-portfolio-remove:hover,
   .pro-portfolio-action:hover,
+  .pro-portfolio-focus-action:hover,
   .pro-focus-button:hover,
   .screen--pro .request-chip:hover,
   .pro-chip:hover {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
+import type { ChangeEvent, CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
