@@ -34,6 +34,7 @@ const collageShapes = [
   'is-tall',
   'is-small',
   'is-small',
+  'is-small',
 ] as const
 
 type ShowcaseShape = (typeof collageShapes)[number]
@@ -49,7 +50,7 @@ type ShowcaseMedia = {
 
 const INITIAL_BLOCKS = 3
 const slotShapes: ShowcaseShape[] = [...collageShapes]
-const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
 
 const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
   id: `fallback-${item.id}`,

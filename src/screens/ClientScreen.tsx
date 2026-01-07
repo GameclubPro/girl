@@ -22,17 +22,29 @@ type ShowcaseMedia = {
   focusX: number
   focusY: number
   categories: string[]
+  shape: ShowcaseShape
 }
 
-const SHOWCASE_SLOTS = 6
-const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+const collageShapes = [
+  'is-wide',
+  'is-wide',
+  'is-tall',
+  'is-tall',
+  'is-small',
+  'is-small',
+  'is-small',
+] as const
+type ShowcaseShape = (typeof collageShapes)[number]
+const slotShapes: ShowcaseShape[] = [...collageShapes]
 
-const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item) => ({
+const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
   id: `fallback-${item.id}`,
   url: item.image,
   focusX: 0.5,
   focusY: 0.5,
   categories: item.categoryId ? [item.categoryId] : [],
+  shape: collageShapes[index % collageShapes.length],
 }))
 
 const shuffleItems = <T,>(items: T[]) => {
@@ -96,6 +108,7 @@ export const ClientScreen = ({
               focusX: item.focusX ?? 0.5,
               focusY: item.focusY ?? 0.5,
               categories,
+              shape: collageShapes[index % collageShapes.length],
             }))
         })
         setShowcasePool(nextPool)
@@ -125,9 +138,28 @@ export const ClientScreen = ({
           : fallbackShowcasePool
     if (basePool.length === 0) return []
     const shuffled = shuffleItems(basePool)
-    return Array.from({ length: SHOWCASE_SLOTS }, (_, index) =>
-      shuffled[index % shuffled.length]
-    )
+    const poolByShape = {
+      'is-small': [] as ShowcaseMedia[],
+      'is-tall': [] as ShowcaseMedia[],
+      'is-wide': [] as ShowcaseMedia[],
+    }
+    basePool.forEach((item) => {
+      poolByShape[item.shape].push(item)
+    })
+    const used = new Set<string>()
+    const pickRandom = (items: ShowcaseMedia[]) => {
+      const available = items.filter((item) => !used.has(item.id))
+      if (available.length === 0) return null
+      const choice = available[Math.floor(Math.random() * available.length)]
+      used.add(choice.id)
+      return choice
+    }
+    return slotShapes.map((shape, index) => {
+      const preferred = pickRandom(poolByShape[shape])
+      if (preferred) return preferred
+      const fallback = pickRandom(shuffled)
+      return fallback ?? shuffled[index % shuffled.length]
+    })
   }, [activeCategoryId, showcasePool])
 
   return (

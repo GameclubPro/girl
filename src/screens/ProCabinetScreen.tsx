@@ -37,11 +37,11 @@ type ProfilePayload = {
   portfolioUrls: string[]
 }
 
-const MAX_PORTFOLIO_ITEMS = 6
+const MAX_PORTFOLIO_ITEMS = 7
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
-const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -102,7 +102,7 @@ export const ProCabinetScreen = ({
   const isBusy = isSaving || isUploading
   const showcaseSubtitle = hasShowcase
     ? `Работ в витрине: ${portfolioItems.length} из ${MAX_PORTFOLIO_ITEMS}`
-    : 'Добавьте до 6 лучших работ'
+    : `Добавьте до ${MAX_PORTFOLIO_ITEMS} лучших работ`
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolveFocusPoint(focusItem)

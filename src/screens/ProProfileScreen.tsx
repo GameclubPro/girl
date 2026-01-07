@@ -91,7 +91,7 @@ type ProfilePayload = {
 }
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
-const MAX_PORTFOLIO_ITEMS = 6
+const MAX_PORTFOLIO_ITEMS = 7
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
 

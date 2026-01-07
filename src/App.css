@@ -723,12 +723,15 @@
 
 .pro-cabinet-showcase-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(3, clamp(76px, 24vw, 130px));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(5, 1fr);
   grid-template-areas:
-    'a a a c'
-    'd e f c'
-    'd b b b';
+    'a a a b b b'
+    'a a a b b b'
+    'c c d d e e'
+    'c c d d e e'
+    'c c d d f g';
+  aspect-ratio: 6 / 5;
   gap: 6px;
 }
 
@@ -4849,15 +4852,17 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(5, minmax(0, 1fr));
   grid-template-areas:
-    'a a a c'
-    'd e f c'
-    'd b b b';
+    'a a a b b b'
+    'a a a b b b'
+    'c c d d e e'
+    'c c d d e e'
+    'c c d d f g';
   gap: 2px;
   align-self: center;
-  height: clamp(92px, 25vw, 120px);
+  aspect-ratio: 6 / 5;
 }
 
 .client-showcase-photo {
@@ -5005,12 +5010,15 @@ h2 {
 
 .client-work-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(3, clamp(76px, 24vw, 130px));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(5, 1fr);
   grid-template-areas:
-    'a a a c'
-    'd e f c'
-    'd b b b';
+    'a a a b b b'
+    'a a a b b b'
+    'c c d d e e'
+    'c c d d e e'
+    'c c d d f g';
+  aspect-ratio: 6 / 5;
   gap: 6px;
 }
 
@@ -5594,7 +5602,7 @@ h2 {
 
   .client-showcase-gallery {
     width: 100%;
-    height: clamp(90px, 26vw, 120px);
+    aspect-ratio: 6 / 5;
   }
 
   .screen--request {
@@ -5682,12 +5690,15 @@ h2 {
   }
 
   .pro-cabinet-showcase-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-template-rows: repeat(3, clamp(76px, 24vw, 130px));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: repeat(5, 1fr);
     grid-template-areas:
-      'a a a c'
-      'd e f c'
-      'd b b b';
+      'a a a b b b'
+      'a a a b b b'
+      'c c d d e e'
+      'c c d d e e'
+      'c c d d f g';
+    aspect-ratio: 6 / 5;
   }
 
   .pro-cabinet-showcase-panel {
