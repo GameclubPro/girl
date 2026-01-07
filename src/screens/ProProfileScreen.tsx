@@ -123,17 +123,13 @@ export const ProProfileScreen = ({
   const [mediaError, setMediaError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
-  const [expandedSection, setExpandedSection] = useState<InlineSection | null>(() =>
+  const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection
       ? focusSection === 'availability'
         ? 'location'
         : focusSection
       : null
   )
-  const basicRef = useRef<HTMLDivElement>(null)
-  const locationRef = useRef<HTMLDivElement>(null)
-  const servicesRef = useRef<HTMLDivElement>(null)
-  const portfolioRef = useRef<HTMLDivElement>(null)
   const autosaveTimerRef = useRef<number | null>(null)
   const autosaveSuccessTimerRef = useRef<number | null>(null)
   const lastSavedRef = useRef('')
@@ -317,12 +313,31 @@ export const ProProfileScreen = ({
   )
   const normalizeSection = (section: ProProfileSection): InlineSection =>
     section === 'availability' ? 'location' : section
-  const isSectionOpen = (section: ProProfileSection) =>
-    expandedSection === normalizeSection(section)
-  const toggleSection = (section: ProProfileSection) => {
-    const normalized = normalizeSection(section)
-    setExpandedSection((current) => (current === normalized ? null : normalized))
+  const openEditor = (section: ProProfileSection) => {
+    setEditingSection(normalizeSection(section))
   }
+  const closeEditor = () => {
+    setEditingSection(null)
+  }
+  const editSectionMeta: Record<InlineSection, { title: string; subtitle: string }> = {
+    basic: {
+      title: 'О себе',
+      subtitle: 'Имя, описание и специализации',
+    },
+    services: {
+      title: 'Услуги и цены',
+      subtitle: 'Категория, список услуг и стоимость',
+    },
+    location: {
+      title: 'Работа',
+      subtitle: 'Город, формат, график и статус',
+    },
+    portfolio: {
+      title: 'Портфолио',
+      subtitle: 'Ссылки на ваши работы',
+    },
+  }
+  const activeEditMeta = editingSection ? editSectionMeta[editingSection] : null
   const persistAutosaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
       window.clearTimeout(autosaveSuccessTimerRef.current)
@@ -352,21 +367,17 @@ export const ProProfileScreen = ({
 
   useEffect(() => {
     if (!focusSection) return
-    const normalized = focusSection === 'availability' ? 'location' : focusSection
-    setExpandedSection(normalized)
-    const timeout = window.setTimeout(() => {
-      const target =
-        normalized === 'basic'
-          ? basicRef
-          : normalized === 'services'
-            ? servicesRef
-            : normalized === 'location'
-              ? locationRef
-              : portfolioRef
-      target.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 60)
-    return () => window.clearTimeout(timeout)
+    setEditingSection(focusSection === 'availability' ? 'location' : focusSection)
   }, [focusSection])
+
+  useEffect(() => {
+    if (!editingSection) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [editingSection])
 
   useEffect(() => {
     hasLoadedRef.current = false
@@ -1049,580 +1060,105 @@ export const ProProfileScreen = ({
         {mediaError && <p className="pro-error">{mediaError}</p>}
 
         <section className="pro-profile-cards animate delay-2">
-          <div
-            className={`pro-profile-card${isSectionOpen('basic') ? ' is-open' : ''}`}
-            ref={basicRef}
+          <button
+            className="pro-profile-card"
+            type="button"
+            onClick={() => openEditor('basic')}
           >
-            <button
-              className="pro-profile-card-head"
-              type="button"
-              onClick={() => toggleSection('basic')}
-              aria-expanded={isSectionOpen('basic')}
-            >
-              <span className="pro-profile-card-icon" aria-hidden="true">
-                👤
+            <span className="pro-profile-card-icon" aria-hidden="true">
+              👤
+            </span>
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">О себе</span>
+              <span
+                className={`pro-profile-card-value${
+                  about.trim() ? '' : ' is-muted'
+                }`}
+              >
+                {aboutPreview}
               </span>
-              <span className="pro-profile-card-content">
-                <span className="pro-profile-card-title">О себе</span>
-                <span
-                  className={`pro-profile-card-value${
-                    about.trim() ? '' : ' is-muted'
-                  }`}
-                >
-                  {aboutPreview}
-                </span>
-                <span className="pro-profile-card-meta">{experienceLabel}</span>
-              </span>
-              <span className="pro-profile-card-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
-            {isSectionOpen('basic') && (
-              <div className="pro-profile-card-edit">
-                <div className="pro-field">
-                  <label className="pro-label" htmlFor="pro-name">
-                    Имя и специализация
-                  </label>
-                  <input
-                    id="pro-name"
-                    className="pro-input"
-                    type="text"
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    placeholder="Например, Алина • Маникюр"
-                  />
-                </div>
-                <div className="pro-field">
-                  <label className="pro-label" htmlFor="pro-about">
-                    О себе
-                  </label>
-                  <textarea
-                    id="pro-about"
-                    className="pro-textarea"
-                    value={about}
-                    onChange={(event) => setAbout(event.target.value)}
-                    placeholder="Коротко о вашем опыте и стиле работы"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div
-            className={`pro-profile-card${
-              isSectionOpen('location') ? ' is-open' : ''
-            }`}
-            ref={locationRef}
+              <span className="pro-profile-card-meta">{experienceLabel}</span>
+            </span>
+            <span className="pro-profile-card-chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-card"
+            type="button"
+            onClick={() => openEditor('location')}
           >
-            <button
-              className="pro-profile-card-head"
-              type="button"
-              onClick={() => toggleSection('location')}
-              aria-expanded={isSectionOpen('location')}
-            >
-              <span className="pro-profile-card-icon" aria-hidden="true">
-                📍
-              </span>
-              <span className="pro-profile-card-content">
-                <span className="pro-profile-card-title">Работа</span>
-                <span className="pro-profile-card-value">{locationLabel}</span>
-                <span className="pro-profile-card-meta">{workFormatLabel}</span>
-                <span className="pro-profile-card-meta">{scheduleSummary}</span>
-              </span>
-              <span className="pro-profile-card-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
-            {isSectionOpen('location') && (
-              <div className="pro-profile-card-edit">
-                <div className="pro-field pro-field--split">
-                  <div>
-                    <label className="pro-label" htmlFor="pro-city">
-                      Город
-                    </label>
-                    <select
-                      id="pro-city"
-                      className="pro-select"
-                      value={cityId ?? ''}
-                      onChange={(event) => {
-                        const nextValue = event.target.value
-                        if (!nextValue) {
-                          setCityId(null)
-                          return
-                        }
-                        const parsedValue = Number(nextValue)
-                        setCityId(Number.isInteger(parsedValue) ? parsedValue : null)
-                      }}
-                    >
-                      <option value="">Выберите город</option>
-                      {cities.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {city.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="pro-label" htmlFor="pro-district">
-                      Район
-                    </label>
-                    <select
-                      id="pro-district"
-                      className="pro-select"
-                      value={districtId ?? ''}
-                      onChange={(event) => {
-                        const nextValue = event.target.value
-                        if (!nextValue) {
-                          setDistrictId(null)
-                          return
-                        }
-                        const parsedValue = Number(nextValue)
-                        setDistrictId(
-                          Number.isInteger(parsedValue) ? parsedValue : null
-                        )
-                      }}
-                      disabled={!cityId || districts.length === 0}
-                    >
-                      <option value="">
-                        {cityId ? 'Выберите район' : 'Сначала выберите город'}
-                      </option>
-                      {districts.map((district) => (
-                        <option key={district.id} value={district.id}>
-                          {district.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="pro-field">
-                  <label className="pro-label" htmlFor="experience">
-                    Опыт (лет)
-                  </label>
-                  <input
-                    id="experience"
-                    className="pro-input"
-                    type="number"
-                    value={experienceYears}
-                    onChange={(event) => setExperienceYears(event.target.value)}
-                    placeholder="3"
-                    min="0"
-                  />
-                </div>
-                <div className="pro-field">
-                  <span className="pro-label">Формат работы</span>
-                  <div className="pro-toggle-grid">
-                    <label className="pro-toggle">
-                      <input
-                        type="checkbox"
-                        checked={worksAtMaster}
-                        onChange={(event) => setWorksAtMaster(event.target.checked)}
-                      />
-                      У мастера
-                    </label>
-                    <label className="pro-toggle">
-                      <input
-                        type="checkbox"
-                        checked={worksAtClient}
-                        onChange={(event) => setWorksAtClient(event.target.checked)}
-                      />
-                      Выезд к клиенту
-                    </label>
-                  </div>
-                </div>
-                <div className="pro-field">
-                  <span className="pro-label">Статус</span>
-                  <label className="pro-toggle">
-                    <input
-                      type="checkbox"
-                      checked={isActive}
-                      onChange={(event) => setIsActive(event.target.checked)}
-                    />
-                    Принимаю заявки
-                  </label>
-                </div>
-                <div className="pro-field">
-                  <span className="pro-label">Дни работы</span>
-                  <div className="request-chips">
-                    {scheduleDayOptions.map((day) => (
-                      <button
-                        className={`request-chip${
-                          scheduleDays.includes(day.id) ? ' is-active' : ''
+            <span className="pro-profile-card-icon" aria-hidden="true">
+              📍
+            </span>
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">Работа</span>
+              <span className="pro-profile-card-value">{locationLabel}</span>
+              <span className="pro-profile-card-meta">{workFormatLabel}</span>
+              <span className="pro-profile-card-meta">{scheduleSummary}</span>
+            </span>
+            <span className="pro-profile-card-chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-card"
+            type="button"
+            onClick={() => openEditor('services')}
+          >
+            <span className="pro-profile-card-icon" aria-hidden="true">
+              💸
+            </span>
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">Услуги и цены</span>
+              <span className="pro-profile-card-value">{servicesSummary}</span>
+              <span className="pro-profile-card-meta">{priceLabel}</span>
+            </span>
+            <span className="pro-profile-card-chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
+          <button
+            className="pro-profile-card"
+            type="button"
+            onClick={() => openEditor('portfolio')}
+          >
+            <span className="pro-profile-card-icon" aria-hidden="true">
+              🖼️
+            </span>
+            <span className="pro-profile-card-content">
+              <span className="pro-profile-card-title">Портфолио</span>
+              <span className="pro-profile-card-value">{portfolioSummary}</span>
+              {portfolioPreview.length > 0 ? (
+                <span className="pro-profile-portfolio">
+                  {portfolioPreview.map((item, index) => {
+                    const showImage = isImageUrl(item.url)
+                    return (
+                      <span
+                        key={`${item.url}-${index}`}
+                        className={`pro-profile-portfolio-thumb${
+                          showImage ? ' has-image' : ''
                         }`}
-                        key={day.id}
-                        type="button"
-                        onClick={() => toggleScheduleDay(day.id)}
-                        aria-pressed={scheduleDays.includes(day.id)}
-                      >
-                        {day.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="pro-field pro-field--split">
-                  <div>
-                    <label className="pro-label" htmlFor="schedule-start">
-                      Начало
-                    </label>
-                    <input
-                      id="schedule-start"
-                      className="pro-input"
-                      type="time"
-                      value={scheduleStart}
-                      onChange={(event) => setScheduleStart(event.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="pro-label" htmlFor="schedule-end">
-                      Окончание
-                    </label>
-                    <input
-                      id="schedule-end"
-                      className="pro-input"
-                      type="time"
-                      value={scheduleEnd}
-                      onChange={(event) => setScheduleEnd(event.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div
-            className={`pro-profile-card${
-              isSectionOpen('services') ? ' is-open' : ''
-            }`}
-            ref={servicesRef}
-          >
-            <button
-              className="pro-profile-card-head"
-              type="button"
-              onClick={() => toggleSection('services')}
-              aria-expanded={isSectionOpen('services')}
-            >
-              <span className="pro-profile-card-icon" aria-hidden="true">
-                💸
-              </span>
-              <span className="pro-profile-card-content">
-                <span className="pro-profile-card-title">Услуги и цены</span>
-                <span className="pro-profile-card-value">{servicesSummary}</span>
-                <span className="pro-profile-card-meta">{priceLabel}</span>
-              </span>
-              <span className="pro-profile-card-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
-            {isSectionOpen('services') && (
-              <div className="pro-profile-card-edit">
-                <div className="pro-field">
-                  <span className="pro-label">Категория</span>
-                  <select
-                    className="request-select-input"
-                    value={serviceCategoryId}
-                    onChange={(event) =>
-                      handleServiceCategoryChange(event.target.value as CategoryId)
-                    }
-                    style={serviceCategoryIconStyle}
-                    aria-label="Категория"
-                  >
-                    {categoryItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="pro-field">
-                  <div
-                    className="request-service-grid"
-                    role="list"
-                    aria-label="Выберите услуги"
-                  >
-                    {serviceCatalogOptions.map((option) => {
-                      const optionKey = normalizeServiceKey(option.title)
-                      const isSelected = selectedServiceKeys.has(optionKey)
-                      return (
-                        <button
-                          className={`request-service-card${
-                            isSelected ? ' is-active' : ''
-                          }`}
-                          key={option.title}
-                          type="button"
-                          onClick={() => toggleCatalogService(option.title)}
-                          aria-pressed={isSelected}
-                        >
-                          <span className="request-service-text">
-                            <span className="request-service-title">
-                              {option.title}
-                            </span>
-                            <span className="request-service-subtitle">
-                              {option.subtitle}
-                            </span>
-                          </span>
-                          <span
-                            className="request-service-indicator"
-                            aria-hidden="true"
-                          />
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {serviceCatalogOptions.length === 0 && (
-                    <p className="request-helper">
-                      Пока нет услуг для этой категории.
-                    </p>
-                  )}
-                </div>
-                <div className="pro-service-grid">
-                  {serviceItems.length > 0 ? (
-                    serviceItems.map((service, index) => {
-                      const metaLabel = formatServiceMeta(service)
-                      return (
-                        <div
-                          className="pro-service-card"
-                          key={`${service.name}-${index}`}
-                        >
-                          <div className="pro-service-card-head">
-                            <span className="pro-service-name">{service.name}</span>
-                            <button
-                              className="pro-service-remove"
-                              type="button"
-                              onClick={() => removeService(index)}
-                              aria-label={`Удалить ${service.name || 'услугу'}`}
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <div className="pro-service-meta">
-                            <input
-                              className="pro-input pro-service-meta-input"
-                              type="number"
-                              value={service.price ?? ''}
-                              onChange={(event) =>
-                                updateServiceItem(index, {
-                                  price: parseNumber(event.target.value),
-                                })
-                              }
-                              placeholder="Цена"
-                              min="0"
-                            />
-                            <input
-                              className="pro-input pro-service-meta-input"
-                              type="number"
-                              value={service.duration ?? ''}
-                              onChange={(event) =>
-                                updateServiceItem(index, {
-                                  duration: parseNumber(event.target.value),
-                                })
-                              }
-                              placeholder="Мин"
-                              min="0"
-                            />
-                          </div>
-                          {metaLabel && (
-                            <div className="pro-service-meta-preview">
-                              {metaLabel}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="pro-service-empty">Пока нет услуг.</div>
-                  )}
-                </div>
-                <div className="pro-field pro-field--split">
-                  <div>
-                    <label className="pro-label" htmlFor="price-from">
-                      Цена от
-                    </label>
-                    <input
-                      id="price-from"
-                      className="pro-input"
-                      type="number"
-                      value={priceFrom}
-                      onChange={(event) => setPriceFrom(event.target.value)}
-                      placeholder="1500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="pro-label" htmlFor="price-to">
-                      Цена до
-                    </label>
-                    <input
-                      id="price-to"
-                      className="pro-input"
-                      type="number"
-                      value={priceTo}
-                      onChange={(event) => setPriceTo(event.target.value)}
-                      placeholder="3000"
-                      min="0"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div
-            className={`pro-profile-card${
-              isSectionOpen('portfolio') ? ' is-open' : ''
-            }`}
-            ref={portfolioRef}
-          >
-            <button
-              className="pro-profile-card-head"
-              type="button"
-              onClick={() => toggleSection('portfolio')}
-              aria-expanded={isSectionOpen('portfolio')}
-            >
-              <span className="pro-profile-card-icon" aria-hidden="true">
-                🖼️
-              </span>
-              <span className="pro-profile-card-content">
-                <span className="pro-profile-card-title">Портфолио</span>
-                <span className="pro-profile-card-value">{portfolioSummary}</span>
-                {portfolioPreview.length > 0 ? (
-                  <span className="pro-profile-portfolio">
-                    {portfolioPreview.map((item, index) => {
-                      const showImage = isImageUrl(item.url)
-                      return (
-                        <span
-                          key={`${item.url}-${index}`}
-                          className={`pro-profile-portfolio-thumb${
-                            showImage ? ' has-image' : ''
-                          }`}
-                          style={
-                            showImage
-                              ? { backgroundImage: `url(${item.url})` }
-                              : undefined
-                          }
-                          aria-hidden="true"
-                        />
-                      )
-                    })}
-                  </span>
-                ) : (
-                  <span className="pro-profile-card-meta is-muted">
-                    Пока нет работ
-                  </span>
-                )}
-              </span>
-              <span className="pro-profile-card-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
-            {isSectionOpen('portfolio') && (
-              <div className="pro-profile-card-edit">
-                <div className="pro-field">
-                  <span className="pro-label">Витрина работ</span>
-                  <div className="pro-portfolio-add">
-                    <input
-                      className="pro-input"
-                      type="url"
-                      value={portfolioInput}
-                      onChange={(event) => setPortfolioInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addPortfolio()
+                        style={
+                          showImage
+                            ? { backgroundImage: `url(${item.url})` }
+                            : undefined
                         }
-                      }}
-                      placeholder="Ссылка на фото или видео"
-                    />
-                    <input
-                      className="pro-input"
-                      type="text"
-                      value={portfolioTitleInput}
-                      onChange={(event) =>
-                        setPortfolioTitleInput(event.target.value)
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addPortfolio()
-                        }
-                      }}
-                      placeholder="Подпись (опционально)"
-                    />
-                    <button className="pro-add" type="button" onClick={addPortfolio}>
-                      Добавить
-                    </button>
-                  </div>
-                </div>
-                <div className="pro-portfolio-grid">
-                  {visiblePortfolio.length > 0 ? (
-                    visiblePortfolio.map((item, index) => {
-                      const showImage = isImageUrl(item.url)
-                      return (
-                        <div
-                          className="pro-portfolio-card"
-                          key={`${item.url}-${index}`}
-                        >
-                          <div
-                            className={`pro-portfolio-thumb${
-                              showImage ? ' has-image' : ''
-                            }`}
-                            style={
-                              showImage
-                                ? { backgroundImage: `url(${item.url})` }
-                                : undefined
-                            }
-                          >
-                            {!showImage && (
-                              <span className="pro-portfolio-thumb-label">LINK</span>
-                            )}
-                          </div>
-                          <div className="pro-portfolio-body">
-                            <input
-                              className="pro-portfolio-title"
-                              type="text"
-                              value={item.title ?? ''}
-                              onChange={(event) =>
-                                updatePortfolioItem(index, {
-                                  title: event.target.value,
-                                })
-                              }
-                              placeholder="Подпись (опционально)"
-                            />
-                            <a
-                              className="pro-portfolio-link"
-                              href={item.url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Открыть работу
-                            </a>
-                          </div>
-                          <button
-                            className="pro-portfolio-remove"
-                            type="button"
-                            onClick={() => removePortfolio(index)}
-                            aria-label="Удалить работу"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="pro-portfolio-empty">Пока нет работ.</div>
-                  )}
-                </div>
-                {hasMorePortfolio && (
-                  <button
-                    className="pro-ghost pro-portfolio-toggle"
-                    type="button"
-                    onClick={() => setShowAllPortfolio((current) => !current)}
-                  >
-                    {showAllPortfolio ? 'Свернуть' : 'Показать все'}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+                        aria-hidden="true"
+                      />
+                    )
+                  })}
+                </span>
+              ) : (
+                <span className="pro-profile-card-meta is-muted">
+                  Пока нет работ
+                </span>
+              )}
+            </span>
+            <span className="pro-profile-card-chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
         </section>
 
         <div className="pro-profile-footer">
@@ -1635,12 +1171,494 @@ export const ProProfileScreen = ({
         </div>
       </div>
 
-      <ProBottomNav
-        active="profile"
-        onCabinet={onBack}
-        onRequests={onViewRequests}
-        onProfile={() => {}}
-      />
+      {editingSection && activeEditMeta && (
+        <div className="pro-profile-editor-screen" role="dialog" aria-modal="true">
+          <div className="pro-profile-editor-shell">
+            <header className="pro-profile-editor-header">
+              <button className="pro-back" type="button" onClick={closeEditor}>
+                ←
+              </button>
+              <div className="pro-profile-editor-headings">
+                <p className="pro-profile-editor-kicker">Редактирование</p>
+                <h2 className="pro-profile-editor-title">{activeEditMeta.title}</h2>
+                <p className="pro-profile-editor-subtitle">
+                  {activeEditMeta.subtitle}
+                </p>
+              </div>
+              <div className={`pro-autosave ${autosaveTone} pro-profile-editor-autosave`}>
+                <span className="pro-autosave-dot" aria-hidden="true" />
+                <span className="pro-autosave-text">{autosaveLabel}</span>
+              </div>
+            </header>
+            <section className="pro-profile-editor-card">
+              {editingSection === 'basic' && (
+                <>
+                  <div className="pro-field">
+                    <label className="pro-label" htmlFor="pro-name">
+                      Имя и специализация
+                    </label>
+                    <input
+                      id="pro-name"
+                      className="pro-input"
+                      type="text"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      placeholder="Например, Алина • Маникюр"
+                    />
+                  </div>
+                  <div className="pro-field">
+                    <label className="pro-label" htmlFor="pro-about">
+                      О себе
+                    </label>
+                    <textarea
+                      id="pro-about"
+                      className="pro-textarea"
+                      value={about}
+                      onChange={(event) => setAbout(event.target.value)}
+                      placeholder="Коротко о вашем опыте и стиле работы"
+                      rows={4}
+                    />
+                  </div>
+                </>
+              )}
+
+              {editingSection === 'location' && (
+                <>
+                  <div className="pro-field pro-field--split">
+                    <div>
+                      <label className="pro-label" htmlFor="pro-city">
+                        Город
+                      </label>
+                      <select
+                        id="pro-city"
+                        className="pro-select"
+                        value={cityId ?? ''}
+                        onChange={(event) => {
+                          const nextValue = event.target.value
+                          if (!nextValue) {
+                            setCityId(null)
+                            return
+                          }
+                          const parsedValue = Number(nextValue)
+                          setCityId(Number.isInteger(parsedValue) ? parsedValue : null)
+                        }}
+                      >
+                        <option value="">Выберите город</option>
+                        {cities.map((city) => (
+                          <option key={city.id} value={city.id}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="pro-label" htmlFor="pro-district">
+                        Район
+                      </label>
+                      <select
+                        id="pro-district"
+                        className="pro-select"
+                        value={districtId ?? ''}
+                        onChange={(event) => {
+                          const nextValue = event.target.value
+                          if (!nextValue) {
+                            setDistrictId(null)
+                            return
+                          }
+                          const parsedValue = Number(nextValue)
+                          setDistrictId(
+                            Number.isInteger(parsedValue) ? parsedValue : null
+                          )
+                        }}
+                        disabled={!cityId || districts.length === 0}
+                      >
+                        <option value="">
+                          {cityId ? 'Выберите район' : 'Сначала выберите город'}
+                        </option>
+                        {districts.map((district) => (
+                          <option key={district.id} value={district.id}>
+                            {district.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="pro-field">
+                    <label className="pro-label" htmlFor="experience">
+                      Опыт (лет)
+                    </label>
+                    <input
+                      id="experience"
+                      className="pro-input"
+                      type="number"
+                      value={experienceYears}
+                      onChange={(event) => setExperienceYears(event.target.value)}
+                      placeholder="3"
+                      min="0"
+                    />
+                  </div>
+                  <div className="pro-field">
+                    <span className="pro-label">Формат работы</span>
+                    <div className="pro-toggle-grid">
+                      <label className="pro-toggle">
+                        <input
+                          type="checkbox"
+                          checked={worksAtMaster}
+                          onChange={(event) =>
+                            setWorksAtMaster(event.target.checked)
+                          }
+                        />
+                        У мастера
+                      </label>
+                      <label className="pro-toggle">
+                        <input
+                          type="checkbox"
+                          checked={worksAtClient}
+                          onChange={(event) =>
+                            setWorksAtClient(event.target.checked)
+                          }
+                        />
+                        Выезд к клиенту
+                      </label>
+                    </div>
+                  </div>
+                  <div className="pro-field">
+                    <span className="pro-label">Статус</span>
+                    <label className="pro-toggle">
+                      <input
+                        type="checkbox"
+                        checked={isActive}
+                        onChange={(event) => setIsActive(event.target.checked)}
+                      />
+                      Принимаю заявки
+                    </label>
+                  </div>
+                  <div className="pro-field">
+                    <span className="pro-label">Дни работы</span>
+                    <div className="request-chips">
+                      {scheduleDayOptions.map((day) => (
+                        <button
+                          className={`request-chip${
+                            scheduleDays.includes(day.id) ? ' is-active' : ''
+                          }`}
+                          key={day.id}
+                          type="button"
+                          onClick={() => toggleScheduleDay(day.id)}
+                          aria-pressed={scheduleDays.includes(day.id)}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="pro-field pro-field--split">
+                    <div>
+                      <label className="pro-label" htmlFor="schedule-start">
+                        Начало
+                      </label>
+                      <input
+                        id="schedule-start"
+                        className="pro-input"
+                        type="time"
+                        value={scheduleStart}
+                        onChange={(event) => setScheduleStart(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="pro-label" htmlFor="schedule-end">
+                        Окончание
+                      </label>
+                      <input
+                        id="schedule-end"
+                        className="pro-input"
+                        type="time"
+                        value={scheduleEnd}
+                        onChange={(event) => setScheduleEnd(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {editingSection === 'services' && (
+                <>
+                  <div className="pro-field">
+                    <span className="pro-label">Категория</span>
+                    <select
+                      className="request-select-input"
+                      value={serviceCategoryId}
+                      onChange={(event) =>
+                        handleServiceCategoryChange(event.target.value as CategoryId)
+                      }
+                      style={serviceCategoryIconStyle}
+                      aria-label="Категория"
+                    >
+                      {categoryItems.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="pro-field">
+                    <div
+                      className="request-service-grid"
+                      role="list"
+                      aria-label="Выберите услуги"
+                    >
+                      {serviceCatalogOptions.map((option) => {
+                        const optionKey = normalizeServiceKey(option.title)
+                        const isSelected = selectedServiceKeys.has(optionKey)
+                        return (
+                          <button
+                            className={`request-service-card${
+                              isSelected ? ' is-active' : ''
+                            }`}
+                            key={option.title}
+                            type="button"
+                            onClick={() => toggleCatalogService(option.title)}
+                            aria-pressed={isSelected}
+                          >
+                            <span className="request-service-text">
+                              <span className="request-service-title">
+                                {option.title}
+                              </span>
+                              <span className="request-service-subtitle">
+                                {option.subtitle}
+                              </span>
+                            </span>
+                            <span
+                              className="request-service-indicator"
+                              aria-hidden="true"
+                            />
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {serviceCatalogOptions.length === 0 && (
+                      <p className="request-helper">
+                        Пока нет услуг для этой категории.
+                      </p>
+                    )}
+                  </div>
+                  <div className="pro-service-grid">
+                    {serviceItems.length > 0 ? (
+                      serviceItems.map((service, index) => {
+                        const metaLabel = formatServiceMeta(service)
+                        return (
+                          <div
+                            className="pro-service-card"
+                            key={`${service.name}-${index}`}
+                          >
+                            <div className="pro-service-card-head">
+                              <span className="pro-service-name">{service.name}</span>
+                              <button
+                                className="pro-service-remove"
+                                type="button"
+                                onClick={() => removeService(index)}
+                                aria-label={`Удалить ${service.name || 'услугу'}`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <div className="pro-service-meta">
+                              <input
+                                className="pro-input pro-service-meta-input"
+                                type="number"
+                                value={service.price ?? ''}
+                                onChange={(event) =>
+                                  updateServiceItem(index, {
+                                    price: parseNumber(event.target.value),
+                                  })
+                                }
+                                placeholder="Цена"
+                                min="0"
+                              />
+                              <input
+                                className="pro-input pro-service-meta-input"
+                                type="number"
+                                value={service.duration ?? ''}
+                                onChange={(event) =>
+                                  updateServiceItem(index, {
+                                    duration: parseNumber(event.target.value),
+                                  })
+                                }
+                                placeholder="Мин"
+                                min="0"
+                              />
+                            </div>
+                            {metaLabel && (
+                              <div className="pro-service-meta-preview">
+                                {metaLabel}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="pro-service-empty">Пока нет услуг.</div>
+                    )}
+                  </div>
+                  <div className="pro-field pro-field--split">
+                    <div>
+                      <label className="pro-label" htmlFor="price-from">
+                        Цена от
+                      </label>
+                      <input
+                        id="price-from"
+                        className="pro-input"
+                        type="number"
+                        value={priceFrom}
+                        onChange={(event) => setPriceFrom(event.target.value)}
+                        placeholder="1500"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="pro-label" htmlFor="price-to">
+                        Цена до
+                      </label>
+                      <input
+                        id="price-to"
+                        className="pro-input"
+                        type="number"
+                        value={priceTo}
+                        onChange={(event) => setPriceTo(event.target.value)}
+                        placeholder="3000"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {editingSection === 'portfolio' && (
+                <>
+                  <div className="pro-field">
+                    <span className="pro-label">Витрина работ</span>
+                    <div className="pro-portfolio-add">
+                      <input
+                        className="pro-input"
+                        type="url"
+                        value={portfolioInput}
+                        onChange={(event) => setPortfolioInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addPortfolio()
+                          }
+                        }}
+                        placeholder="Ссылка на фото или видео"
+                      />
+                      <input
+                        className="pro-input"
+                        type="text"
+                        value={portfolioTitleInput}
+                        onChange={(event) =>
+                          setPortfolioTitleInput(event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addPortfolio()
+                          }
+                        }}
+                        placeholder="Подпись (опционально)"
+                      />
+                      <button className="pro-add" type="button" onClick={addPortfolio}>
+                        Добавить
+                      </button>
+                    </div>
+                  </div>
+                  <div className="pro-portfolio-grid">
+                    {visiblePortfolio.length > 0 ? (
+                      visiblePortfolio.map((item, index) => {
+                        const showImage = isImageUrl(item.url)
+                        return (
+                          <div
+                            className="pro-portfolio-card"
+                            key={`${item.url}-${index}`}
+                          >
+                            <div
+                              className={`pro-portfolio-thumb${
+                                showImage ? ' has-image' : ''
+                              }`}
+                              style={
+                                showImage
+                                  ? { backgroundImage: `url(${item.url})` }
+                                  : undefined
+                              }
+                            >
+                              {!showImage && (
+                                <span className="pro-portfolio-thumb-label">LINK</span>
+                              )}
+                            </div>
+                            <div className="pro-portfolio-body">
+                              <input
+                                className="pro-portfolio-title"
+                                type="text"
+                                value={item.title ?? ''}
+                                onChange={(event) =>
+                                  updatePortfolioItem(index, {
+                                    title: event.target.value,
+                                  })
+                                }
+                                placeholder="Подпись (опционально)"
+                              />
+                              <a
+                                className="pro-portfolio-link"
+                                href={item.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Открыть работу
+                              </a>
+                            </div>
+                            <button
+                              className="pro-portfolio-remove"
+                              type="button"
+                              onClick={() => removePortfolio(index)}
+                              aria-label="Удалить работу"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="pro-portfolio-empty">Пока нет работ.</div>
+                    )}
+                  </div>
+                  {hasMorePortfolio && (
+                    <button
+                      className="pro-ghost pro-portfolio-toggle"
+                      type="button"
+                      onClick={() => setShowAllPortfolio((current) => !current)}
+                    >
+                      {showAllPortfolio ? 'Свернуть' : 'Показать все'}
+                    </button>
+                  )}
+                </>
+              )}
+            </section>
+            {(saveError || saveSuccess) && (
+              <div className="pro-profile-editor-messages">
+                {saveError && <p className="pro-error">{saveError}</p>}
+                {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!editingSection && (
+        <ProBottomNav
+          active="profile"
+          onCabinet={onBack}
+          onRequests={onViewRequests}
+          onProfile={() => {}}
+        />
+      )}
     </div>
   )
 }
