@@ -724,8 +724,8 @@
 .pro-cabinet-showcase-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: clamp(72px, 20vw, 120px);
-  gap: 8px;
+  grid-auto-rows: clamp(64px, 18vw, 104px);
+  gap: 6px;
   grid-auto-flow: dense;
 }
 
@@ -777,7 +777,7 @@
 
 .pro-cabinet-showcase-card.is-large {
   grid-column: span 2;
-  grid-row: span 3;
+  grid-row: span 2;
 }
 
 .pro-cabinet-showcase-card.is-tall {
@@ -5345,7 +5345,7 @@ h2 {
 
   .pro-cabinet-showcase-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: clamp(80px, 28vw, 120px);
+    grid-auto-rows: clamp(64px, 24vw, 96px);
   }
 
   .pro-cabinet-showcase-panel {

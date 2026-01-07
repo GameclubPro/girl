@@ -37,7 +37,7 @@ type ProfilePayload = {
   portfolioUrls: string[]
 }
 
-const MAX_PORTFOLIO_ITEMS = 7
+const MAX_PORTFOLIO_ITEMS = 6
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
@@ -48,7 +48,6 @@ const collageClasses = [
   'is-wide',
   'is-small',
   'is-tall',
-  'is-small',
   'is-small',
 ]
 
@@ -111,7 +110,7 @@ export const ProCabinetScreen = ({
   const isBusy = isSaving || isUploading
   const showcaseSubtitle = hasShowcase
     ? `Работ в витрине: ${portfolioItems.length} из ${MAX_PORTFOLIO_ITEMS}`
-    : 'Добавьте до 7 лучших работ'
+    : 'Добавьте до 6 лучших работ'
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolveFocusPoint(focusItem)
