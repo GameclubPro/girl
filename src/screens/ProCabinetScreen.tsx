@@ -44,11 +44,10 @@ const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'imag
 const collageClasses = [
   'is-large',
   'is-tall',
-  'is-small',
   'is-wide',
   'is-small',
-  'is-tall',
   'is-small',
+  'is-wide',
 ]
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))

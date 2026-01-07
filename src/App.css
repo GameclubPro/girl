@@ -724,7 +724,7 @@
 .pro-cabinet-showcase-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: clamp(64px, 18vw, 104px);
+  grid-auto-rows: clamp(56px, 16vw, 92px);
   gap: 6px;
   grid-auto-flow: dense;
 }
@@ -5344,8 +5344,8 @@ h2 {
   }
 
   .pro-cabinet-showcase-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: clamp(64px, 24vw, 96px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: clamp(52px, 17vw, 88px);
   }
 
   .pro-cabinet-showcase-panel {
