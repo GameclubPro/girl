@@ -15,17 +15,27 @@ const categoryLabelOverrides: Record<string, string> = {
   'fitness-health': 'Фитнес',
 }
 
+const categoryChips = [
+  { id: null, label: 'Все' },
+  ...categoryItems.map((item) => ({
+    id: item.id,
+    label: categoryLabelOverrides[item.id] ?? item.label,
+  })),
+]
+
 export const ClientScreen = ({
   clientName,
   activeCategoryId,
   onCategoryChange,
   onViewShowcase,
+  onCreateRequest,
   onViewRequests,
 }: {
   clientName?: string
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onViewShowcase: () => void
+  onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: () => void
 }) => {
   const displayName = clientName?.trim() ?? ''
@@ -36,6 +46,10 @@ export const ClientScreen = ({
   const visiblePopularItems = useMemo(() => {
     if (!activeCategoryId) return popularItems
     return popularItems.filter((item) => item.categoryId === activeCategoryId)
+  }, [activeCategoryId])
+  const visibleCategoryItems = useMemo(() => {
+    if (!activeCategoryId) return categoryItems
+    return categoryItems.filter((item) => item.id === activeCategoryId)
   }, [activeCategoryId])
   const showcaseItems = useMemo(() => {
     const primary = activeCategoryId
@@ -81,6 +95,27 @@ export const ClientScreen = ({
             </span>
           </button>
         )}
+
+        <section className="client-section">
+          <div className="client-category-bar" role="tablist" aria-label="Категории">
+            {categoryChips.map((chip) => {
+              const isActive =
+                chip.id === activeCategoryId || (!activeCategoryId && chip.id === null)
+              return (
+                <button
+                  className={`client-category-chip${isActive ? ' is-active' : ''}`}
+                  key={chip.id ?? 'all'}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => onCategoryChange(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
 
         <section className="client-section">
           <div className="client-showcase-card">
@@ -164,6 +199,53 @@ export const ClientScreen = ({
               </p>
             )}
           </div>
+        </section>
+
+        <section className="client-section">
+          <div className="category-grid">
+            {visibleCategoryItems.map((item) => {
+              const isSelected = item.id === activeCategoryId
+
+              return (
+                <button
+                  className={`category-card${isSelected ? ' is-selected' : ''}`}
+                  type="button"
+                  key={item.id}
+                  aria-pressed={isSelected}
+                  onClick={() => onCategoryChange(item.id)}
+                >
+                  <span className="category-left">
+                    <span className="category-icon" aria-hidden="true">
+                      <img
+                        className="category-icon-image"
+                        src={item.icon}
+                        alt=""
+                        aria-hidden="true"
+                      />
+                    </span>
+                    {categoryLabelOverrides[item.id] ?? item.label}
+                  </span>
+                  <span className="category-arrow">›</span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="category-helper">
+            {activeCategoryLabel
+              ? `Выбрана категория: ${activeCategoryLabel}`
+              : 'Выберите категорию, чтобы создать заявку'}
+          </p>
+          <button
+            className="cta cta--primary cta--wide"
+            type="button"
+            onClick={() => onCreateRequest(activeCategoryId)}
+            disabled={!activeCategoryId}
+          >
+            <span className="cta-icon" aria-hidden="true">
+              +
+            </span>
+            Создать заявку
+          </button>
         </section>
       </div>
 
