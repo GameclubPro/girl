@@ -20,11 +20,13 @@ const categoryChips = [
 export const ClientScreen = ({
   activeCategoryId,
   onCategoryChange,
+  onViewShowcase,
   onCreateRequest,
   onViewRequests,
 }: {
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
+  onViewShowcase: () => void
   onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: () => void
 }) => {
@@ -53,10 +55,6 @@ export const ClientScreen = ({
     const fallback = activeCategoryId ? popularItems : []
     return [...primary, ...fallback].slice(0, 4)
   }, [activeCategoryId])
-  const handleShowcaseClick = () => {
-    const target = document.getElementById('client-popular')
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
 
   return (
     <div className="screen screen--client">
@@ -110,7 +108,7 @@ export const ClientScreen = ({
               <button
                 className="client-showcase-cta"
                 type="button"
-                onClick={handleShowcaseClick}
+                onClick={onViewShowcase}
               >
                 Смотреть →
               </button>
@@ -221,7 +219,7 @@ export const ClientScreen = ({
           </span>
           Главная
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewShowcase}>
           <span className="nav-icon" aria-hidden="true">
             <IconUsers />
           </span>

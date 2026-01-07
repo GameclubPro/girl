@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AddressScreen } from './screens/AddressScreen'
 import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
 import { ClientScreen } from './screens/ClientScreen'
+import { ClientShowcaseScreen } from './screens/ClientShowcaseScreen'
 import { ProCabinetScreen } from './screens/ProCabinetScreen'
 import { ProProfileScreen } from './screens/ProProfileScreen'
 import { ProRequestsScreen } from './screens/ProRequestsScreen'
@@ -23,6 +24,7 @@ function App() {
     | 'start'
     | 'address'
     | 'client'
+    | 'client-showcase'
     | 'request'
     | 'requests'
     | 'pro-cabinet'
@@ -178,7 +180,11 @@ function App() {
     const isPro =
       view === 'pro-cabinet' || view === 'pro-profile' || view === 'pro-requests'
     const isClient =
-      view === 'client' || view === 'request' || view === 'requests' || isPro
+      view === 'client' ||
+      view === 'client-showcase' ||
+      view === 'request' ||
+      view === 'requests' ||
+      isPro
     const themeColor = isPro ? '#fff3e8' : isClient ? '#f3edf7' : '#f7f2ef'
     webApp.setHeaderColor?.(themeColor)
     webApp.setBackgroundColor?.(themeColor)
@@ -349,6 +355,7 @@ function App() {
 
     const shouldShow =
       view === 'address' ||
+      view === 'client-showcase' ||
       view === 'request' ||
       view === 'requests' ||
       view === 'pro-cabinet' ||
@@ -362,6 +369,9 @@ function App() {
           break
         case 'request':
         case 'requests':
+          setView('client')
+          break
+        case 'client-showcase':
           setView('client')
           break
         case 'pro-profile':
@@ -406,12 +416,24 @@ function App() {
       <ClientScreen
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
+        onViewShowcase={() => setView('client-showcase')}
         onCreateRequest={(categoryId) => {
           setRequestCategoryId(
             categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
           )
           setView('request')
         }}
+        onViewRequests={() => setView('requests')}
+      />
+    )
+  }
+
+  if (view === 'client-showcase') {
+    return (
+      <ClientShowcaseScreen
+        activeCategoryId={clientCategoryId}
+        onCategoryChange={setClientCategoryId}
+        onBack={() => setView('client')}
         onViewRequests={() => setView('requests')}
       />
     )

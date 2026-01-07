@@ -4913,6 +4913,111 @@ h2 {
   display: block;
 }
 
+.screen--client-showcase {
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
+}
+
+.client-showcase-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.client-showcase-back {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  border: 1px solid #e6d9ee;
+  background: rgba(255, 255, 255, 0.8);
+  color: #6b5a77;
+  font-size: 20px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.client-showcase-back:focus-visible {
+  outline: 3px solid rgba(143, 98, 228, 0.35);
+  outline-offset: 2px;
+}
+
+.client-showcase-headings {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.client-showcase-page-kicker {
+  margin: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  color: #7f7386;
+}
+
+.client-showcase-page-title {
+  margin: 0;
+  font-size: clamp(18px, 4.8vw, 24px);
+  font-weight: 800;
+  color: #2f2731;
+}
+
+.client-showcase-page-subtitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a6f8a;
+}
+
+.client-work-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: clamp(110px, 42vw, 180px);
+  gap: 10px;
+  grid-auto-flow: dense;
+}
+
+.client-work-card {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 14px 22px rgba(100, 72, 124, 0.2);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.client-work-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.client-work-card.is-tall {
+  grid-row: span 2;
+}
+
+.client-work-card.is-wide {
+  grid-column: span 2;
+}
+
+.client-work-label {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(210, 120, 96, 0.85);
+  box-shadow: 0 8px 14px rgba(140, 86, 120, 0.32);
+  backdrop-filter: blur(6px);
+}
+
 .section-header {
   display: flex;
   align-items: center;
