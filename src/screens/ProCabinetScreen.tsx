@@ -12,15 +12,15 @@ type ProCabinetScreenProps = {
 }
 
 const MAX_SHOWCASE_ITEMS = 7
-const mosaicClasses = [
-  'is-hero',
+const collageClasses = [
+  'is-large',
   'is-tall',
-  'is-medium',
+  'is-small',
   'is-wide',
+  'is-small',
   'is-tall',
-  'is-medium',
-  'is-wide',
-  'is-medium',
+  'is-small',
+  'is-small',
 ]
 
 const resolveFocusPosition = (
@@ -127,85 +127,89 @@ export const ProCabinetScreen = ({
           {isLoading && <p className="pro-status">Загружаем витрину...</p>}
           {loadError && <p className="pro-error">{loadError}</p>}
           {!hasShowcase ? (
-            <div className="pro-cabinet-showcase-empty">
-              <button
-                className="pro-cabinet-showcase-add"
-                type="button"
-                onClick={() => onEditProfile('portfolio')}
-              >
-                + Добавить работу
-              </button>
-              <div className="pro-cabinet-showcase-preview">
-                <div className="pro-cabinet-showcase-sample">
-                  <span className="pro-cabinet-showcase-sample-icon">✦</span>
-                  <span className="pro-cabinet-showcase-sample-label">
-                    Пример витрины
-                  </span>
+            <div className="pro-cabinet-showcase-panel">
+              <div className="pro-cabinet-showcase-empty">
+                <button
+                  className="pro-cabinet-showcase-add"
+                  type="button"
+                  onClick={() => onEditProfile('portfolio')}
+                >
+                  + Добавить работу
+                </button>
+                <div className="pro-cabinet-showcase-preview">
+                  <div className="pro-cabinet-showcase-sample">
+                    <span className="pro-cabinet-showcase-sample-icon">✦</span>
+                    <span className="pro-cabinet-showcase-sample-label">
+                      Пример витрины
+                    </span>
+                  </div>
+                  <p className="pro-cabinet-showcase-hint">
+                    Одна сильная работа продает лучше, чем десять слабых. Начните с
+                    любимого кейса.
+                  </p>
                 </div>
-                <p className="pro-cabinet-showcase-hint">
-                  Одна сильная работа продает лучше, чем десять слабых. Начните с
-                  любимого кейса.
-                </p>
               </div>
             </div>
           ) : (
-            <div className="pro-cabinet-showcase-grid animate delay-2">
-              {mosaicItems.map((item, index) => {
-                const sizeClass = mosaicClasses[index] ?? 'is-medium'
-                const hasItem = Boolean(item?.url)
-                const isImage = item?.url ? isImageUrl(item.url) : false
-                const caption = item?.title?.trim() || 'Работа'
-                const cardClassName = ['pro-cabinet-showcase-card', sizeClass]
-                  .filter(Boolean)
-                  .join(' ')
-                const mediaClassName = [
-                  'pro-cabinet-showcase-media',
-                  !isImage && hasItem ? 'is-link' : '',
-                  !hasItem ? 'is-add' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')
+            <div className="pro-cabinet-showcase-panel">
+              <div className="pro-cabinet-showcase-grid animate delay-2">
+                {mosaicItems.map((item, index) => {
+                  const sizeClass = collageClasses[index] ?? 'is-small'
+                  const hasItem = Boolean(item?.url)
+                  const isImage = item?.url ? isImageUrl(item.url) : false
+                  const caption = item?.title?.trim() || 'Работа'
+                  const cardClassName = ['pro-cabinet-showcase-card', sizeClass]
+                    .filter(Boolean)
+                    .join(' ')
+                  const mediaClassName = [
+                    'pro-cabinet-showcase-media',
+                    !isImage && hasItem ? 'is-link' : '',
+                    !hasItem ? 'is-add' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
 
-                return (
-                  <article
-                    className={cardClassName}
-                    key={`${item?.url ?? 'add'}-${index}`}
-                  >
-                    {hasItem ? (
-                      <a
-                        className={mediaClassName}
-                        href={item?.url ?? '#'}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                      {isImage ? (
-                        <img
-                          src={item?.url ?? ''}
-                          alt={caption}
-                          loading="lazy"
-                          style={{ objectPosition: resolveFocusPosition(item) }}
-                        />
+                  return (
+                    <article
+                      className={cardClassName}
+                      key={`${item?.url ?? 'add'}-${index}`}
+                    >
+                      {hasItem ? (
+                        <a
+                          className={mediaClassName}
+                          href={item?.url ?? '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {isImage ? (
+                            <img
+                              src={item?.url ?? ''}
+                              alt={caption}
+                              loading="lazy"
+                              style={{ objectPosition: resolveFocusPosition(item) }}
+                            />
+                          ) : (
+                            <span className="pro-cabinet-showcase-link">LINK</span>
+                          )}
+                          {item?.title?.trim() && (
+                            <span className="pro-cabinet-showcase-caption">
+                              {item.title}
+                            </span>
+                          )}
+                        </a>
                       ) : (
-                          <span className="pro-cabinet-showcase-link">LINK</span>
-                        )}
-                        {item?.title?.trim() && (
-                          <span className="pro-cabinet-showcase-caption">
-                            {item.title}
-                          </span>
-                        )}
-                      </a>
-                    ) : (
-                      <button
-                        className={mediaClassName}
-                        type="button"
-                        onClick={() => onEditProfile('portfolio')}
-                      >
-                        <span className="pro-cabinet-showcase-add-icon">+</span>
-                      </button>
-                    )}
-                  </article>
-                )
-              })}
+                        <button
+                          className={mediaClassName}
+                          type="button"
+                          onClick={() => onEditProfile('portfolio')}
+                        >
+                          <span className="pro-cabinet-showcase-add-icon">+</span>
+                        </button>
+                      )}
+                    </article>
+                  )
+                })}
+              </div>
             </div>
           )}
         </section>

@@ -695,6 +695,14 @@
   color: var(--pro-muted);
 }
 
+.pro-cabinet-showcase-panel {
+  border-radius: 24px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 18px 30px rgba(16, 12, 11, 0.14);
+}
+
 .pro-cabinet-showcase-edit {
   border: 1px solid rgba(32, 25, 20, 0.12);
   background: rgba(255, 255, 255, 0.86);
@@ -715,9 +723,9 @@
 
 .pro-cabinet-showcase-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 90px;
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: clamp(72px, 20vw, 120px);
+  gap: 8px;
   grid-auto-flow: dense;
 }
 
@@ -729,7 +737,7 @@
 .pro-cabinet-showcase-media {
   width: 100%;
   height: 100%;
-  border-radius: 18px;
+  border-radius: 14px;
   overflow: hidden;
   position: relative;
   display: flex;
@@ -754,22 +762,18 @@
   display: block;
 }
 
-.pro-cabinet-showcase-card.is-hero {
+.pro-cabinet-showcase-card.is-large {
   grid-column: span 2;
   grid-row: span 3;
 }
 
 .pro-cabinet-showcase-card.is-tall {
-  grid-row: span 3;
-}
-
-.pro-cabinet-showcase-card.is-medium {
   grid-row: span 2;
 }
 
 .pro-cabinet-showcase-card.is-wide {
   grid-column: span 2;
-  grid-row: span 2;
+  grid-row: span 1;
 }
 
 .pro-cabinet-showcase-media.is-link {
@@ -778,11 +782,19 @@
 
 .pro-cabinet-showcase-media.is-add {
   border-style: dashed;
-  background: linear-gradient(145deg, rgba(255, 246, 236, 0.9), rgba(255, 252, 248, 0.9));
+  background: linear-gradient(145deg, rgba(255, 248, 240, 0.95), rgba(250, 250, 248, 0.95));
 }
 
 .pro-cabinet-showcase-add-icon {
-  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(32, 25, 20, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
   font-weight: 700;
   color: var(--pro-ink);
 }
@@ -849,13 +861,13 @@
 }
 
 .pro-cabinet-showcase-sample {
-  border-radius: 22px;
-  aspect-ratio: 3 / 4;
+  border-radius: 18px;
+  aspect-ratio: 4 / 5;
   background:
     radial-gradient(circle at 20% 20%, rgba(255, 212, 178, 0.8), transparent 55%),
     radial-gradient(circle at 80% 0%, rgba(186, 240, 231, 0.7), transparent 50%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(245, 239, 232, 0.95));
-  border: 1px dashed rgba(32, 25, 20, 0.2);
+  border: 1px dashed rgba(32, 25, 20, 0.16);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5292,7 +5304,8 @@ h2 {
   }
 
   .pro-cabinet-showcase-grid {
-    grid-auto-rows: 80px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: clamp(80px, 28vw, 120px);
   }
 
   .pro-portfolio-focus-card {
