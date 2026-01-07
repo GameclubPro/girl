@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties } from 'react'
+import type { ChangeEvent, CSSProperties, DragEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
@@ -77,6 +77,7 @@ type ProfilePayload = {
 }
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
+const MAX_PORTFOLIO_ITEMS = 7
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
 
@@ -118,6 +119,7 @@ export const ProProfileScreen = ({
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
+  const [portfolioError, setPortfolioError] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
@@ -125,6 +127,13 @@ export const ProProfileScreen = ({
   const [mediaError, setMediaError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
+  const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
+  const portfolioDragIndexRef = useRef<number | null>(null)
+  const portfolioReplaceIndexRef = useRef<number | null>(null)
+  const [portfolioDragOverIndex, setPortfolioDragOverIndex] = useState<
+    number | null
+  >(null)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection
       ? focusSection === 'availability'
@@ -234,10 +243,10 @@ export const ProProfileScreen = ({
     serviceItems.length > 0
       ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
       : 'Нет услуг'
-  const portfolioSummary =
-    portfolioItems.length > 0
-      ? formatCount(portfolioItems.length, 'работа', 'работы', 'работ')
-      : 'Нет работ'
+  const portfolioCountRaw = portfolioItems.filter((item) => item.url.trim()).length
+  const portfolioCount = Math.min(portfolioCountRaw, MAX_PORTFOLIO_ITEMS)
+  const portfolioCountLabel =
+    portfolioCount > 0 ? `${portfolioCount} фото` : 'Нет работ'
   const scheduleSummary =
     scheduleDays.length > 0
       ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
@@ -270,8 +279,9 @@ export const ProProfileScreen = ({
   )
   const visiblePortfolio = showAllPortfolio
     ? portfolioItems
-    : portfolioItems.slice(0, 6)
-  const hasMorePortfolio = portfolioItems.length > 6
+    : portfolioItems.slice(0, MAX_PORTFOLIO_ITEMS)
+  const hasMorePortfolio = portfolioItems.length > MAX_PORTFOLIO_ITEMS
+  const canAddPortfolio = portfolioItems.length < MAX_PORTFOLIO_ITEMS
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -359,6 +369,12 @@ export const ProProfileScreen = ({
       document.body.style.overflow = previousOverflow
     }
   }, [editingSection])
+
+  useEffect(() => {
+    if (editingSection !== 'portfolio' && portfolioError) {
+      setPortfolioError('')
+    }
+  }, [editingSection, portfolioError])
 
   useEffect(() => {
     hasLoadedRef.current = false
@@ -685,6 +701,10 @@ export const ProProfileScreen = ({
   const addPortfolio = () => {
     const trimmed = portfolioInput.trim()
     if (!trimmed) return
+    if (!canAddPortfolio) {
+      setPortfolioError(`Можно добавить максимум ${MAX_PORTFOLIO_ITEMS} работ.`)
+      return
+    }
     const title = portfolioTitleInput.trim()
     setPortfolioItems((current) =>
       current.some((item) => item.url === trimmed)
@@ -693,6 +713,7 @@ export const ProProfileScreen = ({
     )
     setPortfolioInput('')
     setPortfolioTitleInput('')
+    setPortfolioError('')
   }
 
   const updatePortfolioItem = (
@@ -710,6 +731,156 @@ export const ProProfileScreen = ({
     setPortfolioItems((current) =>
       current.filter((_, itemIndex) => itemIndex !== index)
     )
+    setPortfolioError('')
+  }
+
+  const validatePortfolioFile = (file: File) => {
+    if (!allowedImageTypes.has(file.type)) {
+      return 'Поддерживаются только PNG, JPG или WebP.'
+    }
+    if (file.size > MAX_MEDIA_BYTES) {
+      return 'Файл слишком большой. Максимум 3 МБ.'
+    }
+    return ''
+  }
+
+  const readImageFileAsync = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = typeof reader.result === 'string' ? reader.result : ''
+        if (!result) {
+          reject(new Error('read_failed'))
+          return
+        }
+        resolve(result)
+      }
+      reader.onerror = () => reject(new Error('read_failed'))
+      reader.readAsDataURL(file)
+    })
+
+  const handlePortfolioUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    if (!canAddPortfolio) {
+      setPortfolioError(`Можно добавить максимум ${MAX_PORTFOLIO_ITEMS} работ.`)
+      return
+    }
+    const remaining = MAX_PORTFOLIO_ITEMS - portfolioItems.length
+    const selection = Array.from(files).slice(0, remaining)
+    for (const file of selection) {
+      const errorMessage = validatePortfolioFile(file)
+      if (errorMessage) {
+        setPortfolioError(errorMessage)
+        return
+      }
+    }
+    try {
+      const dataUrls = await Promise.all(
+        selection.map((file) => readImageFileAsync(file))
+      )
+      setPortfolioItems((current) => {
+        const next = [
+          ...dataUrls.map((url) => ({ url, title: null })),
+          ...current,
+        ]
+        return next.slice(0, MAX_PORTFOLIO_ITEMS)
+      })
+      setPortfolioError('')
+    } catch (error) {
+      setPortfolioError('Не удалось прочитать файл.')
+    }
+  }
+
+  const handlePortfolioReplace = async (file: File, index: number) => {
+    const errorMessage = validatePortfolioFile(file)
+    if (errorMessage) {
+      setPortfolioError(errorMessage)
+      return
+    }
+    try {
+      const dataUrl = await readImageFileAsync(file)
+      setPortfolioItems((current) =>
+        current.map((item, itemIndex) =>
+          itemIndex === index ? { ...item, url: dataUrl } : item
+        )
+      )
+      setPortfolioError('')
+    } catch (error) {
+      setPortfolioError('Не удалось прочитать файл.')
+    }
+  }
+
+  const handlePortfolioUploadClick = () => {
+    if (!canAddPortfolio) {
+      setPortfolioError(`Можно добавить максимум ${MAX_PORTFOLIO_ITEMS} работ.`)
+      return
+    }
+    portfolioUploadInputRef.current?.click()
+  }
+
+  const handlePortfolioUploadChange = (event: ChangeEvent<HTMLInputElement>) => {
+    void handlePortfolioUpload(event.target.files)
+    event.target.value = ''
+  }
+
+  const handlePortfolioReplaceClick = (index: number) => {
+    portfolioReplaceIndexRef.current = index
+    portfolioReplaceInputRef.current?.click()
+  }
+
+  const handlePortfolioReplaceChange = (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    const index = portfolioReplaceIndexRef.current
+    if (!file || index === null || index === undefined) {
+      event.target.value = ''
+      return
+    }
+    void handlePortfolioReplace(file, index)
+    event.target.value = ''
+  }
+
+  const handlePortfolioDragStart = (
+    event: DragEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    portfolioDragIndexRef.current = index
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handlePortfolioDragOver = (
+    event: DragEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    event.preventDefault()
+    setPortfolioDragOverIndex(index)
+  }
+
+  const handlePortfolioDragLeave = () => {
+    setPortfolioDragOverIndex(null)
+  }
+
+  const handlePortfolioDrop = (index: number) => {
+    const fromIndex = portfolioDragIndexRef.current
+    if (fromIndex === null || fromIndex === index) {
+      setPortfolioDragOverIndex(null)
+      return
+    }
+    setPortfolioItems((current) => {
+      if (fromIndex < 0 || fromIndex >= current.length) return current
+      const next = [...current]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(index, 0, moved)
+      return next
+    })
+    portfolioDragIndexRef.current = null
+    setPortfolioDragOverIndex(null)
+  }
+
+  const handlePortfolioDragEnd = () => {
+    portfolioDragIndexRef.current = null
+    setPortfolioDragOverIndex(null)
   }
 
   const toggleScheduleDay = (dayId: string) => {
@@ -1090,8 +1261,14 @@ export const ProProfileScreen = ({
               🖼️
             </span>
             <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Портфолио</span>
-              <span className="pro-profile-card-value">{portfolioSummary}</span>
+              <span className="pro-profile-card-title">Работы</span>
+              <span
+                className={`pro-profile-card-value${
+                  portfolioCount > 0 ? '' : ' is-muted'
+                }`}
+              >
+                {portfolioCountLabel}
+              </span>
               {portfolioPreview.length > 0 ? (
                 <span className="pro-profile-portfolio">
                   {portfolioPreview.map((item, index) => {
@@ -1113,9 +1290,16 @@ export const ProProfileScreen = ({
                   })}
                 </span>
               ) : (
-                <span className="pro-profile-card-meta is-muted">
-                  Пока нет работ
-                </span>
+                <button
+                  className="pro-profile-card-link"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openEditor('portfolio')
+                  }}
+                >
+                  Добавить
+                </button>
               )}
             </span>
             <span className="pro-profile-card-chevron" aria-hidden="true">
@@ -1479,6 +1663,37 @@ export const ProProfileScreen = ({
                 <>
                   <div className="pro-field">
                     <span className="pro-label">Витрина работ</span>
+                    <div className="pro-portfolio-actions">
+                      <input
+                        ref={portfolioUploadInputRef}
+                        className="pro-file-input"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handlePortfolioUploadChange}
+                        aria-hidden="true"
+                        tabIndex={-1}
+                      />
+                      <input
+                        ref={portfolioReplaceInputRef}
+                        className="pro-file-input"
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePortfolioReplaceChange}
+                        aria-hidden="true"
+                        tabIndex={-1}
+                      />
+                      <button
+                        className="pro-add pro-portfolio-upload"
+                        type="button"
+                        onClick={handlePortfolioUploadClick}
+                      >
+                        + Добавить из галереи
+                      </button>
+                      <span className="pro-portfolio-limit">
+                        до {MAX_PORTFOLIO_ITEMS} работ
+                      </span>
+                    </div>
                     <div className="pro-portfolio-add">
                       <input
                         className="pro-input"
@@ -1491,7 +1706,7 @@ export const ProProfileScreen = ({
                             addPortfolio()
                           }
                         }}
-                        placeholder="Ссылка на фото или видео"
+                        placeholder="Ссылка на работу (если нужно)"
                       />
                       <input
                         className="pro-input"
@@ -1508,19 +1723,35 @@ export const ProProfileScreen = ({
                         }}
                         placeholder="Подпись (опционально)"
                       />
-                      <button className="pro-add" type="button" onClick={addPortfolio}>
-                        Добавить
+                      <button className="pro-ghost" type="button" onClick={addPortfolio}>
+                        Добавить ссылку
                       </button>
                     </div>
+                    {portfolioError && (
+                      <p className="pro-error">{portfolioError}</p>
+                    )}
                   </div>
                   <div className="pro-portfolio-grid">
                     {visiblePortfolio.length > 0 ? (
                       visiblePortfolio.map((item, index) => {
                         const showImage = isImageUrl(item.url)
+                        const isDragOver = portfolioDragOverIndex === index
                         return (
                           <div
-                            className="pro-portfolio-card"
+                            className={`pro-portfolio-card${
+                              isDragOver ? ' is-drag-over' : ''
+                            }`}
                             key={`${item.url}-${index}`}
+                            draggable
+                            onDragStart={(event) =>
+                              handlePortfolioDragStart(event, index)
+                            }
+                            onDragOver={(event) =>
+                              handlePortfolioDragOver(event, index)
+                            }
+                            onDragLeave={handlePortfolioDragLeave}
+                            onDrop={() => handlePortfolioDrop(index)}
+                            onDragEnd={handlePortfolioDragEnd}
                           >
                             <div
                               className={`pro-portfolio-thumb${
@@ -1556,6 +1787,16 @@ export const ProProfileScreen = ({
                               >
                                 Открыть работу
                               </a>
+                              <div className="pro-portfolio-actions-row">
+                                <button
+                                  className="pro-portfolio-action"
+                                  type="button"
+                                  onClick={() => handlePortfolioReplaceClick(index)}
+                                >
+                                  Заменить
+                                </button>
+                                <span className="pro-portfolio-drag">Перетащить</span>
+                              </div>
                             </div>
                             <button
                               className="pro-portfolio-remove"

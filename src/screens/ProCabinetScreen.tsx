@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import type { MasterProfile, ProProfileSection } from '../types/app'
-import {
-  isImageUrl,
-  parsePortfolioItems,
-  type PortfolioItem,
-} from '../utils/profileContent'
+import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
 type ProCabinetScreenProps = {
   apiBase: string
@@ -15,15 +11,17 @@ type ProCabinetScreenProps = {
   onViewRequests: () => void
 }
 
-const sizeClasses = [
+const MAX_SHOWCASE_ITEMS = 7
+const mosaicClasses = [
+  'is-hero',
   'is-tall',
-  'is-square',
+  'is-medium',
   'is-wide',
   'is-tall',
-  'is-square',
+  'is-medium',
   'is-wide',
+  'is-medium',
 ]
-const variantClasses = ['is-sand', 'is-blush', 'is-mint']
 
 export const ProCabinetScreen = ({
   apiBase,
@@ -86,19 +84,16 @@ export const ProCabinetScreen = ({
     () => parsePortfolioItems(portfolioUrls),
     [portfolioUrls]
   )
-  const showcaseItems = useMemo(() => {
-    const slots: Array<PortfolioItem | null> = [
-      ...portfolioItems.slice(0, 6),
-    ]
-    while (slots.length < 6) {
-      slots.push(null)
-    }
-    return slots
-  }, [portfolioItems])
-  const showcaseSubtitle =
-    portfolioItems.length > 0
-      ? `Показаны ${Math.min(portfolioItems.length, 6)} из ${portfolioItems.length}`
-      : 'Добавьте до 6 работ в витрину'
+  const showcaseItems = useMemo(
+    () => portfolioItems.slice(0, MAX_SHOWCASE_ITEMS),
+    [portfolioItems]
+  )
+  const hasShowcase = showcaseItems.length > 0
+  const showAddTile = hasShowcase && showcaseItems.length < MAX_SHOWCASE_ITEMS
+  const mosaicItems = showAddTile ? [...showcaseItems, null] : showcaseItems
+  const showcaseSubtitle = hasShowcase
+    ? `Работ в витрине: ${showcaseItems.length} из ${MAX_SHOWCASE_ITEMS}`
+    : 'Добавьте до 7 лучших работ'
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -110,75 +105,99 @@ export const ProCabinetScreen = ({
               <h1 className="pro-cabinet-showcase-title">Витрина работ</h1>
               <p className="pro-cabinet-showcase-subtitle">{showcaseSubtitle}</p>
             </div>
-            <button
-              className="pro-cabinet-showcase-edit"
-              type="button"
-              onClick={() => onEditProfile('portfolio')}
-            >
-              Редактировать
-            </button>
+            {hasShowcase && (
+              <button
+                className="pro-cabinet-showcase-edit"
+                type="button"
+                onClick={() => onEditProfile('portfolio')}
+              >
+                Редактировать витрину
+              </button>
+            )}
           </div>
           {isLoading && <p className="pro-status">Загружаем витрину...</p>}
           {loadError && <p className="pro-error">{loadError}</p>}
-          <div className="pro-cabinet-showcase-grid animate delay-2">
-            {showcaseItems.map((item, index) => {
-              const sizeClass = sizeClasses[index] ?? 'is-square'
-              const variantClass = variantClasses[index % variantClasses.length]
-              const hasItem = Boolean(item?.url)
-              const isImage = item?.url ? isImageUrl(item.url) : false
-              const caption =
-                item?.title?.trim() || (item?.url ? 'Работа' : 'Добавьте работу')
-              const mediaClassName = [
-                'pro-cabinet-showcase-media',
-                sizeClass,
-                !hasItem ? `pro-cabinet-showcase-empty ${variantClass}` : '',
-                !isImage && hasItem ? 'is-link' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')
+          {!hasShowcase ? (
+            <div className="pro-cabinet-showcase-empty">
+              <button
+                className="pro-cabinet-showcase-add"
+                type="button"
+                onClick={() => onEditProfile('portfolio')}
+              >
+                + Добавить работу
+              </button>
+              <div className="pro-cabinet-showcase-preview">
+                <div className="pro-cabinet-showcase-sample">
+                  <span className="pro-cabinet-showcase-sample-icon">✦</span>
+                  <span className="pro-cabinet-showcase-sample-label">
+                    Пример витрины
+                  </span>
+                </div>
+                <p className="pro-cabinet-showcase-hint">
+                  Одна сильная работа продает лучше, чем десять слабых. Начните с
+                  любимого кейса.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="pro-cabinet-showcase-grid animate delay-2">
+              {mosaicItems.map((item, index) => {
+                const sizeClass = mosaicClasses[index] ?? 'is-medium'
+                const hasItem = Boolean(item?.url)
+                const isImage = item?.url ? isImageUrl(item.url) : false
+                const caption = item?.title?.trim() || 'Работа'
+                const cardClassName = ['pro-cabinet-showcase-card', sizeClass]
+                  .filter(Boolean)
+                  .join(' ')
+                const mediaClassName = [
+                  'pro-cabinet-showcase-media',
+                  !isImage && hasItem ? 'is-link' : '',
+                  !hasItem ? 'is-add' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')
 
-              return (
-                <article
-                  className="pro-cabinet-showcase-card"
-                  key={`${item?.url ?? 'empty'}-${index}`}
-                >
-                  {hasItem ? (
-                    <a
-                      className={mediaClassName}
-                      href={item?.url ?? '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {isImage ? (
-                        <img
-                          src={item?.url ?? ''}
-                          alt={caption}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span className="pro-cabinet-showcase-link">LINK</span>
-                      )}
-                      {item?.title?.trim() && (
-                        <span className="pro-cabinet-showcase-caption">
-                          {item.title}
-                        </span>
-                      )}
-                    </a>
-                  ) : (
-                    <button
-                      className={mediaClassName}
-                      type="button"
-                      onClick={() => onEditProfile('portfolio')}
-                    >
-                      <span className="pro-cabinet-showcase-empty-label">
-                        Добавить работу
-                      </span>
-                    </button>
-                  )}
-                </article>
-              )
-            })}
-          </div>
+                return (
+                  <article
+                    className={cardClassName}
+                    key={`${item?.url ?? 'add'}-${index}`}
+                  >
+                    {hasItem ? (
+                      <a
+                        className={mediaClassName}
+                        href={item?.url ?? '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {isImage ? (
+                          <img
+                            src={item?.url ?? ''}
+                            alt={caption}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span className="pro-cabinet-showcase-link">LINK</span>
+                        )}
+                        {item?.title?.trim() && (
+                          <span className="pro-cabinet-showcase-caption">
+                            {item.title}
+                          </span>
+                        )}
+                      </a>
+                    ) : (
+                      <button
+                        className={mediaClassName}
+                        type="button"
+                        onClick={() => onEditProfile('portfolio')}
+                      >
+                        <span className="pro-cabinet-showcase-add-icon">+</span>
+                      </button>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </section>
       </div>
 
