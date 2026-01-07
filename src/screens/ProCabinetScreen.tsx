@@ -79,6 +79,7 @@ export const ProCabinetScreen = ({
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceIndexRef = useRef<number | null>(null)
@@ -107,6 +108,7 @@ export const ProCabinetScreen = ({
   const showAddTile =
     hasShowcase && portfolioItems.length < MAX_PORTFOLIO_ITEMS
   const mosaicItems = showAddTile ? [...portfolioItems, null] : portfolioItems
+  const isBusy = isSaving || isUploading
   const showcaseSubtitle = hasShowcase
     ? `Работ в витрине: ${portfolioItems.length} из ${MAX_PORTFOLIO_ITEMS}`
     : 'Добавьте до 7 лучших работ'
@@ -307,6 +309,46 @@ export const ProCabinetScreen = ({
       reader.readAsDataURL(file)
     })
 
+  const resolveUploadError = (payload: { error?: string } | null) => {
+    if (payload?.error === 'image_too_large') {
+      return 'Файл слишком большой. Максимум 3 МБ.'
+    }
+    if (payload?.error === 'invalid_image') {
+      return 'Формат изображения не поддерживается.'
+    }
+    if (payload?.error === 'userId_required') {
+      return 'Не удалось загрузить файл. Нет пользователя.'
+    }
+    return 'Не удалось загрузить файл.'
+  }
+
+  const uploadPortfolioDataUrl = async (dataUrl: string) => {
+    if (!userId) {
+      throw new Error('Не удалось загрузить файл. Нет пользователя.')
+    }
+    const response = await fetch(`${apiBase}/api/masters/portfolio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, dataUrl }),
+    })
+    const payload = (await response.json().catch(() => null)) as {
+      url?: string
+      error?: string
+    } | null
+    if (!response.ok) {
+      throw new Error(resolveUploadError(payload))
+    }
+    if (!payload?.url) {
+      throw new Error('Не удалось загрузить файл.')
+    }
+    return payload.url
+  }
+
+  const uploadPortfolioFile = async (file: File) => {
+    const dataUrl = await readImageFileAsync(file)
+    return uploadPortfolioDataUrl(dataUrl)
+  }
+
   const handlePortfolioUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     if (portfolioItems.length >= MAX_PORTFOLIO_ITEMS) {
@@ -322,20 +364,33 @@ export const ProCabinetScreen = ({
         return
       }
     }
+    setIsUploading(true)
+    setSaveError('')
     try {
-      const dataUrls = await Promise.all(
-        selection.map((file) => readImageFileAsync(file))
-      )
+      const uploadedUrls: string[] = []
+      for (const file of selection) {
+        const url = await uploadPortfolioFile(file)
+        uploadedUrls.push(url)
+      }
       setPortfolioItems((current) => {
         const next = [
-          ...dataUrls.map((url) => ({ url, title: null, focusX: 0.5, focusY: 0.5 })),
+          ...uploadedUrls.map((url) => ({
+            url,
+            title: null,
+            focusX: 0.5,
+            focusY: 0.5,
+          })),
           ...current,
         ]
         return next.slice(0, MAX_PORTFOLIO_ITEMS)
       })
       setSaveError('')
     } catch (error) {
-      setSaveError('Не удалось прочитать файл.')
+      setSaveError(
+        error instanceof Error ? error.message : 'Не удалось загрузить файл.'
+      )
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -345,22 +400,27 @@ export const ProCabinetScreen = ({
       setSaveError(errorMessage)
       return
     }
+    setIsUploading(true)
+    setSaveError('')
     try {
-      const dataUrl = await readImageFileAsync(file)
+      const url = await uploadPortfolioFile(file)
       setPortfolioItems((current) =>
         current.map((item, itemIndex) =>
-          itemIndex === index
-            ? { ...item, url: dataUrl, focusX: 0.5, focusY: 0.5 }
-            : item
+          itemIndex === index ? { ...item, url, focusX: 0.5, focusY: 0.5 } : item
         )
       )
       setSaveError('')
     } catch (error) {
-      setSaveError('Не удалось прочитать файл.')
+      setSaveError(
+        error instanceof Error ? error.message : 'Не удалось загрузить файл.'
+      )
+    } finally {
+      setIsUploading(false)
     }
   }
 
   const handleAddClick = () => {
+    if (isBusy) return
     portfolioUploadInputRef.current?.click()
   }
 
@@ -535,7 +595,7 @@ export const ProCabinetScreen = ({
                   className="pro-cabinet-showcase-add"
                   type="button"
                   onClick={handleAddClick}
-                  disabled={isSaving}
+                  disabled={isBusy}
                 >
                   + Добавить работу
                 </button>

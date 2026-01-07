@@ -807,6 +807,50 @@ app.post('/api/masters/media', async (req, res) => {
   }
 })
 
+app.post('/api/masters/portfolio', async (req, res) => {
+  const { userId, dataUrl } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const parsed = parseImageDataUrl(dataUrl)
+  if (!parsed) {
+    res.status(400).json({ error: 'invalid_image' })
+    return
+  }
+
+  if (parsed.buffer.length > MAX_UPLOAD_BYTES) {
+    res.status(413).json({ error: 'image_too_large' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    const ext = getImageExtension(parsed.mime)
+    const filename = `portfolio-${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`
+    const relativePath = path.posix.join(
+      'masters',
+      safeUserId,
+      'portfolio',
+      filename
+    )
+    const absolutePath = path.join(uploadsRoot, relativePath)
+
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true })
+    await fs.writeFile(absolutePath, parsed.buffer)
+
+    res.json({ ok: true, url: buildPublicUrl(req, relativePath), path: relativePath })
+  } catch (error) {
+    console.error('POST /api/masters/portfolio failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.delete('/api/masters/media', async (req, res) => {
   const { userId, kind } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
