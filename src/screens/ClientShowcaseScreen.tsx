@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems, popularItems } from '../data/clientData'
 import type { MasterProfile } from '../types/app'
@@ -178,6 +178,28 @@ export const ClientShowcaseScreen = ({
     }
   }, [basePool, poolByShape])
 
+  const appendBlock = useCallback(() => {
+    if (basePool.length === 0) return
+    if (isAppendingRef.current) return
+    isAppendingRef.current = true
+    setShowcaseBlocks((current) => [...current, buildShowcaseBlock()])
+    window.setTimeout(() => {
+      isAppendingRef.current = false
+    }, 250)
+  }, [basePool.length, buildShowcaseBlock])
+
+  const checkNearBottom = useCallback(() => {
+    if (basePool.length === 0) return
+    const scrollElement = document.scrollingElement ?? document.documentElement
+    const scrollTop = scrollElement.scrollTop || document.body.scrollTop
+    const scrollHeight = scrollElement.scrollHeight || document.body.scrollHeight
+    const clientHeight = scrollElement.clientHeight || window.innerHeight
+    const distance = scrollHeight - (scrollTop + clientHeight)
+    if (distance < 260) {
+      appendBlock()
+    }
+  }, [appendBlock, basePool.length])
+
   useEffect(() => {
     if (basePool.length === 0) {
       setShowcaseBlocks([])
@@ -196,18 +218,34 @@ export const ClientShowcaseScreen = ({
         const entry = entries[0]
         if (!entry?.isIntersecting) return
         if (basePool.length === 0) return
-        if (isAppendingRef.current) return
-        isAppendingRef.current = true
-        setShowcaseBlocks((current) => [...current, buildShowcaseBlock()])
-        window.setTimeout(() => {
-          isAppendingRef.current = false
-        }, 350)
+        appendBlock()
       },
       { rootMargin: '220px' }
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [basePool.length, buildShowcaseBlock])
+  }, [appendBlock, basePool.length])
+
+  useEffect(() => {
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        checkNearBottom()
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    checkNearBottom()
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (raf) window.cancelAnimationFrame(raf)
+    }
+  }, [checkNearBottom])
+
+  useEffect(() => {
+    checkNearBottom()
+  }, [checkNearBottom, showcaseBlocks.length])
 
   return (
     <div className="screen screen--client screen--client-showcase">
