@@ -37,7 +37,8 @@ type ProfilePayload = {
   portfolioUrls: string[]
 }
 
-const MAX_PORTFOLIO_ITEMS = 6
+const MAX_PORTFOLIO_ITEMS = 30
+const MAX_SHOWCASE_ITEMS = 6
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
@@ -95,14 +96,28 @@ export const ProCabinetScreen = ({
     () => JSON.stringify(toPortfolioStrings(portfolioItems)),
     [portfolioItems]
   )
-  const hasShowcase = portfolioItems.length > 0
-  const showAddTile =
-    hasShowcase && portfolioItems.length < MAX_PORTFOLIO_ITEMS
-  const mosaicItems = showAddTile ? [...portfolioItems, null] : portfolioItems
+  const showcaseItems = useMemo(
+    () => portfolioItems.filter((item) => item.isShowcase).slice(0, MAX_SHOWCASE_ITEMS),
+    [portfolioItems]
+  )
+  const showcaseTiles = useMemo(
+    () =>
+      Array.from({ length: MAX_SHOWCASE_ITEMS }, (_, index) => ({
+        item: showcaseItems[index] ?? null,
+        index:
+          showcaseItems[index] && portfolioItems.includes(showcaseItems[index])
+            ? portfolioItems.indexOf(showcaseItems[index])
+            : null,
+      })),
+    [portfolioItems, showcaseItems]
+  )
+  const hasShowcase = showcaseItems.length > 0
+  const showAddTile = portfolioItems.length < MAX_PORTFOLIO_ITEMS
   const isBusy = isSaving || isUploading
   const showcaseSubtitle = hasShowcase
-    ? `Работ в витрине: ${portfolioItems.length} из ${MAX_PORTFOLIO_ITEMS}`
-    : `Добавьте до ${MAX_PORTFOLIO_ITEMS} лучших работ`
+    ? `В витрине: ${showcaseItems.length} из ${MAX_SHOWCASE_ITEMS}`
+    : `Выберите до ${MAX_SHOWCASE_ITEMS} работ в профиле`
+  const portfolioSubtitle = `Портфолио: ${portfolioItems.length} из ${MAX_PORTFOLIO_ITEMS}`
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolveFocusPoint(focusItem)
@@ -372,6 +387,7 @@ export const ProCabinetScreen = ({
             title: null,
             focusX: 0.5,
             focusY: 0.5,
+            isShowcase: false,
           })),
           ...current,
         ]

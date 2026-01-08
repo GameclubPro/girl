@@ -9,6 +9,7 @@ export type PortfolioItem = {
   title?: string | null
   focusX?: number | null
   focusY?: number | null
+  isShowcase?: boolean
 }
 
 const SERVICE_PREFIX = 'svc:'
@@ -67,14 +68,16 @@ const parsePortfolioItem = (value: string): PortfolioItem | null => {
     const title = normalizeText(payload?.title)
     const focusX = clampUnit(payload?.focusX, 0.5)
     const focusY = clampUnit(payload?.focusY, 0.5)
+    const isShowcase = Boolean(payload?.showcase ?? payload?.isShowcase)
     return {
       url,
       title: title || null,
       focusX,
       focusY,
+      isShowcase,
     }
   }
-  return { url: raw, title: null, focusX: 0.5, focusY: 0.5 }
+  return { url: raw, title: null, focusX: 0.5, focusY: 0.5, isShowcase: false }
 }
 
 export const parseServiceItems = (values: string[]) =>
@@ -108,6 +111,7 @@ export const stringifyPortfolioItem = (item: PortfolioItem) => {
     title: title || null,
     focusX,
     focusY,
+    showcase: Boolean(item.isShowcase),
   })}`
 }
 
