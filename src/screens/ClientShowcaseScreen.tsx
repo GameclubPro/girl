@@ -44,7 +44,22 @@ type ShowcaseMedia = {
   categories: string[]
 }
 
-const galleryShapePattern = ['is-square', 'is-tall', 'is-square', 'is-wide', 'is-square', 'is-wide'] as const
+const galleryShapePattern = [
+  'is-square',
+  'is-wide',
+  'is-square',
+  'is-tall',
+  'is-square',
+  'is-square',
+  'is-wide',
+  'is-square',
+  'is-tall',
+  'is-square',
+  'is-wide',
+] as const
+
+const pickGalleryShape = (seed: number) =>
+  galleryShapePattern[seed % galleryShapePattern.length]
 
 const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
   id: `fallback-showcase-${item.id}-${index}`,
@@ -293,7 +308,7 @@ export const ClientShowcaseGalleryScreen = ({
           {isLoading ? (
             <div className="client-gallery-grid is-skeleton" aria-hidden="true">
               {Array.from({ length: 9 }).map((_, index) => {
-                const shapeClass = galleryShapePattern[index % galleryShapePattern.length]
+                const shapeClass = pickGalleryShape(index * 7 + 3)
                 return (
                   <span
                     className={`client-gallery-item ${shapeClass} is-skeleton`}
@@ -305,7 +320,7 @@ export const ClientShowcaseGalleryScreen = ({
           ) : showcaseItems.length > 0 ? (
             <div className="client-gallery-grid" role="list">
               {showcaseItems.map((item, index) => {
-                const shapeClass = galleryShapePattern[index % galleryShapePattern.length]
+                const shapeClass = pickGalleryShape(toSeed(item.id) + index * 7)
                 return (
                   <span
                     className={`client-gallery-item ${shapeClass}`}
