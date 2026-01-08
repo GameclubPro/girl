@@ -143,6 +143,10 @@ export const ProProfileScreen = ({
     number | null
   >(null)
   const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
+  const [isPortfolioPickerOpen, setIsPortfolioPickerOpen] = useState(false)
+  const [portfolioQuickActionIndex, setPortfolioQuickActionIndex] = useState<
+    number | null
+  >(null)
   const [isPortfolioUploading, setIsPortfolioUploading] = useState(false)
   const [portfolioError, setPortfolioError] = useState('')
   const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
@@ -151,6 +155,7 @@ export const ProProfileScreen = ({
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
+  const portfolioCameraInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceIndexRef = useRef<number | null>(null)
   const portfolioFocusPointerRef = useRef(false)
@@ -158,6 +163,9 @@ export const ProProfileScreen = ({
   const portfolioFocusIndexRef = useRef<number | null>(null)
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
   const portfolioAutosaveTimerRef = useRef<number | null>(null)
+  const portfolioLongPressTimerRef = useRef<number | null>(null)
+  const portfolioLongPressTriggeredRef = useRef(false)
+  const portfolioLongPressStartRef = useRef<{ x: number; y: number } | null>(null)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection && focusSection !== 'portfolio'
       ? focusSection === 'availability'
@@ -323,6 +331,14 @@ export const ProProfileScreen = ({
         .slice(0, MAX_PORTFOLIO_ITEMS),
     [portfolioItems]
   )
+  const portfolioRecentItems = useMemo(
+    () =>
+      portfolioItems
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item.url.trim() && isImageUrl(item.url))
+        .slice(0, 6),
+    [portfolioItems]
+  )
   const isPortfolioFull = portfolioItems.length >= MAX_PORTFOLIO_ITEMS
   const portfolioLightboxItem =
     portfolioLightboxIndex !== null ? portfolioItems[portfolioLightboxIndex] ?? null : null
@@ -333,6 +349,19 @@ export const ProProfileScreen = ({
   const isLightboxInShowcase = portfolioLightboxItem
     ? showcaseItems.some((item) => item.url === portfolioLightboxItem.url)
     : false
+  const portfolioQuickActionItem =
+    portfolioQuickActionIndex !== null
+      ? portfolioItems[portfolioQuickActionIndex] ?? null
+      : null
+  const isQuickActionInShowcase = portfolioQuickActionItem
+    ? showcaseItems.some((item) => item.url === portfolioQuickActionItem.url)
+    : false
+  const quickActionFocus = resolvePortfolioFocus(portfolioQuickActionItem)
+  const isPortfolioOverlayOpen =
+    portfolioLightboxIndex !== null ||
+    portfolioFocusIndex !== null ||
+    isPortfolioPickerOpen ||
+    portfolioQuickActionIndex !== null
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolvePortfolioFocus(focusItem)
@@ -343,6 +372,13 @@ export const ProProfileScreen = ({
       : 'Нет фото'
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_ROW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded && hasPortfolioOverflow
+  const visiblePortfolioLimit =
+    isPortfolioCollapsed && !isPortfolioFull
+      ? PORTFOLIO_ROW_LIMIT - 1
+      : PORTFOLIO_ROW_LIMIT
+  const visiblePortfolioItems = isPortfolioCollapsed
+    ? portfolioGridItems.slice(0, Math.max(visiblePortfolioLimit, 0))
+    : portfolioGridItems
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -373,6 +409,18 @@ export const ProProfileScreen = ({
     setPortfolioError('')
     setPortfolioFocusIndex(null)
     portfolioFocusPointerRef.current = false
+  }
+  const openPortfolioPicker = () => {
+    setPortfolioError('')
+    setIsPortfolioPickerOpen(true)
+  }
+  const closePortfolioPicker = () => {
+    setIsPortfolioPickerOpen(false)
+  }
+  const openPortfolioQuickActions = (index: number) => {
+    if (!portfolioItems[index]) return
+    setPortfolioError('')
+    setPortfolioQuickActionIndex(index)
   }
   const openEditor = (section: ProProfileSection) => {
     if (section === 'portfolio') {
@@ -434,6 +482,14 @@ export const ProProfileScreen = ({
         closePortfolioLightbox()
         return true
       }
+      if (portfolioQuickActionIndex !== null) {
+        setPortfolioQuickActionIndex(null)
+        return true
+      }
+      if (isPortfolioPickerOpen) {
+        setIsPortfolioPickerOpen(false)
+        return true
+      }
       if (editingSectionRef.current) {
         setEditingSection(null)
         return true
@@ -444,7 +500,7 @@ export const ProProfileScreen = ({
     return () => {
       onBackHandlerChange(null)
     }
-  }, [onBackHandlerChange])
+  }, [isPortfolioPickerOpen, onBackHandlerChange, portfolioQuickActionIndex])
 
   useEffect(() => {
     if (!focusSection) return
@@ -468,13 +524,13 @@ export const ProProfileScreen = ({
   }, [editingSection])
 
   useEffect(() => {
-    if (portfolioLightboxIndex === null && portfolioFocusIndex === null) return
+    if (!isPortfolioOverlayOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [portfolioFocusIndex, portfolioLightboxIndex])
+  }, [isPortfolioOverlayOpen])
 
   useEffect(() => {
     if (portfolioFocusIndex !== null && !portfolioItems[portfolioFocusIndex]) {
@@ -522,6 +578,9 @@ export const ProProfileScreen = ({
       }
       if (portfolioAutosaveTimerRef.current) {
         window.clearTimeout(portfolioAutosaveTimerRef.current)
+      }
+      if (portfolioLongPressTimerRef.current) {
+        window.clearTimeout(portfolioLongPressTimerRef.current)
       }
     }
   }, [])
@@ -1114,18 +1173,40 @@ export const ProProfileScreen = ({
   }
 
   const handlePortfolioUploadChange = (event: ChangeEvent<HTMLInputElement>) => {
+    closePortfolioPicker()
     void handlePortfolioUpload(event.target.files)
     event.target.value = ''
+  }
+
+  const handlePortfolioCameraChange = (event: ChangeEvent<HTMLInputElement>) => {
+    closePortfolioPicker()
+    void handlePortfolioUpload(event.target.files)
+    event.target.value = ''
+  }
+
+  const handlePortfolioCameraClick = () => {
+    if (isPortfolioUploading) return
+    setPortfolioError('')
+    closePortfolioPicker()
+    portfolioCameraInputRef.current?.click()
+  }
+
+  const handlePortfolioGalleryClick = () => {
+    if (isPortfolioUploading) return
+    setPortfolioError('')
+    closePortfolioPicker()
+    portfolioUploadInputRef.current?.click()
   }
 
   const handlePortfolioAddClick = () => {
     if (isPortfolioUploading) return
     setPortfolioError('')
-    portfolioUploadInputRef.current?.click()
+    openPortfolioPicker()
   }
 
   const handlePortfolioReplaceClick = (index: number) => {
     setPortfolioError('')
+    setPortfolioQuickActionIndex(null)
     portfolioReplaceIndexRef.current = index
     portfolioReplaceInputRef.current?.click()
   }
@@ -1174,6 +1255,54 @@ export const ProProfileScreen = ({
     }
     void handlePortfolioReplace(file, index)
     event.target.value = ''
+  }
+
+  const clearPortfolioLongPress = () => {
+    if (portfolioLongPressTimerRef.current) {
+      window.clearTimeout(portfolioLongPressTimerRef.current)
+    }
+    portfolioLongPressTimerRef.current = null
+    portfolioLongPressStartRef.current = null
+  }
+
+  const handlePortfolioThumbPointerDown = (
+    event: PointerEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    if (event.pointerType === 'mouse') return
+    portfolioLongPressTriggeredRef.current = false
+    portfolioLongPressStartRef.current = { x: event.clientX, y: event.clientY }
+    if (portfolioLongPressTimerRef.current) {
+      window.clearTimeout(portfolioLongPressTimerRef.current)
+    }
+    portfolioLongPressTimerRef.current = window.setTimeout(() => {
+      portfolioLongPressTriggeredRef.current = true
+      openPortfolioQuickActions(index)
+    }, 420)
+  }
+
+  const handlePortfolioThumbPointerMove = (
+    event: PointerEvent<HTMLButtonElement>
+  ) => {
+    if (!portfolioLongPressStartRef.current) return
+    if (!portfolioLongPressTimerRef.current) return
+    const dx = Math.abs(event.clientX - portfolioLongPressStartRef.current.x)
+    const dy = Math.abs(event.clientY - portfolioLongPressStartRef.current.y)
+    if (dx > 10 || dy > 10) {
+      clearPortfolioLongPress()
+    }
+  }
+
+  const handlePortfolioThumbPointerUp = () => {
+    clearPortfolioLongPress()
+  }
+
+  const handlePortfolioThumbClick = (index: number) => {
+    if (portfolioLongPressTriggeredRef.current) {
+      portfolioLongPressTriggeredRef.current = false
+      return
+    }
+    openPortfolioLightbox(index)
   }
 
   const removePortfolioItem = (index: number) => {
@@ -1458,6 +1587,17 @@ export const ProProfileScreen = ({
             tabIndex={-1}
           />
           <input
+            ref={portfolioCameraInputRef}
+            className="pro-file-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePortfolioCameraChange}
+            disabled={isPortfolioUploading}
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+          <input
             ref={portfolioReplaceInputRef}
             className="pro-file-input"
             type="file"
@@ -1503,8 +1643,8 @@ export const ProProfileScreen = ({
             role="list"
             aria-label="Портфолио"
           >
-            {portfolioGridItems.length > 0 ? (
-              portfolioGridItems.map(({ item, index }) => {
+            {visiblePortfolioItems.length > 0 ? (
+              visiblePortfolioItems.map(({ item, index }) => {
                 const focus = resolvePortfolioFocus(item)
                 const showImage = isImageUrl(item.url)
                 const isInShowcase = showcaseItems.some(
@@ -1515,7 +1655,14 @@ export const ProProfileScreen = ({
                     className="pro-profile-portfolio-item"
                     key={`${item.url}-${index}`}
                     type="button"
-                    onClick={() => openPortfolioLightbox(index)}
+                    onClick={() => handlePortfolioThumbClick(index)}
+                    onPointerDown={(event) =>
+                      handlePortfolioThumbPointerDown(event, index)
+                    }
+                    onPointerMove={handlePortfolioThumbPointerMove}
+                    onPointerUp={handlePortfolioThumbPointerUp}
+                    onPointerLeave={handlePortfolioThumbPointerUp}
+                    onPointerCancel={handlePortfolioThumbPointerUp}
                     role="listitem"
                     aria-label={`Открыть работу ${index + 1}`}
                   >
@@ -1783,6 +1930,150 @@ export const ProProfileScreen = ({
               </button>
             </div>
             {portfolioError && <p className="pro-error">{portfolioError}</p>}
+          </div>
+        </div>
+      )}
+
+      {isPortfolioPickerOpen && (
+        <div
+          className="pro-portfolio-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closePortfolioPicker}
+        >
+          <div
+            className="pro-portfolio-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-portfolio-sheet-handle" aria-hidden="true" />
+            <div className="pro-portfolio-sheet-head">
+              <h3 className="pro-portfolio-sheet-title">Добавить фото</h3>
+              <p className="pro-portfolio-sheet-subtitle">
+                Камера или галерея телефона
+              </p>
+            </div>
+            <div className="pro-portfolio-sheet-actions">
+              <button
+                className="pro-portfolio-sheet-action"
+                type="button"
+                onClick={handlePortfolioCameraClick}
+                disabled={isPortfolioUploading}
+              >
+                Камера
+              </button>
+              <button
+                className="pro-portfolio-sheet-action"
+                type="button"
+                onClick={handlePortfolioGalleryClick}
+                disabled={isPortfolioUploading}
+              >
+                Галерея
+              </button>
+            </div>
+            <div className="pro-portfolio-sheet-recent">
+              <p className="pro-portfolio-sheet-label">Последние</p>
+              <div className="pro-portfolio-sheet-carousel" role="list">
+                {portfolioRecentItems.length > 0 ? (
+                  portfolioRecentItems.map(({ item, index }) => {
+                    const focus = resolvePortfolioFocus(item)
+                    return (
+                      <button
+                        className="pro-portfolio-sheet-thumb"
+                        key={`${item.url}-recent-${index}`}
+                        type="button"
+                        onClick={() => {
+                          closePortfolioPicker()
+                          openPortfolioLightbox(index)
+                        }}
+                        role="listitem"
+                        aria-label="Открыть недавнее фото"
+                      >
+                        <img
+                          src={item.url}
+                          alt=""
+                          loading="lazy"
+                          style={{ objectPosition: focus.position }}
+                        />
+                      </button>
+                    )
+                  })
+                ) : (
+                  <span className="pro-portfolio-sheet-empty">Пока нет фото</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {portfolioQuickActionItem && (
+        <div
+          className="pro-portfolio-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPortfolioQuickActionIndex(null)}
+        >
+          <div
+            className="pro-portfolio-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-portfolio-sheet-handle" aria-hidden="true" />
+            <div className="pro-portfolio-sheet-preview">
+              {isImageUrl(portfolioQuickActionItem.url) ? (
+                <img
+                  src={portfolioQuickActionItem.url}
+                  alt={portfolioQuickActionItem.title ?? 'Работа'}
+                  style={{ objectPosition: quickActionFocus.position }}
+                />
+              ) : (
+                <span className="pro-portfolio-sheet-link">LINK</span>
+              )}
+            </div>
+            <div className="pro-portfolio-sheet-actions is-stacked">
+              <button
+                className="pro-portfolio-sheet-action"
+                type="button"
+                onClick={() => {
+                  toggleShowcaseItem(portfolioQuickActionItem)
+                  setPortfolioQuickActionIndex(null)
+                }}
+              >
+                {isQuickActionInShowcase ? 'Убрать из витрины' : 'В витрину'}
+              </button>
+              <button
+                className="pro-portfolio-sheet-action"
+                type="button"
+                onClick={() =>
+                  handlePortfolioReplaceClick(
+                    portfolioQuickActionIndex !== null
+                      ? portfolioQuickActionIndex
+                      : 0
+                  )
+                }
+                disabled={isPortfolioUploading}
+              >
+                Заменить
+              </button>
+              <button
+                className="pro-portfolio-sheet-action is-danger"
+                type="button"
+                onClick={() => {
+                  if (portfolioQuickActionIndex !== null) {
+                    removePortfolioItem(portfolioQuickActionIndex)
+                  }
+                  setPortfolioQuickActionIndex(null)
+                }}
+              >
+                Удалить
+              </button>
+            </div>
+            <button
+              className="pro-portfolio-sheet-cancel"
+              type="button"
+              onClick={() => setPortfolioQuickActionIndex(null)}
+            >
+              Отмена
+            </button>
           </div>
         </div>
       )}
