@@ -97,19 +97,19 @@ export const ProCabinetScreen = ({
     [portfolioItems]
   )
   const showcaseItems = useMemo(
-    () => portfolioItems.filter((item) => item.isShowcase).slice(0, MAX_SHOWCASE_ITEMS),
+    () =>
+      portfolioItems
+        .filter((item) => item.isShowcase)
+        .slice(0, MAX_SHOWCASE_ITEMS),
     [portfolioItems]
   )
   const showcaseTiles = useMemo(
     () =>
-      Array.from({ length: MAX_SHOWCASE_ITEMS }, (_, index) => ({
+      showcaseAreas.map((area, index) => ({
+        area,
         item: showcaseItems[index] ?? null,
-        index:
-          showcaseItems[index] && portfolioItems.includes(showcaseItems[index])
-            ? portfolioItems.indexOf(showcaseItems[index])
-            : null,
       })),
-    [portfolioItems, showcaseItems]
+    [showcaseItems]
   )
   const hasShowcase = showcaseItems.length > 0
   const showAddTile = portfolioItems.length < MAX_PORTFOLIO_ITEMS
@@ -185,7 +185,7 @@ export const ProCabinetScreen = ({
         }
       } catch (error) {
         if (!cancelled) {
-          setLoadError('Не удалось загрузить витрину работ.')
+          setLoadError('Не удалось загрузить данные профиля.')
         }
       } finally {
         if (!cancelled) {
@@ -265,7 +265,7 @@ export const ProCabinetScreen = ({
           : current
       )
     } catch (error) {
-      setSaveError('Не удалось сохранить витрину. Попробуйте еще раз.')
+      setSaveError('Не удалось сохранить портфолио. Попробуйте еще раз.')
     } finally {
       setIsSaving(false)
       isSavingRef.current = false
@@ -429,7 +429,7 @@ export const ProCabinetScreen = ({
   }
 
   const handleAddClick = () => {
-    if (isBusy) return
+    if (isBusy || portfolioItems.length >= MAX_PORTFOLIO_ITEMS) return
     portfolioUploadInputRef.current?.click()
   }
 
@@ -574,8 +574,17 @@ export const ProCabinetScreen = ({
               <h1 className="pro-cabinet-showcase-title">Витрина работ</h1>
               <p className="pro-cabinet-showcase-subtitle">{showcaseSubtitle}</p>
             </div>
+            <button
+              className="pro-cabinet-showcase-edit"
+              type="button"
+              onClick={() => onEditProfile('portfolio')}
+            >
+              Настроить витрину
+            </button>
           </div>
-          {isLoading && <p className="pro-status">Загружаем витрину...</p>}
+          {isLoading && (
+            <p className="pro-status">Загружаем данные профиля...</p>
+          )}
           {loadError && <p className="pro-error">{loadError}</p>}
           {saveError && <p className="pro-error">{saveError}</p>}
           <input
@@ -603,10 +612,9 @@ export const ProCabinetScreen = ({
                 <button
                   className="pro-cabinet-showcase-add"
                   type="button"
-                  onClick={handleAddClick}
-                  disabled={isBusy}
+                  onClick={() => onEditProfile('portfolio')}
                 >
-                  + Добавить работу
+                  Выбрать витрину
                 </button>
                 <div className="pro-cabinet-showcase-preview">
                   <div className="pro-cabinet-showcase-sample">
@@ -616,8 +624,8 @@ export const ProCabinetScreen = ({
                     </span>
                   </div>
                   <p className="pro-cabinet-showcase-hint">
-                    Перетащите, чтобы задать порядок. Нажмите на фото, чтобы
-                    выбрать фокус кадра.
+                    Сначала загрузите работы в портфолио, затем отметьте лучшие
+                    в профиле.
                   </p>
                 </div>
               </div>
@@ -625,45 +633,21 @@ export const ProCabinetScreen = ({
           ) : (
             <div className="pro-cabinet-showcase-panel">
               <div className="pro-cabinet-showcase-grid animate delay-2">
-                {mosaicItems.map((item, index) => {
-                  const gridArea = showcaseAreas[index]
+                {showcaseTiles.map((tile, index) => {
+                  const item = tile.item
                   const hasItem = Boolean(item?.url)
                   const isImage = item?.url ? isImageUrl(item.url) : false
                   const caption = item?.title?.trim() || 'Работа'
                   const focus = resolveFocusPoint(item)
-                  const cardClassName = [
-                    'pro-cabinet-showcase-card',
-                    portfolioDragOverIndex === index ? 'is-drag-over' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')
-                  const mediaClassName = [
-                    'pro-cabinet-showcase-media',
-                    hasItem ? 'is-draggable' : '',
-                    !isImage && hasItem ? 'is-link' : '',
-                    !hasItem ? 'is-add' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')
 
                   return (
                     <article
-                      className={cardClassName}
-                      key={`${item?.url ?? 'add'}-${index}`}
-                      style={gridArea ? { gridArea } : undefined}
+                      className="pro-cabinet-showcase-card"
+                      key={`${item?.url ?? 'empty'}-${index}`}
+                      style={tile.area ? { gridArea: tile.area } : undefined}
                     >
                       {hasItem ? (
-                        <button
-                          className={mediaClassName}
-                          type="button"
-                          onClick={() => handleTileClick(index)}
-                          draggable
-                          onDragStart={(event) => handleDragStart(event, index)}
-                          onDragOver={(event) => handleDragOver(event, index)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={() => handleDrop(index, true)}
-                          onDragEnd={handleDragEnd}
-                        >
+                        <div className="pro-cabinet-showcase-media">
                           {isImage ? (
                             <img
                               src={item?.url ?? ''}
@@ -674,17 +658,12 @@ export const ProCabinetScreen = ({
                           ) : (
                             <span className="pro-cabinet-showcase-link">LINK</span>
                           )}
-                        </button>
+                        </div>
                       ) : (
-                        <button
-                          className={mediaClassName}
-                          type="button"
-                          onClick={handleAddClick}
-                          onDragOver={(event) => handleDragOver(event, index)}
-                          onDrop={() => handleDrop(index, false)}
-                        >
-                          <span className="pro-cabinet-showcase-add-icon">+</span>
-                        </button>
+                        <div
+                          className="pro-cabinet-showcase-media is-add"
+                          aria-hidden="true"
+                        />
                       )}
                     </article>
                   )
@@ -692,6 +671,128 @@ export const ProCabinetScreen = ({
               </div>
             </div>
           )}
+        </section>
+        <section className="pro-cabinet-card animate delay-2">
+          <div className="pro-cabinet-head">
+            <div>
+              <h2 className="pro-card-title">Портфолио</h2>
+              <p className="pro-cabinet-subtitle">{portfolioSubtitle}</p>
+            </div>
+            <div className="pro-cabinet-actions">
+              <button
+                className="pro-cabinet-pill is-primary"
+                type="button"
+                onClick={handleAddClick}
+                disabled={!showAddTile || isBusy}
+              >
+                Добавить фото
+              </button>
+              <button
+                className="pro-cabinet-pill"
+                type="button"
+                onClick={() => onEditProfile('portfolio')}
+              >
+                Выбрать для витрины
+              </button>
+            </div>
+          </div>
+          <div className="pro-portfolio-actions-row">
+            <span className="pro-portfolio-drag">
+              Перетащите, чтобы изменить порядок
+            </span>
+            <span className="pro-portfolio-limit">
+              Макс. {MAX_PORTFOLIO_ITEMS} работ
+            </span>
+          </div>
+          <div className="pro-portfolio-grid">
+            {portfolioItems.length === 0 ? (
+              <div className="pro-portfolio-empty">
+                Добавьте работы, чтобы они появились в портфолио.
+              </div>
+            ) : (
+              portfolioItems.map((item, index) => {
+                const focus = resolveFocusPoint(item)
+                const hasImage = isImageUrl(item.url)
+                const label = item.isShowcase
+                  ? 'В витрине'
+                  : !hasImage
+                    ? 'LINK'
+                    : ''
+                const cardClassName = [
+                  'pro-portfolio-card',
+                  portfolioDragOverIndex === index ? 'is-drag-over' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+                const thumbClassName = [
+                  'pro-portfolio-thumb',
+                  hasImage ? ' has-image' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+                const thumbStyle = hasImage
+                  ? {
+                      backgroundImage: `url(${item.url})`,
+                      backgroundPosition: focus.position,
+                    }
+                  : undefined
+
+                return (
+                  <article className={cardClassName} key={`${item.url}-${index}`}>
+                    <button
+                      className={thumbClassName}
+                      type="button"
+                      onClick={() => handleTileClick(index)}
+                      draggable
+                      onDragStart={(event) => handleDragStart(event, index)}
+                      onDragOver={(event) => handleDragOver(event, index)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={() => handleDrop(index, true)}
+                      onDragEnd={handleDragEnd}
+                      style={thumbStyle}
+                      aria-label={item.title?.trim() || `Работа ${index + 1}`}
+                    >
+                      {label && (
+                        <span className="pro-portfolio-thumb-label">{label}</span>
+                      )}
+                    </button>
+                    <button
+                      className="pro-portfolio-remove"
+                      type="button"
+                      onClick={() => removePortfolio(index)}
+                      aria-label={`Удалить работу ${index + 1}`}
+                      disabled={isBusy}
+                    >
+                      ×
+                    </button>
+                    <div className="pro-portfolio-body">
+                      <div className="pro-portfolio-actions-row">
+                        <button
+                          className="pro-portfolio-action"
+                          type="button"
+                          onClick={() => handleReplaceClick(index)}
+                          disabled={isBusy}
+                        >
+                          Заменить
+                        </button>
+                        <button
+                          className="pro-portfolio-action"
+                          type="button"
+                          onClick={() => openFocusEditor(index)}
+                          disabled={isBusy || !hasImage}
+                        >
+                          Фокус
+                        </button>
+                      </div>
+                      <span className="pro-portfolio-drag">
+                        Перетащите для порядка
+                      </span>
+                    </div>
+                  </article>
+                )
+              })
+            )}
+          </div>
         </section>
       </div>
 
