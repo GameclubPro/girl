@@ -366,10 +366,6 @@ export const ProProfileScreen = ({
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolvePortfolioFocus(focusItem)
   const focusIndex = portfolioFocusIndex ?? 0
-  const portfolioGalleryLabel =
-    portfolioGridItems.length > 0
-      ? `${portfolioGridItems.length} фото`
-      : 'Нет фото'
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_ROW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded && hasPortfolioOverflow
   const visiblePortfolioLimit =
