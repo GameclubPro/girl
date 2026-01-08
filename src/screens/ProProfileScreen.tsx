@@ -94,7 +94,7 @@ type ProfilePayload = {
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
-const PORTFOLIO_ROW_LIMIT = 5
+const PORTFOLIO_ROW_LIMIT = 4
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
 
@@ -547,6 +547,15 @@ export const ProProfileScreen = ({
       setPortfolioLightboxIndex(null)
     }
   }, [portfolioItems, portfolioLightboxIndex])
+
+  useEffect(() => {
+    if (
+      portfolioQuickActionIndex !== null &&
+      !portfolioItems[portfolioQuickActionIndex]
+    ) {
+      setPortfolioQuickActionIndex(null)
+    }
+  }, [portfolioItems, portfolioQuickActionIndex])
 
   useEffect(() => {
     if (!profilePayload) return
@@ -1607,30 +1616,6 @@ export const ProProfileScreen = ({
             aria-hidden="true"
             tabIndex={-1}
           />
-          <div className="pro-profile-portfolio-upload">
-            <div>
-              <p className="pro-profile-portfolio-panel-subtitle">
-                Добавляйте фото из галереи или камеры смартфона.
-              </p>
-              <span className="pro-portfolio-limit">
-                {portfolioItems.length}/{MAX_PORTFOLIO_ITEMS} фото · JPG/PNG/WebP · 3 МБ
-              </span>
-            </div>
-            <div className="pro-portfolio-actions">
-              <button
-                className="pro-profile-portfolio-panel-action is-primary"
-                type="button"
-                onClick={handlePortfolioAddClick}
-                disabled={isPortfolioUploading || isPortfolioFull}
-              >
-                {isPortfolioUploading
-                  ? 'Загрузка...'
-                  : isPortfolioFull
-                    ? 'Лимит достигнут'
-                    : 'Добавить фото'}
-              </button>
-            </div>
-          </div>
           {portfolioError && (
             <div className="pro-profile-editor-messages">
               <p className="pro-error">{portfolioError}</p>
