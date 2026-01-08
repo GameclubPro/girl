@@ -164,7 +164,7 @@ export const ProCabinetScreen = ({
         const data = (await response.json()) as MasterProfile
         if (!cancelled) {
           const parsedPortfolio = parsePortfolioItems(
-            data.showcaseUrls ?? data.portfolioUrls ?? []
+            data.showcaseUrls ?? []
           ).slice(0, MAX_PORTFOLIO_ITEMS)
           setProfile(data)
           setPortfolioItems(parsedPortfolio)

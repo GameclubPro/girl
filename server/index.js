@@ -661,7 +661,7 @@ app.get('/api/masters', async (req, res) => {
           mp.categories,
           mp.services,
           mp.portfolio_urls AS "portfolioUrls",
-          COALESCE(ms.showcase_urls, mp.portfolio_urls) AS "showcaseUrls",
+          COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN cities c ON c.id = mp.city_id
@@ -710,7 +710,7 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.categories,
           mp.services,
           mp.portfolio_urls AS "portfolioUrls",
-          COALESCE(ms.showcase_urls, mp.portfolio_urls) AS "showcaseUrls",
+          COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id

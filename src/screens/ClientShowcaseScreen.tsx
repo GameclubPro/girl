@@ -193,7 +193,7 @@ export const ClientShowcaseScreen = ({
     return source.map((profile, index) => {
       const seed = toSeed(profile.userId || profile.displayName || `${index}`)
       const portfolioItems = parsePortfolioItems(
-        profile.showcaseUrls ?? profile.portfolioUrls ?? []
+        profile.showcaseUrls ?? []
       )
         .filter((item) => isImageUrl(item.url))
         .map((item) => ({
