@@ -364,6 +364,13 @@ export const ProProfileScreen = ({
     portfolioFocusPointerRef.current = false
   }
   const openEditor = (section: ProProfileSection) => {
+    if (section === 'portfolio') {
+      portfolioPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+      return
+    }
     setEditingSection(section === 'availability' ? 'location' : section)
   }
   const persistSaveMessage = (message: string) => {
