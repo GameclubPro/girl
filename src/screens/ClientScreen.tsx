@@ -92,20 +92,16 @@ export const ClientScreen = ({
 
         const nextPool = data.flatMap((profile) => {
           const categories = Array.isArray(profile.categories) ? profile.categories : []
-          const portfolioItems = parsePortfolioItems(profile.portfolioUrls ?? []).filter(
-            (item) => isImageUrl(item.url)
-          )
-          const showcaseItems = portfolioItems.filter((item) => item.isShowcase)
-          const visibleItems =
-            showcaseItems.length > 0 ? showcaseItems : portfolioItems
-          return visibleItems.map((item, index) => ({
-            id: `${profile.userId}-${index}`,
-            url: item.url,
-            focusX: item.focusX ?? 0.5,
-            focusY: item.focusY ?? 0.5,
-            categories,
-            shape: collageShapes[index % collageShapes.length],
-          }))
+          return parsePortfolioItems(profile.portfolioUrls ?? [])
+            .filter((item) => isImageUrl(item.url))
+            .map((item, index) => ({
+              id: `${profile.userId}-${index}`,
+              url: item.url,
+              focusX: item.focusX ?? 0.5,
+              focusY: item.focusY ?? 0.5,
+              categories,
+              shape: collageShapes[index % collageShapes.length],
+            }))
         })
         setShowcasePool(nextPool)
       } catch (error) {

@@ -192,25 +192,21 @@ export const ClientShowcaseScreen = ({
     const source = profiles.length > 0 ? profiles : fallbackProfiles
     return source.map((profile, index) => {
       const seed = toSeed(profile.userId || profile.displayName || `${index}`)
-      const portfolioItems = parsePortfolioItems(profile.portfolioUrls ?? []).filter(
-        (item) => isImageUrl(item.url)
-      )
-      const showcaseItems = portfolioItems.filter((item) => item.isShowcase)
-      const visibleItems =
-        showcaseItems.length > 0 ? showcaseItems : portfolioItems
-      const portfolioItemsMapped = visibleItems.map((item) => ({
-        url: item.url,
-        focus: `${(item.focusX ?? 0.5) * 100}% ${(item.focusY ?? 0.5) * 100}%`,
-      }))
+      const portfolioItems = parsePortfolioItems(profile.portfolioUrls ?? [])
+        .filter((item) => isImageUrl(item.url))
+        .map((item) => ({
+          url: item.url,
+          focus: `${(item.focusX ?? 0.5) * 100}% ${(item.focusY ?? 0.5) * 100}%`,
+        }))
 
       const fallbackImage = popularItems[index % popularItems.length]?.image
-      const heroItem = portfolioItemsMapped[0]
+      const heroItem = portfolioItems[0]
       const heroUrl = heroItem?.url ?? fallbackImage
       const heroFocus = heroItem?.focus ?? '50% 50%'
 
       const avatarUrl =
         profile.avatarUrl ?? heroUrl ?? storyItems[index % storyItems.length]?.avatar
-      const gallery = portfolioItemsMapped.slice(1, 4)
+      const gallery = portfolioItems.slice(1, 4)
 
       const rating = clampNumber(4.5 + (seed % 45) / 100, 4.5, 5)
       const reviews = 12 + (seed % 220)
