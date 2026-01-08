@@ -138,7 +138,6 @@ export const ProProfileScreen = ({
   const [isCoverUploading, setIsCoverUploading] = useState(false)
   const [mediaError, setMediaError] = useState('')
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false)
-  const [showcaseError, setShowcaseError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
@@ -250,12 +249,10 @@ export const ProProfileScreen = ({
     serviceItems.length > 0
       ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
       : 'Нет услуг'
-  const showcaseCountRaw = portfolioItems.filter((item) => item.isShowcase).length
+  const showcaseCountRaw = portfolioItems.filter((item) => item.url.trim()).length
   const showcaseCount = Math.min(showcaseCountRaw, MAX_SHOWCASE_ITEMS)
   const showcaseCountLabel =
-    showcaseCount > 0
-      ? `Витрина: ${showcaseCount} из ${MAX_SHOWCASE_ITEMS}`
-      : 'Витрина не выбрана'
+    showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
   const scheduleSummary =
     scheduleDays.length > 0
       ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
@@ -283,7 +280,7 @@ export const ProProfileScreen = ({
     [serviceItems]
   )
   const showcasePreview = useMemo(
-    () => portfolioItems.filter((item) => item.isShowcase).slice(0, 3),
+    () => portfolioItems.filter((item) => item.url.trim()).slice(0, 3),
     [portfolioItems]
   )
   const portfolioGalleryItems = useMemo(
@@ -334,31 +331,6 @@ export const ProProfileScreen = ({
   }
   const openPortfolio = () => setIsPortfolioOpen(true)
   const closePortfolio = () => setIsPortfolioOpen(false)
-  const toggleShowcaseItem = (targetUrl: string) => {
-    setPortfolioItems((current) => {
-      const currentShowcaseCount = current.filter((item) => item.isShowcase).length
-      let blocked = false
-      const next = current.map((item) => {
-        if (item.url !== targetUrl) return item
-        const isSelected = Boolean(item.isShowcase)
-        if (!isSelected && currentShowcaseCount >= MAX_SHOWCASE_ITEMS) {
-          blocked = true
-          return item
-        }
-        return { ...item, isShowcase: !isSelected }
-      })
-      if (blocked) {
-        setShowcaseError(
-          `Можно выбрать только ${MAX_SHOWCASE_ITEMS} фото для витрины.`
-        )
-        return current
-      }
-      if (showcaseError) {
-        setShowcaseError('')
-      }
-      return next
-    })
-  }
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
       window.clearTimeout(autosaveSuccessTimerRef.current)
@@ -1079,19 +1051,12 @@ export const ProProfileScreen = ({
             </div>
           </div>
           {portfolioGalleryItems.length > 0 ? (
-            <div
-              className="pro-profile-portfolio-strip"
-              role="list"
-              aria-label="Портфолио"
-            >
+            <div className="pro-profile-portfolio-strip" role="list" aria-label="Портфолио">
               {portfolioStripItems.map((item, index) => {
                 const focus = resolvePortfolioFocus(item)
-                const isSelected = Boolean(item.isShowcase)
                 return (
                   <button
-                    className={`pro-profile-portfolio-strip-thumb${
-                      isSelected ? ' is-selected' : ''
-                    }`}
+                    className="pro-profile-portfolio-strip-thumb"
                     key={`${item.url}-${index}`}
                     type="button"
                     onClick={openPortfolio}
@@ -1103,11 +1068,6 @@ export const ProProfileScreen = ({
                       loading="lazy"
                       style={{ objectPosition: focus.position }}
                     />
-                    {isSelected && (
-                      <span className="pro-profile-portfolio-strip-flag">
-                        В витрине
-                      </span>
-                    )}
                   </button>
                 )
               })}
@@ -1122,9 +1082,6 @@ export const ProProfileScreen = ({
                 </button>
               )}
             </div>
-            {showcaseError && (
-              <p className="pro-profile-portfolio-panel-error">{showcaseError}</p>
-            )}
           ) : (
             <div className="pro-profile-portfolio-panel-empty">
               <p className="pro-profile-portfolio-panel-empty-title">
@@ -1287,7 +1244,7 @@ export const ProProfileScreen = ({
                   Все работы
                 </h3>
                 <p className="pro-profile-portfolio-modal-subtitle">
-                  {portfolioGalleryLabel} · В витрине {showcaseCount}/{MAX_SHOWCASE_ITEMS}
+                  {portfolioGalleryLabel}
                 </p>
               </div>
               <button
@@ -1305,12 +1262,9 @@ export const ProProfileScreen = ({
             >
               {portfolioGalleryItems.map((item, index) => {
                 const focus = resolvePortfolioFocus(item)
-                const isSelected = Boolean(item.isShowcase)
                 return (
                   <span
-                    className={`pro-profile-portfolio-modal-item${
-                      isSelected ? ' is-selected' : ''
-                    }`}
+                    className="pro-profile-portfolio-modal-item"
                     key={`${item.url}-full-${index}`}
                     role="listitem"
                   >
@@ -1320,15 +1274,6 @@ export const ProProfileScreen = ({
                       loading="lazy"
                       style={{ objectPosition: focus.position }}
                     />
-                    <button
-                      className={`pro-profile-portfolio-modal-toggle${
-                        isSelected ? ' is-active' : ''
-                      }`}
-                      type="button"
-                      onClick={() => toggleShowcaseItem(item.url)}
-                    >
-                      {isSelected ? 'В витрине' : 'В витрину'}
-                    </button>
                   </span>
                 )
               })}
