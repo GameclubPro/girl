@@ -94,6 +94,7 @@ type ProfilePayload = {
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
+const PORTFOLIO_ROW_LIMIT = 5
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
 
@@ -141,6 +142,7 @@ export const ProProfileScreen = ({
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
     number | null
   >(null)
+  const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
   const [isPortfolioUploading, setIsPortfolioUploading] = useState(false)
   const [portfolioError, setPortfolioError] = useState('')
   const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
@@ -339,6 +341,8 @@ export const ProProfileScreen = ({
     portfolioGridItems.length > 0
       ? `${portfolioGridItems.length} фото`
       : 'Нет фото'
+  const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_ROW_LIMIT
+  const isPortfolioCollapsed = !isPortfolioExpanded && hasPortfolioOverflow
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -1430,9 +1434,16 @@ export const ProProfileScreen = ({
               <span className="pro-profile-portfolio-panel-count">
                 {portfolioGalleryLabel}
               </span>
-              <span className="pro-profile-portfolio-panel-note">
-                Автосохранение
-              </span>
+              {hasPortfolioOverflow && (
+                <button
+                  className="pro-profile-portfolio-panel-action"
+                  type="button"
+                  onClick={() => setIsPortfolioExpanded((current) => !current)}
+                  aria-expanded={isPortfolioExpanded}
+                >
+                  {isPortfolioExpanded ? 'Свернуть' : 'Все фото'}
+                </button>
+              )}
             </div>
           </div>
           <input
@@ -1456,7 +1467,7 @@ export const ProProfileScreen = ({
             aria-hidden="true"
             tabIndex={-1}
           />
-          <div className="pro-portfolio-add pro-profile-portfolio-uploader">
+          <div className="pro-profile-portfolio-upload">
             <div>
               <p className="pro-profile-portfolio-panel-subtitle">
                 Добавляйте фото из галереи или камеры смартфона.
@@ -1485,7 +1496,13 @@ export const ProProfileScreen = ({
               <p className="pro-error">{portfolioError}</p>
             </div>
           )}
-          <div className="pro-profile-portfolio-grid" role="list" aria-label="Портфолио">
+          <div
+            className={`pro-profile-portfolio-grid${
+              isPortfolioCollapsed ? ' is-collapsed' : ''
+            }`}
+            role="list"
+            aria-label="Портфолио"
+          >
             {portfolioGridItems.length > 0 ? (
               portfolioGridItems.map(({ item, index }) => {
                 const focus = resolvePortfolioFocus(item)
@@ -1513,7 +1530,13 @@ export const ProProfileScreen = ({
                       <span className="pro-profile-portfolio-fallback">LINK</span>
                     )}
                     {isInShowcase && (
-                      <span className="pro-profile-portfolio-badge">В витрине</span>
+                      <span
+                        className="pro-profile-portfolio-badge"
+                        aria-hidden="true"
+                        title="В витрине"
+                      >
+                        ✦
+                      </span>
                     )}
                   </button>
                 )

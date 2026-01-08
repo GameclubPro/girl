@@ -1790,24 +1790,6 @@
   color: var(--pro-muted);
 }
 
-.pro-portfolio-add {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 10px;
-  border-radius: 16px;
-  border: 1px dashed rgba(32, 25, 20, 0.2);
-  background: rgba(255, 255, 255, 0.7);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.pro-portfolio-add.is-drop-active {
-  border-color: rgba(255, 107, 61, 0.6);
-  background: rgba(255, 107, 61, 0.08);
-  box-shadow: 0 12px 18px rgba(255, 107, 61, 0.18);
-}
-
 .pro-portfolio-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2887,16 +2869,6 @@
   box-shadow: 0 10px 16px rgba(16, 12, 11, 0.08);
 }
 
-.pro-profile-portfolio-panel-note {
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--pro-muted);
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px dashed rgba(32, 25, 20, 0.12);
-}
-
 .pro-profile-portfolio-panel-action {
   border: 1px solid rgba(32, 25, 20, 0.12);
   background: rgba(255, 255, 255, 0.92);
@@ -2923,30 +2895,55 @@
   outline-offset: 2px;
 }
 
-.pro-profile-portfolio-uploader {
-  grid-template-columns: minmax(0, 1fr) auto;
-  position: relative;
-  z-index: 1;
-  border-style: solid;
-  border-color: rgba(32, 25, 20, 0.12);
-  background: rgba(255, 255, 255, 0.92);
-}
-
 .pro-profile-portfolio-grid {
   position: relative;
+  --portfolio-tile: clamp(52px, 14vw, 68px);
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pro-profile-portfolio-grid.is-collapsed {
+  grid-auto-flow: column;
+  grid-auto-columns: var(--portfolio-tile);
+  grid-template-columns: none;
+  grid-template-rows: var(--portfolio-tile);
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
+  display: none;
+}
+
+.pro-profile-portfolio-grid.is-collapsed .pro-profile-portfolio-item {
+  scroll-snap-align: start;
+}
+
+.pro-profile-portfolio-upload {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(32, 25, 20, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  position: relative;
+  z-index: 1;
 }
 
 .pro-profile-portfolio-item {
   position: relative;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6px 12px rgba(16, 12, 11, 0.1);
+  box-shadow: 0 5px 10px rgba(16, 12, 11, 0.1);
   cursor: pointer;
   padding: 0;
   aspect-ratio: 1 / 1;
@@ -2987,7 +2984,7 @@
   justify-content: center;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .pro-profile-portfolio-item.is-add:disabled {
@@ -2996,17 +2993,17 @@
 }
 
 .pro-profile-portfolio-add-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.9);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--pro-ink);
-  box-shadow: 0 12px 18px rgba(16, 12, 11, 0.12);
+  box-shadow: 0 8px 12px rgba(16, 12, 11, 0.12);
 }
 
 .pro-profile-portfolio-add-label {
@@ -3015,16 +3012,19 @@
 
 .pro-profile-portfolio-badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 4px 8px;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
-  background: rgba(12, 10, 8, 0.55);
+  background: rgba(12, 10, 8, 0.5);
   color: #ffffff;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -6757,11 +6757,6 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .pro-portfolio-add {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: stretch;
-  }
-
   .pro-portfolio-actions {
     flex-direction: column;
     align-items: stretch;
@@ -6810,13 +6805,9 @@ h2 {
     align-items: center;
   }
 
-  .pro-profile-portfolio-uploader {
-    grid-template-columns: minmax(0, 1fr);
+  .pro-profile-portfolio-upload {
+    flex-direction: column;
     align-items: stretch;
-  }
-
-  .pro-profile-portfolio-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .pro-profile-portfolio-strip {
