@@ -5761,7 +5761,7 @@ h2 {
 }
 
 .client-gallery-grid {
-  column-count: 2;
+  column-count: 3;
   column-gap: 8px;
 }
 
@@ -5804,11 +5804,6 @@ h2 {
   opacity: 0.8;
 }
 
-@media (min-width: 420px) {
-  .client-gallery-grid {
-    column-count: 3;
-  }
-}
 
 .client-gallery-empty {
   margin: 0;
