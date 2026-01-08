@@ -4859,17 +4859,14 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-rows: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   grid-template-areas:
-    'a a a b b b'
-    'a a a b b b'
-    'c c d d e e'
-    'c c d d e e'
-    'c c d d f g';
+    'a a b'
+    'c d b';
   gap: 2px;
   align-self: center;
-  aspect-ratio: 6 / 5;
+  aspect-ratio: 3 / 2;
 }
 
 .client-showcase-photo {
@@ -6134,7 +6131,7 @@ h2 {
 
   .client-showcase-gallery {
     width: 100%;
-    aspect-ratio: 6 / 5;
+    aspect-ratio: 3 / 2;
   }
 
   .client-master-search {

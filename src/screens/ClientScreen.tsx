@@ -25,16 +25,8 @@ type ShowcaseMedia = {
   shape: ShowcaseShape
 }
 
-const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
-const collageShapes = [
-  'is-wide',
-  'is-wide',
-  'is-tall',
-  'is-tall',
-  'is-small',
-  'is-small',
-  'is-small',
-] as const
+const showcaseAreas = ['a', 'b', 'c', 'd']
+const collageShapes = ['is-wide', 'is-tall', 'is-small', 'is-small'] as const
 type ShowcaseShape = (typeof collageShapes)[number]
 const slotShapes: ShowcaseShape[] = [...collageShapes]
 
