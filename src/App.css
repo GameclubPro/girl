@@ -727,16 +727,16 @@
 
 .pro-cabinet-showcase-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 0.9fr 0.9fr 1.2fr 1.2fr;
-  grid-template-rows: 0.9fr 0.9fr 1fr 1fr 1fr 1.1fr 1.1fr;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(7, minmax(0, 1fr));
   grid-template-areas:
-    'a a b b c c'
-    'a a b b c c'
-    'a a e e c c'
-    'd d e e c c'
-    'd d e e f f'
-    'g g h h f f'
-    'g g h h f f';
+    'a a a b b b'
+    'a a a b b b'
+    'c c d d e e'
+    'c c d d e e'
+    'f f g g e e'
+    'f f g g h h'
+    'f f g g h h';
   aspect-ratio: 6 / 7;
   gap: 6px;
   height: 100%;
@@ -5697,16 +5697,16 @@ h2 {
   }
 
   .pro-cabinet-showcase-grid {
-    grid-template-columns: 1fr 1fr 0.9fr 0.9fr 1.2fr 1.2fr;
-    grid-template-rows: 0.9fr 0.9fr 1fr 1fr 1fr 1.1fr 1.1fr;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: repeat(7, minmax(0, 1fr));
     grid-template-areas:
-      'a a b b c c'
-      'a a b b c c'
-      'a a e e c c'
-      'd d e e c c'
-      'd d e e f f'
-      'g g h h f f'
-      'g g h h f f';
+      'a a a b b b'
+      'a a a b b b'
+      'c c d d e e'
+      'c c d d e e'
+      'f f g g e e'
+      'f f g g h h'
+      'f f g g h h';
     aspect-ratio: 6 / 7;
   }
 
