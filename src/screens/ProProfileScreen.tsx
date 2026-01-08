@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
+import type { ChangeEvent, CSSProperties, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
@@ -146,7 +146,6 @@ export const ProProfileScreen = ({
   const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
     null
   )
-  const [isPortfolioDropActive, setIsPortfolioDropActive] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
@@ -156,6 +155,7 @@ export const ProProfileScreen = ({
   const portfolioLightboxIndexRef = useRef<number | null>(null)
   const portfolioFocusIndexRef = useRef<number | null>(null)
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
+  const portfolioAutosaveTimerRef = useRef<number | null>(null)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection && focusSection !== 'portfolio'
       ? focusSection === 'availability'
@@ -180,6 +180,14 @@ export const ProProfileScreen = ({
   const showcaseStrings = useMemo(
     () => toPortfolioStrings(showcaseItems),
     [showcaseItems]
+  )
+  const portfolioAutosaveKey = useMemo(
+    () =>
+      JSON.stringify({
+        portfolio: portfolioStrings,
+        showcase: showcaseStrings,
+      }),
+    [portfolioStrings, showcaseStrings]
   )
   const profilePayload = useMemo<ProfilePayload | null>(() => {
     if (!userId) return null
@@ -249,7 +257,6 @@ export const ProProfileScreen = ({
     priceFromValue > priceToValue
   const saveButtonLabel = isSaving ? 'Сохраняем...' : 'Сохранить'
   const canSave = Boolean(profilePayload) && !hasInvalidPriceRange && !isSaving
-  const canSavePortfolio = canSave && !isPortfolioUploading
   const priceLabel =
     priceFromValue !== null && priceToValue !== null
       ? `${priceFromValue}–${priceToValue} ₽`
@@ -482,6 +489,23 @@ export const ProProfileScreen = ({
   }, [portfolioItems, portfolioLightboxIndex])
 
   useEffect(() => {
+    if (!profilePayload) return
+    if (!hasLoadedRef.current) return
+    if (isPortfolioUploading) return
+    if (portfolioAutosaveTimerRef.current) {
+      window.clearTimeout(portfolioAutosaveTimerRef.current)
+    }
+    portfolioAutosaveTimerRef.current = window.setTimeout(() => {
+      void saveProfile(profilePayload)
+    }, 700)
+    return () => {
+      if (portfolioAutosaveTimerRef.current) {
+        window.clearTimeout(portfolioAutosaveTimerRef.current)
+      }
+    }
+  }, [isPortfolioUploading, portfolioAutosaveKey])
+
+  useEffect(() => {
     hasLoadedRef.current = false
     lastSavedRef.current = ''
     queuedPayloadRef.current = null
@@ -491,6 +515,9 @@ export const ProProfileScreen = ({
     return () => {
       if (autosaveSuccessTimerRef.current) {
         window.clearTimeout(autosaveSuccessTimerRef.current)
+      }
+      if (portfolioAutosaveTimerRef.current) {
+        window.clearTimeout(portfolioAutosaveTimerRef.current)
       }
     }
   }, [])
@@ -1145,24 +1172,6 @@ export const ProProfileScreen = ({
     event.target.value = ''
   }
 
-  const handlePortfolioDropZoneDragOver = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
-    if (!isPortfolioDropActive) {
-      setIsPortfolioDropActive(true)
-    }
-  }
-
-  const handlePortfolioDropZoneDragLeave = () => {
-    setIsPortfolioDropActive(false)
-  }
-
-  const handlePortfolioDropZoneDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    setIsPortfolioDropActive(false)
-    void handlePortfolioUpload(event.dataTransfer.files)
-  }
-
   const removePortfolioItem = (index: number) => {
     const removedUrl = portfolioItems[index]?.url
     setPortfolioItems((current) =>
@@ -1256,15 +1265,6 @@ export const ProProfileScreen = ({
     portfolioFocusPointerRef.current = false
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-  }
-
-  const handlePortfolioSave = async () => {
-    if (!profilePayload) return
-    if (!canSavePortfolio) return
-    const saved = await saveProfile(profilePayload)
-    if (saved) {
-      setPortfolioError('')
     }
   }
 
@@ -1430,14 +1430,9 @@ export const ProProfileScreen = ({
               <span className="pro-profile-portfolio-panel-count">
                 {portfolioGalleryLabel}
               </span>
-              <button
-                className="pro-profile-portfolio-panel-action is-primary"
-                type="button"
-                onClick={handlePortfolioSave}
-                disabled={!canSavePortfolio}
-              >
-                {saveButtonLabel}
-              </button>
+              <span className="pro-profile-portfolio-panel-note">
+                Автосохранение
+              </span>
             </div>
           </div>
           <input
@@ -1461,17 +1456,10 @@ export const ProProfileScreen = ({
             aria-hidden="true"
             tabIndex={-1}
           />
-          <div
-            className={`pro-portfolio-add pro-profile-portfolio-uploader${
-              isPortfolioDropActive ? ' is-drop-active' : ''
-            }`}
-            onDragOver={handlePortfolioDropZoneDragOver}
-            onDragLeave={handlePortfolioDropZoneDragLeave}
-            onDrop={handlePortfolioDropZoneDrop}
-          >
+          <div className="pro-portfolio-add pro-profile-portfolio-uploader">
             <div>
               <p className="pro-profile-portfolio-panel-subtitle">
-                Перетащите фото сюда или выберите на устройстве.
+                Добавляйте фото из галереи или камеры смартфона.
               </p>
               <span className="pro-portfolio-limit">
                 {portfolioItems.length}/{MAX_PORTFOLIO_ITEMS} фото · JPG/PNG/WebP · 3 МБ
