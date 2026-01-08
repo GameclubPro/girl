@@ -1079,52 +1079,56 @@ export const ProProfileScreen = ({
             </div>
           </div>
           {portfolioGalleryItems.length > 0 ? (
-            <div
-              className="pro-profile-portfolio-strip"
-              role="list"
-              aria-label="Портфолио"
-            >
-              {portfolioStripItems.map((item, index) => {
-                const focus = resolvePortfolioFocus(item)
-                const isSelected = Boolean(item.isShowcase)
-                return (
+            <>
+              <div
+                className="pro-profile-portfolio-strip"
+                role="list"
+                aria-label="Портфолио"
+              >
+                {portfolioStripItems.map((item, index) => {
+                  const focus = resolvePortfolioFocus(item)
+                  const isSelected = Boolean(item.isShowcase)
+                  return (
+                    <button
+                      className={`pro-profile-portfolio-strip-thumb${
+                        isSelected ? ' is-selected' : ''
+                      }`}
+                      key={`${item.url}-${index}`}
+                      type="button"
+                      onClick={openPortfolio}
+                      aria-label={`Открыть работу ${index + 1}`}
+                    >
+                      <img
+                        src={item.url}
+                        alt=""
+                        loading="lazy"
+                        style={{ objectPosition: focus.position }}
+                      />
+                      {isSelected && (
+                        <span className="pro-profile-portfolio-strip-flag">
+                          В витрине
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+                {portfolioOverflowCount > 0 && (
                   <button
-                    className={`pro-profile-portfolio-strip-thumb${
-                      isSelected ? ' is-selected' : ''
-                    }`}
-                    key={`${item.url}-${index}`}
+                    className="pro-profile-portfolio-strip-more"
                     type="button"
                     onClick={openPortfolio}
-                    aria-label={`Открыть работу ${index + 1}`}
+                    aria-label={`Открыть еще ${portfolioOverflowCount} фото`}
                   >
-                    <img
-                      src={item.url}
-                      alt=""
-                      loading="lazy"
-                      style={{ objectPosition: focus.position }}
-                    />
-                    {isSelected && (
-                      <span className="pro-profile-portfolio-strip-flag">
-                        В витрине
-                      </span>
-                    )}
+                    +{portfolioOverflowCount}
                   </button>
-                )
-              })}
-              {portfolioOverflowCount > 0 && (
-                <button
-                  className="pro-profile-portfolio-strip-more"
-                  type="button"
-                  onClick={openPortfolio}
-                  aria-label={`Открыть еще ${portfolioOverflowCount} фото`}
-                >
-                  +{portfolioOverflowCount}
-                </button>
+                )}
+              </div>
+              {showcaseError && (
+                <p className="pro-profile-portfolio-panel-error">
+                  {showcaseError}
+                </p>
               )}
-            </div>
-            {showcaseError && (
-              <p className="pro-profile-portfolio-panel-error">{showcaseError}</p>
-            )}
+            </>
           ) : (
             <div className="pro-profile-portfolio-panel-empty">
               <p className="pro-profile-portfolio-panel-empty-title">
