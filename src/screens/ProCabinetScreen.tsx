@@ -37,11 +37,11 @@ type ProfilePayload = {
   portfolioUrls: string[]
 }
 
-const MAX_PORTFOLIO_ITEMS = 8
+const MAX_PORTFOLIO_ITEMS = 6
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
-const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 
@@ -161,7 +161,9 @@ export const ProCabinetScreen = ({
         }
         const data = (await response.json()) as MasterProfile
         if (!cancelled) {
-          const parsedPortfolio = parsePortfolioItems(data.portfolioUrls ?? [])
+          const parsedPortfolio = parsePortfolioItems(
+            data.portfolioUrls ?? []
+          ).slice(0, MAX_PORTFOLIO_ITEMS)
           setProfile(data)
           setPortfolioItems(parsedPortfolio)
           lastSavedRef.current = JSON.stringify(toPortfolioStrings(parsedPortfolio))
