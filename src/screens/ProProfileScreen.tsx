@@ -92,20 +92,10 @@ type ProfilePayload = {
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const MAX_PORTFOLIO_ITEMS = 30
+const MAX_SHOWCASE_ITEMS = 6
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
-const PORTFOLIO_GALLERY_LAYOUT = [
-  'is-hero',
-  'is-tall',
-  'is-wide',
-  'is-square',
-  'is-square',
-  'is-wide',
-  'is-tall',
-  'is-square',
-  'is-wide',
-  'is-square',
-] as const
+const PORTFOLIO_STRIP_MAX = 12
 
 export const ProProfileScreen = ({
   apiBase,
@@ -147,6 +137,7 @@ export const ProProfileScreen = ({
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
   const [isCoverUploading, setIsCoverUploading] = useState(false)
   const [mediaError, setMediaError] = useState('')
+  const [isPortfolioOpen, setIsPortfolioOpen] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
@@ -258,10 +249,10 @@ export const ProProfileScreen = ({
     serviceItems.length > 0
       ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
       : 'Нет услуг'
-  const portfolioCountRaw = portfolioItems.filter((item) => item.url.trim()).length
-  const portfolioCount = Math.min(portfolioCountRaw, MAX_PORTFOLIO_ITEMS)
-  const portfolioCountLabel =
-    portfolioCount > 0 ? `${portfolioCount} фото` : 'Нет работ'
+  const showcaseCountRaw = portfolioItems.filter((item) => item.url.trim()).length
+  const showcaseCount = Math.min(showcaseCountRaw, MAX_SHOWCASE_ITEMS)
+  const showcaseCountLabel =
+    showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
   const scheduleSummary =
     scheduleDays.length > 0
       ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
@@ -288,7 +279,7 @@ export const ProProfileScreen = ({
     () => serviceItems.filter((item) => item.name.trim()).map((item) => item.name),
     [serviceItems]
   )
-  const portfolioPreview = useMemo(
+  const showcasePreview = useMemo(
     () => portfolioItems.filter((item) => item.url.trim()).slice(0, 3),
     [portfolioItems]
   )
@@ -303,6 +294,14 @@ export const ProProfileScreen = ({
     portfolioGalleryItems.length > 0
       ? `${portfolioGalleryItems.length} фото`
       : 'Нет фото'
+  const portfolioStripItems = useMemo(
+    () => portfolioGalleryItems.slice(0, PORTFOLIO_STRIP_MAX),
+    [portfolioGalleryItems]
+  )
+  const portfolioOverflowCount = Math.max(
+    0,
+    portfolioGalleryItems.length - portfolioStripItems.length
+  )
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -330,6 +329,8 @@ export const ProProfileScreen = ({
     }
     setEditingSection(section === 'availability' ? 'location' : section)
   }
+  const openPortfolio = () => setIsPortfolioOpen(true)
+  const closePortfolio = () => setIsPortfolioOpen(false)
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
       window.clearTimeout(autosaveSuccessTimerRef.current)
@@ -1025,66 +1026,72 @@ export const ProProfileScreen = ({
         {loadError && <p className="pro-error">{loadError}</p>}
         {mediaError && <p className="pro-error">{mediaError}</p>}
 
-        <section className="pro-profile-portfolio animate delay-2">
-          <div className="pro-profile-portfolio-head">
+        <section className="pro-profile-portfolio-panel animate delay-2">
+          <div className="pro-profile-portfolio-panel-head">
             <div>
-              <p className="pro-profile-portfolio-kicker">Портфолио</p>
-              <h2 className="pro-profile-portfolio-title">Галерея работ</h2>
-              <p className="pro-profile-portfolio-subtitle">
-                До {MAX_PORTFOLIO_ITEMS} фото, мозаика подстраивается под стиль
+              <p className="pro-profile-portfolio-panel-kicker">Портфолио</p>
+              <h2 className="pro-profile-portfolio-panel-title">Галерея работ</h2>
+              <p className="pro-profile-portfolio-panel-subtitle">
+                До {MAX_PORTFOLIO_ITEMS} фото, отдельно от витрины, полный список по клику
               </p>
             </div>
-            <div className="pro-profile-portfolio-controls">
-              <span className="pro-profile-portfolio-count">
+            <div className="pro-profile-portfolio-panel-controls">
+              <span className="pro-profile-portfolio-panel-count">
                 {portfolioGalleryLabel}
               </span>
-              <button
-                className="pro-profile-portfolio-action"
-                type="button"
-                onClick={onBack}
-              >
-                Управлять
-              </button>
+              {portfolioGalleryItems.length > 0 && (
+                <button
+                  className="pro-profile-portfolio-panel-action"
+                  type="button"
+                  onClick={openPortfolio}
+                >
+                  Смотреть все
+                </button>
+              )}
             </div>
           </div>
           {portfolioGalleryItems.length > 0 ? (
-            <div
-              className="pro-profile-portfolio-grid"
-              role="list"
-              aria-label="Портфолио"
-            >
-              {portfolioGalleryItems.map((item, index) => {
+            <div className="pro-profile-portfolio-strip" role="list" aria-label="Портфолио">
+              {portfolioStripItems.map((item, index) => {
                 const focus = resolvePortfolioFocus(item)
-                const layout =
-                  PORTFOLIO_GALLERY_LAYOUT[
-                    index % PORTFOLIO_GALLERY_LAYOUT.length
-                  ]
                 return (
-                  <span
-                    className={`pro-profile-portfolio-item ${layout}`}
+                  <button
+                    className="pro-profile-portfolio-strip-thumb"
                     key={`${item.url}-${index}`}
-                    role="listitem"
+                    type="button"
+                    onClick={openPortfolio}
+                    aria-label={`Открыть работу ${index + 1}`}
                   >
                     <img
                       src={item.url}
-                      alt={`Работа ${index + 1}`}
+                      alt=""
                       loading="lazy"
                       style={{ objectPosition: focus.position }}
                     />
-                  </span>
+                  </button>
                 )
               })}
+              {portfolioOverflowCount > 0 && (
+                <button
+                  className="pro-profile-portfolio-strip-more"
+                  type="button"
+                  onClick={openPortfolio}
+                  aria-label={`Открыть еще ${portfolioOverflowCount} фото`}
+                >
+                  +{portfolioOverflowCount}
+                </button>
+              )}
             </div>
           ) : (
-            <div className="pro-profile-portfolio-empty">
-              <p className="pro-profile-portfolio-empty-title">
+            <div className="pro-profile-portfolio-panel-empty">
+              <p className="pro-profile-portfolio-panel-empty-title">
                 Портфолио еще пустое
               </p>
-              <p className="pro-profile-portfolio-empty-text">
+              <p className="pro-profile-portfolio-panel-empty-text">
                 Добавьте работы в кабинете, и они появятся здесь.
               </p>
               <button
-                className="pro-profile-portfolio-action is-primary"
+                className="pro-profile-portfolio-panel-action is-primary"
                 type="button"
                 onClick={onBack}
               >
@@ -1162,17 +1169,17 @@ export const ProProfileScreen = ({
               🖼️
             </span>
             <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Работы</span>
+              <span className="pro-profile-card-title">Витрина</span>
               <span
                 className={`pro-profile-card-value${
-                  portfolioCount > 0 ? '' : ' is-muted'
+                  showcaseCount > 0 ? '' : ' is-muted'
                 }`}
               >
-                {portfolioCountLabel}
+                {showcaseCountLabel}
               </span>
-              {portfolioPreview.length > 0 ? (
+              {showcasePreview.length > 0 ? (
                 <span className="pro-profile-portfolio">
-                  {portfolioPreview.map((item, index) => {
+                  {showcasePreview.map((item, index) => {
                     const showImage = isImageUrl(item.url)
                     const focus = resolvePortfolioFocus(item)
                     return (
@@ -1218,6 +1225,62 @@ export const ProProfileScreen = ({
           {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
         </div>
       </div>
+
+      {isPortfolioOpen && (
+        <div
+          className="pro-profile-portfolio-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closePortfolio}
+        >
+          <div
+            className="pro-profile-portfolio-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="pro-profile-portfolio-modal-head">
+              <div>
+                <p className="pro-profile-portfolio-modal-kicker">Портфолио</p>
+                <h3 className="pro-profile-portfolio-modal-title">
+                  Все работы
+                </h3>
+                <p className="pro-profile-portfolio-modal-subtitle">
+                  {portfolioGalleryLabel}
+                </p>
+              </div>
+              <button
+                className="pro-profile-portfolio-panel-action is-primary"
+                type="button"
+                onClick={closePortfolio}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div
+              className="pro-profile-portfolio-modal-grid"
+              role="list"
+              aria-label="Все работы"
+            >
+              {portfolioGalleryItems.map((item, index) => {
+                const focus = resolvePortfolioFocus(item)
+                return (
+                  <span
+                    className="pro-profile-portfolio-modal-item"
+                    key={`${item.url}-full-${index}`}
+                    role="listitem"
+                  >
+                    <img
+                      src={item.url}
+                      alt={`Работа ${index + 1}`}
+                      loading="lazy"
+                      style={{ objectPosition: focus.position }}
+                    />
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingSection && (
         <div className="pro-profile-editor-screen" role="dialog" aria-modal="true">
