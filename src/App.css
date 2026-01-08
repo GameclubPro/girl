@@ -5761,17 +5761,31 @@ h2 {
 }
 
 .client-gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  column-count: 2;
+  column-gap: 8px;
 }
 
 .client-gallery-item {
   position: relative;
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 8px;
   border-radius: 14px;
   overflow: hidden;
   background: rgba(241, 231, 244, 0.7);
+  break-inside: avoid;
+}
+
+.client-gallery-item.is-square {
   aspect-ratio: 1 / 1;
+}
+
+.client-gallery-item.is-wide {
+  aspect-ratio: 3 / 2;
+}
+
+.client-gallery-item.is-tall {
+  aspect-ratio: 2 / 3;
 }
 
 .client-gallery-item img {
@@ -5788,6 +5802,12 @@ h2 {
   background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.7), transparent);
   animation: master-shimmer 1.6s ease-in-out infinite;
   opacity: 0.8;
+}
+
+@media (min-width: 420px) {
+  .client-gallery-grid {
+    column-count: 3;
+  }
 }
 
 .client-gallery-empty {

@@ -44,6 +44,8 @@ type ShowcaseMedia = {
   categories: string[]
 }
 
+const galleryShapePattern = ['is-square', 'is-tall', 'is-square', 'is-wide', 'is-square', 'is-wide'] as const
+
 const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
   id: `fallback-showcase-${item.id}-${index}`,
   url: item.image,
@@ -290,27 +292,37 @@ export const ClientShowcaseGalleryScreen = ({
           {loadError && <p className="client-gallery-error">{loadError}</p>}
           {isLoading ? (
             <div className="client-gallery-grid is-skeleton" aria-hidden="true">
-              {Array.from({ length: 9 }).map((_, index) => (
-                <span
-                  className="client-gallery-item is-skeleton"
-                  key={`skeleton-${index}`}
-                />
-              ))}
+              {Array.from({ length: 9 }).map((_, index) => {
+                const shapeClass = galleryShapePattern[index % galleryShapePattern.length]
+                return (
+                  <span
+                    className={`client-gallery-item ${shapeClass} is-skeleton`}
+                    key={`skeleton-${index}`}
+                  />
+                )
+              })}
             </div>
           ) : showcaseItems.length > 0 ? (
             <div className="client-gallery-grid" role="list">
-              {showcaseItems.map((item) => (
-                <span className="client-gallery-item" key={item.id} role="listitem">
-                  <img
-                    src={item.url}
-                    alt=""
-                    loading="lazy"
-                    style={{
-                      objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
-                    }}
-                  />
-                </span>
-              ))}
+              {showcaseItems.map((item, index) => {
+                const shapeClass = galleryShapePattern[index % galleryShapePattern.length]
+                return (
+                  <span
+                    className={`client-gallery-item ${shapeClass}`}
+                    key={item.id}
+                    role="listitem"
+                  >
+                    <img
+                      src={item.url}
+                      alt=""
+                      loading="lazy"
+                      style={{
+                        objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
+                      }}
+                    />
+                  </span>
+                )
+              })}
             </div>
           ) : (
             <p className="client-gallery-empty">Пока нет работ в этой категории.</p>
