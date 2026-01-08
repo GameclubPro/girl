@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AddressScreen } from './screens/AddressScreen'
 import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
 import { ClientScreen } from './screens/ClientScreen'
-import { ClientShowcaseScreen } from './screens/ClientShowcaseScreen'
+import {
+  ClientShowcaseGalleryScreen,
+  ClientShowcaseScreen,
+} from './screens/ClientShowcaseScreen'
 import { ProCabinetScreen } from './screens/ProCabinetScreen'
 import { ProProfileScreen } from './screens/ProProfileScreen'
 import { ProRequestsScreen } from './screens/ProRequestsScreen'
@@ -25,6 +28,7 @@ function App() {
     | 'address'
     | 'client'
     | 'client-showcase'
+    | 'client-gallery'
     | 'request'
     | 'requests'
     | 'pro-cabinet'
@@ -182,6 +186,7 @@ function App() {
     const isClient =
       view === 'client' ||
       view === 'client-showcase' ||
+      view === 'client-gallery' ||
       view === 'request' ||
       view === 'requests' ||
       isPro
@@ -356,6 +361,7 @@ function App() {
     const shouldShow =
       view === 'address' ||
       view === 'client-showcase' ||
+      view === 'client-gallery' ||
       view === 'request' ||
       view === 'requests' ||
       view === 'pro-cabinet' ||
@@ -372,6 +378,7 @@ function App() {
           setView('client')
           break
         case 'client-showcase':
+        case 'client-gallery':
           setView('client')
           break
         case 'pro-profile':
@@ -417,7 +424,8 @@ function App() {
         apiBase={apiBase}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
-        onViewShowcase={() => setView('client-showcase')}
+        onViewShowcase={() => setView('client-gallery')}
+        onViewMasters={() => setView('client-showcase')}
         onCreateRequest={(categoryId) => {
           setRequestCategoryId(
             categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
@@ -436,6 +444,19 @@ function App() {
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
+        onViewRequests={() => setView('requests')}
+      />
+    )
+  }
+
+  if (view === 'client-gallery') {
+    return (
+      <ClientShowcaseGalleryScreen
+        apiBase={apiBase}
+        activeCategoryId={clientCategoryId}
+        onCategoryChange={setClientCategoryId}
+        onBack={() => setView('client')}
+        onViewMasters={() => setView('client-showcase')}
         onViewRequests={() => setView('requests')}
       />
     )

@@ -53,6 +53,7 @@ export const ClientScreen = ({
   activeCategoryId,
   onCategoryChange,
   onViewShowcase,
+  onViewMasters,
   onCreateRequest,
   onViewRequests,
 }: {
@@ -60,6 +61,7 @@ export const ClientScreen = ({
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onViewShowcase: () => void
+  onViewMasters: () => void
   onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: () => void
 }) => {
@@ -325,7 +327,7 @@ export const ClientScreen = ({
           </span>
           Главная
         </button>
-        <button className="nav-item" type="button" onClick={onViewShowcase}>
+        <button className="nav-item" type="button" onClick={onViewMasters}>
           <span className="nav-icon" aria-hidden="true">
             <IconUsers />
           </span>

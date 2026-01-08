@@ -5737,6 +5737,67 @@ h2 {
   color: #7a6f8a;
 }
 
+.client-gallery-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.client-gallery-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b5a77;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3edf7;
+  border: 1px solid rgba(226, 214, 235, 0.8);
+}
+
+.client-gallery-error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c45f5f;
+}
+
+.client-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.client-gallery-item {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(241, 231, 244, 0.7);
+  aspect-ratio: 1 / 1;
+}
+
+.client-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.client-gallery-item.is-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: master-shimmer 1.6s ease-in-out infinite;
+  opacity: 0.8;
+}
+
+.client-gallery-empty {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a6f8a;
+  text-align: center;
+}
+
 .client-master-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

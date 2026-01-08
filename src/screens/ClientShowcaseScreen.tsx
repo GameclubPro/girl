@@ -12,6 +12,15 @@ type ClientShowcaseScreenProps = {
   onViewRequests: () => void
 }
 
+type ClientShowcaseGalleryScreenProps = {
+  apiBase: string
+  activeCategoryId: string | null
+  onCategoryChange: (categoryId: string | null) => void
+  onBack: () => void
+  onViewMasters: () => void
+  onViewRequests: () => void
+}
+
 const categoryLabelOverrides: Record<string, string> = {
   'beauty-nails': 'Маникюр',
   'makeup-look': 'Макияж',
@@ -26,6 +35,22 @@ const categoryChips = [
     label: categoryLabelOverrides[item.id] ?? item.label,
   })),
 ]
+
+type ShowcaseMedia = {
+  id: string
+  url: string
+  focusX: number
+  focusY: number
+  categories: string[]
+}
+
+const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
+  id: `fallback-showcase-${item.id}-${index}`,
+  url: item.image,
+  focusX: 0.5,
+  focusY: 0.5,
+  categories: item.categoryId ? [item.categoryId] : [],
+}))
 
 type SortMode = 'smart' | 'rating' | 'price' | 'distance' | 'available'
 
@@ -132,6 +157,196 @@ const buildNextSlot = (seed: number) => {
 
 const buildSlots = (seed: number) =>
   Array.from({ length: 8 }, (_, index) => (seed + index * 3) % 7 !== 0)
+
+export const ClientShowcaseGalleryScreen = ({
+  apiBase,
+  activeCategoryId,
+  onCategoryChange,
+  onBack,
+  onViewMasters,
+  onViewRequests,
+}: ClientShowcaseGalleryScreenProps) => {
+  const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+
+  const activeCategoryLabel = activeCategoryId
+    ? categoryChips.find((chip) => chip.id === activeCategoryId)?.label ?? ''
+    : 'Все работы'
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadShowcase = async () => {
+      setIsLoading(true)
+      setLoadError('')
+      try {
+        const response = await fetch(`${apiBase}/api/masters`)
+        if (!response.ok) {
+          throw new Error('Load showcase failed')
+        }
+        const data = (await response.json()) as MasterProfile[]
+        if (cancelled) return
+
+        const nextPool = (Array.isArray(data) ? data : []).flatMap((profile) => {
+          const categories = Array.isArray(profile.categories) ? profile.categories : []
+          return parsePortfolioItems(profile.showcaseUrls ?? [])
+            .filter((item) => isImageUrl(item.url))
+            .map((item, index) => ({
+              id: `${profile.userId}-${index}`,
+              url: item.url,
+              focusX: item.focusX ?? 0.5,
+              focusY: item.focusY ?? 0.5,
+              categories,
+            }))
+        })
+        setShowcasePool(nextPool)
+      } catch (error) {
+        if (!cancelled) {
+          setShowcasePool([])
+          setLoadError('Не удалось загрузить витрину работ.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadShowcase()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase])
+
+  const basePool = useMemo(
+    () => (showcasePool.length > 0 ? showcasePool : fallbackShowcasePool),
+    [showcasePool]
+  )
+
+  const showcaseItems = useMemo(() => {
+    if (!activeCategoryId) return basePool
+    return basePool.filter((item) => item.categories.includes(activeCategoryId))
+  }, [activeCategoryId, basePool])
+
+  const countLabel = isLoading
+    ? 'Загрузка...'
+    : showcaseItems.length > 0
+      ? `${showcaseItems.length} фото`
+      : 'Нет работ'
+
+  return (
+    <div className="screen screen--client screen--client-showcase screen--client-gallery">
+      <div className="client-shell">
+        <header className="client-showcase-header">
+          <button
+            className="client-showcase-back"
+            type="button"
+            onClick={onBack}
+            aria-label="Назад"
+          >
+            ←
+          </button>
+          <div className="client-showcase-headings">
+            <p className="client-showcase-page-kicker">Витрина</p>
+            <h1 className="client-showcase-page-title">
+              {activeCategoryLabel || 'Витрина работ'}
+            </h1>
+            <p className="client-showcase-page-subtitle">
+              Подборка свежих работ мастеров
+            </p>
+          </div>
+        </header>
+
+        <section className="client-section">
+          <div className="client-category-bar" role="tablist" aria-label="Категории">
+            {categoryChips.map((chip) => {
+              const isActive =
+                chip.id === activeCategoryId || (!activeCategoryId && chip.id === null)
+              return (
+                <button
+                  className={`client-category-chip${isActive ? ' is-active' : ''}`}
+                  key={chip.id ?? 'all'}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => onCategoryChange(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="client-section">
+          <div className="client-gallery-meta">
+            <span className="client-gallery-count">{countLabel}</span>
+          </div>
+        </section>
+
+        <section className="client-section">
+          {loadError && <p className="client-gallery-error">{loadError}</p>}
+          {isLoading ? (
+            <div className="client-gallery-grid is-skeleton" aria-hidden="true">
+              {Array.from({ length: 9 }).map((_, index) => (
+                <span
+                  className="client-gallery-item is-skeleton"
+                  key={`skeleton-${index}`}
+                />
+              ))}
+            </div>
+          ) : showcaseItems.length > 0 ? (
+            <div className="client-gallery-grid" role="list">
+              {showcaseItems.map((item) => (
+                <span className="client-gallery-item" key={item.id} role="listitem">
+                  <img
+                    src={item.url}
+                    alt=""
+                    loading="lazy"
+                    style={{
+                      objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
+                    }}
+                  />
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="client-gallery-empty">Пока нет работ в этой категории.</p>
+          )}
+        </section>
+      </div>
+
+      <nav className="bottom-nav" aria-label="Навигация">
+        <button className="nav-item" type="button" onClick={onBack}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconHome />
+          </span>
+          Главная
+        </button>
+        <button className="nav-item" type="button" onClick={onViewMasters}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconUsers />
+          </span>
+          Мастера
+        </button>
+        <button className="nav-item" type="button" onClick={onViewRequests}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconList />
+          </span>
+          Мои заявки
+        </button>
+        <button className="nav-item" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconUser />
+          </span>
+          Профиль
+        </button>
+      </nav>
+    </div>
+  )
+}
 
 export const ClientShowcaseScreen = ({
   apiBase,
