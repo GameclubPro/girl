@@ -1563,14 +1563,10 @@ export const ProProfileScreen = ({
           <div className="pro-profile-portfolio-panel-head">
             <div>
               <p className="pro-profile-portfolio-panel-kicker">Портфолио</p>
-              <h2 className="pro-profile-portfolio-panel-title">Галерея работ</h2>
-              <p className="pro-profile-portfolio-panel-subtitle">
-                До {MAX_PORTFOLIO_ITEMS} фото, витрина настраивается отдельно по клику
-              </p>
             </div>
             <div className="pro-profile-portfolio-panel-controls">
               <span className="pro-profile-portfolio-panel-count">
-                {portfolioGalleryLabel}
+                {portfolioItems.length} из {MAX_PORTFOLIO_ITEMS}
               </span>
               {hasPortfolioOverflow && (
                 <button

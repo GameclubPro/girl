@@ -2818,21 +2818,6 @@
   color: var(--pro-muted);
 }
 
-.pro-profile-portfolio-panel-title {
-  margin: 4px 0 0;
-  font-family: var(--font-title);
-  font-size: clamp(18px, 4.6vw, 24px);
-  font-weight: 700;
-  color: var(--pro-ink);
-}
-
-.pro-profile-portfolio-panel-subtitle {
-  margin: 4px 0 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--pro-muted);
-}
-
 .pro-profile-portfolio-panel-controls {
   display: flex;
   flex-direction: column;
