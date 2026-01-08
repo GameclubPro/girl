@@ -192,7 +192,9 @@ export const ClientShowcaseScreen = ({
     const source = profiles.length > 0 ? profiles : fallbackProfiles
     return source.map((profile, index) => {
       const seed = toSeed(profile.userId || profile.displayName || `${index}`)
-      const portfolioItems = parsePortfolioItems(profile.portfolioUrls ?? [])
+      const portfolioItems = parsePortfolioItems(
+        profile.showcaseUrls ?? profile.portfolioUrls ?? []
+      )
         .filter((item) => isImageUrl(item.url))
         .map((item) => ({
           url: item.url,

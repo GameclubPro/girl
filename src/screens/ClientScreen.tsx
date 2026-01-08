@@ -92,7 +92,7 @@ export const ClientScreen = ({
 
         const nextPool = data.flatMap((profile) => {
           const categories = Array.isArray(profile.categories) ? profile.categories : []
-          return parsePortfolioItems(profile.portfolioUrls ?? [])
+          return parsePortfolioItems(profile.showcaseUrls ?? profile.portfolioUrls ?? [])
             .filter((item) => isImageUrl(item.url))
             .map((item, index) => ({
               id: `${profile.userId}-${index}`,

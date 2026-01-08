@@ -275,6 +275,15 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_showcases (
+      user_id TEXT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+      showcase_urls TEXT[] NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
     ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
   `)
@@ -652,10 +661,12 @@ app.get('/api/masters', async (req, res) => {
           mp.categories,
           mp.services,
           mp.portfolio_urls AS "portfolioUrls",
+          COALESCE(ms.showcase_urls, mp.portfolio_urls) AS "showcaseUrls",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN cities c ON c.id = mp.city_id
         LEFT JOIN districts d ON d.id = mp.district_id
+        LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
         ${whereClause}
         ORDER BY mp.updated_at DESC
         LIMIT 50
@@ -699,8 +710,10 @@ app.get('/api/masters/:userId', async (req, res) => {
           categories,
           services,
           portfolio_urls AS "portfolioUrls",
+          COALESCE(ms.showcase_urls, master_profiles.portfolio_urls) AS "showcaseUrls",
           updated_at AS "updatedAt"
         FROM master_profiles
+        LEFT JOIN master_showcases ms ON ms.user_id = master_profiles.user_id
         WHERE user_id = $1
       `,
       [normalizedUserId]
@@ -928,6 +941,7 @@ app.post('/api/masters', async (req, res) => {
     categories,
     services,
     portfolioUrls,
+    showcaseUrls,
   } = req.body ?? {}
 
   const normalizedUserId = normalizeText(userId)
@@ -935,7 +949,11 @@ app.post('/api/masters', async (req, res) => {
   const normalizedAbout = normalizeText(about)
   const categoryList = normalizeStringArray(categories)
   const serviceList = normalizeStringArray(services)
-  const portfolioList = normalizeStringArray(portfolioUrls)
+  const portfolioList = Array.isArray(portfolioUrls)
+    ? normalizeStringArray(portfolioUrls)
+    : null
+  const hasShowcase = Array.isArray(showcaseUrls)
+  const showcaseList = hasShowcase ? normalizeStringArray(showcaseUrls) : null
   const scheduleDayList = normalizeStringArray(scheduleDays)
   const normalizedScheduleStart = normalizeText(scheduleStart) || null
   const normalizedScheduleEnd = normalizeText(scheduleEnd) || null
@@ -1017,7 +1035,7 @@ app.post('/api/masters', async (req, res) => {
           services,
           portfolio_urls
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE($17, '{}'::text[]))
         ON CONFLICT (user_id) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             about = EXCLUDED.about,
@@ -1034,7 +1052,11 @@ app.post('/api/masters', async (req, res) => {
             works_at_master = EXCLUDED.works_at_master,
             categories = EXCLUDED.categories,
             services = EXCLUDED.services,
-            portfolio_urls = EXCLUDED.portfolio_urls,
+            portfolio_urls =
+              CASE
+                WHEN $17 IS NULL THEN master_profiles.portfolio_urls
+                ELSE $17
+              END,
             updated_at = NOW()
       `,
       [
@@ -1058,6 +1080,19 @@ app.post('/api/masters', async (req, res) => {
       ]
     )
 
+    if (hasShowcase) {
+      await pool.query(
+        `
+          INSERT INTO master_showcases (user_id, showcase_urls)
+          VALUES ($1, $2)
+          ON CONFLICT (user_id) DO UPDATE
+          SET showcase_urls = EXCLUDED.showcase_urls,
+              updated_at = NOW()
+        `,
+        [normalizedUserId, showcaseList ?? []]
+      )
+    }
+
     const summary = getProfileStatusSummary({
       displayName: normalizedName,
       about: normalizedAbout || null,
@@ -1070,7 +1105,7 @@ app.post('/api/masters', async (req, res) => {
       worksAtMaster: workAtMaster,
       categories: categoryList,
       services: serviceList,
-      portfolioUrls: portfolioList,
+      portfolioUrls: portfolioList ?? [],
     })
 
     res.json({ ok: true, ...summary })

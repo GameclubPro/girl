@@ -121,6 +121,7 @@ export const ProProfileScreen = ({
     categoryItems[0]?.id ?? 'beauty-nails'
   )
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
+  const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
   const [worksAtClient, setWorksAtClient] = useState(true)
   const [worksAtMaster, setWorksAtMaster] = useState(false)
   const [isActive, setIsActive] = useState(true)
@@ -249,7 +250,7 @@ export const ProProfileScreen = ({
     serviceItems.length > 0
       ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
       : 'Нет услуг'
-  const showcaseCountRaw = portfolioItems.filter((item) => item.url.trim()).length
+  const showcaseCountRaw = showcaseItems.filter((item) => item.url.trim()).length
   const showcaseCount = Math.min(showcaseCountRaw, MAX_SHOWCASE_ITEMS)
   const showcaseCountLabel =
     showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
@@ -280,8 +281,8 @@ export const ProProfileScreen = ({
     [serviceItems]
   )
   const showcasePreview = useMemo(
-    () => portfolioItems.filter((item) => item.url.trim()).slice(0, 3),
-    [portfolioItems]
+    () => showcaseItems.filter((item) => item.url.trim()).slice(0, 3),
+    [showcaseItems]
   )
   const portfolioGalleryItems = useMemo(
     () =>
@@ -518,6 +519,9 @@ export const ProProfileScreen = ({
         const nextCategories = data.categories ?? []
         const nextServiceItems = parseServiceItems(data.services ?? [])
         const nextPortfolioItems = parsePortfolioItems(data.portfolioUrls ?? [])
+        const nextShowcaseItems = parsePortfolioItems(
+          data.showcaseUrls ?? data.portfolioUrls ?? []
+        )
 
         setDisplayName(nextDisplayName)
         setAbout(nextAbout)
@@ -540,6 +544,7 @@ export const ProProfileScreen = ({
         setServiceCategoryId(nextServiceCategoryId)
         setServiceItems(nextServiceItems)
         setPortfolioItems(nextPortfolioItems)
+        setShowcaseItems(nextShowcaseItems)
         setAvatarUrl(data.avatarUrl ?? '')
         setCoverUrl(data.coverUrl ?? '')
 
@@ -1088,15 +1093,8 @@ export const ProProfileScreen = ({
                 Портфолио еще пустое
               </p>
               <p className="pro-profile-portfolio-panel-empty-text">
-                Добавьте работы в кабинете, и они появятся здесь.
+                Портфолио заполняется отдельно от витрины.
               </p>
-              <button
-                className="pro-profile-portfolio-panel-action is-primary"
-                type="button"
-                onClick={onBack}
-              >
-                Добавить работы
-              </button>
             </div>
           )}
         </section>

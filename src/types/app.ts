@@ -34,6 +34,7 @@ export type MasterProfile = {
   categories: string[]
   services: string[]
   portfolioUrls: string[]
+  showcaseUrls?: string[]
   avatarUrl?: string | null
   coverUrl?: string | null
   isActive?: boolean

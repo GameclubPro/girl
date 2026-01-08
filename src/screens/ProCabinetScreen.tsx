@@ -35,6 +35,7 @@ type ProfilePayload = {
   categories: string[]
   services: string[]
   portfolioUrls: string[]
+  showcaseUrls: string[]
 }
 
 const MAX_PORTFOLIO_ITEMS = 6
@@ -145,6 +146,7 @@ export const ProCabinetScreen = ({
               categories: [],
               services: [],
               portfolioUrls: [],
+              showcaseUrls: [],
               isActive: true,
               scheduleDays: [],
               scheduleStart: null,
@@ -162,7 +164,7 @@ export const ProCabinetScreen = ({
         const data = (await response.json()) as MasterProfile
         if (!cancelled) {
           const parsedPortfolio = parsePortfolioItems(
-            data.portfolioUrls ?? []
+            data.showcaseUrls ?? data.portfolioUrls ?? []
           ).slice(0, MAX_PORTFOLIO_ITEMS)
           setProfile(data)
           setPortfolioItems(parsedPortfolio)
@@ -213,7 +215,8 @@ export const ProCabinetScreen = ({
     worksAtMaster: Boolean(base.worksAtMaster),
     categories: base.categories ?? [],
     services: base.services ?? [],
-    portfolioUrls: toPortfolioStrings(portfolioItems),
+    portfolioUrls: Array.isArray(base.portfolioUrls) ? base.portfolioUrls : [],
+    showcaseUrls: toPortfolioStrings(portfolioItems),
   })
 
   const savePortfolio = async () => {
@@ -246,6 +249,7 @@ export const ProCabinetScreen = ({
           ? {
               ...current,
               portfolioUrls: payload.portfolioUrls,
+              showcaseUrls: payload.showcaseUrls,
             }
           : current
       )
