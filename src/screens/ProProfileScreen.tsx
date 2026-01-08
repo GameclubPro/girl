@@ -91,9 +91,21 @@ type ProfilePayload = {
 }
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
-const MAX_PORTFOLIO_ITEMS = 7
+const MAX_PORTFOLIO_ITEMS = 30
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
+const PORTFOLIO_GALLERY_LAYOUT = [
+  'is-hero',
+  'is-tall',
+  'is-wide',
+  'is-square',
+  'is-square',
+  'is-wide',
+  'is-tall',
+  'is-square',
+  'is-wide',
+  'is-square',
+] as const
 
 export const ProProfileScreen = ({
   apiBase,
@@ -280,6 +292,17 @@ export const ProProfileScreen = ({
     () => portfolioItems.filter((item) => item.url.trim()).slice(0, 3),
     [portfolioItems]
   )
+  const portfolioGalleryItems = useMemo(
+    () =>
+      portfolioItems
+        .filter((item) => item.url.trim() && isImageUrl(item.url))
+        .slice(0, MAX_PORTFOLIO_ITEMS),
+    [portfolioItems]
+  )
+  const portfolioGalleryLabel =
+    portfolioGalleryItems.length > 0
+      ? `${portfolioGalleryItems.length} фото`
+      : 'Нет фото'
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -1001,6 +1024,75 @@ export const ProProfileScreen = ({
         {isLoading && <p className="pro-status">Загружаем профиль...</p>}
         {loadError && <p className="pro-error">{loadError}</p>}
         {mediaError && <p className="pro-error">{mediaError}</p>}
+
+        <section className="pro-profile-portfolio animate delay-2">
+          <div className="pro-profile-portfolio-head">
+            <div>
+              <p className="pro-profile-portfolio-kicker">Портфолио</p>
+              <h2 className="pro-profile-portfolio-title">Галерея работ</h2>
+              <p className="pro-profile-portfolio-subtitle">
+                До {MAX_PORTFOLIO_ITEMS} фото, мозаика подстраивается под стиль
+              </p>
+            </div>
+            <div className="pro-profile-portfolio-controls">
+              <span className="pro-profile-portfolio-count">
+                {portfolioGalleryLabel}
+              </span>
+              <button
+                className="pro-profile-portfolio-action"
+                type="button"
+                onClick={onBack}
+              >
+                Управлять
+              </button>
+            </div>
+          </div>
+          {portfolioGalleryItems.length > 0 ? (
+            <div
+              className="pro-profile-portfolio-grid"
+              role="list"
+              aria-label="Портфолио"
+            >
+              {portfolioGalleryItems.map((item, index) => {
+                const focus = resolvePortfolioFocus(item)
+                const layout =
+                  PORTFOLIO_GALLERY_LAYOUT[
+                    index % PORTFOLIO_GALLERY_LAYOUT.length
+                  ]
+                return (
+                  <span
+                    className={`pro-profile-portfolio-item ${layout}`}
+                    key={`${item.url}-${index}`}
+                    role="listitem"
+                  >
+                    <img
+                      src={item.url}
+                      alt={`Работа ${index + 1}`}
+                      loading="lazy"
+                      style={{ objectPosition: focus.position }}
+                    />
+                  </span>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="pro-profile-portfolio-empty">
+              <p className="pro-profile-portfolio-empty-title">
+                Портфолио еще пустое
+              </p>
+              <p className="pro-profile-portfolio-empty-text">
+                Добавьте работы в кабинете, и они появятся здесь.
+              </p>
+              <button
+                className="pro-profile-portfolio-action is-primary"
+                type="button"
+                onClick={onBack}
+              >
+                Добавить работы
+              </button>
+            </div>
+          )}
+        </section>
 
         <section className="pro-profile-cards animate delay-2">
           <button
