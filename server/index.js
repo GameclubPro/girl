@@ -691,30 +691,30 @@ app.get('/api/masters/:userId', async (req, res) => {
     const result = await pool.query(
       `
         SELECT
-          user_id AS "userId",
-          display_name AS "displayName",
-          about,
-          city_id AS "cityId",
-          district_id AS "districtId",
-          experience_years AS "experienceYears",
-          price_from AS "priceFrom",
-          price_to AS "priceTo",
-          avatar_path AS "avatarPath",
-          cover_path AS "coverPath",
-          is_active AS "isActive",
-          schedule_days AS "scheduleDays",
-          schedule_start AS "scheduleStart",
-          schedule_end AS "scheduleEnd",
-          works_at_client AS "worksAtClient",
-          works_at_master AS "worksAtMaster",
-          categories,
-          services,
-          portfolio_urls AS "portfolioUrls",
-          COALESCE(ms.showcase_urls, master_profiles.portfolio_urls) AS "showcaseUrls",
-          updated_at AS "updatedAt"
-        FROM master_profiles
-        LEFT JOIN master_showcases ms ON ms.user_id = master_profiles.user_id
-        WHERE user_id = $1
+          mp.user_id AS "userId",
+          mp.display_name AS "displayName",
+          mp.about,
+          mp.city_id AS "cityId",
+          mp.district_id AS "districtId",
+          mp.experience_years AS "experienceYears",
+          mp.price_from AS "priceFrom",
+          mp.price_to AS "priceTo",
+          mp.avatar_path AS "avatarPath",
+          mp.cover_path AS "coverPath",
+          mp.is_active AS "isActive",
+          mp.schedule_days AS "scheduleDays",
+          mp.schedule_start AS "scheduleStart",
+          mp.schedule_end AS "scheduleEnd",
+          mp.works_at_client AS "worksAtClient",
+          mp.works_at_master AS "worksAtMaster",
+          mp.categories,
+          mp.services,
+          mp.portfolio_urls AS "portfolioUrls",
+          COALESCE(ms.showcase_urls, mp.portfolio_urls) AS "showcaseUrls",
+          mp.updated_at AS "updatedAt"
+        FROM master_profiles mp
+        LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
+        WHERE mp.user_id = $1
       `,
       [normalizedUserId]
     )
