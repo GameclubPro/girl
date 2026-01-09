@@ -5763,13 +5763,14 @@ h2 {
 .client-gallery-grid {
   column-count: 3;
   column-gap: 2px;
+  line-height: 0;
 }
 
 .client-gallery-item {
   position: relative;
-  display: inline-block;
+  display: block;
   width: 100%;
-  margin: 0 0 2px;
+  margin: 0 0 1px;
   border-radius: 8px;
   overflow: hidden;
   background: rgba(241, 231, 244, 0.7);
