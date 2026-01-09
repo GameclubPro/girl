@@ -214,6 +214,21 @@ const weekDays = [
   { id: 'sun', label: 'Вс' },
 ] as const
 
+const scheduleDayAliases: Record<string, string> = {
+  пн: 'mon',
+  вт: 'tue',
+  ср: 'wed',
+  чт: 'thu',
+  пт: 'fri',
+  сб: 'sat',
+  вс: 'sun',
+}
+
+const normalizeScheduleDay = (value: string) => {
+  const normalized = value.trim().toLowerCase()
+  return scheduleDayAliases[normalized] ?? normalized
+}
+
 const formatRecencyChip = (updatedAtTs: number) => {
   if (!updatedAtTs) return 'Недавно'
   const diffDays = Math.floor(
@@ -777,7 +792,7 @@ export const ClientShowcaseScreen = ({
                 const responseLabel = buildResponseLabel(seed)
                 const recencyLabel = formatRecencyChip(master.updatedAtTs)
                 const scheduleSet = new Set(
-                  master.scheduleDays.map((day) => day.trim().toLowerCase())
+                  master.scheduleDays.map((day) => normalizeScheduleDay(day))
                 )
                 const chipItems = [
                   distanceLabel,

@@ -6498,9 +6498,11 @@ h2 {
 
 .client-master-availability {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 10px;
   position: relative;
   z-index: 1;
 }
@@ -6512,33 +6514,37 @@ h2 {
   letter-spacing: 0.5px;
   color: #9a8f98;
   white-space: nowrap;
+  line-height: 1;
+  flex: 0 0 auto;
 }
 
 .client-master-week {
-  width: 100%;
+  --week-cell-size: clamp(20px, 6vw, 26px);
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(7, var(--week-cell-size));
+  gap: 5px;
+  flex: 0 0 auto;
 }
 
 .client-master-weekday {
-  aspect-ratio: 1 / 1;
-  border-radius: 10px;
+  width: var(--week-cell-size);
+  height: var(--week-cell-size);
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #8a7c85;
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(220, 210, 216, 0.9);
-  box-shadow: 0 6px 10px rgba(60, 50, 70, 0.08);
+  box-shadow: 0 4px 8px rgba(60, 50, 70, 0.08);
 }
 
 .client-master-weekday.is-active {
   color: #ffffff;
   background: linear-gradient(135deg, var(--card-accent) 0%, #f09a73 100%);
   border-color: transparent;
-  box-shadow: 0 10px 16px rgba(227, 122, 90, 0.24);
+  box-shadow: 0 8px 12px rgba(227, 122, 90, 0.24);
 }
 
 .client-master-actions {
