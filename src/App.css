@@ -6498,9 +6498,9 @@ h2 {
 
 .client-master-availability {
   display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   position: relative;
   z-index: 1;
 }
@@ -6514,23 +6514,31 @@ h2 {
   white-space: nowrap;
 }
 
-.client-master-slots {
-  flex: 1;
-  min-width: 140px;
+.client-master-week {
+  width: 100%;
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
 }
 
-.client-master-slot {
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(213, 201, 208, 0.75);
+.client-master-weekday {
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a7c85;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(220, 210, 216, 0.9);
+  box-shadow: 0 6px 10px rgba(60, 50, 70, 0.08);
 }
 
-.client-master-slot.is-open {
-  background: linear-gradient(135deg, #f6a375 0%, #e58258 100%);
-  box-shadow: 0 6px 10px rgba(226, 130, 88, 0.22);
+.client-master-weekday.is-active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--card-accent) 0%, #f09a73 100%);
+  border-color: transparent;
+  box-shadow: 0 10px 16px rgba(227, 122, 90, 0.24);
 }
 
 .client-master-actions {

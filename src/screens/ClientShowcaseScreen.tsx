@@ -128,6 +128,7 @@ type MasterCard = {
   worksAtClient: boolean
   worksAtMaster: boolean
   isActive: boolean
+  scheduleDays: string[]
   cityName: string | null
   districtName: string | null
   locationLabel: string
@@ -202,6 +203,16 @@ const formatUpdatedLabel = (value: string | null) => {
     month: 'short',
   })}`
 }
+
+const weekDays = [
+  { id: 'mon', label: 'Пн' },
+  { id: 'tue', label: 'Вт' },
+  { id: 'wed', label: 'Ср' },
+  { id: 'thu', label: 'Чт' },
+  { id: 'fri', label: 'Пт' },
+  { id: 'sat', label: 'Сб' },
+  { id: 'sun', label: 'Вс' },
+] as const
 
 const formatRecencyChip = (updatedAtTs: number) => {
   if (!updatedAtTs) return 'Недавно'
@@ -469,6 +480,7 @@ export const ClientShowcaseScreen = ({
       const priceFrom = profile.priceFrom ?? null
       const priceTo = profile.priceTo ?? null
       const isActive = Boolean(profile.isActive ?? true)
+      const scheduleDays = Array.isArray(profile.scheduleDays) ? profile.scheduleDays : []
       const reviewsCount =
         typeof profile.reviewsCount === 'number' ? profile.reviewsCount : 0
       const reviewsAverage =
@@ -508,6 +520,7 @@ export const ClientShowcaseScreen = ({
         worksAtClient: Boolean(profile.worksAtClient),
         worksAtMaster: Boolean(profile.worksAtMaster),
         isActive,
+        scheduleDays,
         cityName: profile.cityName ?? null,
         districtName: profile.districtName ?? null,
         locationLabel,
@@ -763,6 +776,9 @@ export const ClientShowcaseScreen = ({
                 )
                 const responseLabel = buildResponseLabel(seed)
                 const recencyLabel = formatRecencyChip(master.updatedAtTs)
+                const scheduleSet = new Set(
+                  master.scheduleDays.map((day) => day.trim().toLowerCase())
+                )
                 const chipItems = [
                   distanceLabel,
                   responseLabel,
@@ -773,10 +789,6 @@ export const ClientShowcaseScreen = ({
                   item: master.thumbItems[index] ?? null,
                   index,
                 }))
-                const slotFill = 4 + (seed % 5)
-                const slotIndicators = Array.from({ length: 10 }, (_, index) =>
-                  index < slotFill
-                )
 
                 return (
                   <article
@@ -822,17 +834,30 @@ export const ClientShowcaseScreen = ({
 
                     <div className="client-master-availability">
                       <span className="client-master-availability-label">
-                        Ближайшие слоты
+                        График
                       </span>
-                      <div className="client-master-slots">
-                        {slotIndicators.map((isOpen, index) => (
-                          <span
-                            className={`client-master-slot${
-                              isOpen ? ' is-open' : ''
-                            }`}
-                            key={`slot-${master.id}-${index}`}
-                          />
-                        ))}
+                      <div
+                        className="client-master-week"
+                        role="list"
+                        aria-label="Дни работы"
+                      >
+                        {weekDays.map((day) => {
+                          const isActive = scheduleSet.has(day.id)
+                          return (
+                            <span
+                              className={`client-master-weekday${
+                                isActive ? ' is-active' : ''
+                              }`}
+                              key={day.id}
+                              role="listitem"
+                              aria-label={`${day.label} ${
+                                isActive ? 'работает' : 'выходной'
+                              }`}
+                            >
+                              {day.label}
+                            </span>
+                          )
+                        })}
                       </div>
                     </div>
 
