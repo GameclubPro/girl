@@ -25,6 +25,11 @@ type MasterBookingSlot = {
   status: string
 }
 
+type CategoryId = (typeof categoryItems)[number]['id']
+
+const isCategoryId = (value: string): value is CategoryId =>
+  categoryItems.some((item) => item.id === value)
+
 const scheduleLabels: Record<string, string> = {
   mon: 'Пн',
   tue: 'Вт',
@@ -207,10 +212,16 @@ export const BookingScreen = ({
       return
     }
     setCategoryId((current) => {
-      if (preferredCategoryId && availableCategoryIds.includes(preferredCategoryId)) {
+      if (
+        preferredCategoryId &&
+        isCategoryId(preferredCategoryId) &&
+        availableCategoryIds.includes(preferredCategoryId)
+      ) {
         return preferredCategoryId
       }
-      return availableCategoryIds.includes(current) ? current : availableCategoryIds[0]
+      return isCategoryId(current) && availableCategoryIds.includes(current)
+        ? current
+        : availableCategoryIds[0]
     })
   }, [availableCategoryIds, preferredCategoryId])
 
