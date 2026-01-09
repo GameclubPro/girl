@@ -58,23 +58,6 @@ const resolveFocusPoint = (item?: PortfolioItem | null) => {
   }
 }
 
-const formatReviewCount = (value: number) => {
-  const mod10 = value % 10
-  const mod100 = value % 100
-  if (mod10 === 1 && mod100 !== 11) return `${value} отзыв`
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${value} отзыва`
-  }
-  return `${value} отзывов`
-}
-
-const buildStars = (value: number) => {
-  const clamped = Math.max(0, Math.min(5, Math.round(value)))
-  return Array.from({ length: 5 }, (_, index) => (index < clamped ? '★' : '☆')).join(
-    ''
-  )
-}
-
 export const ProCabinetScreen = ({
   apiBase,
   userId,
@@ -107,8 +90,6 @@ export const ProCabinetScreen = ({
   const queuedSaveRef = useRef(false)
   const hasLoadedRef = useRef(false)
 
-  const displayNameValue =
-    profile?.displayName?.trim() || displayNameFallback.trim() || 'Мастер'
   const portfolioKey = useMemo(
     () => JSON.stringify(toPortfolioStrings(portfolioItems)),
     [portfolioItems]
@@ -121,15 +102,6 @@ export const ProCabinetScreen = ({
   const showcaseSubtitle = hasShowcase
     ? `Работ в витрине: ${portfolioItems.length} из ${MAX_PORTFOLIO_ITEMS}`
     : `Добавьте до ${MAX_PORTFOLIO_ITEMS} лучших работ`
-  const reviewsCount = typeof profile?.reviewsCount === 'number' ? profile.reviewsCount : 0
-  const reviewsAverage =
-    reviewsCount > 0 && typeof profile?.reviewsAverage === 'number'
-      ? profile.reviewsAverage
-      : 0
-  const reviewsScoreLabel = reviewsCount > 0 ? reviewsAverage.toFixed(1) : '—'
-  const reviewsCountLabel =
-    reviewsCount > 0 ? formatReviewCount(reviewsCount) : 'Нет отзывов'
-  const reviewsStars = reviewsCount > 0 ? buildStars(reviewsAverage) : '☆☆☆☆☆'
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolveFocusPoint(focusItem)
@@ -584,14 +556,8 @@ export const ProCabinetScreen = ({
         <section className="pro-cabinet-showcase animate delay-1">
           <div className="pro-cabinet-showcase-head">
             <div>
-              <p className="pro-cabinet-showcase-eyebrow">{displayNameValue}</p>
               <h1 className="pro-cabinet-showcase-title">Витрина работ</h1>
               <p className="pro-cabinet-showcase-subtitle">{showcaseSubtitle}</p>
-            </div>
-            <div className="pro-cabinet-reviews">
-              <span className="pro-cabinet-reviews-score">{reviewsScoreLabel}</span>
-              <span className="pro-cabinet-reviews-stars">{reviewsStars}</span>
-              <span className="pro-cabinet-reviews-count">{reviewsCountLabel}</span>
             </div>
           </div>
           {isLoading && <p className="pro-status">Загружаем витрину...</p>}
