@@ -191,10 +191,6 @@ export const ClientShowcaseGalleryScreen = ({
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
-  const activeCategoryLabel = activeCategoryId
-    ? categoryChips.find((chip) => chip.id === activeCategoryId)?.label ?? ''
-    : 'Все работы'
-
   useEffect(() => {
     let cancelled = false
 
@@ -255,26 +251,6 @@ export const ClientShowcaseGalleryScreen = ({
   return (
     <div className="screen screen--client screen--client-showcase screen--client-gallery">
       <div className="client-shell">
-        <header className="client-showcase-header">
-          <button
-            className="client-showcase-back"
-            type="button"
-            onClick={onBack}
-            aria-label="Назад"
-          >
-            ←
-          </button>
-          <div className="client-showcase-headings">
-            <p className="client-showcase-page-kicker">Витрина</p>
-            <h1 className="client-showcase-page-title">
-              {activeCategoryLabel || 'Витрина работ'}
-            </h1>
-            <p className="client-showcase-page-subtitle">
-              Подборка свежих работ мастеров
-            </p>
-          </div>
-        </header>
-
         <section className="client-section">
           <div className="client-category-bar" role="tablist" aria-label="Категории">
             {categoryChips.map((chip) => {
@@ -390,11 +366,6 @@ export const ClientShowcaseScreen = ({
   const [onlyActive, setOnlyActive] = useState(false)
   const [onlyAtClient, setOnlyAtClient] = useState(false)
   const [onlyAtMaster, setOnlyAtMaster] = useState(false)
-
-  const activeCategoryLabel =
-    categoryChips.find((chip) => chip.id === activeCategoryId)?.label ??
-    categoryItems.find((item) => item.id === activeCategoryId)?.label ??
-    ''
 
   useEffect(() => {
     let cancelled = false
@@ -578,45 +549,6 @@ export const ClientShowcaseScreen = ({
   return (
     <div className="screen screen--client screen--client-showcase">
       <div className="client-shell">
-        <header className="client-showcase-header">
-          <button
-            className="client-showcase-back"
-            type="button"
-            onClick={onBack}
-            aria-label="Назад"
-          >
-            ←
-          </button>
-          <div className="client-showcase-headings">
-            <p className="client-showcase-page-kicker">Мастера</p>
-            <h1 className="client-showcase-page-title">
-              {activeCategoryLabel || 'Все специалисты'}
-            </h1>
-            <p className="client-showcase-page-subtitle">
-              Сравнивай по цене, опыту и портфолио
-            </p>
-          </div>
-        </header>
-
-        <section className="client-section">
-          <div className="client-master-search">
-            <label className="client-master-search-field">
-              <span className="client-master-search-icon" aria-hidden="true">
-                ⌕
-              </span>
-              <input
-                type="search"
-                placeholder="Имя, услуга или район"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <button className="client-master-filter" type="button">
-              Фильтры
-            </button>
-          </div>
-        </section>
-
         <section className="client-section">
           <div className="client-category-bar" role="tablist" aria-label="Категории">
             {categoryChips.map((chip) => {
@@ -635,6 +567,25 @@ export const ClientShowcaseScreen = ({
                 </button>
               )
             })}
+          </div>
+        </section>
+
+        <section className="client-section">
+          <div className="client-master-search">
+            <label className="client-master-search-field">
+              <span className="client-master-search-icon" aria-hidden="true">
+                ⌕
+              </span>
+              <input
+                type="search"
+                placeholder="Имя, услуга или район"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <button className="client-master-filter" type="button">
+              Фильтры
+            </button>
           </div>
         </section>
 
