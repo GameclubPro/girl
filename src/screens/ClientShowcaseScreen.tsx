@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
+import { IconFilter, IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile } from '../types/app'
 import {
@@ -572,20 +572,25 @@ export const ClientShowcaseScreen = ({
 
         <section className="client-section">
           <div className="client-master-search">
-            <label className="client-master-search-field">
+            <div className="client-master-search-field">
               <span className="client-master-search-icon" aria-hidden="true">
                 ⌕
               </span>
               <input
                 type="search"
                 placeholder="Имя, услуга или район"
+                aria-label="Поиск"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-            </label>
-            <button className="client-master-filter" type="button">
-              Фильтры
-            </button>
+              <button
+                className="client-master-filter"
+                type="button"
+                aria-label="Фильтры"
+              >
+                <IconFilter />
+              </button>
+            </div>
           </div>
         </section>
 

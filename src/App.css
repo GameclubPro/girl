@@ -6079,9 +6079,7 @@ h2 {
 }
 
 .client-master-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  display: block;
   align-items: center;
 }
 
@@ -6107,7 +6105,8 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   color: #3d323a;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   outline: none;
 }
 
@@ -6121,15 +6120,23 @@ h2 {
 }
 
 .client-master-filter {
-  border: none;
-  border-radius: 14px;
-  padding: 10px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, #f09a6a 0%, #dd7a62 100%);
-  box-shadow: 0 12px 18px rgba(214, 116, 91, 0.35);
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  border: 1px solid rgba(214, 199, 206, 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  color: #6b5a77;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   cursor: pointer;
+}
+
+.client-master-filter svg {
+  width: 16px;
+  height: 16px;
 }
 
 .client-master-filter:focus-visible {
@@ -6138,7 +6145,7 @@ h2 {
 }
 
 .client-master-sort {
-  display: flex;
+  display: none;
   gap: 8px;
   overflow-x: auto;
   padding: 2px 18px 6px;
@@ -7730,11 +7737,12 @@ h2 {
   }
 
   .client-master-search {
-    grid-template-columns: minmax(0, 1fr);
+    display: block;
   }
 
   .client-master-filter {
-    width: 100%;
+    width: 30px;
+    height: 30px;
   }
 
   .client-master-top {
