@@ -712,6 +712,8 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.about,
           mp.city_id AS "cityId",
           mp.district_id AS "districtId",
+          c.name AS "cityName",
+          d.name AS "districtName",
           mp.experience_years AS "experienceYears",
           mp.price_from AS "priceFrom",
           mp.price_to AS "priceTo",
@@ -729,6 +731,8 @@ app.get('/api/masters/:userId', async (req, res) => {
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
+        LEFT JOIN cities c ON c.id = mp.city_id
+        LEFT JOIN districts d ON d.id = mp.district_id
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
         WHERE mp.user_id = $1
       `,

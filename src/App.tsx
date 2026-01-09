@@ -6,6 +6,7 @@ import {
   ClientShowcaseGalleryScreen,
   ClientShowcaseScreen,
 } from './screens/ClientShowcaseScreen'
+import { ClientMasterProfileScreen } from './screens/ClientMasterProfileScreen'
 import { ProCabinetScreen } from './screens/ProCabinetScreen'
 import { ProProfileScreen } from './screens/ProProfileScreen'
 import { ProRequestsScreen } from './screens/ProRequestsScreen'
@@ -29,6 +30,7 @@ function App() {
     | 'client'
     | 'client-showcase'
     | 'client-gallery'
+    | 'client-master-profile'
     | 'request'
     | 'requests'
     | 'pro-cabinet'
@@ -55,6 +57,7 @@ function App() {
   const [requestCategoryId, setRequestCategoryId] = useState<string>(
     categoryItems[0]?.id ?? ''
   )
+  const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
@@ -187,6 +190,7 @@ function App() {
       view === 'client' ||
       view === 'client-showcase' ||
       view === 'client-gallery' ||
+      view === 'client-master-profile' ||
       view === 'request' ||
       view === 'requests' ||
       isPro
@@ -362,6 +366,7 @@ function App() {
       view === 'address' ||
       view === 'client-showcase' ||
       view === 'client-gallery' ||
+      view === 'client-master-profile' ||
       view === 'request' ||
       view === 'requests' ||
       view === 'pro-cabinet' ||
@@ -380,6 +385,10 @@ function App() {
         case 'client-showcase':
         case 'client-gallery':
           setView('client')
+          break
+        case 'client-master-profile':
+          setSelectedMasterId(null)
+          setView('client-showcase')
           break
         case 'pro-profile':
           if (proProfileBackHandlerRef.current?.()) {
@@ -410,6 +419,12 @@ function App() {
       backButton.offClick(handleBack)
     }
   }, [view])
+
+  useEffect(() => {
+    if (view === 'client-master-profile' && !selectedMasterId) {
+      setView('client-showcase')
+    }
+  }, [selectedMasterId, view])
 
   const registerProProfileBackHandler = useCallback(
     (handler: (() => boolean) | null) => {
@@ -445,6 +460,41 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
         onViewRequests={() => setView('requests')}
+        onViewProfile={(masterId) => {
+          setSelectedMasterId(masterId)
+          setView('client-master-profile')
+        }}
+      />
+    )
+  }
+
+  if (view === 'client-master-profile' && selectedMasterId) {
+    return (
+      <ClientMasterProfileScreen
+        apiBase={apiBase}
+        masterId={selectedMasterId}
+        onBack={() => {
+          setSelectedMasterId(null)
+          setView('client-showcase')
+        }}
+        onViewHome={() => {
+          setSelectedMasterId(null)
+          setView('client')
+        }}
+        onViewMasters={() => {
+          setSelectedMasterId(null)
+          setView('client-showcase')
+        }}
+        onViewRequests={() => {
+          setSelectedMasterId(null)
+          setView('requests')
+        }}
+        onCreateRequest={(categoryId) => {
+          setRequestCategoryId(
+            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
+          )
+          setView('request')
+        }}
       />
     )
   }

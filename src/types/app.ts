@@ -26,6 +26,8 @@ export type MasterProfile = {
   about?: string | null
   cityId?: number | null
   districtId?: number | null
+  cityName?: string | null
+  districtName?: string | null
   experienceYears?: number | null
   priceFrom?: number | null
   priceTo?: number | null
@@ -41,6 +43,7 @@ export type MasterProfile = {
   scheduleDays?: string[]
   scheduleStart?: string | null
   scheduleEnd?: string | null
+  updatedAt?: string | null
 }
 
 export type ServiceRequest = {

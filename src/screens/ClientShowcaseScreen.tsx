@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile } from '../types/app'
-import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
+import {
+  isImageUrl,
+  parsePortfolioItems,
+  parseServiceItems,
+} from '../utils/profileContent'
+import type { ServiceItem } from '../utils/profileContent'
 
 type ClientShowcaseScreenProps = {
   apiBase: string
@@ -10,6 +15,7 @@ type ClientShowcaseScreenProps = {
   onCategoryChange: (categoryId: string | null) => void
   onBack: () => void
   onViewRequests: () => void
+  onViewProfile: (masterId: string) => void
 }
 
 type ClientShowcaseGalleryScreenProps = {
@@ -61,26 +67,15 @@ const galleryShapePattern = [
 const pickGalleryShape = (seed: number) =>
   galleryShapePattern[seed % galleryShapePattern.length]
 
-type SortMode = 'smart' | 'rating' | 'price' | 'distance' | 'available'
+type SortMode = 'recent' | 'active' | 'experience' | 'price' | 'portfolio'
 
 const sortOptions: { id: SortMode; label: string }[] = [
-  { id: 'smart', label: 'Лучшие рядом' },
-  { id: 'available', label: 'Сегодня' },
-  { id: 'rating', label: 'Рейтинг' },
+  { id: 'recent', label: 'Актуальные' },
+  { id: 'active', label: 'Запись открыта' },
+  { id: 'experience', label: 'Опыт' },
   { id: 'price', label: 'Бюджет' },
-  { id: 'distance', label: 'Ближе' },
+  { id: 'portfolio', label: 'Работы' },
 ]
-
-const signalLabels = [
-  'Лучшее рядом',
-  'Быстрый отклик',
-  'Топ по отзывам',
-  'Под ваш стиль',
-  'Можно сегодня',
-]
-
-const dayLabels = ['Сегодня', 'Завтра', 'Послезавтра']
-const timeSlots = ['09:00', '11:30', '13:00', '15:30', '18:00', '19:30']
 
 type MasterCard = {
   id: string
@@ -88,37 +83,31 @@ type MasterCard = {
   categories: string[]
   categoryLabels: string[]
   primaryCategory: string
-  services: string[]
+  services: ServiceItem[]
+  serviceNames: string[]
   avatarUrl: string | null
   heroUrl: string | null
   heroFocus: string
-  rating: number
-  reviews: number
-  distance: number
-  responseMinutes: number
-  priceFrom: number
-  priceTo: number
-  experienceYears: number
+  priceFrom: number | null
+  priceTo: number | null
+  experienceYears: number | null
   worksAtClient: boolean
   worksAtMaster: boolean
-  isAvailable: boolean
-  nextSlot: string
-  slots: boolean[]
-  signal: string
+  isActive: boolean
+  cityName: string | null
+  districtName: string | null
+  locationLabel: string
+  about: string | null
+  updatedAt: string | null
+  updatedAtTs: number
+  portfolioCount: number
+  updateLabel: string
   gallery: { url: string; focus: string }[]
-  score: number
-  slotCount: number
   initials: string
 }
 
 const toSeed = (value: string) =>
   value.split('').reduce((total, char) => total + char.charCodeAt(0), 0)
-
-const clampNumber = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value))
-
-const formatDistance = (value: number) =>
-  `${value.toFixed(1).replace('.', ',')} км`
 
 const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
@@ -126,6 +115,29 @@ const getCategoryLabel = (categoryId: string) =>
   categoryLabelOverrides[categoryId] ??
   categoryItems.find((item) => item.id === categoryId)?.label ??
   categoryId
+
+const formatPriceRange = (from: number | null, to: number | null) => {
+  if (typeof from === 'number' && typeof to === 'number') {
+    if (from === to) return formatPrice(from)
+    return `${formatPrice(from)} - ${formatPrice(to)}`
+  }
+  if (typeof from === 'number') return `от ${formatPrice(from)}`
+  if (typeof to === 'number') return `до ${formatPrice(to)}`
+  return 'Цена не указана'
+}
+
+const formatExperience = (value: number | null) => {
+  if (typeof value !== 'number' || value <= 0) {
+    return 'Без опыта'
+  }
+  const mod10 = value % 10
+  const mod100 = value % 100
+  if (mod10 === 1 && mod100 !== 11) return `${value} год`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} года`
+  }
+  return `${value} лет`
+}
 
 const getInitials = (value: string) => {
   const normalized = value.trim()
@@ -137,31 +149,26 @@ const getInitials = (value: string) => {
   return normalized.slice(0, 2).toUpperCase()
 }
 
-const buildPriceRange = (profile: MasterProfile, seed: number) => {
-  let from = profile.priceFrom ?? null
-  let to = profile.priceTo ?? null
-  if (!from && !to) {
-    from = 1400 + (seed % 8) * 250
-    to = from + 900 + (seed % 5) * 250
-  } else if (from && !to) {
-    to = from + 900 + (seed % 5) * 250
-  } else if (!from && to) {
-    from = Math.max(800, to - (900 + (seed % 5) * 250))
-  }
-  return {
-    from: Math.round(from ?? 0),
-    to: Math.round(to ?? 0),
-  }
+const buildLocationLabel = (profile: MasterProfile) => {
+  const parts = [profile.cityName, profile.districtName].filter(Boolean)
+  return parts.length > 0 ? parts.join(', ') : 'Локация не указана'
 }
 
-const buildNextSlot = (seed: number) => {
-  const day = dayLabels[seed % dayLabels.length]
-  const time = timeSlots[(seed + 2) % timeSlots.length]
-  return `${day} ${time}`
+const formatUpdatedLabel = (value: string | null) => {
+  if (!value) return 'Нет обновлений'
+  const updatedDate = new Date(value)
+  if (Number.isNaN(updatedDate.getTime())) return 'Нет обновлений'
+  const now = new Date()
+  const diffMs = now.getTime() - updatedDate.getTime()
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  if (diffDays <= 0) return 'Обновлено сегодня'
+  if (diffDays === 1) return 'Обновлено вчера'
+  if (diffDays < 7) return `Обновлено ${diffDays} дн. назад`
+  return `Обновлено ${updatedDate.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  })}`
 }
-
-const buildSlots = (seed: number) =>
-  Array.from({ length: 8 }, (_, index) => (seed + index * 3) % 7 !== 0)
 
 export const ClientShowcaseGalleryScreen = ({
   apiBase,
@@ -364,13 +371,14 @@ export const ClientShowcaseScreen = ({
   onCategoryChange,
   onBack,
   onViewRequests,
+  onViewProfile,
 }: ClientShowcaseScreenProps) => {
   const [profiles, setProfiles] = useState<MasterProfile[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [sortMode, setSortMode] = useState<SortMode>('smart')
+  const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [query, setQuery] = useState('')
-  const [onlyAvailable, setOnlyAvailable] = useState(false)
+  const [onlyActive, setOnlyActive] = useState(false)
   const [onlyAtClient, setOnlyAtClient] = useState(false)
   const [onlyAtMaster, setOnlyAtMaster] = useState(false)
 
@@ -416,7 +424,6 @@ export const ClientShowcaseScreen = ({
   const masterCards = useMemo<MasterCard[]>(() => {
     const source = profiles
     return source.map((profile, index) => {
-      const seed = toSeed(profile.userId || profile.displayName || `${index}`)
       const portfolioItems = parsePortfolioItems(
         profile.portfolioUrls ?? []
       )
@@ -432,17 +439,23 @@ export const ClientShowcaseScreen = ({
 
       const avatarUrl = profile.avatarUrl ?? null
       const gallery = heroItem ? portfolioItems.slice(1, 4) : portfolioItems.slice(0, 3)
+      const portfolioCount = portfolioItems.length
 
-      const rating = clampNumber(4.5 + (seed % 45) / 100, 4.5, 5)
-      const reviews = 12 + (seed % 220)
-      const distance = clampNumber(0.6 + (seed % 90) / 10, 0.6, 12.5)
-      const responseMinutes = 6 + (seed % 40)
-      const isAvailable = Boolean(profile.isActive)
-      const experienceYears = profile.experienceYears ?? 2 + (seed % 12)
-      const { from, to } = buildPriceRange(profile, seed)
-      const nextSlot = buildNextSlot(seed)
-      const slots = buildSlots(seed)
-      const slotCount = slots.filter(Boolean).length
+      const services = parseServiceItems(profile.services ?? [])
+      const serviceNames = services.map((item) => item.name)
+
+      const experienceYears = profile.experienceYears ?? null
+      const priceFrom = profile.priceFrom ?? null
+      const priceTo = profile.priceTo ?? null
+      const isActive = Boolean(profile.isActive ?? true)
+      const updatedAt = profile.updatedAt ?? null
+      const updatedAtTs =
+        updatedAt && Number.isFinite(Date.parse(updatedAt))
+          ? Date.parse(updatedAt)
+          : 0
+      const updateLabel = formatUpdatedLabel(updatedAt)
+      const about = profile.about?.trim() || null
+      const locationLabel = buildLocationLabel(profile)
 
       const categories = Array.isArray(profile.categories) ? profile.categories : []
       const categoryLabels =
@@ -450,39 +463,32 @@ export const ClientShowcaseScreen = ({
           ? categories.map((id) => getCategoryLabel(id))
           : ['Мастер-универсал']
 
-      const score =
-        rating * 1.8 +
-        (isAvailable ? 1.2 : 0) +
-        (profile.worksAtClient ? 0.3 : 0) -
-        distance * 0.08 -
-        from / 5200
-
       return {
         id: profile.userId || `profile-${index}`,
         name: profile.displayName || 'Мастер',
         categories,
         categoryLabels,
         primaryCategory: categoryLabels[0],
-        services: Array.isArray(profile.services) ? profile.services : [],
+        services,
+        serviceNames,
         avatarUrl,
         heroUrl,
         heroFocus,
-        rating,
-        reviews,
-        distance,
-        responseMinutes,
-        priceFrom: from,
-        priceTo: to,
+        priceFrom,
+        priceTo,
         experienceYears,
         worksAtClient: Boolean(profile.worksAtClient),
         worksAtMaster: Boolean(profile.worksAtMaster),
-        isAvailable,
-        nextSlot,
-        slots,
-        signal: signalLabels[seed % signalLabels.length],
+        isActive,
+        cityName: profile.cityName ?? null,
+        districtName: profile.districtName ?? null,
+        locationLabel,
+        about,
+        updatedAt,
+        updatedAtTs,
+        portfolioCount,
+        updateLabel,
         gallery,
-        score,
-        slotCount,
         initials: getInitials(profile.displayName || 'Мастер'),
       }
     })
@@ -500,15 +506,17 @@ export const ClientShowcaseScreen = ({
           master.name,
           master.primaryCategory,
           ...master.categoryLabels,
-          ...master.services,
+          ...master.serviceNames,
+          master.about ?? '',
+          master.locationLabel,
         ]
           .join(' ')
           .toLowerCase()
         return haystack.includes(normalizedQuery)
       })
     }
-    if (onlyAvailable) {
-      list = list.filter((master) => master.isAvailable)
+    if (onlyActive) {
+      list = list.filter((master) => master.isActive)
     }
     if (onlyAtClient) {
       list = list.filter((master) => master.worksAtClient)
@@ -519,24 +527,25 @@ export const ClientShowcaseScreen = ({
     const sorted = [...list]
     sorted.sort((a, b) => {
       switch (sortMode) {
-        case 'rating':
-          return b.rating - a.rating
-        case 'price':
-          return a.priceFrom - b.priceFrom
-        case 'distance':
-          return a.distance - b.distance
-        case 'available':
-          if (a.isAvailable !== b.isAvailable) {
-            return a.isAvailable ? -1 : 1
+        case 'active':
+          if (a.isActive !== b.isActive) {
+            return a.isActive ? -1 : 1
           }
-          return b.slotCount - a.slotCount
-        case 'smart':
+          return b.updatedAtTs - a.updatedAtTs
+        case 'price':
+          return (a.priceFrom ?? Number.POSITIVE_INFINITY) -
+            (b.priceFrom ?? Number.POSITIVE_INFINITY)
+        case 'experience':
+          return (b.experienceYears ?? 0) - (a.experienceYears ?? 0)
+        case 'portfolio':
+          return b.portfolioCount - a.portfolioCount
+        case 'recent':
         default:
-          return b.score - a.score
+          return b.updatedAtTs - a.updatedAtTs
       }
     })
     return sorted
-  }, [activeCategoryId, masterCards, onlyAtClient, onlyAtMaster, onlyAvailable, query, sortMode])
+  }, [activeCategoryId, masterCards, onlyActive, onlyAtClient, onlyAtMaster, query, sortMode])
 
   const featuredIds = useMemo(
     () => new Set(filteredMasters.slice(0, 2).map((master) => master.id)),
@@ -561,7 +570,7 @@ export const ClientShowcaseScreen = ({
               {activeCategoryLabel || 'Все специалисты'}
             </h1>
             <p className="client-showcase-page-subtitle">
-              Сравнивай по свободным слотам, цене и отзывам
+              Сравнивай по цене, опыту и портфолио
             </p>
           </div>
         </header>
@@ -625,11 +634,11 @@ export const ClientShowcaseScreen = ({
           </div>
           <div className="client-master-toggles">
             <button
-              className={`client-master-toggle${onlyAvailable ? ' is-active' : ''}`}
+              className={`client-master-toggle${onlyActive ? ' is-active' : ''}`}
               type="button"
-              onClick={() => setOnlyAvailable((prev) => !prev)}
+              onClick={() => setOnlyActive((prev) => !prev)}
             >
-              Сейчас свободны
+              Запись открыта
             </button>
             <button
               className={`client-master-toggle${onlyAtClient ? ' is-active' : ''}`}
@@ -677,20 +686,13 @@ export const ClientShowcaseScreen = ({
                 const cardClassName = `client-master-card${
                   isFeatured ? ' is-featured' : ''
                 }`
-                const experienceLabel = `${master.experienceYears} ${
-                  master.experienceYears % 10 === 1 && master.experienceYears % 100 !== 11
-                    ? 'год'
-                    : master.experienceYears % 10 >= 2 &&
-                        master.experienceYears % 10 <= 4 &&
-                        (master.experienceYears % 100 < 12 ||
-                          master.experienceYears % 100 > 14)
-                      ? 'года'
-                      : 'лет'
-                }`
-                const priceLabel =
-                  master.priceFrom === master.priceTo
-                    ? formatPrice(master.priceFrom)
-                    : `${formatPrice(master.priceFrom)} - ${formatPrice(master.priceTo)}`
+                const experienceLabel = formatExperience(master.experienceYears)
+                const priceLabel = formatPriceRange(master.priceFrom, master.priceTo)
+                const servicesCount =
+                  master.services.length > 0 ? `${master.services.length}` : '—'
+                const portfolioCount =
+                  master.portfolioCount > 0 ? `${master.portfolioCount}` : '—'
+                const aboutPreview = master.about ?? 'Описание пока не заполнено.'
 
                 return (
                   <article className={cardClassName} key={master.id} role="listitem">
@@ -706,28 +708,25 @@ export const ClientShowcaseScreen = ({
                           )}
                           <span
                             className={`client-master-status${
-                              master.isAvailable ? ' is-live' : ''
+                              master.isActive ? ' is-live' : ''
                             }`}
                           >
-                            {master.isAvailable ? 'Сегодня' : 'По записи'}
+                            {master.isActive ? 'Запись открыта' : 'Пауза'}
                           </span>
                         </span>
                         <div className="client-master-main">
                           <div className="client-master-name-row">
                             <h2 className="client-master-name">{master.name}</h2>
                             <span className="client-master-score">
-                              {master.rating.toFixed(1)} ★
+                              {experienceLabel}
                             </span>
                           </div>
                           <p className="client-master-meta">
-                            {master.primaryCategory} · {experienceLabel}
+                            {master.primaryCategory}
                           </p>
                           <div className="client-master-tags">
                             <span className="client-master-tag">
-                              {formatDistance(master.distance)}
-                            </span>
-                            <span className="client-master-tag">
-                              Ответ {master.responseMinutes} мин
+                              {master.locationLabel}
                             </span>
                             {master.worksAtClient && (
                               <span className="client-master-tag">Выезд</span>
@@ -755,7 +754,9 @@ export const ClientShowcaseScreen = ({
                             {master.initials}
                           </span>
                         )}
-                        <span className="client-master-signal">{master.signal}</span>
+                        <span className="client-master-signal">
+                          {master.updateLabel}
+                        </span>
                       </div>
                     </div>
 
@@ -765,30 +766,18 @@ export const ClientShowcaseScreen = ({
                         <span className="client-master-stat-label">Цена</span>
                       </div>
                       <div className="client-master-stat">
-                        <span className="client-master-stat-value">{master.nextSlot}</span>
-                        <span className="client-master-stat-label">Окно</span>
+                        <span className="client-master-stat-value">{servicesCount}</span>
+                        <span className="client-master-stat-label">Услуги</span>
                       </div>
                       <div className="client-master-stat">
                         <span className="client-master-stat-value">
-                          {master.reviews}
+                          {portfolioCount}
                         </span>
-                        <span className="client-master-stat-label">Отзывы</span>
+                        <span className="client-master-stat-label">Работы</span>
                       </div>
                     </div>
 
-                    <div className="client-master-availability">
-                      <span className="client-master-availability-label">
-                        Ближайшие слоты
-                      </span>
-                      <div className="client-master-slots">
-                        {master.slots.map((slot, index) => (
-                          <span
-                            className={`client-master-slot${slot ? ' is-open' : ''}`}
-                            key={`${master.id}-slot-${index}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    <p className="client-master-about">{aboutPreview}</p>
 
                     {master.gallery.length > 0 && (
                       <div className="client-master-gallery">
@@ -809,7 +798,11 @@ export const ClientShowcaseScreen = ({
                       <button className="client-master-cta" type="button">
                         Записаться
                       </button>
-                      <button className="client-master-ghost" type="button">
+                      <button
+                        className="client-master-ghost"
+                        type="button"
+                        onClick={() => onViewProfile(master.id)}
+                      >
                         Профиль
                       </button>
                     </div>
