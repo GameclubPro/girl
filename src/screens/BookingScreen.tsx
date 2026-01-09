@@ -1,0 +1,777 @@
+import { useEffect, useMemo, useState } from 'react'
+import { IconClock, IconPin, IconPhoto } from '../components/icons'
+import { categoryItems } from '../data/clientData'
+import { requestServiceCatalog } from '../data/requestData'
+import type { MasterProfile } from '../types/app'
+import { parseServiceItems } from '../utils/profileContent'
+
+type BookingScreenProps = {
+  apiBase: string
+  userId: string
+  masterId: string
+  cityId: number | null
+  districtId: number | null
+  cityName: string
+  districtName: string
+  address: string
+  photoUrls?: string[]
+  preferredCategoryId?: string | null
+  onBack: () => void
+}
+
+type MasterBookingSlot = {
+  scheduledAt: string
+  serviceDuration: number | null
+  status: string
+}
+
+const scheduleLabels: Record<string, string> = {
+  mon: 'Пн',
+  tue: 'Вт',
+  wed: 'Ср',
+  thu: 'Чт',
+  fri: 'Пт',
+  sat: 'Сб',
+  sun: 'Вс',
+}
+
+const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+const getDayKey = (date: Date) => dayKeyOrder[date.getDay()] ?? 'mon'
+
+const parseTimeToMinutes = (value: string | null | undefined) => {
+  const normalized = value?.trim() ?? ''
+  if (!normalized) return null
+  const [hoursRaw, minutesRaw] = normalized.split(':')
+  const hours = Number(hoursRaw)
+  const minutes = Number(minutesRaw)
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+const formatTime = (minutes: number) => {
+  const hours = String(Math.floor(minutes / 60)).padStart(2, '0')
+  const mins = String(minutes % 60).padStart(2, '0')
+  return `${hours}:${mins}`
+}
+
+const formatDateLabel = (date: Date) => {
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${day}.${month}`
+}
+
+const normalizeServiceKey = (value: string) => value.trim().toLowerCase()
+
+const resolveServiceCategory = (serviceName: string) => {
+  const normalized = normalizeServiceKey(serviceName)
+  const match = Object.entries(requestServiceCatalog).find(([, options]) =>
+    options.some((option) => normalizeServiceKey(option.title) === normalized)
+  )
+  return match?.[0] ?? null
+}
+
+const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
+
+export const BookingScreen = ({
+  apiBase,
+  userId,
+  masterId,
+  cityId,
+  districtId,
+  cityName,
+  districtName,
+  address,
+  photoUrls = [],
+  preferredCategoryId,
+  onBack,
+}: BookingScreenProps) => {
+  const [profile, setProfile] = useState<MasterProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [bookings, setBookings] = useState<MasterBookingSlot[]>([])
+  const [isBookingLoading, setIsBookingLoading] = useState(false)
+  const [bookingError, setBookingError] = useState('')
+  const [categoryId, setCategoryId] = useState<string>('')
+  const [serviceName, setServiceName] = useState<string>('')
+  const [locationType, setLocationType] = useState<'master' | 'client'>('master')
+  const [selectedDayKey, setSelectedDayKey] = useState<string>('')
+  const [selectedTime, setSelectedTime] = useState<string>('')
+  const [details, setDetails] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [submitSuccess, setSubmitSuccess] = useState('')
+
+  useEffect(() => {
+    if (!masterId) return
+    let cancelled = false
+
+    const loadProfile = async () => {
+      setIsLoading(true)
+      setLoadError('')
+      try {
+        const response = await fetch(`${apiBase}/api/masters/${masterId}`)
+        if (!response.ok) {
+          throw new Error('Load master failed')
+        }
+        const data = (await response.json()) as MasterProfile
+        if (!cancelled) {
+          setProfile(data)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError('Не удалось загрузить профиль мастера.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, masterId])
+
+  useEffect(() => {
+    if (!masterId) return
+    let cancelled = false
+
+    const loadBookings = async () => {
+      setIsBookingLoading(true)
+      setBookingError('')
+      try {
+        const from = new Date().toISOString()
+        const to = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+        const response = await fetch(
+          `${apiBase}/api/masters/${masterId}/bookings?from=${encodeURIComponent(
+            from
+          )}&to=${encodeURIComponent(to)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load bookings failed')
+        }
+        const data = (await response.json()) as MasterBookingSlot[]
+        if (!cancelled) {
+          setBookings(Array.isArray(data) ? data : [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBookingError('Не удалось загрузить расписание мастера.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsBookingLoading(false)
+        }
+      }
+    }
+
+    void loadBookings()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, masterId])
+
+  const serviceItems = useMemo(() => parseServiceItems(profile?.services ?? []), [profile])
+
+  const servicesByCategory = useMemo(() => {
+    const map = new Map<string, typeof serviceItems>()
+    serviceItems.forEach((service) => {
+      const category = resolveServiceCategory(service.name)
+      if (!category) return
+      if (!map.has(category)) {
+        map.set(category, [])
+      }
+      map.get(category)?.push(service)
+    })
+    return map
+  }, [serviceItems])
+
+  const availableCategoryIds = useMemo(() => {
+    const allowed = new Set(
+      Array.isArray(profile?.categories) ? profile?.categories : []
+    )
+    return categoryItems
+      .map((item) => item.id)
+      .filter((id) => allowed.has(id) && (servicesByCategory.get(id)?.length ?? 0) > 0)
+  }, [profile, servicesByCategory])
+
+  useEffect(() => {
+    if (availableCategoryIds.length === 0) {
+      setCategoryId('')
+      return
+    }
+    setCategoryId((current) => {
+      if (preferredCategoryId && availableCategoryIds.includes(preferredCategoryId)) {
+        return preferredCategoryId
+      }
+      return availableCategoryIds.includes(current) ? current : availableCategoryIds[0]
+    })
+  }, [availableCategoryIds, preferredCategoryId])
+
+  const serviceOptions = useMemo(() => {
+    if (!categoryId) return []
+    return servicesByCategory.get(categoryId) ?? []
+  }, [categoryId, servicesByCategory])
+
+  useEffect(() => {
+    if (!serviceOptions.length) {
+      setServiceName('')
+      return
+    }
+    setServiceName((current) =>
+      serviceOptions.some((item) => item.name === current)
+        ? current
+        : serviceOptions[0].name
+    )
+  }, [serviceOptions])
+
+  const selectedService = useMemo(
+    () => serviceOptions.find((item) => item.name === serviceName) ?? null,
+    [serviceName, serviceOptions]
+  )
+
+  const locationOptions = useMemo(() => {
+    const options: { value: 'master' | 'client'; label: string }[] = []
+    if (profile?.worksAtMaster) {
+      options.push({ value: 'master', label: 'У мастера' })
+    }
+    if (profile?.worksAtClient) {
+      options.push({ value: 'client', label: 'Выезд' })
+    }
+    return options
+  }, [profile])
+
+  useEffect(() => {
+    if (!locationOptions.length) return
+    setLocationType((current) =>
+      locationOptions.some((option) => option.value === current)
+        ? current
+        : locationOptions[0].value
+    )
+  }, [locationOptions])
+
+  const availableDays = useMemo(() => {
+    if (!profile) return []
+    const scheduleDays = Array.isArray(profile.scheduleDays)
+      ? profile.scheduleDays.map((day) => day.trim().toLowerCase())
+      : []
+    const startMinutes = parseTimeToMinutes(profile.scheduleStart ?? null)
+    const endMinutes = parseTimeToMinutes(profile.scheduleEnd ?? null)
+    if (!scheduleDays.length || startMinutes === null || endMinutes === null) {
+      return []
+    }
+
+    const duration = selectedService?.duration ?? 60
+    const bookedRanges = bookings
+      .filter((booking) => booking.scheduledAt)
+      .map((booking) => {
+        const start = new Date(booking.scheduledAt).getTime()
+        const bookingDuration = booking.serviceDuration ?? 60
+        return {
+          start,
+          end: start + bookingDuration * 60 * 1000,
+        }
+      })
+
+    const result: {
+      key: string
+      date: Date
+      label: string
+      slots: string[]
+    }[] = []
+
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    const minLeadMinutes = 30
+
+    for (let offset = 0; offset < 14; offset += 1) {
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+      const dayKey = getDayKey(date)
+      if (!scheduleDays.includes(dayKey)) continue
+
+      const slots: string[] = []
+      const baseMinutes =
+        offset === 0 ? Math.max(startMinutes, nowMinutes + minLeadMinutes) : startMinutes
+      for (
+        let minutes = baseMinutes;
+        minutes + duration <= endMinutes;
+        minutes += 30
+      ) {
+        const slotDate = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate(),
+          Math.floor(minutes / 60),
+          minutes % 60
+        )
+        const slotStart = slotDate.getTime()
+        const slotEnd = slotStart + duration * 60 * 1000
+        if (slotStart < now.getTime()) continue
+        const isBusy = bookedRanges.some(
+          (range) => slotStart < range.end && slotEnd > range.start
+        )
+        if (!isBusy) {
+          slots.push(formatTime(minutes))
+        }
+      }
+
+      if (slots.length > 0) {
+        result.push({
+          key: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+          date,
+          label: `${scheduleLabels[dayKey] ?? dayKey} ${formatDateLabel(date)}`,
+          slots,
+        })
+      }
+    }
+
+    return result
+  }, [bookings, profile, selectedService])
+
+  useEffect(() => {
+    if (!availableDays.length) {
+      setSelectedDayKey('')
+      setSelectedTime('')
+      return
+    }
+    setSelectedDayKey((current) => {
+      const exists = availableDays.some((day) => day.key === current)
+      return exists ? current : availableDays[0].key
+    })
+  }, [availableDays])
+
+  useEffect(() => {
+    if (!selectedDayKey) {
+      setSelectedTime('')
+      return
+    }
+    const day = availableDays.find((item) => item.key === selectedDayKey)
+    if (!day) {
+      setSelectedTime('')
+      return
+    }
+    setSelectedTime((current) =>
+      day.slots.includes(current) ? current : day.slots[0] ?? ''
+    )
+  }, [availableDays, selectedDayKey])
+
+  const selectedDay = availableDays.find((item) => item.key === selectedDayKey) ?? null
+
+  const priceLabel =
+    selectedService?.price !== null && selectedService?.price !== undefined
+      ? formatPrice(selectedService.price)
+      : null
+  const hasServices = serviceOptions.length > 0
+  const hasCategoryChoice = availableCategoryIds.length > 1
+  const hasServiceChoice = serviceOptions.length > 1
+  const hasLocation = Boolean(cityId && districtId)
+  const hasAddress = Boolean(address.trim())
+  const hasSlots = Boolean(selectedDay && selectedTime)
+  const canSubmit =
+    Boolean(categoryId) &&
+    Boolean(serviceName) &&
+    hasLocation &&
+    (locationType !== 'client' || hasAddress) &&
+    hasSlots &&
+    !isSubmitting
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return
+    setSubmitError('')
+    setSubmitSuccess('')
+
+    if (!categoryId || !serviceName) {
+      setSubmitError('Укажите услугу для записи.')
+      return
+    }
+
+    if (!selectedDay || !selectedTime) {
+      setSubmitError('Выберите свободное время.')
+      return
+    }
+
+    if (!cityId || !districtId) {
+      setSubmitError('Укажите город и район в профиле.')
+      return
+    }
+
+    if (locationType === 'client' && !address.trim()) {
+      setSubmitError('Для выезда укажите адрес в профиле.')
+      return
+    }
+
+    const [hoursRaw, minutesRaw] = selectedTime.split(':')
+    const hours = Number(hoursRaw)
+    const minutes = Number(minutesRaw)
+    const scheduledAt = new Date(
+      selectedDay.date.getFullYear(),
+      selectedDay.date.getMonth(),
+      selectedDay.date.getDate(),
+      hours,
+      minutes
+    )
+
+    if (Number.isNaN(scheduledAt.getTime())) {
+      setSubmitError('Некорректное время записи.')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch(`${apiBase}/api/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          masterId,
+          cityId,
+          districtId,
+          address: address.trim() || null,
+          categoryId,
+          serviceName: serviceName.trim(),
+          locationType,
+          scheduledAt: scheduledAt.toISOString(),
+          photoUrls,
+          comment: details.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null
+        if (data?.error === 'time_unavailable') {
+          setSubmitError('Это время уже занято. Выберите другое.')
+          return
+        }
+        if (data?.error === 'schedule_unavailable') {
+          setSubmitError('Мастер еще не настроил расписание.')
+          return
+        }
+        throw new Error('Create booking failed')
+      }
+
+      setSubmitSuccess('Запись отправлена мастеру.')
+    } catch (error) {
+      setSubmitError('Не удалось создать запись. Попробуйте еще раз.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="screen screen--request screen--booking">
+      <div className="request-shell booking-shell">
+        <header className="request-header booking-header animate delay-1">
+          <button className="request-back" type="button" onClick={onBack}>
+            ←
+          </button>
+          <div className="request-headings">
+            <h1 className="request-title">Запись к мастеру</h1>
+            <p className="request-subtitle">Услуга • место • время</p>
+          </div>
+        </header>
+
+        {loadError && <p className="request-error">{loadError}</p>}
+
+        {isLoading ? (
+          <section className="request-card booking-card animate delay-2">
+            <p className="request-helper">Загружаем профиль мастера...</p>
+          </section>
+        ) : profile ? (
+          <>
+            <section className="request-card booking-card animate delay-2">
+              <div className="booking-master-row">
+                <span className="booking-master-name">
+                  {profile.displayName || 'Мастер'}
+                </span>
+                {profile.reviewsAverage ? (
+                  <span className="booking-master-rating">
+                    ★ {profile.reviewsAverage.toFixed(1)}
+                  </span>
+                ) : (
+                  <span className="booking-master-rating is-muted">Новый</span>
+                )}
+              </div>
+              <p className="booking-master-meta">
+                {profile.cityName ? profile.cityName : 'Город не указан'}
+                {profile.districtName ? ` • ${profile.districtName}` : ''}
+              </p>
+            </section>
+
+            <section className="request-card booking-card animate delay-2">
+              <h2 className="request-card-title">Услуга</h2>
+              {!hasServices ? (
+                <p className="request-helper">
+                  Мастер еще не добавил услуги для записи.
+                </p>
+              ) : !hasCategoryChoice && !hasServiceChoice ? (
+                <div className="booking-summary">
+                  <span className="booking-summary-label">
+                    {categoryItems.find((item) => item.id === categoryId)?.label ??
+                      'Категория'}
+                  </span>
+                  <span className="booking-summary-value">{serviceName}</span>
+                </div>
+              ) : (
+                <>
+                  {hasCategoryChoice && (
+                    <div className="request-field">
+                      <select
+                        className="request-select-input"
+                        value={categoryId}
+                        onChange={(event) => setCategoryId(event.target.value)}
+                        aria-label="Категория"
+                      >
+                        {availableCategoryIds.map((id) => {
+                          const category = categoryItems.find((item) => item.id === id)
+                          return (
+                            <option key={id} value={id}>
+                              {category?.label ?? id}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+                  )}
+                  {hasServiceChoice && (
+                    <div className="request-field">
+                      <div className="request-service-grid" role="list">
+                        {serviceOptions.map((option) => {
+                          const isSelected = option.name === serviceName
+                          return (
+                            <button
+                              className={`request-service-card${
+                                isSelected ? ' is-active' : ''
+                              }`}
+                              key={option.name}
+                              type="button"
+                              onClick={() => setServiceName(option.name)}
+                              aria-pressed={isSelected}
+                            >
+                              <span className="request-service-text">
+                                <span className="request-service-title">
+                                  {option.name}
+                                </span>
+                                {option.duration ? (
+                                  <span className="request-service-subtitle">
+                                    {option.duration} мин
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span
+                                className="request-service-indicator"
+                                aria-hidden="true"
+                              />
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {hasServices && (
+                <>
+                  {priceLabel ? (
+                    <div className="booking-price">Стоимость: {priceLabel}</div>
+                  ) : (
+                    <p className="booking-price is-muted">
+                      Цена согласуется с мастером.
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className="request-card booking-card animate delay-3">
+              <h2 className="request-card-title">Где делать</h2>
+              {locationOptions.length > 1 ? (
+                <div className="request-segment">
+                  {locationOptions.map((option) => (
+                    <button
+                      className={`request-segment-button${
+                        option.value === locationType ? ' is-active' : ''
+                      }`}
+                      key={option.value}
+                      type="button"
+                      onClick={() => setLocationType(option.value)}
+                      aria-pressed={option.value === locationType}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="booking-summary">
+                  <span className="booking-summary-label">Формат</span>
+                  <span className="booking-summary-value">
+                    {locationOptions[0]?.label ?? 'Не указан'}
+                  </span>
+                </div>
+              )}
+              <div className="request-field">
+                <span className="request-label">Город *</span>
+                <div className="request-select request-select--icon request-select--static">
+                  <span className="request-select-main">
+                    <span className="request-select-icon" aria-hidden="true">
+                      <IconPin />
+                    </span>
+                    {cityName || 'Город не указан'}
+                  </span>
+                </div>
+              </div>
+              <div className="request-field">
+                <span className="request-label">Район / метро *</span>
+                <div className="request-select request-select--icon request-select--static">
+                  <span className="request-select-main">
+                    <span className="request-select-icon" aria-hidden="true">
+                      <IconPin />
+                    </span>
+                    {districtName || 'Район не указан'}
+                  </span>
+                </div>
+              </div>
+              {locationType === 'client' && (
+                <div className="request-field">
+                  <span className="request-label">Адрес для выезда *</span>
+                  <div className="request-select request-select--static">
+                    {address.trim() || 'Адрес не указан'}
+                  </div>
+                </div>
+              )}
+              {!hasLocation && (
+                <p className="request-helper">
+                  Заполните город и район в профиле, чтобы записаться.
+                </p>
+              )}
+            </section>
+
+            <section className="request-card booking-card animate delay-4">
+              <h2 className="request-card-title">Когда</h2>
+              {bookingError && <p className="request-helper">{bookingError}</p>}
+              {isBookingLoading && (
+                <p className="request-helper">Загружаем свободное время...</p>
+              )}
+              {!isBookingLoading && availableDays.length > 0 ? (
+                <>
+                  <div className="booking-days">
+                    {availableDays.map((day) => (
+                      <button
+                        className={`booking-day${
+                          day.key === selectedDayKey ? ' is-active' : ''
+                        }`}
+                        key={day.key}
+                        type="button"
+                        onClick={() => setSelectedDayKey(day.key)}
+                      >
+                        <span className="booking-day-title">{day.label}</span>
+                        <span className="booking-day-count">
+                          {day.slots.length} слота
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedDay && (
+                    <div className="booking-slots">
+                      {selectedDay.slots.map((slot) => (
+                        <button
+                          className={`booking-slot${
+                            slot === selectedTime ? ' is-active' : ''
+                          }`}
+                          key={`${selectedDay.key}-${slot}`}
+                          type="button"
+                          onClick={() => setSelectedTime(slot)}
+                        >
+                          {slot}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                !isBookingLoading && (
+                  <div className="request-select request-select--icon request-select--static">
+                    <span className="request-select-main">
+                      <span className="request-select-icon" aria-hidden="true">
+                        <IconClock />
+                      </span>
+                      Нет свободного времени
+                    </span>
+                  </div>
+                )
+              )}
+            </section>
+
+            <section className="request-card booking-card animate delay-5">
+              <h2 className="request-card-title">Детали</h2>
+              <div className="request-field">
+                <span className="request-label">Комментарий</span>
+                <textarea
+                  className="request-textarea"
+                  placeholder="Пожелания и детали"
+                  value={details}
+                  onChange={(event) => setDetails(event.target.value)}
+                  rows={3}
+                />
+              </div>
+              {photoUrls.length > 0 && (
+                <div className="request-field">
+                  <span className="request-label">Фото примера</span>
+                  <div className="booking-photo-grid" role="list">
+                    {photoUrls.map((url, index) => (
+                      <span
+                        className="booking-photo"
+                        key={`${url}-${index}`}
+                        role="listitem"
+                      >
+                        <img src={url} alt="" loading="lazy" />
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {photoUrls.length === 0 && (
+                <div className="request-field">
+                  <span className="request-label">Фото примера</span>
+                  <div className="request-upload">
+                    <div className="request-upload-media" aria-hidden="true">
+                      <IconPhoto />
+                    </div>
+                    <div className="request-upload-body">
+                      <div className="request-upload-title">Фото не выбрано</div>
+                      <div className="request-upload-meta">
+                        Можно добавить после записи
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {submitError && <p className="request-error">{submitError}</p>}
+            {submitSuccess && <p className="request-success">{submitSuccess}</p>}
+          </>
+        ) : null}
+      </div>
+
+      <div className="request-submit-bar">
+        <button
+          className="request-submit"
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+        >
+          {isSubmitting ? 'Отправляем...' : 'Записаться'}
+        </button>
+      </div>
+    </div>
+  )
+}

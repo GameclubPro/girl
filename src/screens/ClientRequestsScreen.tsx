@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { categoryItems } from '../data/clientData'
-import type { RequestResponse, ServiceRequest } from '../types/app'
+import type { Booking, RequestResponse, ServiceRequest } from '../types/app'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -21,6 +21,24 @@ const responseStatusLabelMap = {
   expired: 'истек',
 } as const
 
+const bookingStatusLabelMap = {
+  pending: 'Ожидает подтверждения мастером',
+  price_pending: 'Мастер уточняет цену',
+  price_proposed: 'Цена предложена',
+  confirmed: 'Подтверждена',
+  declined: 'Отклонена',
+  cancelled: 'Отменена',
+} as const
+
+const bookingStatusToneMap = {
+  pending: 'is-waiting',
+  price_pending: 'is-waiting',
+  price_proposed: 'is-offer',
+  confirmed: 'is-confirmed',
+  declined: 'is-cancelled',
+  cancelled: 'is-cancelled',
+} as const
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
   const parsed = new Date(value)
@@ -31,6 +49,19 @@ const formatDateTime = (value?: string | null) => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(parsed)
+}
+
+const formatPrice = (value: number) =>
+  `${Math.round(value).toLocaleString('ru-RU')} ₽`
+
+const getInitials = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return 'М'
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  const letters = parts.slice(0, 2).map((part) => part[0] ?? '')
+  const joined = letters.join('').toUpperCase()
+  if (joined) return joined
+  return normalized.slice(0, 2).toUpperCase()
 }
 
 type ClientRequestsScreenProps = {
@@ -44,6 +75,7 @@ export const ClientRequestsScreen = ({
   userId,
   onCreateRequest,
 }: ClientRequestsScreenProps) => {
+  const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -56,6 +88,13 @@ export const ClientRequestsScreen = ({
   )
   const [responsesError, setResponsesError] = useState('')
   const [responsesErrorId, setResponsesErrorId] = useState<number | null>(null)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [isBookingsLoading, setIsBookingsLoading] = useState(false)
+  const [bookingsError, setBookingsError] = useState('')
+  const [bookingActionId, setBookingActionId] = useState<number | null>(null)
+  const [bookingActionError, setBookingActionError] = useState<
+    Record<number, string>
+  >({})
 
   useEffect(() => {
     if (!userId) return
@@ -94,7 +133,45 @@ export const ClientRequestsScreen = ({
     }
   }, [apiBase, userId])
 
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const loadBookings = async () => {
+      setIsBookingsLoading(true)
+      setBookingsError('')
+      try {
+        const response = await fetch(
+          `${apiBase}/api/bookings?userId=${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load bookings failed')
+        }
+        const data = (await response.json()) as Booking[]
+        if (!cancelled) {
+          setBookings(Array.isArray(data) ? data : [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBookings([])
+          setBookingsError('Не удалось загрузить записи.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsBookingsLoading(false)
+        }
+      }
+    }
+
+    loadBookings()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
+
   const items = useMemo(() => requests, [requests])
+  const bookingItems = useMemo(() => bookings, [bookings])
 
   const toggleResponses = async (requestId: number) => {
     if (expandedRequestId === requestId) {
@@ -131,138 +208,371 @@ export const ClientRequestsScreen = ({
     }
   }
 
+  const handleBookingAction = async (
+    bookingId: number,
+    action: 'client-accept-price' | 'client-decline-price' | 'client-cancel'
+  ) => {
+    if (bookingActionId !== null) return
+
+    setBookingActionId(bookingId)
+    setBookingActionError((current) => ({ ...current, [bookingId]: '' }))
+
+    try {
+      const response = await fetch(`${apiBase}/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, action }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Booking update failed')
+      }
+
+      const data = (await response.json().catch(() => null)) as
+        | { status?: Booking['status']; servicePrice?: number | null }
+        | null
+
+      setBookings((current) =>
+        current.map((booking) => {
+          if (booking.id !== bookingId) return booking
+          const next = { ...booking }
+          if (data?.status) {
+            next.status = data.status
+          } else if (action === 'client-cancel' || action === 'client-decline-price') {
+            next.status = 'cancelled'
+          } else if (action === 'client-accept-price') {
+            next.status = 'confirmed'
+          }
+          if (action === 'client-accept-price') {
+            const acceptedPrice =
+              typeof data?.servicePrice === 'number'
+                ? data.servicePrice
+                : booking.proposedPrice ?? booking.servicePrice ?? null
+            next.servicePrice = acceptedPrice
+            next.proposedPrice = null
+          }
+          return next
+        })
+      )
+    } catch (error) {
+      setBookingActionError((current) => ({
+        ...current,
+        [bookingId]: 'Не удалось обновить запись.',
+      }))
+    } finally {
+      setBookingActionId((current) => (current === bookingId ? null : current))
+    }
+  }
+
   return (
     <div className="screen screen--requests">
       <div className="requests-shell">
         <header className="requests-header animate delay-1">
           <div className="request-headings">
-            <h1 className="request-title">Мои заявки</h1>
-            <p className="request-subtitle">История и статус заявок</p>
+            <h1 className="request-title">Мои заявки и записи</h1>
+            <p className="request-subtitle">История заявок и записей</p>
           </div>
         </header>
 
         <section className="requests-card animate delay-2">
-          <div className="requests-top">
-            <h2 className="requests-title">Активные</h2>
+          <div className="requests-tabs" role="tablist" aria-label="Разделы">
             <button
-              className="cta cta--secondary"
+              className={`requests-tab${activeTab === 'requests' ? ' is-active' : ''}`}
               type="button"
-              onClick={onCreateRequest}
+              role="tab"
+              aria-selected={activeTab === 'requests'}
+              onClick={() => setActiveTab('requests')}
             >
-              + Новая заявка
+              Заявки
+            </button>
+            <button
+              className={`requests-tab${activeTab === 'bookings' ? ' is-active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'bookings'}
+              onClick={() => setActiveTab('bookings')}
+            >
+              Записи
             </button>
           </div>
+          <div className="requests-top">
+            <h2 className="requests-title">
+              {activeTab === 'requests' ? 'Активные' : 'Записи'}
+            </h2>
+            {activeTab === 'requests' && (
+              <button
+                className="cta cta--secondary"
+                type="button"
+                onClick={onCreateRequest}
+              >
+                + Новая заявка
+              </button>
+            )}
+          </div>
 
-          {isLoading && <p className="requests-status">Загружаем заявки...</p>}
-          {loadError && <p className="requests-error">{loadError}</p>}
+          {activeTab === 'requests' && (
+            <>
+              {isLoading && <p className="requests-status">Загружаем заявки...</p>}
+              {loadError && <p className="requests-error">{loadError}</p>}
 
-          {!isLoading && !items.length && !loadError && (
-            <p className="requests-empty">
-              Пока нет заявок. Создайте первую!
-            </p>
+              {!isLoading && !items.length && !loadError && (
+                <p className="requests-empty">
+                  Пока нет заявок. Создайте первую!
+                </p>
+              )}
+
+              <div className="requests-list">
+                {items.map((item) => {
+                  const locationLabel =
+                    locationLabelMap[item.locationType] ?? 'Не важно'
+                  const dateLabel =
+                    item.dateOption === 'choose'
+                      ? formatDateTime(item.dateTime) || 'По договоренности'
+                      : dateLabelMap[item.dateOption]
+                  const statusLabel = item.status === 'open' ? 'Открыта' : 'Закрыта'
+                  const categoryLabel =
+                    categoryItems.find((category) => category.id === item.categoryId)
+                      ?.label ?? item.categoryId
+                  const responseCount = item.responsesCount ?? 0
+                  const responses = responsesByRequestId[item.id] ?? []
+                  const isResponsesOpen = expandedRequestId === item.id
+
+                  return (
+                    <div className="request-item" key={item.id}>
+                      <div className="request-item-top">
+                        <div className="request-item-title">{item.serviceName}</div>
+                        <span
+                          className={`request-status${
+                            item.status === 'open' ? ' is-open' : ''
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className="request-item-meta">
+                        {categoryLabel}
+                        {item.budget ? ` • ${item.budget}` : ''}
+                      </div>
+                      <div className="request-item-meta">
+                        {locationLabel}
+                        {item.cityName ? ` • ${item.cityName}` : ''}
+                        {item.districtName ? ` • ${item.districtName}` : ''}
+                      </div>
+                      <div className="request-item-meta">{dateLabel}</div>
+                      <div className="request-item-actions">
+                        <button
+                          className="response-toggle"
+                          type="button"
+                          onClick={() => toggleResponses(item.id)}
+                        >
+                          {isResponsesOpen ? 'Скрыть отклики' : 'Отклики'}
+                          {responseCount > 0 ? ` (${responseCount})` : ''}
+                        </button>
+                      </div>
+                      {isResponsesOpen && (
+                        <div className="request-responses">
+                          {responsesLoadingId === item.id && (
+                            <p className="response-status">Загружаем отклики...</p>
+                          )}
+                          {responsesErrorId === item.id && responsesError && (
+                            <p className="response-error">{responsesError}</p>
+                          )}
+                          {responsesLoadingId !== item.id &&
+                            responses.length === 0 &&
+                            responsesErrorId !== item.id && (
+                              <p className="response-status">
+                                Откликов пока нет.
+                              </p>
+                            )}
+                          {responses.map((responseItem) => {
+                            const responseStatusLabel =
+                              responseStatusLabelMap[responseItem.status] ??
+                              responseItem.status
+
+                            return (
+                              <div className="response-card" key={responseItem.id}>
+                                <div className="response-top">
+                                  <div className="response-name">
+                                    {responseItem.displayName || 'Мастер'}
+                                  </div>
+                                  {responseItem.price !== null &&
+                                    responseItem.price !== undefined && (
+                                      <span className="response-price">
+                                        {responseItem.price} ₽
+                                      </span>
+                                    )}
+                                </div>
+                                {responseItem.comment && (
+                                  <div className="response-comment">
+                                    {responseItem.comment}
+                                  </div>
+                                )}
+                                {responseItem.proposedTime && (
+                                  <div className="response-meta">
+                                    Время: {responseItem.proposedTime}
+                                  </div>
+                                )}
+                                <div className="response-meta">
+                                  Статус: {responseStatusLabel}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
 
-          <div className="requests-list">
-            {items.map((item) => {
-              const locationLabel =
-                locationLabelMap[item.locationType] ?? 'Не важно'
-              const dateLabel =
-                item.dateOption === 'choose'
-                  ? formatDateTime(item.dateTime) || 'По договоренности'
-                  : dateLabelMap[item.dateOption]
-              const statusLabel = item.status === 'open' ? 'Открыта' : 'Закрыта'
-              const categoryLabel =
-                categoryItems.find((category) => category.id === item.categoryId)
-                  ?.label ?? item.categoryId
-              const responseCount = item.responsesCount ?? 0
-              const responses = responsesByRequestId[item.id] ?? []
-              const isResponsesOpen = expandedRequestId === item.id
+          {activeTab === 'bookings' && (
+            <>
+              {isBookingsLoading && (
+                <p className="requests-status">Загружаем записи...</p>
+              )}
+              {bookingsError && <p className="requests-error">{bookingsError}</p>}
 
-              return (
-                <div className="request-item" key={item.id}>
-                  <div className="request-item-top">
-                    <div className="request-item-title">{item.serviceName}</div>
-                    <span
-                      className={`request-status${
-                        item.status === 'open' ? ' is-open' : ''
-                      }`}
-                    >
-                      {statusLabel}
-                    </span>
-                  </div>
-                  <div className="request-item-meta">
-                    {categoryLabel}
-                    {item.budget ? ` • ${item.budget}` : ''}
-                  </div>
-                  <div className="request-item-meta">
-                    {locationLabel}
-                    {item.cityName ? ` • ${item.cityName}` : ''}
-                    {item.districtName ? ` • ${item.districtName}` : ''}
-                  </div>
-                  <div className="request-item-meta">{dateLabel}</div>
-                  <div className="request-item-actions">
-                    <button
-                      className="response-toggle"
-                      type="button"
-                      onClick={() => toggleResponses(item.id)}
-                    >
-                      {isResponsesOpen ? 'Скрыть отклики' : 'Отклики'}
-                      {responseCount > 0 ? ` (${responseCount})` : ''}
-                    </button>
-                  </div>
-                  {isResponsesOpen && (
-                    <div className="request-responses">
-                      {responsesLoadingId === item.id && (
-                        <p className="response-status">Загружаем отклики...</p>
-                      )}
-                      {responsesErrorId === item.id && responsesError && (
-                        <p className="response-error">{responsesError}</p>
-                      )}
-                      {responsesLoadingId !== item.id &&
-                        responses.length === 0 &&
-                        responsesErrorId !== item.id && (
-                          <p className="response-status">Откликов пока нет.</p>
-                        )}
-                      {responses.map((responseItem) => {
-                        const responseStatusLabel =
-                          responseStatusLabelMap[responseItem.status] ??
-                          responseItem.status
+              {!isBookingsLoading && bookingItems.length === 0 && !bookingsError && (
+                <p className="requests-empty">Пока нет записей.</p>
+              )}
 
-                        return (
-                          <div className="response-card" key={responseItem.id}>
-                            <div className="response-top">
-                              <div className="response-name">
-                                {responseItem.displayName || 'Мастер'}
-                              </div>
-                              {responseItem.price !== null &&
-                                responseItem.price !== undefined && (
-                                  <span className="response-price">
-                                    {responseItem.price} ₽
-                                  </span>
-                                )}
-                            </div>
-                            {responseItem.comment && (
-                              <div className="response-comment">
-                                {responseItem.comment}
-                              </div>
-                            )}
-                            {responseItem.proposedTime && (
-                              <div className="response-meta">
-                                Время: {responseItem.proposedTime}
-                              </div>
-                            )}
-                            <div className="response-meta">
-                              Статус: {responseStatusLabel}
-                            </div>
+              <div className="requests-list booking-list">
+                {bookingItems.map((booking) => {
+                  const statusLabel =
+                    bookingStatusLabelMap[booking.status] ?? booking.status
+                  const statusTone =
+                    bookingStatusToneMap[booking.status] ?? 'is-waiting'
+                  const locationLabel =
+                    locationLabelMap[booking.locationType] ?? 'Не важно'
+                  const categoryLabel =
+                    categoryItems.find(
+                      (category) => category.id === booking.categoryId
+                    )?.label ?? booking.categoryId
+                  const scheduledLabel = formatDateTime(booking.scheduledAt)
+                  const priceLabel =
+                    typeof booking.servicePrice === 'number'
+                      ? `Стоимость: ${formatPrice(booking.servicePrice)}`
+                      : typeof booking.proposedPrice === 'number'
+                        ? `Предложенная цена: ${formatPrice(booking.proposedPrice)}`
+                        : 'Цена согласуется с мастером'
+                  const canAcceptPrice = booking.status === 'price_proposed'
+                  const canDeclinePrice = booking.status === 'price_proposed'
+                  const canCancel = [
+                    'pending',
+                    'price_pending',
+                    'confirmed',
+                  ].includes(booking.status)
+                  const isActionLoading = bookingActionId !== null
+                  const masterName = booking.masterName ?? 'Мастер'
+                  const masterInitials = getInitials(masterName)
+                  const photoItems = Array.isArray(booking.photoUrls)
+                    ? booking.photoUrls
+                    : []
+
+                  return (
+                    <div className="booking-item" key={booking.id}>
+                      <div className="booking-item-head">
+                        <span className="booking-item-avatar" aria-hidden="true">
+                          {booking.masterAvatarUrl ? (
+                            <img src={booking.masterAvatarUrl} alt="" />
+                          ) : (
+                            <span>{masterInitials}</span>
+                          )}
+                        </span>
+                        <div className="booking-item-main">
+                          <div className="booking-item-master">{masterName}</div>
+                          <div className="booking-item-service">
+                            {booking.serviceName}
                           </div>
-                        )
-                      })}
+                        </div>
+                        <span className={`booking-status ${statusTone}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className="booking-item-meta">
+                        {categoryLabel}
+                        {scheduledLabel ? ` • ${scheduledLabel}` : ''}
+                      </div>
+                      <div className="booking-item-meta">
+                        {locationLabel}
+                        {booking.cityName ? ` • ${booking.cityName}` : ''}
+                        {booking.districtName ? ` • ${booking.districtName}` : ''}
+                      </div>
+                      {booking.locationType === 'client' && booking.address && (
+                        <div className="booking-item-meta">
+                          Адрес: {booking.address}
+                        </div>
+                      )}
+                      <div className="booking-item-price">{priceLabel}</div>
+                      {booking.comment && (
+                        <div className="booking-item-comment">{booking.comment}</div>
+                      )}
+                      {photoItems.length > 0 && (
+                        <div className="booking-photo-strip" role="list">
+                          {photoItems.map((url, index) => (
+                            <span
+                              className="booking-photo-thumb"
+                              key={`${booking.id}-${index}`}
+                              role="listitem"
+                            >
+                              <img src={url} alt="" loading="lazy" />
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {(canAcceptPrice || canDeclinePrice || canCancel) && (
+                        <div className="booking-actions">
+                          {canAcceptPrice && (
+                            <button
+                              className="booking-action is-primary"
+                              type="button"
+                              onClick={() =>
+                                handleBookingAction(booking.id, 'client-accept-price')
+                              }
+                              disabled={isActionLoading}
+                            >
+                              Принять цену
+                            </button>
+                          )}
+                          {canDeclinePrice && (
+                            <button
+                              className="booking-action"
+                              type="button"
+                              onClick={() =>
+                                handleBookingAction(booking.id, 'client-decline-price')
+                              }
+                              disabled={isActionLoading}
+                            >
+                              Отказаться
+                            </button>
+                          )}
+                          {canCancel && (
+                            <button
+                              className="booking-action is-ghost"
+                              type="button"
+                              onClick={() =>
+                                handleBookingAction(booking.id, 'client-cancel')
+                              }
+                              disabled={isActionLoading}
+                            >
+                              Отменить запись
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {bookingActionError[booking.id] && (
+                        <p className="booking-action-error">
+                          {bookingActionError[booking.id]}
+                        </p>
+                      )}
                     </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </section>
       </div>
     </div>

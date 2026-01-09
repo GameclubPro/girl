@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
-import type { ProfileStatus, ProProfileSection, ServiceRequest } from '../types/app'
+import type {
+  Booking,
+  ProfileStatus,
+  ProProfileSection,
+  ServiceRequest,
+} from '../types/app'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -22,6 +27,24 @@ const responseStatusLabelMap = {
   expired: 'истек',
 } as const
 
+const bookingStatusLabelMap = {
+  pending: 'Ждет подтверждения',
+  price_pending: 'Нужна цена',
+  price_proposed: 'Цена предложена',
+  confirmed: 'Подтверждена',
+  declined: 'Отклонена',
+  cancelled: 'Отменена',
+} as const
+
+const bookingStatusToneMap = {
+  pending: 'is-waiting',
+  price_pending: 'is-waiting',
+  price_proposed: 'is-offer',
+  confirmed: 'is-confirmed',
+  declined: 'is-cancelled',
+  cancelled: 'is-cancelled',
+} as const
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
   const parsed = new Date(value)
@@ -32,6 +55,19 @@ const formatDateTime = (value?: string | null) => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(parsed)
+}
+
+const formatPrice = (value: number) =>
+  `${Math.round(value).toLocaleString('ru-RU')} ₽`
+
+const getInitials = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return 'К'
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  const letters = parts.slice(0, 2).map((part) => part[0] ?? '')
+  const joined = letters.join('').toUpperCase()
+  if (joined) return joined
+  return normalized.slice(0, 2).toUpperCase()
 }
 
 type ProRequest = ServiceRequest & {
@@ -61,6 +97,7 @@ export const ProRequestsScreen = ({
   onBack,
   onEditProfile,
 }: ProRequestsScreenProps) => {
+  const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
   const [requests, setRequests] = useState<ProRequest[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -70,6 +107,14 @@ export const ProRequestsScreen = ({
   const [drafts, setDrafts] = useState<Record<number, ResponseDraft>>({})
   const [missingFields, setMissingFields] = useState<string[]>([])
   const [isActive, setIsActive] = useState(true)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [isBookingsLoading, setIsBookingsLoading] = useState(false)
+  const [bookingsError, setBookingsError] = useState('')
+  const [bookingActionId, setBookingActionId] = useState<number | null>(null)
+  const [bookingActionError, setBookingActionError] = useState<
+    Record<number, string>
+  >({})
+  const [bookingDrafts, setBookingDrafts] = useState<Record<number, string>>({})
 
   useEffect(() => {
     if (!userId) return
@@ -137,7 +182,58 @@ export const ProRequestsScreen = ({
     }
   }, [apiBase, userId])
 
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const loadBookings = async () => {
+      setIsBookingsLoading(true)
+      setBookingsError('')
+
+      try {
+        const response = await fetch(
+          `${apiBase}/api/pro/bookings?userId=${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load bookings failed')
+        }
+        const data = (await response.json()) as Booking[]
+        if (cancelled) return
+        const bookingItems = Array.isArray(data) ? data : []
+        setBookings(bookingItems)
+        setBookingDrafts((current) => {
+          const next = { ...current }
+          bookingItems.forEach((booking) => {
+            if (next[booking.id] === undefined) {
+              next[booking.id] =
+                typeof booking.proposedPrice === 'number'
+                  ? String(booking.proposedPrice)
+                  : ''
+            }
+          })
+          return next
+        })
+      } catch (error) {
+        if (!cancelled) {
+          setBookings([])
+          setBookingsError('Не удалось загрузить записи.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsBookingsLoading(false)
+        }
+      }
+    }
+
+    loadBookings()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
+
   const items = useMemo(() => requests, [requests])
+  const bookingItems = useMemo(() => bookings, [bookings])
   const missingLabels = useMemo(() => {
     const labels: string[] = []
     if (missingFields.includes('displayName')) {
@@ -172,6 +268,90 @@ export const ProRequestsScreen = ({
         [field]: value,
       },
     }))
+  }
+
+  const handleBookingDraftChange = (bookingId: number, value: string) => {
+    setBookingDrafts((current) => ({
+      ...current,
+      [bookingId]: value,
+    }))
+  }
+
+  const handleBookingAction = async (
+    bookingId: number,
+    action: 'master-accept' | 'master-decline' | 'master-propose-price',
+    price?: string
+  ) => {
+    if (bookingActionId !== null) return
+
+    if (action === 'master-propose-price') {
+      const parsedPrice = Number(price)
+      if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+        setBookingActionError((current) => ({
+          ...current,
+          [bookingId]: 'Укажите корректную цену.',
+        }))
+        return
+      }
+    }
+
+    setBookingActionId(bookingId)
+    setBookingActionError((current) => ({ ...current, [bookingId]: '' }))
+
+    try {
+      const payload: { userId: string; action: string; price?: number } = {
+        userId,
+        action,
+      }
+      if (action === 'master-propose-price') {
+        payload.price = Number(price)
+      }
+
+      const response = await fetch(`${apiBase}/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        throw new Error('Booking update failed')
+      }
+
+      const data = (await response.json().catch(() => null)) as
+        | { status?: Booking['status']; proposedPrice?: number | null }
+        | null
+
+      setBookings((current) =>
+        current.map((booking) => {
+          if (booking.id !== bookingId) return booking
+          const next = { ...booking }
+          if (data?.status) {
+            next.status = data.status
+          } else if (action === 'master-accept') {
+            next.status = 'confirmed'
+          } else if (action === 'master-decline') {
+            next.status = 'declined'
+          } else if (action === 'master-propose-price') {
+            next.status = 'price_proposed'
+          }
+          if (action === 'master-propose-price') {
+            const updatedPrice =
+              typeof data?.proposedPrice === 'number'
+                ? data.proposedPrice
+                : Number(price)
+            next.proposedPrice = updatedPrice
+          }
+          return next
+        })
+      )
+    } catch (error) {
+      setBookingActionError((current) => ({
+        ...current,
+        [bookingId]: 'Не удалось обновить запись.',
+      }))
+    } finally {
+      setBookingActionId((current) => (current === bookingId ? null : current))
+    }
   }
 
   const handleSubmit = async (requestId: number) => {
@@ -284,10 +464,10 @@ export const ProRequestsScreen = ({
       <div className="pro-shell">
         <section className="pro-card pro-requests-hero animate delay-1">
           <div>
-            <p className="pro-card-eyebrow">Заявки</p>
-            <h1 className="pro-card-title">Заявки рядом</h1>
+            <p className="pro-card-eyebrow">Заявки и записи</p>
+            <h1 className="pro-card-title">Заявки и записи</h1>
             <p className="pro-requests-subtitle">
-              Откликайтесь на подходящие заявки
+              Отклики, подтверждения и цены в одном месте
             </p>
           </div>
         </section>
@@ -327,131 +507,329 @@ export const ProRequestsScreen = ({
               </button>
             </div>
           )}
-          {isLoading && <p className="requests-status">Загружаем заявки...</p>}
-          {loadError && <p className="requests-error">{loadError}</p>}
+          <div
+            className="requests-tabs pro-requests-tabs"
+            role="tablist"
+            aria-label="Разделы"
+          >
+            <button
+              className={`requests-tab${activeTab === 'requests' ? ' is-active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'requests'}
+              onClick={() => setActiveTab('requests')}
+            >
+              Заявки
+            </button>
+            <button
+              className={`requests-tab${activeTab === 'bookings' ? ' is-active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'bookings'}
+              onClick={() => setActiveTab('bookings')}
+            >
+              Записи
+            </button>
+          </div>
 
-          {!isLoading && !items.length && !loadError && (
-            <p className="requests-empty">
-              {!isActive
-                ? 'Вы на паузе. Включите прием заявок.'
-                : missingFields.some((field) => field !== 'displayName')
-                ? 'Заполните профиль, чтобы видеть заявки рядом.'
-                : 'Пока нет подходящих заявок.'}
-            </p>
+          {activeTab === 'requests' && (
+            <>
+              {isLoading && <p className="requests-status">Загружаем заявки...</p>}
+              {loadError && <p className="requests-error">{loadError}</p>}
+
+              {!isLoading && !items.length && !loadError && (
+                <p className="requests-empty">
+                  {!isActive
+                    ? 'Вы на паузе. Включите прием заявок.'
+                    : missingFields.some((field) => field !== 'displayName')
+                    ? 'Заполните профиль, чтобы видеть заявки рядом.'
+                    : 'Пока нет подходящих заявок.'}
+                </p>
+              )}
+
+              <div className="requests-list">
+                {items.map((item) => {
+                  const categoryLabel =
+                    categoryItems.find((category) => category.id === item.categoryId)
+                      ?.label ?? item.categoryId
+                  const locationLabel =
+                    locationLabelMap[item.locationType] ?? 'Не важно'
+                  const dateLabel =
+                    item.dateOption === 'choose'
+                      ? formatDateTime(item.dateTime) || 'По договоренности'
+                      : dateLabelMap[item.dateOption]
+                  const responseStatusLabel = item.responseStatus
+                    ? responseStatusLabelMap[
+                        item.responseStatus as keyof typeof responseStatusLabelMap
+                      ] ?? item.responseStatus
+                    : ''
+                  const draft = drafts[item.id] ?? {
+                    price: '',
+                    comment: '',
+                    proposedTime: '',
+                  }
+                  const isSubmitting = submittingId === item.id
+                  const canRespond = missingFields.length === 0 && isActive
+
+                  return (
+                    <div className="pro-request-item" key={item.id}>
+                      <div className="request-item-top">
+                        <div className="request-item-title">{item.serviceName}</div>
+                        <span className="request-status is-open">Открыта</span>
+                      </div>
+                      <div className="request-item-meta">
+                        {categoryLabel}
+                        {item.budget ? ` • ${item.budget}` : ''}
+                      </div>
+                      <div className="request-item-meta">
+                        {locationLabel}
+                        {item.cityName ? ` • ${item.cityName}` : ''}
+                        {item.districtName ? ` • ${item.districtName}` : ''}
+                      </div>
+                      <div className="request-item-meta">{dateLabel}</div>
+                      {responseStatusLabel && (
+                        <div className="request-item-meta">
+                          Ваш отклик: {responseStatusLabel}
+                        </div>
+                      )}
+                      {item.details && (
+                        <div className="request-item-details">{item.details}</div>
+                      )}
+
+                      <div className="pro-response-form">
+                        <input
+                          className="pro-response-input"
+                          type="number"
+                          placeholder="Ваша цена, ₽"
+                          value={draft.price}
+                          onChange={(event) =>
+                            handleDraftChange(item.id, 'price', event.target.value)
+                          }
+                          min="0"
+                          disabled={!canRespond}
+                        />
+                        <input
+                          className="pro-response-input"
+                          type="text"
+                          placeholder="Предложенное время (опционально)"
+                          value={draft.proposedTime}
+                          onChange={(event) =>
+                            handleDraftChange(
+                              item.id,
+                              'proposedTime',
+                              event.target.value
+                            )
+                          }
+                          disabled={!canRespond}
+                        />
+                        <textarea
+                          className="pro-response-textarea"
+                          placeholder="Комментарий для клиента"
+                          rows={3}
+                          value={draft.comment}
+                          onChange={(event) =>
+                            handleDraftChange(
+                              item.id,
+                              'comment',
+                              event.target.value
+                            )
+                          }
+                          disabled={!canRespond}
+                        />
+                        <button
+                          className="pro-response-button"
+                          type="button"
+                          onClick={() => handleSubmit(item.id)}
+                          disabled={isSubmitting || !canRespond}
+                        >
+                          {isSubmitting
+                            ? 'Отправляем...'
+                            : item.responseStatus
+                              ? 'Обновить отклик'
+                              : 'Откликнуться'}
+                        </button>
+                        {submitError[item.id] && (
+                          <p className="pro-response-error">
+                            {submitError[item.id]}
+                          </p>
+                        )}
+                        {submitSuccess[item.id] && (
+                          <p className="pro-response-success">
+                            {submitSuccess[item.id]}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
 
-          <div className="requests-list">
-            {items.map((item) => {
-              const categoryLabel =
-                categoryItems.find((category) => category.id === item.categoryId)
-                  ?.label ?? item.categoryId
-              const locationLabel =
-                locationLabelMap[item.locationType] ?? 'Не важно'
-              const dateLabel =
-                item.dateOption === 'choose'
-                  ? formatDateTime(item.dateTime) || 'По договоренности'
-                  : dateLabelMap[item.dateOption]
-              const responseStatusLabel = item.responseStatus
-                ? responseStatusLabelMap[
-                    item.responseStatus as keyof typeof responseStatusLabelMap
-                  ] ?? item.responseStatus
-                : ''
-              const draft = drafts[item.id] ?? {
-                price: '',
-                comment: '',
-                proposedTime: '',
-              }
-              const isSubmitting = submittingId === item.id
-              const canRespond = missingFields.length === 0 && isActive
+          {activeTab === 'bookings' && (
+            <>
+              {isBookingsLoading && (
+                <p className="requests-status">Загружаем записи...</p>
+              )}
+              {bookingsError && <p className="requests-error">{bookingsError}</p>}
 
-              return (
-                <div className="pro-request-item" key={item.id}>
-                  <div className="request-item-top">
-                    <div className="request-item-title">{item.serviceName}</div>
-                    <span className="request-status is-open">Открыта</span>
-                  </div>
-                  <div className="request-item-meta">
-                    {categoryLabel}
-                    {item.budget ? ` • ${item.budget}` : ''}
-                  </div>
-                  <div className="request-item-meta">
-                    {locationLabel}
-                    {item.cityName ? ` • ${item.cityName}` : ''}
-                    {item.districtName ? ` • ${item.districtName}` : ''}
-                  </div>
-                  <div className="request-item-meta">{dateLabel}</div>
-                  {responseStatusLabel && (
-                    <div className="request-item-meta">
-                      Ваш отклик: {responseStatusLabel}
+              {!isBookingsLoading && bookingItems.length === 0 && !bookingsError && (
+                <p className="requests-empty">Пока нет записей.</p>
+              )}
+
+              <div className="requests-list booking-list">
+                {bookingItems.map((booking) => {
+                  const statusLabel =
+                    bookingStatusLabelMap[booking.status] ?? booking.status
+                  const statusTone =
+                    bookingStatusToneMap[booking.status] ?? 'is-waiting'
+                  const categoryLabel =
+                    categoryItems.find(
+                      (category) => category.id === booking.categoryId
+                    )?.label ?? booking.categoryId
+                  const locationLabel =
+                    locationLabelMap[booking.locationType] ?? 'Не важно'
+                  const scheduledLabel = formatDateTime(booking.scheduledAt)
+                  const hasServicePrice = typeof booking.servicePrice === 'number'
+                  const priceLabel = hasServicePrice
+                    ? `Стоимость: ${formatPrice(booking.servicePrice ?? 0)}`
+                    : typeof booking.proposedPrice === 'number'
+                      ? `Предложенная цена: ${formatPrice(booking.proposedPrice)}`
+                      : 'Цена не указана'
+                  const canAccept = booking.status === 'pending' && hasServicePrice
+                  const canPropose =
+                    !hasServicePrice &&
+                    ['pending', 'price_pending', 'price_proposed'].includes(
+                      booking.status
+                    )
+                  const canDecline = ['pending', 'price_pending', 'price_proposed'].includes(
+                    booking.status
+                  )
+                  const isActionLoading = bookingActionId !== null
+                  const draftPrice = bookingDrafts[booking.id] ?? ''
+                  const clientName = booking.clientName ?? 'Клиент'
+                  const clientInitials = getInitials(clientName)
+                  const photoItems = Array.isArray(booking.photoUrls)
+                    ? booking.photoUrls
+                    : []
+
+                  return (
+                    <div className="booking-item" key={booking.id}>
+                      <div className="booking-item-head">
+                        <span className="booking-item-avatar" aria-hidden="true">
+                          <span>{clientInitials}</span>
+                        </span>
+                        <div className="booking-item-main">
+                          <div className="booking-item-master">{clientName}</div>
+                          <div className="booking-item-service">
+                            {booking.serviceName}
+                          </div>
+                        </div>
+                        <span className={`booking-status ${statusTone}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className="booking-item-meta">
+                        {categoryLabel}
+                        {scheduledLabel ? ` • ${scheduledLabel}` : ''}
+                      </div>
+                      <div className="booking-item-meta">
+                        {locationLabel}
+                        {booking.cityName ? ` • ${booking.cityName}` : ''}
+                        {booking.districtName ? ` • ${booking.districtName}` : ''}
+                      </div>
+                      {booking.locationType === 'client' && booking.address && (
+                        <div className="booking-item-meta">
+                          Адрес: {booking.address}
+                        </div>
+                      )}
+                      <div className="booking-item-price">{priceLabel}</div>
+                      {booking.comment && (
+                        <div className="booking-item-comment">{booking.comment}</div>
+                      )}
+                      {photoItems.length > 0 && (
+                        <div className="booking-photo-strip" role="list">
+                          {photoItems.map((url, index) => (
+                            <span
+                              className="booking-photo-thumb"
+                              key={`${booking.id}-${index}`}
+                              role="listitem"
+                            >
+                              <img src={url} alt="" loading="lazy" />
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {canPropose && (
+                        <div className="booking-price-form">
+                          <input
+                            className="booking-price-input"
+                            type="number"
+                            placeholder="Ваша цена, ₽"
+                            value={draftPrice}
+                            onChange={(event) =>
+                              handleBookingDraftChange(booking.id, event.target.value)
+                            }
+                            min="0"
+                            disabled={isActionLoading}
+                          />
+                          <button
+                            className="booking-action is-primary"
+                            type="button"
+                            onClick={() =>
+                              handleBookingAction(
+                                booking.id,
+                                'master-propose-price',
+                                draftPrice
+                              )
+                            }
+                            disabled={isActionLoading}
+                          >
+                            {booking.status === 'price_proposed'
+                              ? 'Обновить цену'
+                              : 'Предложить цену'}
+                          </button>
+                        </div>
+                      )}
+                      {(canAccept || canDecline) && (
+                        <div className="booking-actions">
+                          {canAccept && (
+                            <button
+                              className="booking-action is-primary"
+                              type="button"
+                              onClick={() =>
+                                handleBookingAction(booking.id, 'master-accept')
+                              }
+                              disabled={isActionLoading}
+                            >
+                              Подтвердить
+                            </button>
+                          )}
+                          {canDecline && (
+                            <button
+                              className="booking-action"
+                              type="button"
+                              onClick={() =>
+                                handleBookingAction(booking.id, 'master-decline')
+                              }
+                              disabled={isActionLoading}
+                            >
+                              Отказать
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {bookingActionError[booking.id] && (
+                        <p className="booking-action-error">
+                          {bookingActionError[booking.id]}
+                        </p>
+                      )}
                     </div>
-                  )}
-                  {item.details && (
-                    <div className="request-item-details">{item.details}</div>
-                  )}
-
-                  <div className="pro-response-form">
-                    <input
-                      className="pro-response-input"
-                      type="number"
-                      placeholder="Ваша цена, ₽"
-                      value={draft.price}
-                      onChange={(event) =>
-                        handleDraftChange(item.id, 'price', event.target.value)
-                      }
-                      min="0"
-                      disabled={!canRespond}
-                    />
-                    <input
-                      className="pro-response-input"
-                      type="text"
-                      placeholder="Предложенное время (опционально)"
-                      value={draft.proposedTime}
-                      onChange={(event) =>
-                        handleDraftChange(
-                          item.id,
-                          'proposedTime',
-                          event.target.value
-                        )
-                      }
-                      disabled={!canRespond}
-                    />
-                    <textarea
-                      className="pro-response-textarea"
-                      placeholder="Комментарий для клиента"
-                      rows={3}
-                      value={draft.comment}
-                      onChange={(event) =>
-                        handleDraftChange(item.id, 'comment', event.target.value)
-                      }
-                      disabled={!canRespond}
-                    />
-                    <button
-                      className="pro-response-button"
-                      type="button"
-                      onClick={() => handleSubmit(item.id)}
-                      disabled={isSubmitting || !canRespond}
-                    >
-                      {isSubmitting
-                        ? 'Отправляем...'
-                        : item.responseStatus
-                          ? 'Обновить отклик'
-                          : 'Откликнуться'}
-                    </button>
-                    {submitError[item.id] && (
-                      <p className="pro-response-error">
-                        {submitError[item.id]}
-                      </p>
-                    )}
-                    {submitSuccess[item.id] && (
-                      <p className="pro-response-success">
-                        {submitSuccess[item.id]}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </section>
       </div>
 

@@ -87,6 +87,39 @@ export type ServiceRequest = {
   responsesCount?: number
 }
 
+export type BookingStatus =
+  | 'pending'
+  | 'price_pending'
+  | 'price_proposed'
+  | 'confirmed'
+  | 'declined'
+  | 'cancelled'
+
+export type Booking = {
+  id: number
+  clientId: string
+  masterId: string
+  masterName?: string | null
+  masterAvatarUrl?: string | null
+  clientName?: string | null
+  categoryId: string
+  serviceName: string
+  servicePrice?: number | null
+  proposedPrice?: number | null
+  serviceDuration?: number | null
+  locationType: 'client' | 'master'
+  cityId: number | null
+  districtId: number | null
+  cityName?: string | null
+  districtName?: string | null
+  address?: string | null
+  scheduledAt: string
+  status: BookingStatus
+  photoUrls: string[]
+  comment?: string | null
+  createdAt: string
+}
+
 export type RequestResponse = {
   id: number
   requestId: number

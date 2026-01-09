@@ -9,6 +9,7 @@ import {
   type ShowcaseMedia,
 } from './screens/ClientShowcaseScreen'
 import { ClientMasterProfileScreen } from './screens/ClientMasterProfileScreen'
+import { BookingScreen } from './screens/BookingScreen'
 import { ProCabinetScreen } from './screens/ProCabinetScreen'
 import { ProProfileScreen } from './screens/ProProfileScreen'
 import { ProRequestsScreen } from './screens/ProRequestsScreen'
@@ -24,6 +25,12 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
+type BookingReturnView =
+  | 'client'
+  | 'client-showcase'
+  | 'client-gallery'
+  | 'client-gallery-detail'
+  | 'client-master-profile'
 
 function App() {
   const [view, setView] = useState<
@@ -34,6 +41,7 @@ function App() {
     | 'client-gallery'
     | 'client-gallery-detail'
     | 'client-master-profile'
+    | 'booking'
     | 'request'
     | 'requests'
     | 'pro-cabinet'
@@ -63,6 +71,13 @@ function App() {
   const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
   const [selectedShowcaseItem, setSelectedShowcaseItem] =
     useState<ShowcaseMedia | null>(null)
+  const [bookingMasterId, setBookingMasterId] = useState<string | null>(null)
+  const [bookingPhotoUrls, setBookingPhotoUrls] = useState<string[]>([])
+  const [bookingPreferredCategoryId, setBookingPreferredCategoryId] = useState<
+    string | null
+  >(null)
+  const [bookingReturnView, setBookingReturnView] =
+    useState<BookingReturnView | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
@@ -197,6 +212,7 @@ function App() {
       view === 'client-gallery' ||
       view === 'client-gallery-detail' ||
       view === 'client-master-profile' ||
+      view === 'booking' ||
       view === 'request' ||
       view === 'requests' ||
       isPro
@@ -374,6 +390,7 @@ function App() {
       view === 'client-gallery' ||
       view === 'client-gallery-detail' ||
       view === 'client-master-profile' ||
+      view === 'booking' ||
       view === 'request' ||
       view === 'requests' ||
       view === 'pro-cabinet' ||
@@ -400,6 +417,13 @@ function App() {
         case 'client-master-profile':
           setSelectedMasterId(null)
           setView('client-showcase')
+          break
+        case 'booking':
+          setBookingMasterId(null)
+          setBookingPhotoUrls([])
+          setBookingPreferredCategoryId(null)
+          setView(bookingReturnView ?? 'client-showcase')
+          setBookingReturnView(null)
           break
         case 'pro-profile':
           if (proProfileBackHandlerRef.current?.()) {
@@ -443,9 +467,36 @@ function App() {
     }
   }, [selectedShowcaseItem, view])
 
+  useEffect(() => {
+    if (view === 'booking' && !bookingMasterId) {
+      setBookingPreferredCategoryId(null)
+      setBookingPhotoUrls([])
+      setBookingReturnView(null)
+      setView(bookingReturnView ?? 'client-showcase')
+    }
+  }, [bookingMasterId, bookingReturnView, view])
+
   const registerProProfileBackHandler = useCallback(
     (handler: (() => boolean) | null) => {
       proProfileBackHandlerRef.current = handler
+    },
+    []
+  )
+
+  const openBooking = useCallback(
+    (
+      masterId: string,
+      options?: {
+        photoUrls?: string[]
+        preferredCategoryId?: string | null
+        returnView?: BookingReturnView
+      }
+    ) => {
+      setBookingMasterId(masterId)
+      setBookingPhotoUrls(options?.photoUrls ?? [])
+      setBookingPreferredCategoryId(options?.preferredCategoryId ?? null)
+      setBookingReturnView(options?.returnView ?? 'client-showcase')
+      setView('booking')
     },
     []
   )
@@ -477,6 +528,12 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
         onViewRequests={() => setView('requests')}
+        onCreateBooking={(masterId) =>
+          openBooking(masterId, {
+            returnView: 'client-showcase',
+            preferredCategoryId: clientCategoryId,
+          })
+        }
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)
           setView('client-master-profile')
@@ -506,12 +563,12 @@ function App() {
           setSelectedMasterId(null)
           setView('requests')
         }}
-        onCreateRequest={(categoryId) => {
-          setRequestCategoryId(
-            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
-          )
-          setView('request')
-        }}
+        onCreateBooking={() =>
+          openBooking(selectedMasterId, {
+            returnView: 'client-master-profile',
+            preferredCategoryId: clientCategoryId,
+          })
+        }
       />
     )
   }
@@ -542,13 +599,14 @@ function App() {
           setSelectedMasterId(masterId)
           setView('client-master-profile')
         }}
-        onCreateRequest={(categoryId) => {
-          setSelectedShowcaseItem(null)
-          setRequestCategoryId(
-            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
-          )
-          setView('request')
-        }}
+        onCreateBooking={() =>
+          openBooking(selectedShowcaseItem.masterId, {
+            photoUrls: [selectedShowcaseItem.url],
+            preferredCategoryId:
+              selectedShowcaseItem.categories[0] ?? clientCategoryId,
+            returnView: 'client-gallery-detail',
+          })
+        }
       />
     )
   }
@@ -585,6 +643,34 @@ function App() {
         cityName={cityName}
         districtName={districtName}
         address={address}
+      />
+    )
+  }
+
+  if (view === 'booking' && bookingMasterId) {
+    const cityName = cities.find((item) => item.id === cityId)?.name ?? ''
+    const districtName =
+      districts.find((item) => item.id === districtId)?.name ?? ''
+
+    return (
+      <BookingScreen
+        apiBase={apiBase}
+        userId={userId}
+        masterId={bookingMasterId}
+        cityId={cityId}
+        districtId={districtId}
+        cityName={cityName}
+        districtName={districtName}
+        address={address}
+        photoUrls={bookingPhotoUrls}
+        preferredCategoryId={bookingPreferredCategoryId}
+        onBack={() => {
+          setBookingMasterId(null)
+          setBookingPhotoUrls([])
+          setBookingPreferredCategoryId(null)
+          setView(bookingReturnView ?? 'client-showcase')
+          setBookingReturnView(null)
+        }}
       />
     )
   }

@@ -16,7 +16,7 @@ type ClientMasterProfileScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewRequests: () => void
-  onCreateRequest: (categoryId?: string | null) => void
+  onCreateBooking: () => void
 }
 
 const scheduleLabels: Record<string, string> = {
@@ -162,7 +162,7 @@ export const ClientMasterProfileScreen = ({
   onViewHome,
   onViewMasters,
   onViewRequests,
-  onCreateRequest,
+  onCreateBooking,
 }: ClientMasterProfileScreenProps) => {
   const [profile, setProfile] = useState<MasterProfile | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -456,13 +456,7 @@ export const ClientMasterProfileScreen = ({
                 <button
                   className="pro-profile-action is-primary"
                   type="button"
-                  onClick={() =>
-                    onCreateRequest(
-                      Array.isArray(profile.categories)
-                        ? profile.categories[0] ?? null
-                        : null
-                    )
-                  }
+                  onClick={onCreateBooking}
                 >
                   Записаться
                 </button>

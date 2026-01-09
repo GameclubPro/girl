@@ -61,6 +61,56 @@ const parseOptionalInt = (value) => {
   return Number.isInteger(parsed) ? parsed : null
 }
 
+const normalizeServiceName = (value) => normalizeText(value).toLowerCase()
+
+const parseServiceItem = (value) => {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('svc:')) {
+    try {
+      const payload = JSON.parse(trimmed.slice(4))
+      const name = normalizeText(payload?.name)
+      if (!name) return null
+      return {
+        name,
+        price: parseOptionalInt(payload?.price),
+        duration: parseOptionalInt(payload?.duration),
+      }
+    } catch (error) {
+      return null
+    }
+  }
+  return { name: trimmed, price: null, duration: null }
+}
+
+const parseServiceItems = (values) =>
+  (Array.isArray(values) ? values : [])
+    .map((value) => parseServiceItem(value))
+    .filter(Boolean)
+
+const parseTimeToMinutes = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  const [hoursRaw, minutesRaw] = normalized.split(':')
+  const hours = Number(hoursRaw)
+  const minutes = Number(minutesRaw)
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+const getDayKeyFromDate = (date) =>
+  dayKeyOrder[date.getDay()] ?? 'mon'
+
+const buildDayBounds = (date) => {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
+  return { start, end }
+}
+
 const sanitizePathSegment = (value) => {
   const normalized = normalizeText(value)
   return normalized.replace(/[^a-zA-Z0-9_-]/g, '') || 'user'
@@ -353,6 +403,29 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS service_bookings (
+      id SERIAL PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      city_id INTEGER REFERENCES cities(id),
+      district_id INTEGER REFERENCES districts(id),
+      address TEXT,
+      category_id TEXT NOT NULL,
+      service_name TEXT NOT NULL,
+      service_price INTEGER,
+      service_duration INTEGER,
+      location_type TEXT NOT NULL,
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      photo_urls TEXT[] NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'pending',
+      proposed_price INTEGER,
+      client_comment TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS request_responses (
       id SERIAL PRIMARY KEY,
       request_id INTEGER NOT NULL REFERENCES service_requests(id) ON DELETE CASCADE,
@@ -374,6 +447,16 @@ const ensureSchema = async () => {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS request_responses_request_idx
     ON request_responses (request_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_bookings_master_idx
+    ON service_bookings (master_id, scheduled_at);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_bookings_client_idx
+    ON service_bookings (client_id, scheduled_at);
   `)
 
   await pool.query(`
@@ -806,6 +889,49 @@ app.get('/api/masters/:userId', async (req, res) => {
     })
   } catch (error) {
     console.error('GET /api/masters/:userId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/masters/:userId/bookings', async (req, res) => {
+  const normalizedUserId = normalizeText(req.params.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const fromParam = normalizeText(req.query.from)
+  const toParam = normalizeText(req.query.to)
+  const fromDate = fromParam ? new Date(fromParam) : new Date()
+  const toDate = toParam
+    ? new Date(toParam)
+    : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    res.status(400).json({ error: 'date_range_invalid' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          scheduled_at AS "scheduledAt",
+          service_duration AS "serviceDuration",
+          status
+        FROM service_bookings
+        WHERE master_id = $1
+          AND status NOT IN ('declined', 'cancelled')
+          AND scheduled_at >= $2
+          AND scheduled_at <= $3
+        ORDER BY scheduled_at ASC
+      `,
+      [normalizedUserId, fromDate.toISOString(), toDate.toISOString()]
+    )
+    res.json(result.rows)
+  } catch (error) {
+    console.error('GET /api/masters/:userId/bookings failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -1397,6 +1523,561 @@ app.get('/api/pro/requests', async (req, res) => {
     res.json({ ...summary, isActive: profile.isActive, requests: result.rows })
   } catch (error) {
     console.error('GET /api/pro/requests failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/bookings', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          b.id,
+          b.client_id AS "clientId",
+          b.master_id AS "masterId",
+          mp.display_name AS "masterName",
+          mp.avatar_path AS "masterAvatarPath",
+          b.city_id AS "cityId",
+          b.district_id AS "districtId",
+          c.name AS "cityName",
+          d.name AS "districtName",
+          b.address,
+          b.category_id AS "categoryId",
+          b.service_name AS "serviceName",
+          b.service_price AS "servicePrice",
+          b.service_duration AS "serviceDuration",
+          b.location_type AS "locationType",
+          b.scheduled_at AS "scheduledAt",
+          b.photo_urls AS "photoUrls",
+          b.status,
+          b.proposed_price AS "proposedPrice",
+          b.client_comment AS "comment",
+          b.created_at AS "createdAt"
+        FROM service_bookings b
+        LEFT JOIN master_profiles mp ON mp.user_id = b.master_id
+        LEFT JOIN cities c ON c.id = b.city_id
+        LEFT JOIN districts d ON d.id = b.district_id
+        WHERE b.client_id = $1
+        ORDER BY b.created_at DESC
+      `,
+      [normalizedUserId]
+    )
+
+    const payload = result.rows.map((row) => ({
+      ...row,
+      masterName: row.masterName || 'Мастер',
+      masterAvatarUrl: buildPublicUrl(req, row.masterAvatarPath),
+    }))
+
+    res.json(payload)
+  } catch (error) {
+    console.error('GET /api/bookings failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/pro/bookings', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          b.id,
+          b.client_id AS "clientId",
+          b.master_id AS "masterId",
+          u.first_name AS "clientFirstName",
+          u.last_name AS "clientLastName",
+          u.username AS "clientUsername",
+          b.city_id AS "cityId",
+          b.district_id AS "districtId",
+          c.name AS "cityName",
+          d.name AS "districtName",
+          b.address,
+          b.category_id AS "categoryId",
+          b.service_name AS "serviceName",
+          b.service_price AS "servicePrice",
+          b.service_duration AS "serviceDuration",
+          b.location_type AS "locationType",
+          b.scheduled_at AS "scheduledAt",
+          b.photo_urls AS "photoUrls",
+          b.status,
+          b.proposed_price AS "proposedPrice",
+          b.client_comment AS "comment",
+          b.created_at AS "createdAt"
+        FROM service_bookings b
+        LEFT JOIN users u ON u.user_id = b.client_id
+        LEFT JOIN cities c ON c.id = b.city_id
+        LEFT JOIN districts d ON d.id = b.district_id
+        WHERE b.master_id = $1
+        ORDER BY b.created_at DESC
+      `,
+      [normalizedUserId]
+    )
+
+    const payload = result.rows.map((row) => {
+      const nameParts = [row.clientFirstName, row.clientLastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim()
+      const clientName = nameParts || (row.clientUsername ? `@${row.clientUsername}` : 'Клиент')
+      return {
+        ...row,
+        clientName,
+      }
+    })
+
+    res.json(payload)
+  } catch (error) {
+    console.error('GET /api/pro/bookings failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/bookings', async (req, res) => {
+  const {
+    userId,
+    masterId,
+    cityId,
+    districtId,
+    address,
+    categoryId,
+    serviceName,
+    locationType,
+    scheduledAt,
+    photoUrls,
+    comment,
+  } = req.body ?? {}
+
+  const normalizedUserId = normalizeText(userId)
+  const normalizedMasterId = normalizeText(masterId)
+  const normalizedCategoryId = normalizeText(categoryId)
+  const normalizedServiceName = normalizeText(serviceName)
+  const normalizedLocationType = normalizeText(locationType)
+  const normalizedAddress = normalizeText(address)
+  const normalizedComment = normalizeText(comment)
+  const photoList = normalizeStringArray(photoUrls)
+
+  if (!normalizedUserId || !normalizedMasterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!normalizedCategoryId || !normalizedServiceName) {
+    res.status(400).json({ error: 'service_required' })
+    return
+  }
+
+  if (!['client', 'master'].includes(normalizedLocationType)) {
+    res.status(400).json({ error: 'locationType_invalid' })
+    return
+  }
+
+  if (!normalizeText(scheduledAt)) {
+    res.status(400).json({ error: 'scheduledAt_required' })
+    return
+  }
+
+  const scheduledDate = new Date(scheduledAt)
+  if (Number.isNaN(scheduledDate.getTime())) {
+    res.status(400).json({ error: 'scheduledAt_invalid' })
+    return
+  }
+
+  const parsedCityId = Number(cityId)
+  const parsedDistrictId = Number(districtId)
+  if (!Number.isInteger(parsedCityId) || !Number.isInteger(parsedDistrictId)) {
+    res.status(400).json({ error: 'location_required' })
+    return
+  }
+
+  if (normalizedLocationType === 'client' && !normalizedAddress) {
+    res.status(400).json({ error: 'address_required' })
+    return
+  }
+
+  try {
+    const profile = await loadMasterProfile(normalizedMasterId)
+    if (!profile) {
+      res.status(404).json({ error: 'master_not_found' })
+      return
+    }
+
+    const categories = Array.isArray(profile.categories) ? profile.categories : []
+    if (!categories.includes(normalizedCategoryId)) {
+      res.status(403).json({ error: 'category_mismatch' })
+      return
+    }
+
+    const serviceItems = parseServiceItems(profile.services ?? [])
+    const normalizedRequestedService = normalizeServiceName(normalizedServiceName)
+    const matchedService = serviceItems.find(
+      (item) => normalizeServiceName(item.name) === normalizedRequestedService
+    )
+    if (!matchedService) {
+      res.status(403).json({ error: 'service_mismatch' })
+      return
+    }
+
+    if (normalizedLocationType === 'client' && !profile.worksAtClient) {
+      res.status(403).json({ error: 'location_type_mismatch' })
+      return
+    }
+    if (normalizedLocationType === 'master' && !profile.worksAtMaster) {
+      res.status(403).json({ error: 'location_type_mismatch' })
+      return
+    }
+
+    const profileCityId = parseOptionalInt(profile.cityId)
+    const profileDistrictId = parseOptionalInt(profile.districtId)
+    if (
+      (profileCityId && profileCityId !== parsedCityId) ||
+      (profileDistrictId && profileDistrictId !== parsedDistrictId)
+    ) {
+      res.status(403).json({ error: 'location_mismatch' })
+      return
+    }
+
+    const scheduleDays = Array.isArray(profile.scheduleDays)
+      ? profile.scheduleDays.map((day) => normalizeText(day).toLowerCase())
+      : []
+    const scheduleStartMinutes = parseTimeToMinutes(profile.scheduleStart)
+    const scheduleEndMinutes = parseTimeToMinutes(profile.scheduleEnd)
+
+    if (
+      scheduleDays.length === 0 ||
+      scheduleStartMinutes === null ||
+      scheduleEndMinutes === null ||
+      scheduleStartMinutes >= scheduleEndMinutes
+    ) {
+      res.status(409).json({ error: 'schedule_unavailable' })
+      return
+    }
+
+    const dayKey = getDayKeyFromDate(scheduledDate)
+    if (!scheduleDays.includes(dayKey)) {
+      res.status(409).json({ error: 'day_unavailable' })
+      return
+    }
+
+    const serviceDuration = matchedService.duration ?? 60
+    const scheduledMinutes =
+      scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
+    if (
+      scheduledMinutes < scheduleStartMinutes ||
+      scheduledMinutes + serviceDuration > scheduleEndMinutes
+    ) {
+      res.status(409).json({ error: 'time_unavailable' })
+      return
+    }
+
+    if (scheduledDate.getTime() < Date.now()) {
+      res.status(409).json({ error: 'time_unavailable' })
+      return
+    }
+
+    const { start: dayStart, end: dayEnd } = buildDayBounds(scheduledDate)
+    const existing = await pool.query(
+      `
+        SELECT
+          scheduled_at AS "scheduledAt",
+          service_duration AS "serviceDuration"
+        FROM service_bookings
+        WHERE master_id = $1
+          AND status NOT IN ('declined', 'cancelled')
+          AND scheduled_at >= $2
+          AND scheduled_at < $3
+      `,
+      [normalizedMasterId, dayStart.toISOString(), dayEnd.toISOString()]
+    )
+
+    const startMs = scheduledDate.getTime()
+    const endMs = startMs + serviceDuration * 60 * 1000
+    const hasConflict = existing.rows.some((row) => {
+      const existingStart = new Date(row.scheduledAt).getTime()
+      const existingDuration = Number(row.serviceDuration) || 60
+      const existingEnd = existingStart + existingDuration * 60 * 1000
+      return startMs < existingEnd && endMs > existingStart
+    })
+    if (hasConflict) {
+      res.status(409).json({ error: 'time_unavailable' })
+      return
+    }
+
+    await ensureUser(normalizedUserId)
+    await ensureUser(normalizedMasterId)
+
+    const status = matchedService.price !== null ? 'pending' : 'price_pending'
+    const result = await pool.query(
+      `
+        INSERT INTO service_bookings (
+          client_id,
+          master_id,
+          city_id,
+          district_id,
+          address,
+          category_id,
+          service_name,
+          service_price,
+          service_duration,
+          location_type,
+          scheduled_at,
+          photo_urls,
+          status,
+          proposed_price,
+          client_comment
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, $14)
+        RETURNING id, created_at AS "createdAt"
+      `,
+      [
+        normalizedUserId,
+        normalizedMasterId,
+        parsedCityId,
+        parsedDistrictId,
+        normalizedAddress || null,
+        normalizedCategoryId,
+        normalizedServiceName,
+        matchedService.price ?? null,
+        serviceDuration,
+        normalizedLocationType,
+        scheduledDate.toISOString(),
+        photoList,
+        status,
+        normalizedComment || null,
+      ]
+    )
+
+    res.json({
+      ok: true,
+      id: result.rows[0]?.id,
+      createdAt: result.rows[0]?.createdAt,
+      status,
+    })
+  } catch (error) {
+    console.error('POST /api/bookings failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.patch('/api/bookings/:id', async (req, res) => {
+  const bookingId = Number(req.params.id)
+  if (!Number.isInteger(bookingId)) {
+    res.status(400).json({ error: 'bookingId_invalid' })
+    return
+  }
+
+  const { userId, action, price } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedAction = normalizeText(action)
+  const parsedPrice = parseOptionalInt(price)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!normalizedAction) {
+    res.status(400).json({ error: 'action_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          client_id AS "clientId",
+          master_id AS "masterId",
+          status,
+          service_price AS "servicePrice",
+          proposed_price AS "proposedPrice"
+        FROM service_bookings
+        WHERE id = $1
+      `,
+      [bookingId]
+    )
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const booking = result.rows[0]
+    const isMaster = booking.masterId === normalizedUserId
+    const isClient = booking.clientId === normalizedUserId
+
+    if (!isMaster && !isClient) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    if (normalizedAction === 'master-accept') {
+      if (!isMaster) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.status !== 'pending' || booking.servicePrice === null) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET status = 'confirmed',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+
+      res.json({ ok: true, status: 'confirmed' })
+      return
+    }
+
+    if (normalizedAction === 'master-decline') {
+      if (!isMaster) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET status = 'declined',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+
+      res.json({ ok: true, status: 'declined' })
+      return
+    }
+
+    if (normalizedAction === 'master-propose-price') {
+      if (!isMaster) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (parsedPrice === null) {
+        res.status(400).json({ error: 'price_required' })
+        return
+      }
+      if (!['pending', 'price_pending', 'price_proposed'].includes(booking.status)) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET proposed_price = $2,
+              status = 'price_proposed',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId, parsedPrice]
+      )
+
+      res.json({ ok: true, status: 'price_proposed', proposedPrice: parsedPrice })
+      return
+    }
+
+    if (normalizedAction === 'client-accept-price') {
+      if (!isClient) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.status !== 'price_proposed' || booking.proposedPrice === null) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET service_price = $2,
+              proposed_price = NULL,
+              status = 'confirmed',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId, booking.proposedPrice]
+      )
+
+      res.json({
+        ok: true,
+        status: 'confirmed',
+        servicePrice: booking.proposedPrice,
+      })
+      return
+    }
+
+    if (normalizedAction === 'client-decline-price') {
+      if (!isClient) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.status !== 'price_proposed') {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET status = 'cancelled',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+
+      res.json({ ok: true, status: 'cancelled' })
+      return
+    }
+
+    if (normalizedAction === 'client-cancel') {
+      if (!isClient) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!['pending', 'confirmed', 'price_proposed', 'price_pending'].includes(booking.status)) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET status = 'cancelled',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+
+      res.json({ ok: true, status: 'cancelled' })
+      return
+    }
+
+    res.status(400).json({ error: 'action_invalid' })
+  } catch (error) {
+    console.error('PATCH /api/bookings/:id failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

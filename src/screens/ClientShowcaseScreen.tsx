@@ -15,6 +15,7 @@ type ClientShowcaseScreenProps = {
   onCategoryChange: (categoryId: string | null) => void
   onBack: () => void
   onViewRequests: () => void
+  onCreateBooking: (masterId: string) => void
   onViewProfile: (masterId: string) => void
 }
 
@@ -36,7 +37,7 @@ type ClientShowcaseDetailScreenProps = {
   onViewMasters: () => void
   onViewRequests: () => void
   onViewProfile: (masterId: string) => void
-  onCreateRequest: (categoryId?: string | null) => void
+  onCreateBooking: () => void
 }
 
 const categoryLabelOverrides: Record<string, string> = {
@@ -520,7 +521,7 @@ export const ClientShowcaseDetailScreen = ({
   onViewMasters,
   onViewRequests,
   onViewProfile,
-  onCreateRequest,
+  onCreateBooking,
 }: ClientShowcaseDetailScreenProps) => {
   const [isLiked, setIsLiked] = useState(false)
   const masterInitials = getInitials(item.masterName)
@@ -540,7 +541,6 @@ export const ClientShowcaseDetailScreen = ({
   const ratingLabel =
     item.reviewsAverage !== null ? item.reviewsAverage.toFixed(1) : 'Новый'
   const hasReviews = item.reviewsCount > 0 && item.reviewsAverage !== null
-  const requestCategoryId = primaryCategoryId ?? item.categories[0] ?? null
 
   return (
     <div className="screen screen--client screen--client-showcase screen--client-gallery-detail">
@@ -641,7 +641,7 @@ export const ClientShowcaseDetailScreen = ({
           <button
             className="client-gallery-detail-cta"
             type="button"
-            onClick={() => onCreateRequest(requestCategoryId)}
+            onClick={onCreateBooking}
           >
             Хочу так же
           </button>
@@ -691,6 +691,7 @@ export const ClientShowcaseScreen = ({
   onCategoryChange,
   onBack,
   onViewRequests,
+  onCreateBooking,
   onViewProfile,
 }: ClientShowcaseScreenProps) => {
   const [profiles, setProfiles] = useState<MasterProfile[]>([])
@@ -1167,7 +1168,11 @@ export const ClientShowcaseScreen = ({
                     </div>
 
                     <div className="client-master-actions">
-                      <button className="client-master-cta" type="button">
+                      <button
+                        className="client-master-cta"
+                        type="button"
+                        onClick={() => onCreateBooking(master.id)}
+                      >
                         Записаться
                       </button>
                       <button
