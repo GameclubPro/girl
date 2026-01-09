@@ -42,6 +42,27 @@ const categoryChips = [
   })),
 ]
 
+type CategoryPalette = {
+  accent: string
+  soft: string
+  ink: string
+}
+
+const categoryPalettes: Record<string, CategoryPalette> = {
+  'beauty-nails': { accent: '#d27a9a', soft: '#f6e6ee', ink: '#6d354a' },
+  'brows-lashes': { accent: '#9a7ad0', soft: '#eee9f7', ink: '#4f3c75' },
+  hair: { accent: '#c08c6c', soft: '#f5ede6', ink: '#6c4a37' },
+  'makeup-look': { accent: '#d06c6c', soft: '#f7e5e5', ink: '#6b3030' },
+  'cosmetology-care': { accent: '#6fb5b0', soft: '#e5f4f2', ink: '#2f6c66' },
+  'massage-body': { accent: '#8fae6a', soft: '#eef4e7', ink: '#4c6531' },
+  'fitness-health': { accent: '#6ea8c7', soft: '#e6f1f8', ink: '#2e5a72' },
+  'home-family': { accent: '#d1a35f', soft: '#f8eedf', ink: '#734f1c' },
+  default: { accent: '#c58f7a', soft: '#f5eae5', ink: '#6c4b3e' },
+}
+
+const pickPalette = (categories: string[]) =>
+  categoryPalettes[categories[0] ?? ''] ?? categoryPalettes.default
+
 type ShowcaseMedia = {
   id: string
   url: string
@@ -698,10 +719,12 @@ export const ClientShowcaseScreen = ({
                 const cardClassName = `client-master-card${
                   isFeatured ? ' is-featured' : ''
                 }`
-                const accentHue = toSeed(master.id) % 360
-                const cardStyle = isFeatured
-                  ? ({ '--accent-hue': `${accentHue}` } as CSSProperties)
-                  : undefined
+                const palette = pickPalette(master.categories)
+                const cardStyle = {
+                  '--card-accent': palette.accent,
+                  '--card-accent-soft': palette.soft,
+                  '--card-accent-ink': palette.ink,
+                } as CSSProperties
                 const experienceLabel = formatExperience(master.experienceYears)
                 const priceLabel = formatPriceRange(master.priceFrom, master.priceTo)
                 const ratingLabel =
@@ -715,9 +738,6 @@ export const ClientShowcaseScreen = ({
                   master.services.length > 0 ? `${master.services.length}` : '—'
                 const portfolioCount =
                   master.portfolioCount > 0 ? `${master.portfolioCount}` : '—'
-                const aboutPreview = master.about?.trim() ?? ''
-                const showGallery = isFeatured && master.gallery.length > 0
-                const showAbout = isFeatured && Boolean(aboutPreview)
 
                 return (
                   <article
@@ -788,9 +808,6 @@ export const ClientShowcaseScreen = ({
                               </span>
                             </span>
                           </div>
-                          {showAbout && (
-                            <p className="client-master-about">{aboutPreview}</p>
-                          )}
                         </div>
                       </div>
                       <div className="client-master-media">
@@ -815,23 +832,6 @@ export const ClientShowcaseScreen = ({
                             {master.updateLabel}
                           </span>
                         </div>
-                        {showGallery && (
-                          <div className="client-master-gallery is-mini">
-                            {master.gallery.slice(0, 2).map((shot, index) => (
-                              <span
-                                className="client-master-shot"
-                                key={`${master.id}-g-${index}`}
-                              >
-                                <img
-                                  src={shot.url}
-                                  alt=""
-                                  loading="lazy"
-                                  style={{ objectPosition: shot.focus }}
-                                />
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
 

@@ -6302,13 +6302,15 @@ h2 {
   border-radius: 20px;
   padding: 10px;
   background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 16px 24px rgba(116, 90, 105, 0.16);
+  border: 1px solid rgba(214, 206, 218, 0.75);
+  box-shadow: 0 14px 20px rgba(60, 50, 70, 0.12);
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow: hidden;
-  --accent-hue: 28;
+  --card-accent: #c58f7a;
+  --card-accent-soft: #f5eae5;
+  --card-accent-ink: #6c4b3e;
 }
 
 .client-master-card::after {
@@ -6317,23 +6319,18 @@ h2 {
   inset: 0;
   background-image: radial-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px);
   background-size: 90px 90px;
-  opacity: 0.16;
+  opacity: 0.08;
   pointer-events: none;
 }
 
 .client-master-card.is-featured {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.94)) padding-box,
-    linear-gradient(
-      135deg,
-      hsl(var(--accent-hue) 82% 88% / 0.95),
-      hsl(calc(var(--accent-hue) + 28) 80% 90% / 0.95)
-    )
-    border-box;
-  box-shadow:
-    0 18px 30px hsl(var(--accent-hue) 55% 55% / 0.22),
-    0 10px 18px rgba(116, 90, 105, 0.18);
+  border-color: var(--card-accent);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    var(--card-accent-soft) 140%
+  );
+  box-shadow: 0 14px 22px rgba(60, 50, 70, 0.16);
 }
 
 .client-master-card.is-featured::before {
@@ -6341,94 +6338,30 @@ h2 {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background:
-    radial-gradient(
-      120% 120% at 100% 0%,
-      hsl(var(--accent-hue) 90% 88% / 0.35),
-      transparent 56%
-    ),
-    radial-gradient(
-      120% 120% at 0% 0%,
-      hsl(calc(var(--accent-hue) + 24) 95% 90% / 0.3),
-      transparent 54%
-    );
-  opacity: 0.9;
+  background: linear-gradient(180deg, var(--card-accent-soft), transparent 70%);
+  opacity: 0.7;
   pointer-events: none;
 }
 
 .client-master-card.is-featured::after {
-  background-image: radial-gradient(
-    hsl(var(--accent-hue) 70% 90% / 0.28) 1px,
-    transparent 1px
-  );
-  opacity: 0.22;
+  opacity: 0;
 }
 
-.client-master-card.is-featured .client-master-media {
-  position: relative;
+.client-master-card.is-featured .client-master-tag {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--card-accent-soft);
+  color: var(--card-accent-ink);
 }
 
-.client-master-card.is-featured .client-master-hero {
-  min-height: 112px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 14px 24px hsl(var(--accent-hue) 50% 55% / 0.28);
-}
-
-.client-master-card.is-featured .client-master-hero::after {
-  background:
-    linear-gradient(160deg, rgba(0, 0, 0, 0.2), transparent 55%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.12), transparent 70%);
-  opacity: 0.6;
-}
-
-.client-master-card.is-featured .client-master-gallery.is-mini {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 86px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 10px 16px rgba(116, 90, 105, 0.18);
-  backdrop-filter: blur(10px);
-}
-
-.client-master-card.is-featured .client-master-shot {
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-}
-
-.client-master-card.is-featured .client-master-score {
-  background: linear-gradient(
-    135deg,
-    hsl(var(--accent-hue) 82% 58%),
-    hsl(calc(var(--accent-hue) + 18) 84% 52%)
-  );
-  box-shadow: 0 8px 14px hsl(var(--accent-hue) 60% 55% / 0.3);
+.client-master-card.is-featured .client-master-stat {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--card-accent-soft);
 }
 
 .client-master-card.is-featured .client-master-signal {
   color: #ffffff;
-  background: rgba(12, 10, 14, 0.32);
-  border-color: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(6px);
-}
-
-.client-master-card.is-featured .client-master-cta {
-  background: linear-gradient(
-    135deg,
-    hsl(var(--accent-hue) 82% 56%),
-    hsl(calc(var(--accent-hue) + 14) 85% 52%)
-  );
-  box-shadow: 0 12px 18px hsl(var(--accent-hue) 60% 55% / 0.35);
-}
-
-.client-master-card.is-featured .client-master-about {
-  -webkit-line-clamp: 2;
+  background: rgba(17, 14, 20, 0.34);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .client-master-top {
@@ -6505,7 +6438,7 @@ h2 {
 
 .client-master-status.is-live {
   color: #ffffff;
-  background: linear-gradient(135deg, #f09a6a 0%, #dd7a62 100%);
+  background: var(--card-accent);
   border-color: transparent;
 }
 
@@ -6535,8 +6468,8 @@ h2 {
   color: #ffffff;
   padding: 3px 7px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #f6b07a 0%, #f08b5a 100%);
-  box-shadow: 0 8px 12px rgba(214, 116, 91, 0.3);
+  background: var(--card-accent);
+  box-shadow: 0 6px 12px rgba(60, 50, 70, 0.18);
   white-space: nowrap;
 }
 
@@ -6558,24 +6491,26 @@ h2 {
   border-radius: 999px;
   font-size: 9px;
   font-weight: 700;
-  color: #6b5a77;
-  background: rgba(250, 244, 240, 0.95);
-  border: 1px solid rgba(214, 199, 206, 0.5);
+  color: var(--card-accent-ink);
+  background: var(--card-accent-soft);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .client-master-hero {
   position: relative;
   border-radius: 16px;
   overflow: hidden;
-  min-height: 92px;
+  aspect-ratio: 4 / 3;
+  min-height: 0;
   background: rgba(255, 255, 255, 0.75);
-  box-shadow: 0 12px 20px rgba(116, 90, 105, 0.18);
+  box-shadow: 0 10px 16px rgba(60, 50, 70, 0.16);
 }
 
 .client-master-hero.is-empty {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--card-accent-soft);
 }
 
 .client-master-hero img {
@@ -6590,7 +6525,7 @@ h2 {
   z-index: 1;
   font-size: 18px;
   font-weight: 700;
-  color: rgba(107, 90, 119, 0.7);
+  color: var(--card-accent-ink);
   letter-spacing: 0.08em;
 }
 
@@ -6637,8 +6572,8 @@ h2 {
   gap: 4px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(250, 244, 240, 0.95);
-  border: 1px solid rgba(214, 199, 206, 0.45);
+  background: var(--card-accent-soft);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .client-master-stat-value {
@@ -6653,17 +6588,6 @@ h2 {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: #8a7b8f;
-}
-
-.client-master-about {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.4;
-  color: #6f6370;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .client-master-availability {
@@ -6698,30 +6622,8 @@ h2 {
 }
 
 .client-master-slot.is-open {
-  background: linear-gradient(135deg, #f6b07a 0%, #f08b5a 100%);
-  box-shadow: 0 6px 10px rgba(214, 116, 91, 0.3);
-}
-
-.client-master-gallery {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
-  position: relative;
-  z-index: 1;
-}
-
-.client-master-shot {
-  border-radius: 10px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.85);
-  aspect-ratio: 1 / 1;
-}
-
-.client-master-shot img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+  background: var(--card-accent);
+  box-shadow: 0 6px 10px rgba(60, 50, 70, 0.18);
 }
 
 .client-master-actions {
@@ -6739,8 +6641,8 @@ h2 {
   font-size: 11px;
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(135deg, #f09a6a 0%, #dd7a62 100%);
-  box-shadow: 0 12px 18px rgba(214, 116, 91, 0.35);
+  background: var(--card-accent);
+  box-shadow: 0 10px 16px rgba(60, 50, 70, 0.2);
   cursor: pointer;
 }
 
@@ -7907,23 +7809,8 @@ h2 {
     grid-template-columns: minmax(0, 1fr) 88px;
   }
 
-  .client-master-hero {
-    min-height: 84px;
-  }
-
   .client-master-media {
     gap: 5px;
-  }
-
-  .client-master-card.is-featured .client-master-hero {
-    min-height: 98px;
-  }
-
-  .client-master-card.is-featured .client-master-gallery.is-mini {
-    width: 74px;
-    right: 4px;
-    bottom: 4px;
-    padding: 3px;
   }
 
   .client-master-actions {
