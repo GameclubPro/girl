@@ -452,6 +452,18 @@ export const ProProfileScreen = ({
     () => requestServiceCatalog[serviceCategoryId] ?? [],
     [serviceCategoryId]
   )
+  const selectedServicesCount = serviceItems.length
+  const selectedServicesLabel =
+    selectedServicesCount > 0
+      ? formatCount(selectedServicesCount, 'услуга', 'услуги', 'услуг')
+      : 'Нет услуг'
+  const selectedInCategoryCount = serviceCatalogOptions.filter((option) =>
+    selectedServiceKeys.has(normalizeServiceKey(option.title))
+  ).length
+  const categorySelectionLabel =
+    serviceCatalogOptions.length > 0
+      ? `${selectedInCategoryCount}/${serviceCatalogOptions.length}`
+      : '0'
   const openPortfolioLightbox = (index: number) => {
     if (!portfolioItems[index]) return
     setPortfolioError('')
@@ -2539,8 +2551,18 @@ export const ProProfileScreen = ({
 
               {editingSection === 'services' && (
                 <>
-                  <div className="pro-field">
-                    <span className="pro-label">Категория</span>
+                  <div className="pro-service-panel pro-service-panel--category">
+                    <div className="pro-service-panel-head">
+                      <div className="pro-service-panel-title">
+                        <span className="pro-label">Категория</span>
+                        <p className="pro-service-panel-subtitle">
+                          Выберите категорию и отметьте услуги
+                        </p>
+                      </div>
+                      <span className="pro-service-count-pill">
+                        {selectedServicesLabel}
+                      </span>
+                    </div>
                     <select
                       className="request-select-input"
                       value={serviceCategoryId}
@@ -2557,9 +2579,21 @@ export const ProProfileScreen = ({
                       ))}
                     </select>
                   </div>
-                  <div className="pro-field">
+
+                  <div className="pro-service-panel">
+                    <div className="pro-service-panel-head">
+                      <div className="pro-service-panel-title">
+                        <span className="pro-label">Услуги в категории</span>
+                        <p className="pro-service-panel-subtitle">
+                          Тапните, чтобы добавить или убрать
+                        </p>
+                      </div>
+                      <span className="pro-service-count-pill">
+                        {categorySelectionLabel}
+                      </span>
+                    </div>
                     <div
-                      className="request-service-grid"
+                      className="request-service-grid pro-service-catalog-grid"
                       role="list"
                       aria-label="Выберите услуги"
                     >
@@ -2593,97 +2627,134 @@ export const ProProfileScreen = ({
                       })}
                     </div>
                     {serviceCatalogOptions.length === 0 && (
-                      <p className="request-helper">
+                      <p className="pro-service-empty">
                         Пока нет услуг для этой категории.
                       </p>
                     )}
                   </div>
-                  <div className="pro-service-grid">
-                    {serviceItems.length > 0 ? (
-                      serviceItems.map((service, index) => {
-                        const metaLabel = formatServiceMeta(service)
-                        return (
-                          <div
-                            className="pro-service-card"
-                            key={`${service.name}-${index}`}
-                          >
-                            <div className="pro-service-card-head">
-                              <span className="pro-service-name">{service.name}</span>
-                              <button
-                                className="pro-service-remove"
-                                type="button"
-                                onClick={() => removeService(index)}
-                                aria-label={`Удалить ${service.name || 'услугу'}`}
-                              >
-                                ×
-                              </button>
-                            </div>
-                            <div className="pro-service-meta">
-                              <input
-                                className="pro-input pro-service-meta-input"
-                                type="number"
-                                value={service.price ?? ''}
-                                onChange={(event) =>
-                                  updateServiceItem(index, {
-                                    price: parseNumber(event.target.value),
-                                  })
-                                }
-                                placeholder="Цена"
-                                min="0"
-                              />
-                              <input
-                                className="pro-input pro-service-meta-input"
-                                type="number"
-                                value={service.duration ?? ''}
-                                onChange={(event) =>
-                                  updateServiceItem(index, {
-                                    duration: parseNumber(event.target.value),
-                                  })
-                                }
-                                placeholder="Мин"
-                                min="0"
-                              />
-                            </div>
-                            {metaLabel && (
-                              <div className="pro-service-meta-preview">
-                                {metaLabel}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div className="pro-service-empty">Пока нет услуг.</div>
-                    )}
-                  </div>
-                  <div className="pro-field pro-field--split">
-                    <div>
-                      <label className="pro-label" htmlFor="price-from">
-                        Цена от
-                      </label>
-                      <input
-                        id="price-from"
-                        className="pro-input"
-                        type="number"
-                        value={priceFrom}
-                        onChange={(event) => setPriceFrom(event.target.value)}
-                        placeholder="1500"
-                        min="0"
-                      />
+
+                  <div className="pro-service-panel">
+                    <div className="pro-service-panel-head">
+                      <div className="pro-service-panel-title">
+                        <span className="pro-label">Ваши услуги</span>
+                        <p className="pro-service-panel-subtitle">
+                          Добавьте цену и длительность
+                        </p>
+                      </div>
+                      <span className="pro-service-count-pill">
+                        {selectedServicesLabel}
+                      </span>
                     </div>
-                    <div>
-                      <label className="pro-label" htmlFor="price-to">
-                        Цена до
-                      </label>
-                      <input
-                        id="price-to"
-                        className="pro-input"
-                        type="number"
-                        value={priceTo}
-                        onChange={(event) => setPriceTo(event.target.value)}
-                        placeholder="3000"
-                        min="0"
-                      />
+                    <div className="pro-service-grid pro-service-grid--stacked">
+                      {serviceItems.length > 0 ? (
+                        serviceItems.map((service, index) => {
+                          const metaLabel = formatServiceMeta(service)
+                          return (
+                            <div
+                              className="pro-service-card"
+                              key={`${service.name}-${index}`}
+                            >
+                              <div className="pro-service-card-head">
+                                <span className="pro-service-name">
+                                  {service.name}
+                                </span>
+                                <button
+                                  className="pro-service-remove"
+                                  type="button"
+                                  onClick={() => removeService(index)}
+                                  aria-label={`Удалить ${service.name || 'услугу'}`}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                              <div className="pro-service-meta">
+                                <label className="pro-service-meta-field">
+                                  <span className="pro-service-meta-label">
+                                    Цена, ₽
+                                  </span>
+                                  <input
+                                    className="pro-input pro-service-meta-input"
+                                    type="number"
+                                    value={service.price ?? ''}
+                                    onChange={(event) =>
+                                      updateServiceItem(index, {
+                                        price: parseNumber(event.target.value),
+                                      })
+                                    }
+                                    placeholder="1500"
+                                    min="0"
+                                  />
+                                </label>
+                                <label className="pro-service-meta-field">
+                                  <span className="pro-service-meta-label">
+                                    Длительность, мин
+                                  </span>
+                                  <input
+                                    className="pro-input pro-service-meta-input"
+                                    type="number"
+                                    value={service.duration ?? ''}
+                                    onChange={(event) =>
+                                      updateServiceItem(index, {
+                                        duration: parseNumber(event.target.value),
+                                      })
+                                    }
+                                    placeholder="60"
+                                    min="0"
+                                  />
+                                </label>
+                              </div>
+                              {metaLabel && (
+                                <div className="pro-service-meta-preview">
+                                  {metaLabel}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="pro-service-empty">Пока нет услуг.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pro-service-panel">
+                    <div className="pro-service-panel-head">
+                      <div className="pro-service-panel-title">
+                        <span className="pro-label">Диапазон цен</span>
+                        <p className="pro-service-panel-subtitle">
+                          Показывается в профиле
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pro-field pro-field--split">
+                      <div>
+                        <label className="pro-label" htmlFor="price-from">
+                          Цена от
+                        </label>
+                        <input
+                          id="price-from"
+                          className="pro-input"
+                          type="number"
+                          value={priceFrom}
+                          onChange={(event) => setPriceFrom(event.target.value)}
+                          placeholder="1500"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="pro-label" htmlFor="price-to">
+                          Цена до
+                        </label>
+                        <input
+                          id="price-to"
+                          className="pro-input"
+                          type="number"
+                          value={priceTo}
+                          onChange={(event) => setPriceTo(event.target.value)}
+                          placeholder="3000"
+                          min="0"
+                        />
+                      </div>
                     </div>
                   </div>
                 </>
