@@ -622,6 +622,7 @@ app.get('/api/masters', async (req, res) => {
   const cityId = Number(req.query.cityId)
   const districtId = Number(req.query.districtId)
   const categoryId = normalizeText(req.query.categoryId ?? req.query.category)
+  const limitParam = Number(req.query.limit)
 
   const conditions = []
   const values = []
@@ -639,6 +640,15 @@ app.get('/api/masters', async (req, res) => {
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  let limitClause = 'LIMIT 50'
+  if (Number.isInteger(limitParam)) {
+    if (limitParam > 0) {
+      values.push(limitParam)
+      limitClause = `LIMIT $${values.length}`
+    } else {
+      limitClause = ''
+    }
+  }
 
   try {
     const result = await pool.query(
@@ -669,7 +679,7 @@ app.get('/api/masters', async (req, res) => {
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
         ${whereClause}
         ORDER BY mp.updated_at DESC
-        LIMIT 50
+        ${limitClause}
       `,
       values
     )

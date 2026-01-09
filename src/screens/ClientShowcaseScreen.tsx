@@ -198,7 +198,7 @@ export const ClientShowcaseGalleryScreen = ({
       setIsLoading(true)
       setLoadError('')
       try {
-        const response = await fetch(`${apiBase}/api/masters`)
+        const response = await fetch(`${apiBase}/api/masters?limit=0`)
         if (!response.ok) {
           throw new Error('Load showcase failed')
         }
