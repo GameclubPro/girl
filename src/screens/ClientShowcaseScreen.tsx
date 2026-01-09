@@ -119,7 +119,6 @@ type MasterCard = {
   services: ServiceItem[]
   serviceNames: string[]
   avatarUrl: string | null
-  heroItem: PreviewMedia | null
   thumbItems: PreviewMedia[]
   priceFrom: number | null
   priceTo: number | null
@@ -129,9 +128,6 @@ type MasterCard = {
   worksAtClient: boolean
   worksAtMaster: boolean
   isActive: boolean
-  scheduleDays: string[]
-  scheduleStart: string | null
-  scheduleEnd: string | null
   cityName: string | null
   districtName: string | null
   locationLabel: string
@@ -207,11 +203,6 @@ const formatUpdatedLabel = (value: string | null) => {
   })}`
 }
 
-const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
-
-const getDayKey = (offset: number) =>
-  dayKeyOrder[(new Date().getDay() + offset) % dayKeyOrder.length] ?? 'mon'
-
 const formatRecencyChip = (updatedAtTs: number) => {
   if (!updatedAtTs) return 'Недавно'
   const diffDays = Math.floor(
@@ -231,29 +222,6 @@ const buildDistanceLabel = (seed: number, hasLocation: boolean) => {
 
 const buildResponseLabel = (seed: number) =>
   `Ответ ${20 + (seed % 41)} мин`
-
-const buildSlotLabels = (
-  days: string[],
-  start: string | null,
-  end: string | null
-) => {
-  const todayKey = getDayKey(0)
-  const tomorrowKey = getDayKey(1)
-  const afterTomorrowKey = getDayKey(2)
-  let dayLabel = 'Окно'
-  if (days.includes(todayKey)) {
-    dayLabel = 'Сегодня'
-  } else if (days.includes(tomorrowKey)) {
-    dayLabel = 'Завтра'
-  } else if (days.includes(afterTomorrowKey)) {
-    dayLabel = 'Послезавтра'
-  } else if (days.length > 0) {
-    dayLabel = 'Ближайшее'
-  }
-
-  const timeLabel = start?.trim() || end?.trim() || 'По записи'
-  return { dayLabel, timeLabel }
-}
 
 export const ClientShowcaseGalleryScreen = ({
   apiBase,
@@ -488,12 +456,10 @@ export const ClientShowcaseScreen = ({
         .map((item) => ({
           url: item.url,
           focus: `${(item.focusX ?? 0.5) * 100}% ${(item.focusY ?? 0.5) * 100}%`,
-        }))
+      }))
 
       const avatarUrl = profile.avatarUrl ?? null
-      const heroItem =
-        portfolioItems.length > 0 ? portfolioItems[portfolioItems.length - 1] : null
-      const thumbItems = portfolioItems.slice(-4, -1)
+      const thumbItems = portfolioItems.slice(-3)
       const portfolioCount = portfolioItems.length
 
       const services = parseServiceItems(profile.services ?? [])
@@ -503,9 +469,6 @@ export const ClientShowcaseScreen = ({
       const priceFrom = profile.priceFrom ?? null
       const priceTo = profile.priceTo ?? null
       const isActive = Boolean(profile.isActive ?? true)
-      const scheduleDays = Array.isArray(profile.scheduleDays) ? profile.scheduleDays : []
-      const scheduleStart = profile.scheduleStart ?? null
-      const scheduleEnd = profile.scheduleEnd ?? null
       const reviewsCount =
         typeof profile.reviewsCount === 'number' ? profile.reviewsCount : 0
       const reviewsAverage =
@@ -536,7 +499,6 @@ export const ClientShowcaseScreen = ({
         services,
         serviceNames,
         avatarUrl,
-        heroItem,
         thumbItems,
         priceFrom,
         priceTo,
@@ -546,9 +508,6 @@ export const ClientShowcaseScreen = ({
         worksAtClient: Boolean(profile.worksAtClient),
         worksAtMaster: Boolean(profile.worksAtMaster),
         isActive,
-        scheduleDays,
-        scheduleStart,
-        scheduleEnd,
         cityName: profile.cityName ?? null,
         districtName: profile.districtName ?? null,
         locationLabel,
@@ -784,20 +743,19 @@ export const ClientShowcaseScreen = ({
                   '--card-accent-ink': palette.ink,
                 } as CSSProperties
                 const experienceLabel = formatExperience(master.experienceYears)
-                const priceLabel = formatPriceRange(master.priceFrom, master.priceTo)
                 const priceTag =
                   master.priceFrom !== null || master.priceTo !== null
-                    ? priceLabel
-                    : 'По запросу'
+                    ? formatPriceRange(master.priceFrom, master.priceTo)
+                    : null
+                const metaItems = [
+                  master.primaryCategory,
+                  experienceLabel,
+                  priceTag,
+                ].filter((item): item is string => Boolean(item))
                 const ratingLabel =
                   master.reviewsAverage !== null
                     ? `${master.reviewsAverage.toFixed(1)} ★`
                     : 'Новый'
-                const slotLabels = buildSlotLabels(
-                  master.scheduleDays,
-                  master.scheduleStart,
-                  master.scheduleEnd
-                )
                 const seed = toSeed(master.id)
                 const distanceLabel = buildDistanceLabel(
                   seed,
@@ -815,12 +773,10 @@ export const ClientShowcaseScreen = ({
                   item: master.thumbItems[index] ?? null,
                   index,
                 }))
-                const heroItem = master.heroItem
                 const slotFill = 4 + (seed % 5)
                 const slotIndicators = Array.from({ length: 10 }, (_, index) =>
                   index < slotFill
                 )
-                const reviewsLabel = master.reviewsCount > 0 ? `${master.reviewsCount}` : '—'
 
                 return (
                   <article
@@ -829,32 +785,6 @@ export const ClientShowcaseScreen = ({
                     role="listitem"
                     style={cardStyle}
                   >
-                    <div className="client-master-card-top">
-                      <button
-                        className="client-master-back"
-                        type="button"
-                        onClick={onBack}
-                      >
-                        ← Назад
-                      </button>
-                      <div className="client-master-head-actions">
-                        <button
-                          className="client-master-head-button"
-                          type="button"
-                          aria-label="Свернуть"
-                        >
-                          ˅
-                        </button>
-                        <button
-                          className="client-master-head-button"
-                          type="button"
-                          aria-label="Еще"
-                        >
-                          ⋮
-                        </button>
-                      </div>
-                    </div>
-
                     <div className="client-master-overview">
                       <div className="client-master-avatar-block">
                         <span className="client-master-avatar" aria-hidden="true">
@@ -878,7 +808,7 @@ export const ClientShowcaseScreen = ({
                           </span>
                         </div>
                         <p className="client-master-meta">
-                          {master.primaryCategory} · {experienceLabel}
+                          {metaItems.join(' · ')}
                         </p>
                         <div className="client-master-chip-row">
                           {chipItems.map((chip, index) => (
@@ -887,46 +817,6 @@ export const ClientShowcaseScreen = ({
                             </span>
                           ))}
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="client-master-hero">
-                      {heroItem ? (
-                        <img
-                          src={heroItem.url}
-                          alt=""
-                          loading="lazy"
-                          style={{ objectPosition: heroItem.focus }}
-                        />
-                      ) : (
-                        <span className="client-master-hero-fallback">
-                          {master.initials}
-                        </span>
-                      )}
-                      {isFeatured && (
-                        <span className="client-master-hero-badge">
-                          Топ по отзывам
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="client-master-stats">
-                      <div className="client-master-stat">
-                        <span className="client-master-stat-value">{priceTag}</span>
-                        <span className="client-master-stat-label">Цена</span>
-                      </div>
-                      <div className="client-master-stat">
-                        <span className="client-master-stat-value">
-                          {slotLabels.dayLabel}
-                        </span>
-                        <span className="client-master-stat-subvalue">
-                          {slotLabels.timeLabel}
-                        </span>
-                        <span className="client-master-stat-label">Окно</span>
-                      </div>
-                      <div className="client-master-stat">
-                        <span className="client-master-stat-value">{reviewsLabel}</span>
-                        <span className="client-master-stat-label">Отзывы</span>
                       </div>
                     </div>
 
