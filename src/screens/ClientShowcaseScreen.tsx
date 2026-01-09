@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { IconFilter, IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile } from '../types/app'
@@ -698,6 +698,10 @@ export const ClientShowcaseScreen = ({
                 const cardClassName = `client-master-card${
                   isFeatured ? ' is-featured' : ''
                 }`
+                const accentHue = toSeed(master.id) % 360
+                const cardStyle = isFeatured
+                  ? ({ '--accent-hue': `${accentHue}` } as CSSProperties)
+                  : undefined
                 const experienceLabel = formatExperience(master.experienceYears)
                 const priceLabel = formatPriceRange(master.priceFrom, master.priceTo)
                 const ratingLabel =
@@ -716,7 +720,12 @@ export const ClientShowcaseScreen = ({
                 const showAbout = isFeatured && Boolean(aboutPreview)
 
                 return (
-                  <article className={cardClassName} key={master.id} role="listitem">
+                  <article
+                    className={cardClassName}
+                    key={master.id}
+                    role="listitem"
+                    style={cardStyle}
+                  >
                     <div className="client-master-top">
                       <div className="client-master-info">
                         <span className="client-master-avatar" aria-hidden="true">
