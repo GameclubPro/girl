@@ -684,6 +684,7 @@ app.get('/api/masters', async (req, res) => {
           mp.avatar_path AS "avatarPath",
           mp.cover_path AS "coverPath",
           mp.is_active AS "isActive",
+          mp.schedule_days AS "scheduleDays",
           mp.works_at_client AS "worksAtClient",
           mp.works_at_master AS "worksAtMaster",
           mp.categories,
