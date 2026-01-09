@@ -22,7 +22,9 @@
 .screen--client {
   background: radial-gradient(120% 140% at 50% -10%, #ffffff 0%, #f4eef8 50%, #efe7f4 100%);
   --client-pad-x: 18px;
-  padding: calc(10px + var(--safe-top) + var(--tg-top-offset)) var(--client-pad-x)
+  --client-top-offset: 6px;
+  padding: calc(10px + var(--safe-top) + var(--tg-top-offset) + var(--client-top-offset))
+    var(--client-pad-x)
     calc(120px + env(safe-area-inset-bottom));
 }
 
