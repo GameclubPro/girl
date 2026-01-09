@@ -3,7 +3,14 @@ import type { ChangeEvent, CSSProperties, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
-import type { City, District, MasterProfile, ProProfileSection } from '../types/app'
+import type {
+  City,
+  District,
+  MasterProfile,
+  MasterReview,
+  MasterReviewSummary,
+  ProProfileSection,
+} from '../types/app'
 import {
   formatServiceMeta,
   isImageUrl,
@@ -39,6 +46,46 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
     return `${value} ${few}`
   }
   return `${value} ${many}`
+}
+
+const formatReviewCount = (value: number) =>
+  formatCount(value, 'отзыв', 'отзыва', 'отзывов')
+
+const buildReviewStars = (value: number) => {
+  const clamped = Math.max(0, Math.min(5, Math.round(value)))
+  return Array.from({ length: 5 }, (_, index) => (index < clamped ? '★' : '☆')).join(
+    ''
+  )
+}
+
+const formatReviewDate = (value: string) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const buildReviewerName = (review: MasterReview) => {
+  const name = [review.reviewerFirstName, review.reviewerLastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+  if (name) return name
+  if (review.reviewerUsername) return `@${review.reviewerUsername}`
+  return 'Клиент'
+}
+
+const getNameInitials = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return 'К'
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  const letters = parts.slice(0, 2).map((part) => part[0] ?? '')
+  const joined = letters.join('').toUpperCase()
+  if (joined) return joined
+  return normalized.slice(0, 2).toUpperCase()
 }
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
@@ -136,6 +183,11 @@ export const ProProfileScreen = ({
   const [saveSuccess, setSaveSuccess] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
+  const [reviews, setReviews] = useState<MasterReview[]>([])
+  const [reviewSummary, setReviewSummary] =
+    useState<MasterReviewSummary | null>(null)
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false)
+  const [reviewsError, setReviewsError] = useState('')
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
   const [isCoverUploading, setIsCoverUploading] = useState(false)
   const [mediaError, setMediaError] = useState('')
@@ -293,6 +345,11 @@ export const ProProfileScreen = ({
   const showcaseCount = Math.min(showcaseCountRaw, MAX_SHOWCASE_ITEMS)
   const showcaseCountLabel =
     showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
+  const reviewCount = reviewSummary?.count ?? 0
+  const reviewAverage = reviewSummary?.average ?? 0
+  const reviewDistribution = reviewSummary?.distribution ?? []
+  const reviewCountLabel =
+    reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
   const scheduleSummary =
     scheduleDays.length > 0
       ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
@@ -767,6 +824,50 @@ export const ProProfileScreen = ({
       cancelled = true
     }
   }, [apiBase, displayNameFallback, userId])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const loadReviews = async () => {
+      setIsReviewsLoading(true)
+      setReviewsError('')
+      setReviews([])
+      setReviewSummary(null)
+      try {
+        const response = await fetch(
+          `${apiBase}/api/masters/${userId}/reviews?limit=6`
+        )
+        if (!response.ok) {
+          throw new Error('Load reviews failed')
+        }
+        const data = (await response.json()) as {
+          summary?: MasterReviewSummary | null
+          reviews?: MasterReview[]
+        }
+        if (!cancelled) {
+          setReviewSummary(data.summary ?? null)
+          setReviews(Array.isArray(data.reviews) ? data.reviews : [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setReviewSummary(null)
+          setReviews([])
+          setReviewsError('Не удалось загрузить отзывы.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsReviewsLoading(false)
+        }
+      }
+    }
+
+    void loadReviews()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
 
   const saveProfile = async (payload: ProfilePayload) => {
     if (!payload.userId) return false
@@ -1527,6 +1628,13 @@ export const ProProfileScreen = ({
                     Теги появятся здесь
                   </span>
                 )}
+                {reviewCount > 0 ? (
+                  <span className="pro-profile-tag is-review">
+                    ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                  </span>
+                ) : (
+                  <span className="pro-profile-tag is-muted">Нет отзывов</span>
+                )}
               </div>
               <p
                 className={`pro-profile-social-about${
@@ -1805,6 +1913,119 @@ export const ProProfileScreen = ({
               ›
             </span>
           </button>
+        </section>
+
+        <section className="pro-profile-reviews animate delay-3">
+          <div className="pro-profile-reviews-head">
+            <div>
+              <p className="pro-profile-reviews-kicker">Отзывы</p>
+              <h2 className="pro-profile-reviews-title">Отзывы клиентов</h2>
+            </div>
+            <span className="pro-profile-reviews-count-pill">
+              {reviewCountLabel}
+            </span>
+          </div>
+
+          {isReviewsLoading ? (
+            <div className="pro-profile-reviews-skeleton" aria-hidden="true">
+              <div className="pro-profile-reviews-skeleton-line is-wide" />
+              <div className="pro-profile-reviews-skeleton-line" />
+              <div className="pro-profile-reviews-skeleton-line is-short" />
+            </div>
+          ) : reviewsError ? (
+            <p className="pro-error">{reviewsError}</p>
+          ) : reviewCount > 0 ? (
+            <>
+              <div className="pro-profile-reviews-summary">
+                <div className="pro-profile-reviews-score">
+                  <span className="pro-profile-reviews-average">
+                    {reviewAverage.toFixed(1)}
+                  </span>
+                  <span className="pro-profile-reviews-stars">
+                    {buildReviewStars(reviewAverage)}
+                  </span>
+                  <span className="pro-profile-reviews-count">
+                    {reviewCountLabel}
+                  </span>
+                </div>
+                <div className="pro-profile-reviews-bars">
+                  {reviewDistribution.map((entry) => {
+                    const percent =
+                      reviewCount > 0 ? (entry.count / reviewCount) * 100 : 0
+                    return (
+                      <div
+                        className="pro-profile-reviews-bar"
+                        key={`review-bar-${entry.rating}`}
+                      >
+                        <span className="pro-profile-reviews-bar-label">
+                          {entry.rating}
+                        </span>
+                        <span className="pro-profile-reviews-bar-track">
+                          <span
+                            className="pro-profile-reviews-bar-fill"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </span>
+                        <span className="pro-profile-reviews-bar-count">
+                          {entry.count}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="pro-profile-reviews-list">
+                {reviews.map((review) => {
+                  const reviewerName = buildReviewerName(review)
+                  const reviewerInitials = getNameInitials(reviewerName)
+                  const dateLabel = formatReviewDate(review.createdAt)
+                  const comment =
+                    review.comment?.trim() || 'Без комментария.'
+
+                  return (
+                    <article
+                      className="pro-profile-review-card"
+                      key={review.id}
+                    >
+                      <span
+                        className="pro-profile-review-avatar"
+                        aria-hidden="true"
+                      >
+                        {reviewerInitials}
+                      </span>
+                      <div className="pro-profile-review-body">
+                        <div className="pro-profile-review-head">
+                          <span className="pro-profile-review-name">
+                            {reviewerName}
+                          </span>
+                          <span className="pro-profile-review-rating">
+                            {buildReviewStars(review.rating)}
+                          </span>
+                        </div>
+                        {(review.serviceName || dateLabel) && (
+                          <div className="pro-profile-review-meta">
+                            {review.serviceName && (
+                              <span className="pro-profile-review-service">
+                                {review.serviceName}
+                              </span>
+                            )}
+                            {dateLabel && (
+                              <span className="pro-profile-review-date">
+                                {dateLabel}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <p className="pro-profile-review-text">{comment}</p>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <p className="pro-profile-reviews-empty">Пока нет отзывов.</p>
+          )}
         </section>
 
         <div className="pro-profile-footer">

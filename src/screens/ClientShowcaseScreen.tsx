@@ -67,11 +67,18 @@ const galleryShapePattern = [
 const pickGalleryShape = (seed: number) =>
   galleryShapePattern[seed % galleryShapePattern.length]
 
-type SortMode = 'recent' | 'active' | 'experience' | 'price' | 'portfolio'
+type SortMode =
+  | 'recent'
+  | 'active'
+  | 'experience'
+  | 'price'
+  | 'portfolio'
+  | 'rating'
 
 const sortOptions: { id: SortMode; label: string }[] = [
   { id: 'recent', label: 'Актуальные' },
   { id: 'active', label: 'Запись открыта' },
+  { id: 'rating', label: 'Отзывы' },
   { id: 'experience', label: 'Опыт' },
   { id: 'price', label: 'Бюджет' },
   { id: 'portfolio', label: 'Работы' },
@@ -542,6 +549,12 @@ export const ClientShowcaseScreen = ({
             return a.isActive ? -1 : 1
           }
           return b.updatedAtTs - a.updatedAtTs
+        case 'rating': {
+          const ratingDiff =
+            (b.reviewsAverage ?? 0) - (a.reviewsAverage ?? 0)
+          if (ratingDiff !== 0) return ratingDiff
+          return b.reviewsCount - a.reviewsCount
+        }
         case 'price':
           return (a.priceFrom ?? Number.POSITIVE_INFINITY) -
             (b.priceFrom ?? Number.POSITIVE_INFINITY)
@@ -701,7 +714,7 @@ export const ClientShowcaseScreen = ({
                 const ratingLabel =
                   master.reviewsAverage !== null
                     ? `${master.reviewsAverage.toFixed(1)} ★`
-                    : experienceLabel
+                    : 'Новый'
                 const servicesCount =
                   master.services.length > 0 ? `${master.services.length}` : '—'
                 const portfolioCount =
