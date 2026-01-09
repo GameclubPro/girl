@@ -114,8 +114,7 @@ type MasterCard = {
   services: ServiceItem[]
   serviceNames: string[]
   avatarUrl: string | null
-  heroUrl: string | null
-  heroFocus: string
+  portfolioPreview: { url: string; focus: string }[]
   priceFrom: number | null
   priceTo: number | null
   experienceYears: number | null
@@ -132,29 +131,16 @@ type MasterCard = {
   updatedAtTs: number
   portfolioCount: number
   updateLabel: string
-  gallery: { url: string; focus: string }[]
   initials: string
 }
 
 const toSeed = (value: string) =>
   value.split('').reduce((total, char) => total + char.charCodeAt(0), 0)
 
-const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
-
 const getCategoryLabel = (categoryId: string) =>
   categoryLabelOverrides[categoryId] ??
   categoryItems.find((item) => item.id === categoryId)?.label ??
   categoryId
-
-const formatPriceRange = (from: number | null, to: number | null) => {
-  if (typeof from === 'number' && typeof to === 'number') {
-    if (from === to) return formatPrice(from)
-    return `${formatPrice(from)} - ${formatPrice(to)}`
-  }
-  if (typeof from === 'number') return `от ${formatPrice(from)}`
-  if (typeof to === 'number') return `до ${formatPrice(to)}`
-  return 'Цена не указана'
-}
 
 const formatExperience = (value: number | null) => {
   if (typeof value !== 'number' || value <= 0) {
@@ -435,12 +421,8 @@ export const ClientShowcaseScreen = ({
           focus: `${(item.focusX ?? 0.5) * 100}% ${(item.focusY ?? 0.5) * 100}%`,
         }))
 
-      const heroItem = profile.coverUrl ? null : portfolioItems[0]
-      const heroUrl = profile.coverUrl ?? heroItem?.url ?? profile.avatarUrl ?? null
-      const heroFocus = heroItem?.focus ?? '50% 50%'
-
       const avatarUrl = profile.avatarUrl ?? null
-      const gallery = heroItem ? portfolioItems.slice(1, 3) : portfolioItems.slice(0, 2)
+      const portfolioPreview = portfolioItems.slice(-3).reverse()
       const portfolioCount = portfolioItems.length
 
       const services = parseServiceItems(profile.services ?? [])
@@ -480,8 +462,7 @@ export const ClientShowcaseScreen = ({
         services,
         serviceNames,
         avatarUrl,
-        heroUrl,
-        heroFocus,
+        portfolioPreview,
         priceFrom,
         priceTo,
         experienceYears,
@@ -498,7 +479,6 @@ export const ClientShowcaseScreen = ({
         updatedAtTs,
         portfolioCount,
         updateLabel,
-        gallery,
         initials: getInitials(profile.displayName || 'Мастер'),
       }
     })
@@ -726,18 +706,15 @@ export const ClientShowcaseScreen = ({
                   '--card-accent-ink': palette.ink,
                 } as CSSProperties
                 const experienceLabel = formatExperience(master.experienceYears)
-                const priceLabel = formatPriceRange(master.priceFrom, master.priceTo)
                 const ratingLabel =
                   master.reviewsAverage !== null
                     ? `${master.reviewsAverage.toFixed(1)} ★`
                     : 'Новый'
-                const hasPrice =
-                  master.priceFrom !== null || master.priceTo !== null
-                const priceTag = hasPrice ? priceLabel : 'По запросу'
-                const servicesCount =
-                  master.services.length > 0 ? `${master.services.length}` : '—'
-                const portfolioCount =
-                  master.portfolioCount > 0 ? `${master.portfolioCount}` : '—'
+                const previewItems = master.portfolioPreview
+                const mediaItems = Array.from({ length: 3 }, (_, index) => ({
+                  item: previewItems[index] ?? null,
+                  index,
+                }))
 
                 return (
                   <article
@@ -790,44 +767,35 @@ export const ClientShowcaseScreen = ({
                               <span className="client-master-tag">У мастера</span>
                             )}
                           </div>
-                          <div className="client-master-metrics" aria-label="Сводка">
-                            <div className="client-master-metric is-price">
-                              <span className="client-master-metric-label">Цена</span>
-                              <span className="client-master-metric-value">{priceTag}</span>
-                            </div>
-                            <div className="client-master-metric">
-                              <span className="client-master-metric-value">
-                                {servicesCount}
-                              </span>
-                              <span className="client-master-metric-label">Услуг</span>
-                            </div>
-                            <div className="client-master-metric">
-                              <span className="client-master-metric-value">
-                                {portfolioCount}
-                              </span>
-                              <span className="client-master-metric-label">Работ</span>
-                            </div>
-                          </div>
                         </div>
                       </div>
                       <div className="client-master-media">
-                        <div
-                          className={`client-master-hero${
-                            master.heroUrl ? '' : ' is-empty'
-                          }`}
-                        >
-                          {master.heroUrl ? (
-                            <img
-                              src={master.heroUrl}
-                              alt=""
-                              loading="lazy"
-                              style={{ objectPosition: master.heroFocus }}
-                            />
-                          ) : (
-                            <span className="client-master-hero-placeholder">
-                              {master.initials}
-                            </span>
-                          )}
+                        <div className="client-master-gallery" role="list">
+                          {mediaItems.map(({ item, index }) => {
+                            const tileClassName = `client-master-gallery-item${
+                              index === 0 ? ' is-main' : ''
+                            }${item ? '' : ' is-empty'}`
+                            return (
+                              <span
+                                className={tileClassName}
+                                key={item?.url ?? `fallback-${index}`}
+                                role="listitem"
+                              >
+                                {item ? (
+                                  <img
+                                    src={item.url}
+                                    alt=""
+                                    loading="lazy"
+                                    style={{ objectPosition: item.focus }}
+                                  />
+                                ) : (
+                                  <span className="client-master-gallery-fallback">
+                                    {master.initials}
+                                  </span>
+                                )}
+                              </span>
+                            )
+                          })}
                           <span className="client-master-signal">
                             {master.updateLabel}
                           </span>
