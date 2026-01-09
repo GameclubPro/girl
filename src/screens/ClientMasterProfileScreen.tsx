@@ -3,11 +3,11 @@ import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, MasterReview, MasterReviewSummary } from '../types/app'
 import {
-  formatServiceMeta,
   isImageUrl,
   parsePortfolioItems,
   parseServiceItems,
 } from '../utils/profileContent'
+import type { PortfolioItem } from '../utils/profileContent'
 
 type ClientMasterProfileScreenProps = {
   apiBase: string
@@ -32,7 +32,8 @@ const scheduleLabels: Record<string, string> = {
 const getCategoryLabel = (categoryId: string) =>
   categoryItems.find((item) => item.id === categoryId)?.label ?? categoryId
 
-const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
+const formatPrice = (value: number) =>
+  `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
 const formatPriceRange = (from: number | null, to: number | null) => {
   if (typeof from === 'number' && typeof to === 'number') {
@@ -57,18 +58,34 @@ const formatExperience = (value: number | null) => {
   return `${value} лет`
 }
 
+const formatCount = (value: number, one: string, few: string, many: string) => {
+  const mod10 = value % 10
+  const mod100 = value % 100
+  if (mod10 === 1 && mod100 !== 11) return `${value} ${one}`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} ${few}`
+  }
+  return `${value} ${many}`
+}
+
+const formatReviewCount = (value: number) =>
+  formatCount(value, 'отзыв', 'отзыва', 'отзывов')
+
+const formatServiceCount = (value: number) =>
+  formatCount(value, 'услуга', 'услуги', 'услуг')
+
 const buildLocationLabel = (profile: MasterProfile | null) => {
   if (!profile) return 'Локация не указана'
   const parts = [profile.cityName, profile.districtName].filter(Boolean)
   return parts.length > 0 ? parts.join(', ') : 'Локация не указана'
 }
 
-const buildWorkFormat = (profile: MasterProfile | null) => {
-  if (!profile) return []
-  const formats: string[] = []
-  if (profile.worksAtClient) formats.push('Выезд')
-  if (profile.worksAtMaster) formats.push('У мастера')
-  return formats
+const buildWorkFormatLabel = (profile: MasterProfile | null) => {
+  if (!profile) return 'Формат не указан'
+  if (profile.worksAtClient && profile.worksAtMaster) return 'У мастера и выезд'
+  if (profile.worksAtClient) return 'Выезд к клиенту'
+  if (profile.worksAtMaster) return 'У мастера'
+  return 'Формат не указан'
 }
 
 const buildScheduleRange = (start?: string | null, end?: string | null) => {
@@ -79,6 +96,11 @@ const buildScheduleRange = (start?: string | null, end?: string | null) => {
   if (normalizedEnd) return `до ${normalizedEnd}`
   return 'Время не указано'
 }
+
+const buildScheduleLabel = (days: string[]) =>
+  days.length > 0
+    ? days.map((day) => scheduleLabels[day] ?? day).join(', ')
+    : 'График не указан'
 
 const getInitials = (value: string) => {
   const normalized = value.trim()
@@ -100,16 +122,6 @@ const formatReviewDate = (value: string) => {
   })
 }
 
-const formatReviewCount = (value: number) => {
-  const mod10 = value % 10
-  const mod100 = value % 100
-  if (mod10 === 1 && mod100 !== 11) return `${value} отзыв`
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${value} отзыва`
-  }
-  return `${value} отзывов`
-}
-
 const buildReviewerName = (review: MasterReview) => {
   const name = [review.reviewerFirstName, review.reviewerLastName]
     .filter(Boolean)
@@ -126,6 +138,22 @@ const buildStars = (value: number) => {
     ''
   )
 }
+
+const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
+
+const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
+  const rawX = typeof item?.focusX === 'number' ? item.focusX : 0.5
+  const rawY = typeof item?.focusY === 'number' ? item.focusY : 0.5
+  const x = clampUnit(rawX)
+  const y = clampUnit(rawY)
+  return {
+    x,
+    y,
+    position: `${x * 100}% ${y * 100}%`,
+  }
+}
+
+const PORTFOLIO_PREVIEW_LIMIT = 4
 
 export const ClientMasterProfileScreen = ({
   apiBase,
@@ -144,6 +172,10 @@ export const ClientMasterProfileScreen = ({
     useState<MasterReviewSummary | null>(null)
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
+  const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
+  const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
+    number | null
+  >(null)
 
   useEffect(() => {
     if (!masterId) return
@@ -225,29 +257,25 @@ export const ClientMasterProfileScreen = ({
     }
   }, [apiBase, masterId])
 
+  useEffect(() => {
+    setIsPortfolioExpanded(false)
+    setPortfolioLightboxIndex(null)
+  }, [masterId])
+
   const serviceItems = useMemo(
     () => parseServiceItems(profile?.services ?? []),
     [profile]
   )
 
   const portfolioItems = useMemo(
-    () =>
-      parsePortfolioItems(profile?.portfolioUrls ?? []).filter((item) =>
-        isImageUrl(item.url)
-      ),
+    () => parsePortfolioItems(profile?.portfolioUrls ?? []),
     [profile]
   )
 
-  const coverItem = useMemo(() => {
-    if (!profile || profile.coverUrl) return null
-    return portfolioItems[0] ?? null
-  }, [portfolioItems, profile])
-
-  const coverUrl = profile?.coverUrl ?? coverItem?.url ?? null
-  const coverFocus = coverItem
-    ? `${(coverItem.focusX ?? 0.5) * 100}% ${(coverItem.focusY ?? 0.5) * 100}%`
-    : '50% 50%'
-  const galleryItems = coverItem ? portfolioItems.slice(1) : portfolioItems
+  const showcaseItems = useMemo(
+    () => parsePortfolioItems(profile?.showcaseUrls ?? []),
+    [profile]
+  )
 
   const categoryLabels = useMemo(() => {
     const categories = Array.isArray(profile?.categories) ? profile?.categories : []
@@ -255,261 +283,409 @@ export const ClientMasterProfileScreen = ({
     return categories.map((categoryId) => getCategoryLabel(categoryId))
   }, [profile])
 
+  const displayName = profile?.displayName?.trim() || 'Мастер'
+  const initials = getInitials(displayName)
+  const aboutValue = profile?.about?.trim() || ''
+  const aboutText = aboutValue || 'Описание пока не добавлено.'
+  const primaryCategory = categoryLabels[0]
+  const reviewCount = reviewSummary?.count ?? 0
+  const reviewAverage = reviewSummary?.average ?? 0
+  const reviewDistribution = reviewSummary?.distribution ?? []
+  const reviewCountLabel = reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
   const priceLabel = formatPriceRange(
     profile?.priceFrom ?? null,
     profile?.priceTo ?? null
   )
   const experienceLabel = formatExperience(profile?.experienceYears ?? null)
   const locationLabel = buildLocationLabel(profile)
-  const formats = buildWorkFormat(profile)
+  const workFormatLabel = buildWorkFormatLabel(profile)
   const scheduleDays = Array.isArray(profile?.scheduleDays) ? profile?.scheduleDays : []
+  const scheduleLabel = buildScheduleLabel(scheduleDays)
   const scheduleRange = buildScheduleRange(
     profile?.scheduleStart,
     profile?.scheduleEnd
   )
-  const scheduleLabel =
-    scheduleDays.length > 0
-      ? scheduleDays
-          .map((day) => scheduleLabels[day] ?? day)
-          .join(', ')
-      : 'График не указан'
-
+  const scheduleMeta =
+    scheduleDays.length > 0 && scheduleRange !== 'Время не указано'
+      ? `${scheduleLabel} · ${scheduleRange}`
+      : scheduleDays.length > 0
+        ? scheduleLabel
+        : scheduleRange
+  const servicesSummary =
+    serviceItems.length > 0
+      ? formatServiceCount(serviceItems.length)
+      : 'Нет услуг'
+  const showcaseCount = showcaseItems.filter((item) => item.url.trim()).length
+  const showcaseCountLabel = showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
+  const showcasePreview = useMemo(
+    () => showcaseItems.filter((item) => item.url.trim()).slice(0, 3),
+    [showcaseItems]
+  )
+  const serviceNames = useMemo(
+    () => serviceItems.map((item) => item.name.trim()).filter(Boolean),
+    [serviceItems]
+  )
+  const previewTagSource = serviceNames.length > 0 ? serviceNames : categoryLabels
+  const previewTags = previewTagSource.slice(0, 3)
+  const previewTagRemainder = previewTagSource.length - previewTags.length
   const isActive = Boolean(profile?.isActive ?? true)
-  const displayName = profile?.displayName?.trim() || 'Мастер'
-  const initials = getInitials(displayName)
-  const aboutText = profile?.about?.trim() || 'Описание пока не заполнено.'
-  const primaryCategory = categoryLabels[0]
-  const extraCategories = categoryLabels.slice(1)
-  const reviewCount = reviewSummary?.count ?? 0
-  const reviewAverage = reviewSummary?.average ?? 0
-  const reviewDistribution = reviewSummary?.distribution ?? []
-  const reviewCountLabel = reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
+  const activeTone = isActive ? 'is-active' : 'is-paused'
+
+  const portfolioGridItems = useMemo(
+    () =>
+      portfolioItems
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item.url.trim()),
+    [portfolioItems]
+  )
+  const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_PREVIEW_LIMIT
+  const isPortfolioCollapsed = !isPortfolioExpanded && hasPortfolioOverflow
+  const visiblePortfolioItems = isPortfolioCollapsed
+    ? portfolioGridItems.slice(0, PORTFOLIO_PREVIEW_LIMIT)
+    : portfolioGridItems
+  const portfolioCountLabel =
+    portfolioGridItems.length > 0 ? `${portfolioGridItems.length} фото` : 'Нет фото'
+
+  const portfolioLightboxItem =
+    portfolioLightboxIndex !== null ? portfolioItems[portfolioLightboxIndex] ?? null : null
+  const portfolioLightboxFocus = resolvePortfolioFocus(portfolioLightboxItem)
+  const isLightboxImage = portfolioLightboxItem
+    ? isImageUrl(portfolioLightboxItem.url)
+    : false
+
+  const coverUrl = profile?.coverUrl ?? null
+  const coverFocus = '50% 50%'
 
   return (
     <div className="screen screen--client screen--client-master-profile">
-      <div className="client-shell">
-        <header className="client-showcase-header">
+      <div className="pro-shell">
+        <header className="master-profile-header">
           <button
-            className="client-showcase-back"
+            className="pro-back"
             type="button"
             onClick={onBack}
             aria-label="Назад"
           >
             ←
           </button>
-          <div className="client-showcase-headings">
-            <p className="client-showcase-page-kicker">Мастер</p>
-            <h1 className="client-showcase-page-title">{displayName}</h1>
-            <p className="client-showcase-page-subtitle">{primaryCategory}</p>
+          <div className="master-profile-context">
+            <span className="master-profile-context-kicker">Профиль мастера</span>
+            <span className="master-profile-context-title">{primaryCategory}</span>
           </div>
         </header>
 
-        {loadError && <p className="client-master-profile-error">{loadError}</p>}
+        {loadError && <p className="pro-error">{loadError}</p>}
         {isLoading ? (
-          <div className="client-master-profile-skeleton" aria-hidden="true">
-            <div className="client-master-profile-skeleton-cover" />
-            <div className="client-master-profile-skeleton-line is-wide" />
-            <div className="client-master-profile-skeleton-line" />
-            <div className="client-master-profile-skeleton-line is-short" />
+          <div className="master-profile-skeleton" aria-hidden="true">
+            <div className="master-profile-skeleton-cover" />
+            <div className="master-profile-skeleton-line is-wide" />
+            <div className="master-profile-skeleton-line" />
+            <div className="master-profile-skeleton-line is-short" />
           </div>
         ) : profile ? (
           <>
-            <section className="client-master-profile-hero">
+            <section className="pro-profile-social animate delay-1">
               <div
-                className={`client-master-profile-cover${
-                  coverUrl ? '' : ' is-empty'
-                }`}
+                className={`pro-profile-social-cover${coverUrl ? ' has-image' : ''}`}
+                style={
+                  coverUrl
+                    ? { backgroundImage: `url(${coverUrl})`, backgroundPosition: coverFocus }
+                    : undefined
+                }
               >
-                {coverUrl ? (
-                  <img
-                    src={coverUrl}
-                    alt=""
-                    loading="lazy"
-                    style={{ objectPosition: coverFocus }}
-                  />
-                ) : (
-                  <span className="client-master-profile-cover-fallback">
+                <div className="pro-profile-social-glow" aria-hidden="true" />
+                {!coverUrl && (
+                  <span className="master-profile-cover-fallback" aria-hidden="true">
                     {initials}
                   </span>
                 )}
               </div>
-              <div className="client-master-profile-identity">
-                <span className="client-master-profile-avatar" aria-hidden="true">
+              <div className="pro-profile-social-body">
+                <div className="pro-profile-social-avatar">
                   {profile.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt="" loading="lazy" />
+                    <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
                   ) : (
-                    <span className="client-master-profile-avatar-fallback">
-                      {initials}
-                    </span>
+                    <span aria-hidden="true">{initials}</span>
                   )}
-                  <span
-                    className={`client-master-profile-status${
-                      isActive ? ' is-active' : ''
-                    }`}
-                  >
-                    {isActive ? 'Запись открыта' : 'Пауза'}
-                  </span>
-                </span>
-                <div className="client-master-profile-title">
-                  <h2>{displayName}</h2>
-                  <span>{primaryCategory}</span>
                 </div>
-                <div className="client-master-profile-tags">
-                  <span className="client-master-profile-tag">{locationLabel}</span>
-                  {formats.map((format) => (
-                    <span className="client-master-profile-tag" key={format}>
-                      {format}
+                <div className="pro-profile-social-content">
+                  <div className="pro-profile-social-header">
+                    <h1 className="pro-profile-social-name">{displayName}</h1>
+                    <span className={`pro-profile-social-status ${activeTone}`}>
+                      <span className="pro-profile-social-dot" aria-hidden="true" />
+                      {isActive ? 'Запись открыта' : 'Пауза'}
                     </span>
-                  ))}
-                  {extraCategories.map((category) => (
-                    <span className="client-master-profile-tag" key={category}>
-                      {category}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="client-master-profile-actions">
-              <button
-                className="client-master-cta"
-                type="button"
-                onClick={() =>
-                  onCreateRequest(
-                    Array.isArray(profile.categories)
-                      ? profile.categories[0] ?? null
-                      : null
-                  )
-                }
-              >
-                Записаться
-              </button>
-              <button className="client-master-ghost" type="button" onClick={onViewMasters}>
-                Все мастера
-              </button>
-            </section>
-
-            <section className="client-master-profile-stats">
-              <div className="client-master-profile-stat">
-                <span className="client-master-profile-stat-value">{priceLabel}</span>
-                <span className="client-master-profile-stat-label">Цена</span>
-              </div>
-              <div className="client-master-profile-stat">
-                <span className="client-master-profile-stat-value">{experienceLabel}</span>
-                <span className="client-master-profile-stat-label">Опыт</span>
-              </div>
-              <div className="client-master-profile-stat">
-                <span className="client-master-profile-stat-value">{scheduleRange}</span>
-                <span className="client-master-profile-stat-label">Время</span>
-              </div>
-            </section>
-
-            <section className="client-master-profile-section">
-              <div className="client-master-profile-section-head">
-                <h3>График</h3>
-                <span>{scheduleLabel}</span>
-              </div>
-              {scheduleDays.length > 0 ? (
-                <div className="client-master-profile-week">
-                  {scheduleDays.map((day) => (
-                    <span className="client-master-profile-chip" key={day}>
-                      {scheduleLabels[day] ?? day}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="client-master-profile-empty">
-                  Мастер пока не указал расписание.
-                </p>
-              )}
-            </section>
-
-            <section className="client-master-profile-section">
-              <div className="client-master-profile-section-head">
-                <h3>О себе</h3>
-              </div>
-              <p className="client-master-profile-about">{aboutText}</p>
-            </section>
-
-            <section className="client-master-profile-section">
-              <div className="client-master-profile-section-head">
-                <h3>Услуги</h3>
-                <span>{serviceItems.length > 0 ? `${serviceItems.length}` : '0'}</span>
-              </div>
-              {serviceItems.length > 0 ? (
-                <div className="client-master-profile-services">
-                  {serviceItems.map((service, index) => {
-                    const meta = formatServiceMeta(service)
-                    return (
-                      <div
-                        className="client-master-profile-service"
-                        key={`${service.name}-${index}`}
-                      >
-                        <span className="client-master-profile-service-title">
-                          {service.name}
-                        </span>
-                        {meta && (
-                          <span className="client-master-profile-service-meta">
-                            {meta}
+                  </div>
+                  <div className="pro-profile-social-tags">
+                    {previewTags.length > 0 ? (
+                      <>
+                        {previewTags.map((label, index) => (
+                          <span className="pro-profile-tag" key={`${label}-${index}`}>
+                            {label}
+                          </span>
+                        ))}
+                        {previewTagRemainder > 0 && (
+                          <span className="pro-profile-tag is-muted">
+                            +{previewTagRemainder}
                           </span>
                         )}
-                      </div>
-                    )
-                  })}
+                      </>
+                    ) : (
+                      <span className="pro-profile-tag is-muted">
+                        Теги появятся здесь
+                      </span>
+                    )}
+                    {reviewCount > 0 ? (
+                      <span className="pro-profile-tag is-review">
+                        ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                      </span>
+                    ) : (
+                      <span className="pro-profile-tag is-muted">Нет отзывов</span>
+                    )}
+                  </div>
+                  <p
+                    className={`pro-profile-social-about${
+                      aboutValue ? '' : ' is-muted'
+                    }`}
+                  >
+                    {aboutText}
+                  </p>
                 </div>
-              ) : (
-                <p className="client-master-profile-empty">
-                  Список услуг пока не заполнен.
-                </p>
-              )}
+              </div>
+              <div className="pro-profile-social-actions">
+                <button
+                  className="pro-profile-action is-primary"
+                  type="button"
+                  onClick={() =>
+                    onCreateRequest(
+                      Array.isArray(profile.categories)
+                        ? profile.categories[0] ?? null
+                        : null
+                    )
+                  }
+                >
+                  Записаться
+                </button>
+                <button
+                  className="pro-profile-action"
+                  type="button"
+                  onClick={onViewMasters}
+                >
+                  Все мастера
+                </button>
+              </div>
             </section>
 
-            <section className="client-master-profile-section client-master-profile-reviews">
-              <div className="client-master-profile-section-head">
-                <h3>Отзывы</h3>
-                <span>{reviewCountLabel}</span>
+            <section className="pro-profile-portfolio-panel animate delay-2">
+              <div className="pro-profile-portfolio-panel-head">
+                <div>
+                  <p className="pro-profile-portfolio-panel-kicker">Портфолио</p>
+                </div>
+                <div className="pro-profile-portfolio-panel-controls">
+                  <span className="pro-profile-portfolio-panel-count">
+                    {portfolioCountLabel}
+                  </span>
+                  {hasPortfolioOverflow && (
+                    <button
+                      className="pro-profile-portfolio-panel-action"
+                      type="button"
+                      onClick={() => setIsPortfolioExpanded((current) => !current)}
+                      aria-expanded={isPortfolioExpanded}
+                    >
+                      {isPortfolioExpanded ? 'Свернуть' : 'Все фото'}
+                    </button>
+                  )}
+                </div>
               </div>
+              <div
+                className={`pro-profile-portfolio-grid${
+                  isPortfolioCollapsed ? ' is-collapsed' : ''
+                }`}
+                role="list"
+                aria-label="Портфолио"
+              >
+                {visiblePortfolioItems.length > 0 ? (
+                  visiblePortfolioItems.map(({ item, index }) => {
+                    const focus = resolvePortfolioFocus(item)
+                    const showImage = isImageUrl(item.url)
+                    const isInShowcase = showcaseItems.some(
+                      (showcaseItem) => showcaseItem.url === item.url
+                    )
+                    return (
+                      <button
+                        className="pro-profile-portfolio-item"
+                        key={`${item.url}-${index}`}
+                        type="button"
+                        onClick={() => setPortfolioLightboxIndex(index)}
+                        role="listitem"
+                        aria-label={`Открыть работу ${index + 1}`}
+                      >
+                        {showImage ? (
+                          <img
+                            src={item.url}
+                            alt=""
+                            loading="lazy"
+                            style={{ objectPosition: focus.position }}
+                          />
+                        ) : (
+                          <span className="pro-profile-portfolio-fallback">LINK</span>
+                        )}
+                        {isInShowcase && (
+                          <span
+                            className="pro-profile-portfolio-badge"
+                            aria-hidden="true"
+                            title="В витрине"
+                          >
+                            ✦
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <div className="pro-profile-portfolio-empty" role="listitem">
+                    У мастера пока нет работ.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="pro-profile-cards animate delay-2">
+              <div className="pro-profile-card is-static">
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  👤
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">О себе</span>
+                  <span
+                    className={`pro-profile-card-value${
+                      aboutValue ? '' : ' is-muted'
+                    }`}
+                  >
+                    {aboutText}
+                  </span>
+                  <span className="pro-profile-card-meta">{experienceLabel}</span>
+                </span>
+              </div>
+              <div className="pro-profile-card is-static">
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  📍
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">Работа</span>
+                  <span className="pro-profile-card-value">{locationLabel}</span>
+                  <span className="pro-profile-card-meta">{workFormatLabel}</span>
+                  <span className="pro-profile-card-meta">{scheduleMeta}</span>
+                </span>
+              </div>
+              <div className="pro-profile-card is-static">
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  💸
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">Услуги и цены</span>
+                  <span className="pro-profile-card-value">{servicesSummary}</span>
+                  <span className="pro-profile-card-meta">{priceLabel}</span>
+                </span>
+              </div>
+              <div className="pro-profile-card is-static">
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  🖼️
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">Витрина</span>
+                  <span
+                    className={`pro-profile-card-value${
+                      showcaseCount > 0 ? '' : ' is-muted'
+                    }`}
+                  >
+                    {showcaseCountLabel}
+                  </span>
+                  {showcasePreview.length > 0 ? (
+                    <span className="pro-profile-portfolio">
+                      {showcasePreview.map((item, index) => {
+                        const showImage = isImageUrl(item.url)
+                        const focus = resolvePortfolioFocus(item)
+                        return (
+                          <span
+                            key={`${item.url}-${index}`}
+                            className={`pro-profile-portfolio-thumb${
+                              showImage ? ' has-image' : ''
+                            }`}
+                            style={
+                              showImage
+                                ? {
+                                    backgroundImage: `url(${item.url})`,
+                                    backgroundPosition: focus.position,
+                                  }
+                                : undefined
+                            }
+                            aria-hidden="true"
+                          />
+                        )
+                      })}
+                    </span>
+                  ) : (
+                    <span className="pro-profile-card-meta is-muted">
+                      Нет выбранных работ
+                    </span>
+                  )}
+                </span>
+              </div>
+            </section>
+
+            <section className="pro-profile-reviews animate delay-3">
+              <div className="pro-profile-reviews-head">
+                <div>
+                  <p className="pro-profile-reviews-kicker">Отзывы</p>
+                  <h2 className="pro-profile-reviews-title">Отзывы клиентов</h2>
+                </div>
+                <span className="pro-profile-reviews-count-pill">
+                  {reviewCountLabel}
+                </span>
+              </div>
+
               {isReviewsLoading ? (
-                <div className="client-master-review-skeleton" aria-hidden="true">
-                  <div className="client-master-review-skeleton-line is-wide" />
-                  <div className="client-master-review-skeleton-line" />
-                  <div className="client-master-review-skeleton-line is-short" />
+                <div className="pro-profile-reviews-skeleton" aria-hidden="true">
+                  <div className="pro-profile-reviews-skeleton-line is-wide" />
+                  <div className="pro-profile-reviews-skeleton-line" />
+                  <div className="pro-profile-reviews-skeleton-line is-short" />
                 </div>
               ) : reviewsError ? (
-                <p className="client-master-profile-empty">{reviewsError}</p>
+                <p className="pro-error">{reviewsError}</p>
               ) : reviewCount > 0 ? (
                 <>
-                  <div className="client-master-review-summary">
-                    <div className="client-master-review-score">
-                      <span className="client-master-review-average">
+                  <div className="pro-profile-reviews-summary">
+                    <div className="pro-profile-reviews-score">
+                      <span className="pro-profile-reviews-average">
                         {reviewAverage.toFixed(1)}
                       </span>
-                      <span className="client-master-review-stars">
+                      <span className="pro-profile-reviews-stars">
                         {buildStars(reviewAverage)}
                       </span>
-                      <span className="client-master-review-count">
+                      <span className="pro-profile-reviews-count">
                         {reviewCountLabel}
                       </span>
                     </div>
-                    <div className="client-master-review-bars">
+                    <div className="pro-profile-reviews-bars">
                       {reviewDistribution.map((entry) => {
                         const percent =
                           reviewCount > 0 ? (entry.count / reviewCount) * 100 : 0
                         return (
                           <div
-                            className="client-master-review-bar"
+                            className="pro-profile-reviews-bar"
                             key={`rating-${entry.rating}`}
                           >
-                            <span className="client-master-review-bar-label">
+                            <span className="pro-profile-reviews-bar-label">
                               {entry.rating}
                             </span>
-                            <span className="client-master-review-bar-track">
+                            <span className="pro-profile-reviews-bar-track">
                               <span
-                                className="client-master-review-bar-fill"
+                                className="pro-profile-reviews-bar-fill"
                                 style={{ width: `${percent}%` }}
                               />
                             </span>
-                            <span className="client-master-review-bar-count">
+                            <span className="pro-profile-reviews-bar-count">
                               {entry.count}
                             </span>
                           </div>
@@ -517,45 +693,42 @@ export const ClientMasterProfileScreen = ({
                       })}
                     </div>
                   </div>
-                  <div className="client-master-review-list">
+                  <div className="pro-profile-reviews-list">
                     {reviews.map((review) => {
                       const reviewerName = buildReviewerName(review)
                       const reviewerInitials = getInitials(reviewerName)
                       const dateLabel = formatReviewDate(review.createdAt)
-                      const comment =
-                        review.comment?.trim() || 'Без комментария.'
+                      const comment = review.comment?.trim() || 'Без комментария.'
+
                       return (
-                        <article className="client-master-review-card" key={review.id}>
-                          <span
-                            className="client-master-review-avatar"
-                            aria-hidden="true"
-                          >
+                        <article className="pro-profile-review-card" key={review.id}>
+                          <span className="pro-profile-review-avatar" aria-hidden="true">
                             {reviewerInitials}
                           </span>
-                          <div className="client-master-review-body">
-                            <div className="client-master-review-head">
-                              <span className="client-master-review-name">
+                          <div className="pro-profile-review-body">
+                            <div className="pro-profile-review-head">
+                              <span className="pro-profile-review-name">
                                 {reviewerName}
                               </span>
-                              <span className="client-master-review-rating">
+                              <span className="pro-profile-review-rating">
                                 {buildStars(review.rating)}
                               </span>
                             </div>
                             {(review.serviceName || dateLabel) && (
-                              <div className="client-master-review-meta">
+                              <div className="pro-profile-review-meta">
                                 {review.serviceName && (
-                                  <span className="client-master-review-service">
+                                  <span className="pro-profile-review-service">
                                     {review.serviceName}
                                   </span>
                                 )}
                                 {dateLabel && (
-                                  <span className="client-master-review-date">
+                                  <span className="pro-profile-review-date">
                                     {dateLabel}
                                   </span>
                                 )}
                               </div>
                             )}
-                            <p className="client-master-review-text">{comment}</p>
+                            <p className="pro-profile-review-text">{comment}</p>
                           </div>
                         </article>
                       )
@@ -563,47 +736,61 @@ export const ClientMasterProfileScreen = ({
                   </div>
                 </>
               ) : (
-                <p className="client-master-profile-empty">Пока нет отзывов.</p>
-              )}
-            </section>
-
-            <section className="client-master-profile-section">
-              <div className="client-master-profile-section-head">
-                <h3>Портфолио</h3>
-                <span>
-                  {galleryItems.length > 0 ? `${galleryItems.length} фото` : 'Нет фото'}
-                </span>
-              </div>
-              {galleryItems.length > 0 ? (
-                <div className="client-master-profile-portfolio" role="list">
-                  {galleryItems.map((item, index) => (
-                    <span
-                      className="client-master-profile-shot"
-                      key={`${item.url}-${index}`}
-                      role="listitem"
-                    >
-                      <img
-                        src={item.url}
-                        alt=""
-                        loading="lazy"
-                        style={{
-                          objectPosition: `${(item.focusX ?? 0.5) * 100}% ${
-                            (item.focusY ?? 0.5) * 100
-                          }%`,
-                        }}
-                      />
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="client-master-profile-empty">
-                  У мастера пока нет работ.
-                </p>
+                <p className="pro-profile-reviews-empty">Пока нет отзывов.</p>
               )}
             </section>
           </>
         ) : null}
       </div>
+
+      {portfolioLightboxItem && (
+        <div
+          className="pro-portfolio-lightbox-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPortfolioLightboxIndex(null)}
+        >
+          <div
+            className="pro-portfolio-lightbox"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="pro-portfolio-lightbox-head">
+              <div>
+                <p className="pro-portfolio-lightbox-kicker">Портфолио</p>
+                <h3 className="pro-portfolio-lightbox-title">
+                  {portfolioLightboxItem.title?.trim() ||
+                    `Работа ${portfolioLightboxIndex !== null ? portfolioLightboxIndex + 1 : 1}`}
+                </h3>
+              </div>
+              <button
+                className="pro-portfolio-lightbox-close"
+                type="button"
+                onClick={() => setPortfolioLightboxIndex(null)}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="pro-portfolio-lightbox-media">
+              {isLightboxImage ? (
+                <img
+                  src={portfolioLightboxItem.url}
+                  alt={portfolioLightboxItem.title ?? 'Работа'}
+                  style={{ objectPosition: portfolioLightboxFocus.position }}
+                />
+              ) : (
+                <a
+                  className="pro-portfolio-lightbox-link"
+                  href={portfolioLightboxItem.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Открыть ссылку
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="bottom-nav" aria-label="Навигация">
         <button className="nav-item" type="button" onClick={onViewHome}>
