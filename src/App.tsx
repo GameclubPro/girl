@@ -3,8 +3,10 @@ import { AddressScreen } from './screens/AddressScreen'
 import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
 import { ClientScreen } from './screens/ClientScreen'
 import {
+  ClientShowcaseDetailScreen,
   ClientShowcaseGalleryScreen,
   ClientShowcaseScreen,
+  type ShowcaseMedia,
 } from './screens/ClientShowcaseScreen'
 import { ClientMasterProfileScreen } from './screens/ClientMasterProfileScreen'
 import { ProCabinetScreen } from './screens/ProCabinetScreen'
@@ -30,6 +32,7 @@ function App() {
     | 'client'
     | 'client-showcase'
     | 'client-gallery'
+    | 'client-gallery-detail'
     | 'client-master-profile'
     | 'request'
     | 'requests'
@@ -58,6 +61,8 @@ function App() {
     categoryItems[0]?.id ?? ''
   )
   const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
+  const [selectedShowcaseItem, setSelectedShowcaseItem] =
+    useState<ShowcaseMedia | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
@@ -190,6 +195,7 @@ function App() {
       view === 'client' ||
       view === 'client-showcase' ||
       view === 'client-gallery' ||
+      view === 'client-gallery-detail' ||
       view === 'client-master-profile' ||
       view === 'request' ||
       view === 'requests' ||
@@ -366,6 +372,7 @@ function App() {
       view === 'address' ||
       view === 'client-showcase' ||
       view === 'client-gallery' ||
+      view === 'client-gallery-detail' ||
       view === 'client-master-profile' ||
       view === 'request' ||
       view === 'requests' ||
@@ -385,6 +392,10 @@ function App() {
         case 'client-showcase':
         case 'client-gallery':
           setView('client')
+          break
+        case 'client-gallery-detail':
+          setSelectedShowcaseItem(null)
+          setView('client-gallery')
           break
         case 'client-master-profile':
           setSelectedMasterId(null)
@@ -425,6 +436,12 @@ function App() {
       setView('client-showcase')
     }
   }, [selectedMasterId, view])
+
+  useEffect(() => {
+    if (view === 'client-gallery-detail' && !selectedShowcaseItem) {
+      setView('client-gallery')
+    }
+  }, [selectedShowcaseItem, view])
 
   const registerProProfileBackHandler = useCallback(
     (handler: (() => boolean) | null) => {
@@ -499,6 +516,43 @@ function App() {
     )
   }
 
+  if (view === 'client-gallery-detail' && selectedShowcaseItem) {
+    return (
+      <ClientShowcaseDetailScreen
+        item={selectedShowcaseItem}
+        activeCategoryId={clientCategoryId}
+        onBack={() => {
+          setSelectedShowcaseItem(null)
+          setView('client-gallery')
+        }}
+        onViewHome={() => {
+          setSelectedShowcaseItem(null)
+          setView('client')
+        }}
+        onViewMasters={() => {
+          setSelectedShowcaseItem(null)
+          setView('client-showcase')
+        }}
+        onViewRequests={() => {
+          setSelectedShowcaseItem(null)
+          setView('requests')
+        }}
+        onViewProfile={(masterId) => {
+          setSelectedShowcaseItem(null)
+          setSelectedMasterId(masterId)
+          setView('client-master-profile')
+        }}
+        onCreateRequest={(categoryId) => {
+          setSelectedShowcaseItem(null)
+          setRequestCategoryId(
+            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
+          )
+          setView('request')
+        }}
+      />
+    )
+  }
+
   if (view === 'client-gallery') {
     return (
       <ClientShowcaseGalleryScreen
@@ -508,6 +562,10 @@ function App() {
         onBack={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
         onViewRequests={() => setView('requests')}
+        onViewDetail={(item) => {
+          setSelectedShowcaseItem(item)
+          setView('client-gallery-detail')
+        }}
       />
     )
   }

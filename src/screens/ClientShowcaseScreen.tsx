@@ -25,6 +25,18 @@ type ClientShowcaseGalleryScreenProps = {
   onBack: () => void
   onViewMasters: () => void
   onViewRequests: () => void
+  onViewDetail: (item: ShowcaseMedia) => void
+}
+
+type ClientShowcaseDetailScreenProps = {
+  item: ShowcaseMedia
+  activeCategoryId: string | null
+  onBack: () => void
+  onViewHome: () => void
+  onViewMasters: () => void
+  onViewRequests: () => void
+  onViewProfile: (masterId: string) => void
+  onCreateRequest: (categoryId?: string | null) => void
 }
 
 const categoryLabelOverrides: Record<string, string> = {
@@ -63,12 +75,23 @@ const categoryPalettes: Record<string, CategoryPalette> = {
 const pickPalette = (categories: string[]) =>
   categoryPalettes[categories[0] ?? ''] ?? categoryPalettes.default
 
-type ShowcaseMedia = {
+export type ShowcaseMedia = {
   id: string
   url: string
   focusX: number
   focusY: number
+  title: string | null
   categories: string[]
+  masterId: string
+  masterName: string
+  masterAvatarUrl: string | null
+  reviewsAverage: number | null
+  reviewsCount: number
+  priceFrom: number | null
+  priceTo: number | null
+  cityName: string | null
+  districtName: string | null
+  services: ServiceItem[]
 }
 
 const galleryShapePattern = [
@@ -249,6 +272,52 @@ const buildDistanceLabel = (seed: number, hasLocation: boolean) => {
 const buildResponseLabel = (seed: number) =>
   `Ответ ${20 + (seed % 41)} мин`
 
+const normalizeTag = (value: string) => value.replace(/\s+/g, ' ').trim()
+
+const splitShowcaseTags = (value: string) =>
+  value
+    .split(/[•·,/|#]+/)
+    .map((tag) => normalizeTag(tag))
+    .filter(Boolean)
+
+const buildShowcaseTags = (item: ShowcaseMedia, fallbackLabel: string) => {
+  const tags: string[] = []
+  const seen = new Set<string>()
+  const pushTag = (tag: string) => {
+    const normalized = normalizeTag(tag)
+    if (!normalized) return
+    const key = normalized.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    tags.push(normalized)
+  }
+
+  if (item.title) {
+    splitShowcaseTags(item.title).forEach(pushTag)
+  }
+
+  if (tags.length < 3) {
+    item.services.forEach((service) => pushTag(service.name))
+  }
+
+  if (tags.length < 3) {
+    item.categories.map((id) => getCategoryLabel(id)).forEach(pushTag)
+  }
+
+  if (tags.length === 0 && fallbackLabel) {
+    pushTag(fallbackLabel)
+  }
+
+  return tags.slice(0, 3)
+}
+
+const buildShowcaseLocation = (item: ShowcaseMedia) => {
+  const district = item.districtName?.trim()
+  if (district) return `м. ${district}`
+  const city = item.cityName?.trim()
+  return city || 'Локация не указана'
+}
+
 export const ClientShowcaseGalleryScreen = ({
   apiBase,
   activeCategoryId,
@@ -256,6 +325,7 @@ export const ClientShowcaseGalleryScreen = ({
   onBack,
   onViewMasters,
   onViewRequests,
+  onViewDetail,
 }: ClientShowcaseGalleryScreenProps) => {
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -277,6 +347,14 @@ export const ClientShowcaseGalleryScreen = ({
 
         const nextPool = (Array.isArray(data) ? data : []).flatMap((profile) => {
           const categories = Array.isArray(profile.categories) ? profile.categories : []
+          const services = parseServiceItems(profile.services ?? [])
+          const masterName = profile.displayName?.trim() || 'Мастер'
+          const reviewsCount =
+            typeof profile.reviewsCount === 'number' ? profile.reviewsCount : 0
+          const reviewsAverage =
+            reviewsCount > 0 && typeof profile.reviewsAverage === 'number'
+              ? profile.reviewsAverage
+              : null
           return parsePortfolioItems(profile.portfolioUrls ?? [])
             .filter((item) => isImageUrl(item.url))
             .map((item, index) => ({
@@ -284,7 +362,18 @@ export const ClientShowcaseGalleryScreen = ({
               url: item.url,
               focusX: item.focusX ?? 0.5,
               focusY: item.focusY ?? 0.5,
+              title: item.title ?? null,
               categories,
+              masterId: profile.userId,
+              masterName,
+              masterAvatarUrl: profile.avatarUrl ?? null,
+              reviewsAverage,
+              reviewsCount,
+              priceFrom: profile.priceFrom ?? null,
+              priceTo: profile.priceTo ?? null,
+              cityName: profile.cityName ?? null,
+              districtName: profile.districtName ?? null,
+              services,
             }))
         })
         setShowcasePool(nextPool)
@@ -367,10 +456,13 @@ export const ClientShowcaseGalleryScreen = ({
               {showcaseItems.map((item, index) => {
                 const shapeClass = pickGalleryShape(toSeed(item.id) + index * 7)
                 return (
-                  <span
+                  <button
                     className={`client-gallery-item ${shapeClass}`}
                     key={item.id}
                     role="listitem"
+                    type="button"
+                    aria-label={`Открыть работу мастера ${item.masterName}`}
+                    onClick={() => onViewDetail(item)}
                   >
                     <img
                       src={item.url}
@@ -380,7 +472,7 @@ export const ClientShowcaseGalleryScreen = ({
                         objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
                       }}
                     />
-                  </span>
+                  </button>
                 )
               })}
             </div>
@@ -392,6 +484,179 @@ export const ClientShowcaseGalleryScreen = ({
 
       <nav className="bottom-nav" aria-label="Навигация">
         <button className="nav-item" type="button" onClick={onBack}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconHome />
+          </span>
+          Главная
+        </button>
+        <button className="nav-item" type="button" onClick={onViewMasters}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconUsers />
+          </span>
+          Мастера
+        </button>
+        <button className="nav-item" type="button" onClick={onViewRequests}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconList />
+          </span>
+          Мои заявки
+        </button>
+        <button className="nav-item" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconUser />
+          </span>
+          Профиль
+        </button>
+      </nav>
+    </div>
+  )
+}
+
+export const ClientShowcaseDetailScreen = ({
+  item,
+  activeCategoryId,
+  onBack,
+  onViewHome,
+  onViewMasters,
+  onViewRequests,
+  onViewProfile,
+  onCreateRequest,
+}: ClientShowcaseDetailScreenProps) => {
+  const [isLiked, setIsLiked] = useState(false)
+  const masterInitials = getInitials(item.masterName)
+  const primaryCategoryId = activeCategoryId ?? item.categories[0] ?? null
+  const primaryCategoryLabel = primaryCategoryId
+    ? getCategoryLabel(primaryCategoryId)
+    : 'Работа'
+  const priceLabel =
+    item.priceFrom !== null || item.priceTo !== null
+      ? formatPriceRange(item.priceFrom, item.priceTo)
+      : null
+  const headerTitle = priceLabel
+    ? `${primaryCategoryLabel} · ${priceLabel}`
+    : primaryCategoryLabel
+  const tags = buildShowcaseTags(item, primaryCategoryLabel)
+  const locationLabel = buildShowcaseLocation(item)
+  const ratingLabel =
+    item.reviewsAverage !== null ? item.reviewsAverage.toFixed(1) : 'Новый'
+  const hasReviews = item.reviewsCount > 0 && item.reviewsAverage !== null
+  const requestCategoryId = primaryCategoryId ?? item.categories[0] ?? null
+
+  return (
+    <div className="screen screen--client screen--client-showcase screen--client-gallery-detail">
+      <div className="client-shell client-gallery-detail-shell">
+        <header className="client-gallery-detail-header">
+          <button
+            className="client-gallery-detail-back"
+            type="button"
+            onClick={onBack}
+            aria-label="Назад"
+          >
+            ←
+          </button>
+          <div className="client-gallery-detail-title">
+            <h1>{headerTitle}</h1>
+          </div>
+          <button
+            className={`client-gallery-detail-like${isLiked ? ' is-active' : ''}`}
+            type="button"
+            aria-label={isLiked ? 'Убрать из избранного' : 'В избранное'}
+            onClick={() => setIsLiked((prev) => !prev)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 20.2s-6.4-3.7-8.6-7.4c-1.6-2.7-0.8-6.1 2-7.2 2.1-0.9 4.6-0.1 6.6 1.8 2-1.9 4.5-2.7 6.6-1.8 2.8 1.1 3.6 4.5 2 7.2-2.2 3.7-8.6 7.4-8.6 7.4Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </header>
+
+        <div className="client-gallery-detail-hero animate delay-1">
+          <img
+            src={item.url}
+            alt={item.title ?? 'Работа мастера'}
+            loading="lazy"
+            style={{ objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%` }}
+          />
+        </div>
+
+        <div className="client-gallery-detail-tags animate delay-2" role="list">
+          {tags.map((tag) => (
+            <span className="client-gallery-detail-tag" key={tag} role="listitem">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        <button
+          className="client-gallery-detail-master animate delay-2"
+          type="button"
+          onClick={() => onViewProfile(item.masterId)}
+        >
+          <span className="client-gallery-detail-avatar" aria-hidden="true">
+            {item.masterAvatarUrl ? (
+              <img src={item.masterAvatarUrl} alt="" loading="lazy" />
+            ) : (
+              <span className="client-gallery-detail-avatar-fallback">
+                {masterInitials}
+              </span>
+            )}
+          </span>
+          <span className="client-gallery-detail-master-body">
+            <span className="client-gallery-detail-master-head">
+              <span className="client-gallery-detail-master-name">
+                {item.masterName}
+              </span>
+              <span
+                className={`client-gallery-detail-master-rating${
+                  hasReviews ? '' : ' is-muted'
+                }`}
+              >
+                ★ {ratingLabel}
+              </span>
+            </span>
+            <span className="client-gallery-detail-master-location">
+              {locationLabel}
+            </span>
+          </span>
+          <span className="client-gallery-detail-master-chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16">
+              <path
+                d="M6 3.5 10.5 8 6 12.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </button>
+
+        <div className="client-gallery-detail-actions animate delay-3">
+          <button
+            className="client-gallery-detail-cta"
+            type="button"
+            onClick={() => onCreateRequest(requestCategoryId)}
+          >
+            Хочу так же
+          </button>
+          <button
+            className="client-gallery-detail-secondary"
+            type="button"
+            onClick={() => onViewProfile(item.masterId)}
+          >
+            Профиль мастера
+          </button>
+        </div>
+      </div>
+
+      <nav className="bottom-nav" aria-label="Навигация">
+        <button className="nav-item is-active" type="button" onClick={onViewHome}>
           <span className="nav-icon" aria-hidden="true">
             <IconHome />
           </span>
