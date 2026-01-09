@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems } from '../data/clientData'
-import type { MasterProfile } from '../types/app'
+import type { MasterProfile, MasterReview, MasterReviewSummary } from '../types/app'
 import {
   formatServiceMeta,
   isImageUrl,
@@ -90,6 +90,43 @@ const getInitials = (value: string) => {
   return normalized.slice(0, 2).toUpperCase()
 }
 
+const formatReviewDate = (value: string) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const formatReviewCount = (value: number) => {
+  const mod10 = value % 10
+  const mod100 = value % 100
+  if (mod10 === 1 && mod100 !== 11) return `${value} отзыв`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} отзыва`
+  }
+  return `${value} отзывов`
+}
+
+const buildReviewerName = (review: MasterReview) => {
+  const name = [review.reviewerFirstName, review.reviewerLastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+  if (name) return name
+  if (review.reviewerUsername) return `@${review.reviewerUsername}`
+  return 'Клиент'
+}
+
+const buildStars = (value: number) => {
+  const clamped = Math.max(0, Math.min(5, Math.round(value)))
+  return Array.from({ length: 5 }, (_, index) => (index < clamped ? '★' : '☆')).join(
+    ''
+  )
+}
+
 export const ClientMasterProfileScreen = ({
   apiBase,
   masterId,
@@ -102,6 +139,11 @@ export const ClientMasterProfileScreen = ({
   const [profile, setProfile] = useState<MasterProfile | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [reviews, setReviews] = useState<MasterReview[]>([])
+  const [reviewSummary, setReviewSummary] =
+    useState<MasterReviewSummary | null>(null)
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false)
+  const [reviewsError, setReviewsError] = useState('')
 
   useEffect(() => {
     if (!masterId) return
@@ -133,6 +175,50 @@ export const ClientMasterProfileScreen = ({
     }
 
     void loadProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, masterId])
+
+  useEffect(() => {
+    if (!masterId) return
+    let cancelled = false
+
+    const loadReviews = async () => {
+      setIsReviewsLoading(true)
+      setReviewsError('')
+      setReviews([])
+      setReviewSummary(null)
+      try {
+        const response = await fetch(
+          `${apiBase}/api/masters/${masterId}/reviews?limit=8`
+        )
+        if (!response.ok) {
+          throw new Error('Load reviews failed')
+        }
+        const data = (await response.json()) as {
+          summary?: MasterReviewSummary | null
+          reviews?: MasterReview[]
+        }
+        if (!cancelled) {
+          setReviewSummary(data.summary ?? null)
+          setReviews(Array.isArray(data.reviews) ? data.reviews : [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setReviews([])
+          setReviewSummary(null)
+          setReviewsError('Не удалось загрузить отзывы.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsReviewsLoading(false)
+        }
+      }
+    }
+
+    void loadReviews()
 
     return () => {
       cancelled = true
@@ -194,6 +280,10 @@ export const ClientMasterProfileScreen = ({
   const aboutText = profile?.about?.trim() || 'Описание пока не заполнено.'
   const primaryCategory = categoryLabels[0]
   const extraCategories = categoryLabels.slice(1)
+  const reviewCount = reviewSummary?.count ?? 0
+  const reviewAverage = reviewSummary?.average ?? 0
+  const reviewDistribution = reviewSummary?.distribution ?? []
+  const reviewCountLabel = reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
 
   return (
     <div className="screen screen--client screen--client-master-profile">
@@ -371,6 +461,109 @@ export const ClientMasterProfileScreen = ({
                 <p className="client-master-profile-empty">
                   Список услуг пока не заполнен.
                 </p>
+              )}
+            </section>
+
+            <section className="client-master-profile-section client-master-profile-reviews">
+              <div className="client-master-profile-section-head">
+                <h3>Отзывы</h3>
+                <span>{reviewCountLabel}</span>
+              </div>
+              {isReviewsLoading ? (
+                <div className="client-master-review-skeleton" aria-hidden="true">
+                  <div className="client-master-review-skeleton-line is-wide" />
+                  <div className="client-master-review-skeleton-line" />
+                  <div className="client-master-review-skeleton-line is-short" />
+                </div>
+              ) : reviewsError ? (
+                <p className="client-master-profile-empty">{reviewsError}</p>
+              ) : reviewCount > 0 ? (
+                <>
+                  <div className="client-master-review-summary">
+                    <div className="client-master-review-score">
+                      <span className="client-master-review-average">
+                        {reviewAverage.toFixed(1)}
+                      </span>
+                      <span className="client-master-review-stars">
+                        {buildStars(reviewAverage)}
+                      </span>
+                      <span className="client-master-review-count">
+                        {reviewCountLabel}
+                      </span>
+                    </div>
+                    <div className="client-master-review-bars">
+                      {reviewDistribution.map((entry) => {
+                        const percent =
+                          reviewCount > 0 ? (entry.count / reviewCount) * 100 : 0
+                        return (
+                          <div
+                            className="client-master-review-bar"
+                            key={`rating-${entry.rating}`}
+                          >
+                            <span className="client-master-review-bar-label">
+                              {entry.rating}
+                            </span>
+                            <span className="client-master-review-bar-track">
+                              <span
+                                className="client-master-review-bar-fill"
+                                style={{ width: `${percent}%` }}
+                              />
+                            </span>
+                            <span className="client-master-review-bar-count">
+                              {entry.count}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="client-master-review-list">
+                    {reviews.map((review) => {
+                      const reviewerName = buildReviewerName(review)
+                      const reviewerInitials = getInitials(reviewerName)
+                      const dateLabel = formatReviewDate(review.createdAt)
+                      const comment =
+                        review.comment?.trim() || 'Без комментария.'
+                      return (
+                        <article className="client-master-review-card" key={review.id}>
+                          <span
+                            className="client-master-review-avatar"
+                            aria-hidden="true"
+                          >
+                            {reviewerInitials}
+                          </span>
+                          <div className="client-master-review-body">
+                            <div className="client-master-review-head">
+                              <span className="client-master-review-name">
+                                {reviewerName}
+                              </span>
+                              <span className="client-master-review-rating">
+                                {buildStars(review.rating)}
+                              </span>
+                            </div>
+                            {(review.serviceName || dateLabel) && (
+                              <div className="client-master-review-meta">
+                                {review.serviceName && (
+                                  <span className="client-master-review-service">
+                                    {review.serviceName}
+                                  </span>
+                                )}
+                                {dateLabel && (
+                                  <span className="client-master-review-date">
+                                    {dateLabel}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <p className="client-master-review-text">{comment}</p>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : (
+                <p className="client-master-profile-empty">Пока нет отзывов.</p>
               )}
             </section>
 

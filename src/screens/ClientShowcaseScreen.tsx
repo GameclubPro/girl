@@ -91,6 +91,8 @@ type MasterCard = {
   priceFrom: number | null
   priceTo: number | null
   experienceYears: number | null
+  reviewsCount: number
+  reviewsAverage: number | null
   worksAtClient: boolean
   worksAtMaster: boolean
   isActive: boolean
@@ -448,6 +450,12 @@ export const ClientShowcaseScreen = ({
       const priceFrom = profile.priceFrom ?? null
       const priceTo = profile.priceTo ?? null
       const isActive = Boolean(profile.isActive ?? true)
+      const reviewsCount =
+        typeof profile.reviewsCount === 'number' ? profile.reviewsCount : 0
+      const reviewsAverage =
+        reviewsCount > 0 && typeof profile.reviewsAverage === 'number'
+          ? profile.reviewsAverage
+          : null
       const updatedAt = profile.updatedAt ?? null
       const updatedAtTs =
         updatedAt && Number.isFinite(Date.parse(updatedAt))
@@ -477,6 +485,8 @@ export const ClientShowcaseScreen = ({
         priceFrom,
         priceTo,
         experienceYears,
+        reviewsCount,
+        reviewsAverage,
         worksAtClient: Boolean(profile.worksAtClient),
         worksAtMaster: Boolean(profile.worksAtMaster),
         isActive,
@@ -688,6 +698,10 @@ export const ClientShowcaseScreen = ({
                 }`
                 const experienceLabel = formatExperience(master.experienceYears)
                 const priceLabel = formatPriceRange(master.priceFrom, master.priceTo)
+                const ratingLabel =
+                  master.reviewsAverage !== null
+                    ? `${master.reviewsAverage.toFixed(1)} ★`
+                    : experienceLabel
                 const servicesCount =
                   master.services.length > 0 ? `${master.services.length}` : '—'
                 const portfolioCount =
@@ -718,16 +732,21 @@ export const ClientShowcaseScreen = ({
                           <div className="client-master-name-row">
                             <h2 className="client-master-name">{master.name}</h2>
                             <span className="client-master-score">
-                              {experienceLabel}
+                              {ratingLabel}
                             </span>
                           </div>
                           <p className="client-master-meta">
-                            {master.primaryCategory}
+                            {master.primaryCategory} · {experienceLabel}
                           </p>
                           <div className="client-master-tags">
                             <span className="client-master-tag">
                               {master.locationLabel}
                             </span>
+                            {master.reviewsCount > 0 && (
+                              <span className="client-master-tag">
+                                Отзывы {master.reviewsCount}
+                              </span>
+                            )}
                             {master.worksAtClient && (
                               <span className="client-master-tag">Выезд</span>
                             )}

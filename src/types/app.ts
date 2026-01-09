@@ -44,6 +44,25 @@ export type MasterProfile = {
   scheduleStart?: string | null
   scheduleEnd?: string | null
   updatedAt?: string | null
+  reviewsCount?: number | null
+  reviewsAverage?: number | null
+}
+
+export type MasterReview = {
+  id: number
+  rating: number
+  comment?: string | null
+  serviceName?: string | null
+  reviewerFirstName?: string | null
+  reviewerLastName?: string | null
+  reviewerUsername?: string | null
+  createdAt: string
+}
+
+export type MasterReviewSummary = {
+  count: number
+  average: number
+  distribution: { rating: number; count: number }[]
 }
 
 export type ServiceRequest = {

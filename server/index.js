@@ -284,6 +284,23 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_reviews (
+      id SERIAL PRIMARY KEY,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      reviewer_id TEXT REFERENCES users(user_id) ON DELETE SET NULL,
+      rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+      comment TEXT,
+      service_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_reviews_master_idx
+    ON master_reviews (master_id);
+  `)
+
+  await pool.query(`
     ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
   `)
@@ -673,22 +690,39 @@ app.get('/api/masters', async (req, res) => {
           mp.services,
           mp.portfolio_urls AS "portfolioUrls",
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
+          COALESCE(mr.reviews_count, 0) AS "reviewsCount",
+          COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN cities c ON c.id = mp.city_id
         LEFT JOIN districts d ON d.id = mp.district_id
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
+        LEFT JOIN (
+          SELECT
+            master_id,
+            COUNT(*)::int AS reviews_count,
+            AVG(rating)::float AS reviews_average
+          FROM master_reviews
+          GROUP BY master_id
+        ) mr ON mr.master_id = mp.user_id
         ${whereClause}
         ORDER BY mp.updated_at DESC
         ${limitClause}
       `,
       values
     )
-    const payload = result.rows.map((row) => ({
-      ...row,
-      avatarUrl: buildPublicUrl(req, row.avatarPath),
-      coverUrl: buildPublicUrl(req, row.coverPath),
-    }))
+    const payload = result.rows.map((row) => {
+      const average = Number(row.reviewsAverage)
+      return {
+        ...row,
+        reviewsAverage: Number.isFinite(average) ? average : 0,
+        reviewsCount: Number.isFinite(Number(row.reviewsCount))
+          ? Number(row.reviewsCount)
+          : 0,
+        avatarUrl: buildPublicUrl(req, row.avatarPath),
+        coverUrl: buildPublicUrl(req, row.coverPath),
+      }
+    })
     res.json(payload)
   } catch (error) {
     console.error('GET /api/masters failed:', error)
@@ -729,11 +763,21 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.services,
           mp.portfolio_urls AS "portfolioUrls",
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
+          COALESCE(mr.reviews_count, 0) AS "reviewsCount",
+          COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN cities c ON c.id = mp.city_id
         LEFT JOIN districts d ON d.id = mp.district_id
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
+        LEFT JOIN (
+          SELECT
+            master_id,
+            COUNT(*)::int AS reviews_count,
+            AVG(rating)::float AS reviews_average
+          FROM master_reviews
+          GROUP BY master_id
+        ) mr ON mr.master_id = mp.user_id
         WHERE mp.user_id = $1
       `,
       [normalizedUserId]
@@ -746,14 +790,94 @@ app.get('/api/masters/:userId', async (req, res) => {
 
     const row = result.rows[0]
     const summary = getProfileStatusSummary(row)
+    const average = Number(row.reviewsAverage)
+    const reviewsAverage = Number.isFinite(average) ? average : 0
+    const reviewsCount = Number.isFinite(Number(row.reviewsCount))
+      ? Number(row.reviewsCount)
+      : 0
     res.json({
       ...row,
+      reviewsAverage,
+      reviewsCount,
       avatarUrl: buildPublicUrl(req, row.avatarPath),
       coverUrl: buildPublicUrl(req, row.coverPath),
       ...summary,
     })
   } catch (error) {
     console.error('GET /api/masters/:userId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/masters/:userId/reviews', async (req, res) => {
+  const normalizedUserId = normalizeText(req.params.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const limitParam = Number(req.query.limit)
+  const limit = Number.isInteger(limitParam)
+    ? Math.min(Math.max(limitParam, 1), 50)
+    : 8
+
+  try {
+    const summaryResult = await pool.query(
+      `
+        SELECT
+          COUNT(*)::int AS count,
+          COALESCE(AVG(rating), 0) AS average,
+          SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END)::int AS rating5,
+          SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END)::int AS rating4,
+          SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END)::int AS rating3,
+          SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END)::int AS rating2,
+          SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END)::int AS rating1
+        FROM master_reviews
+        WHERE master_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    const reviewsResult = await pool.query(
+      `
+        SELECT
+          mr.id,
+          mr.rating,
+          mr.comment,
+          mr.service_name AS "serviceName",
+          mr.created_at AS "createdAt",
+          u.first_name AS "reviewerFirstName",
+          u.last_name AS "reviewerLastName",
+          u.username AS "reviewerUsername"
+        FROM master_reviews mr
+        LEFT JOIN users u ON u.user_id = mr.reviewer_id
+        WHERE mr.master_id = $1
+        ORDER BY mr.created_at DESC
+        LIMIT $2
+      `,
+      [normalizedUserId, limit]
+    )
+
+    const summaryRow = summaryResult.rows[0] ?? {}
+    const average = Number(summaryRow.average)
+    const summary = {
+      count: summaryRow.count ?? 0,
+      average: Number.isFinite(average) ? average : 0,
+      distribution: [
+        { rating: 5, count: summaryRow.rating5 ?? 0 },
+        { rating: 4, count: summaryRow.rating4 ?? 0 },
+        { rating: 3, count: summaryRow.rating3 ?? 0 },
+        { rating: 2, count: summaryRow.rating2 ?? 0 },
+        { rating: 1, count: summaryRow.rating1 ?? 0 },
+      ],
+    }
+
+    res.json({
+      summary,
+      reviews: reviewsResult.rows,
+    })
+  } catch (error) {
+    console.error('GET /api/masters/:userId/reviews failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
