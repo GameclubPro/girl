@@ -5762,7 +5762,7 @@ h2 {
 
 .client-gallery-grid {
   column-count: 3;
-  column-gap: 2px;
+  column-gap: 4px;
   line-height: 0;
 }
 
@@ -5770,8 +5770,8 @@ h2 {
   position: relative;
   display: block;
   width: 100%;
-  margin: 0 0 1px;
-  border-radius: 8px;
+  margin: 0 0 3px;
+  border-radius: 6px;
   overflow: hidden;
   background: rgba(241, 231, 244, 0.7);
   break-inside: avoid;
