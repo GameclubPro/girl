@@ -5762,15 +5762,17 @@ h2 {
 
 .client-gallery-grid {
   column-count: 3;
-  column-gap: 4px;
+  column-gap: 5px;
   line-height: 0;
+  margin: 0 calc(50% - 50vw);
+  padding: 0 var(--client-pad-x);
 }
 
 .client-gallery-item {
   position: relative;
   display: block;
   width: 100%;
-  margin: 0 0 3px;
+  margin: 0 0 4px;
   border-radius: 6px;
   overflow: hidden;
   background: rgba(241, 231, 244, 0.7);
