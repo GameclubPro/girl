@@ -363,6 +363,7 @@ export const ClientShowcaseScreen = ({
   const [loadError, setLoadError] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [query, setQuery] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [onlyActive, setOnlyActive] = useState(false)
   const [onlyAtClient, setOnlyAtClient] = useState(false)
   const [onlyAtMaster, setOnlyAtMaster] = useState(false)
@@ -545,6 +546,12 @@ export const ClientShowcaseScreen = ({
     () => new Set(filteredMasters.slice(0, 2).map((master) => master.id)),
     [filteredMasters]
   )
+  const hasActiveFilters = onlyActive || onlyAtClient || onlyAtMaster
+  const resetFilters = () => {
+    setOnlyActive(false)
+    setOnlyAtClient(false)
+    setOnlyAtMaster(false)
+  }
 
   return (
     <div className="screen screen--client screen--client-showcase">
@@ -584,9 +591,14 @@ export const ClientShowcaseScreen = ({
                 onChange={(event) => setQuery(event.target.value)}
               />
               <button
-                className="client-master-filter"
+                className={`client-master-filter${
+                  filtersOpen ? ' is-open' : ''
+                }${hasActiveFilters ? ' is-active' : ''}`}
                 type="button"
                 aria-label="Фильтры"
+                aria-expanded={filtersOpen}
+                aria-controls="client-master-filters"
+                onClick={() => setFiltersOpen((prev) => !prev)}
               >
                 <IconFilter />
               </button>
@@ -611,29 +623,50 @@ export const ClientShowcaseScreen = ({
               </button>
             ))}
           </div>
-          <div className="client-master-toggles">
-            <button
-              className={`client-master-toggle${onlyActive ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => setOnlyActive((prev) => !prev)}
+          {filtersOpen && (
+            <div
+              className="client-master-filters"
+              id="client-master-filters"
+              role="region"
+              aria-label="Фильтры"
             >
-              Запись открыта
-            </button>
-            <button
-              className={`client-master-toggle${onlyAtClient ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => setOnlyAtClient((prev) => !prev)}
-            >
-              Выезд
-            </button>
-            <button
-              className={`client-master-toggle${onlyAtMaster ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => setOnlyAtMaster((prev) => !prev)}
-            >
-              У мастера
-            </button>
-          </div>
+              <div className="client-master-filter-head">
+                <span className="client-master-filter-title">Фильтры</span>
+                {hasActiveFilters && (
+                  <button
+                    className="client-master-filter-reset"
+                    type="button"
+                    onClick={resetFilters}
+                  >
+                    Сбросить
+                  </button>
+                )}
+              </div>
+              <div className="client-master-toggles">
+                <button
+                  className={`client-master-toggle${onlyActive ? ' is-active' : ''}`}
+                  type="button"
+                  onClick={() => setOnlyActive((prev) => !prev)}
+                >
+                  Запись открыта
+                </button>
+                <button
+                  className={`client-master-toggle${onlyAtClient ? ' is-active' : ''}`}
+                  type="button"
+                  onClick={() => setOnlyAtClient((prev) => !prev)}
+                >
+                  Выезд
+                </button>
+                <button
+                  className={`client-master-toggle${onlyAtMaster ? ' is-active' : ''}`}
+                  type="button"
+                  onClick={() => setOnlyAtMaster((prev) => !prev)}
+                >
+                  У мастера
+                </button>
+              </div>
+            </div>
+          )}
           <p className="client-master-summary">
             {filteredMasters.length > 0
               ? `Найдено мастеров: ${filteredMasters.length}`

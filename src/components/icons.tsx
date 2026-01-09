@@ -74,13 +74,15 @@ export const IconList = () => (
 export const IconFilter = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
-      d="M4 6h16l-6.4 7.2v4.8l-3.2 1.8v-6.6L4 6Z"
+      d="M4 7h16M4 12h16M4 17h16"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.6"
-      strokeLinejoin="round"
       strokeLinecap="round"
     />
+    <circle cx="9" cy="7" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="15" cy="12" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="12" cy="17" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
   </svg>
 )
 
