@@ -447,7 +447,7 @@ export const ClientShowcaseScreen = ({
       const heroFocus = heroItem?.focus ?? '50% 50%'
 
       const avatarUrl = profile.avatarUrl ?? null
-      const gallery = heroItem ? portfolioItems.slice(1, 4) : portfolioItems.slice(0, 3)
+      const gallery = heroItem ? portfolioItems.slice(1, 3) : portfolioItems.slice(0, 2)
       const portfolioCount = portfolioItems.length
 
       const services = parseServiceItems(profile.services ?? [])
@@ -715,11 +715,16 @@ export const ClientShowcaseScreen = ({
                   master.reviewsAverage !== null
                     ? `${master.reviewsAverage.toFixed(1)} ★`
                     : 'Новый'
+                const hasPrice =
+                  master.priceFrom !== null || master.priceTo !== null
+                const priceTag = hasPrice ? priceLabel : 'По запросу'
                 const servicesCount =
                   master.services.length > 0 ? `${master.services.length}` : '—'
                 const portfolioCount =
                   master.portfolioCount > 0 ? `${master.portfolioCount}` : '—'
-                const aboutPreview = master.about ?? 'Описание пока не заполнено.'
+                const aboutPreview = master.about?.trim() ?? ''
+                const showGallery = isFeatured && master.gallery.length > 0
+                const showAbout = isFeatured && Boolean(aboutPreview)
 
                 return (
                   <article className={cardClassName} key={master.id} role="listitem">
@@ -767,64 +772,70 @@ export const ClientShowcaseScreen = ({
                               <span className="client-master-tag">У мастера</span>
                             )}
                           </div>
+                          <div className="client-master-stats">
+                            <span className="client-master-stat">
+                              <span className="client-master-stat-label">Цена</span>
+                              <span className="client-master-stat-value">{priceTag}</span>
+                            </span>
+                            <span className="client-master-stat">
+                              <span className="client-master-stat-label">Услуги</span>
+                              <span className="client-master-stat-value">
+                                {servicesCount}
+                              </span>
+                            </span>
+                            <span className="client-master-stat">
+                              <span className="client-master-stat-label">Работы</span>
+                              <span className="client-master-stat-value">
+                                {portfolioCount}
+                              </span>
+                            </span>
+                          </div>
+                          {showAbout && (
+                            <p className="client-master-about">{aboutPreview}</p>
+                          )}
                         </div>
                       </div>
-                      <div
-                        className={`client-master-hero${
-                          master.heroUrl ? '' : ' is-empty'
-                        }`}
-                      >
-                        {master.heroUrl ? (
-                          <img
-                            src={master.heroUrl}
-                            alt=""
-                            loading="lazy"
-                            style={{ objectPosition: master.heroFocus }}
-                          />
-                        ) : (
-                          <span className="client-master-hero-placeholder">
-                            {master.initials}
-                          </span>
-                        )}
-                        <span className="client-master-signal">
-                          {master.updateLabel}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="client-master-stats">
-                      <div className="client-master-stat">
-                        <span className="client-master-stat-value">{priceLabel}</span>
-                        <span className="client-master-stat-label">Цена</span>
-                      </div>
-                      <div className="client-master-stat">
-                        <span className="client-master-stat-value">{servicesCount}</span>
-                        <span className="client-master-stat-label">Услуги</span>
-                      </div>
-                      <div className="client-master-stat">
-                        <span className="client-master-stat-value">
-                          {portfolioCount}
-                        </span>
-                        <span className="client-master-stat-label">Работы</span>
-                      </div>
-                    </div>
-
-                    <p className="client-master-about">{aboutPreview}</p>
-
-                    {master.gallery.length > 0 && (
-                      <div className="client-master-gallery">
-                        {master.gallery.map((shot, index) => (
-                          <span className="client-master-shot" key={`${master.id}-g-${index}`}>
+                      <div className="client-master-media">
+                        <div
+                          className={`client-master-hero${
+                            master.heroUrl ? '' : ' is-empty'
+                          }`}
+                        >
+                          {master.heroUrl ? (
                             <img
-                              src={shot.url}
+                              src={master.heroUrl}
                               alt=""
                               loading="lazy"
-                              style={{ objectPosition: shot.focus }}
+                              style={{ objectPosition: master.heroFocus }}
                             />
+                          ) : (
+                            <span className="client-master-hero-placeholder">
+                              {master.initials}
+                            </span>
+                          )}
+                          <span className="client-master-signal">
+                            {master.updateLabel}
                           </span>
-                        ))}
+                        </div>
+                        {showGallery && (
+                          <div className="client-master-gallery is-mini">
+                            {master.gallery.slice(0, 2).map((shot, index) => (
+                              <span
+                                className="client-master-shot"
+                                key={`${master.id}-g-${index}`}
+                              >
+                                <img
+                                  src={shot.url}
+                                  alt=""
+                                  loading="lazy"
+                                  style={{ objectPosition: shot.focus }}
+                                />
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
 
                     <div className="client-master-actions">
                       <button className="client-master-cta" type="button">
