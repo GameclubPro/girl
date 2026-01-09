@@ -105,6 +105,11 @@ const sortOptions: { id: SortMode; label: string }[] = [
   { id: 'portfolio', label: 'Работы' },
 ]
 
+type PreviewMedia = {
+  url: string
+  focus: string
+}
+
 type MasterCard = {
   id: string
   name: string
@@ -114,7 +119,8 @@ type MasterCard = {
   services: ServiceItem[]
   serviceNames: string[]
   avatarUrl: string | null
-  portfolioPreview: { url: string; focus: string }[]
+  heroItem: PreviewMedia | null
+  thumbItems: PreviewMedia[]
   priceFrom: number | null
   priceTo: number | null
   experienceYears: number | null
@@ -123,6 +129,9 @@ type MasterCard = {
   worksAtClient: boolean
   worksAtMaster: boolean
   isActive: boolean
+  scheduleDays: string[]
+  scheduleStart: string | null
+  scheduleEnd: string | null
   cityName: string | null
   districtName: string | null
   locationLabel: string
@@ -137,10 +146,22 @@ type MasterCard = {
 const toSeed = (value: string) =>
   value.split('').reduce((total, char) => total + char.charCodeAt(0), 0)
 
+const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
+
 const getCategoryLabel = (categoryId: string) =>
   categoryLabelOverrides[categoryId] ??
   categoryItems.find((item) => item.id === categoryId)?.label ??
   categoryId
+
+const formatPriceRange = (from: number | null, to: number | null) => {
+  if (typeof from === 'number' && typeof to === 'number') {
+    if (from === to) return formatPrice(from)
+    return `${formatPrice(from)} - ${formatPrice(to)}`
+  }
+  if (typeof from === 'number') return `от ${formatPrice(from)}`
+  if (typeof to === 'number') return `до ${formatPrice(to)}`
+  return 'Цена не указана'
+}
 
 const formatExperience = (value: number | null) => {
   if (typeof value !== 'number' || value <= 0) {
@@ -184,6 +205,54 @@ const formatUpdatedLabel = (value: string | null) => {
     day: 'numeric',
     month: 'short',
   })}`
+}
+
+const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+
+const getDayKey = (offset: number) =>
+  dayKeyOrder[(new Date().getDay() + offset) % dayKeyOrder.length] ?? 'mon'
+
+const formatRecencyChip = (updatedAtTs: number) => {
+  if (!updatedAtTs) return 'Недавно'
+  const diffDays = Math.floor(
+    (Date.now() - updatedAtTs) / (24 * 60 * 60 * 1000)
+  )
+  if (diffDays <= 0) return 'Сегодня'
+  if (diffDays === 1) return 'Вчера'
+  if (diffDays < 7) return `${diffDays} дн`
+  return 'Недавно'
+}
+
+const buildDistanceLabel = (seed: number, hasLocation: boolean) => {
+  if (!hasLocation) return 'Рядом'
+  const value = 1 + (seed % 80) / 10
+  return `${value.toFixed(1).replace('.', ',')} км`
+}
+
+const buildResponseLabel = (seed: number) =>
+  `Ответ ${20 + (seed % 41)} мин`
+
+const buildSlotLabels = (
+  days: string[],
+  start: string | null,
+  end: string | null
+) => {
+  const todayKey = getDayKey(0)
+  const tomorrowKey = getDayKey(1)
+  const afterTomorrowKey = getDayKey(2)
+  let dayLabel = 'Окно'
+  if (days.includes(todayKey)) {
+    dayLabel = 'Сегодня'
+  } else if (days.includes(tomorrowKey)) {
+    dayLabel = 'Завтра'
+  } else if (days.includes(afterTomorrowKey)) {
+    dayLabel = 'Послезавтра'
+  } else if (days.length > 0) {
+    dayLabel = 'Ближайшее'
+  }
+
+  const timeLabel = start?.trim() || end?.trim() || 'По записи'
+  return { dayLabel, timeLabel }
 }
 
 export const ClientShowcaseGalleryScreen = ({
@@ -422,7 +491,9 @@ export const ClientShowcaseScreen = ({
         }))
 
       const avatarUrl = profile.avatarUrl ?? null
-      const portfolioPreview = portfolioItems.slice(-3).reverse()
+      const heroItem =
+        portfolioItems.length > 0 ? portfolioItems[portfolioItems.length - 1] : null
+      const thumbItems = portfolioItems.slice(-4, -1)
       const portfolioCount = portfolioItems.length
 
       const services = parseServiceItems(profile.services ?? [])
@@ -432,6 +503,9 @@ export const ClientShowcaseScreen = ({
       const priceFrom = profile.priceFrom ?? null
       const priceTo = profile.priceTo ?? null
       const isActive = Boolean(profile.isActive ?? true)
+      const scheduleDays = Array.isArray(profile.scheduleDays) ? profile.scheduleDays : []
+      const scheduleStart = profile.scheduleStart ?? null
+      const scheduleEnd = profile.scheduleEnd ?? null
       const reviewsCount =
         typeof profile.reviewsCount === 'number' ? profile.reviewsCount : 0
       const reviewsAverage =
@@ -462,7 +536,8 @@ export const ClientShowcaseScreen = ({
         services,
         serviceNames,
         avatarUrl,
-        portfolioPreview,
+        heroItem,
+        thumbItems,
         priceFrom,
         priceTo,
         experienceYears,
@@ -471,6 +546,9 @@ export const ClientShowcaseScreen = ({
         worksAtClient: Boolean(profile.worksAtClient),
         worksAtMaster: Boolean(profile.worksAtMaster),
         isActive,
+        scheduleDays,
+        scheduleStart,
+        scheduleEnd,
         cityName: profile.cityName ?? null,
         districtName: profile.districtName ?? null,
         locationLabel,
@@ -706,15 +784,43 @@ export const ClientShowcaseScreen = ({
                   '--card-accent-ink': palette.ink,
                 } as CSSProperties
                 const experienceLabel = formatExperience(master.experienceYears)
+                const priceLabel = formatPriceRange(master.priceFrom, master.priceTo)
+                const priceTag =
+                  master.priceFrom !== null || master.priceTo !== null
+                    ? priceLabel
+                    : 'По запросу'
                 const ratingLabel =
                   master.reviewsAverage !== null
                     ? `${master.reviewsAverage.toFixed(1)} ★`
                     : 'Новый'
-                const previewItems = master.portfolioPreview
-                const mediaItems = Array.from({ length: 3 }, (_, index) => ({
-                  item: previewItems[index] ?? null,
+                const slotLabels = buildSlotLabels(
+                  master.scheduleDays,
+                  master.scheduleStart,
+                  master.scheduleEnd
+                )
+                const seed = toSeed(master.id)
+                const distanceLabel = buildDistanceLabel(
+                  seed,
+                  master.locationLabel !== 'Локация не указана'
+                )
+                const responseLabel = buildResponseLabel(seed)
+                const recencyLabel = formatRecencyChip(master.updatedAtTs)
+                const chipItems = [
+                  distanceLabel,
+                  responseLabel,
+                  master.worksAtClient ? 'Выезд' : null,
+                  master.worksAtMaster ? 'У мастера' : null,
+                ].filter(Boolean) as string[]
+                const thumbSlots = Array.from({ length: 3 }, (_, index) => ({
+                  item: master.thumbItems[index] ?? null,
                   index,
                 }))
+                const heroItem = master.heroItem
+                const slotFill = 4 + (seed % 5)
+                const slotIndicators = Array.from({ length: 10 }, (_, index) =>
+                  index < slotFill
+                )
+                const reviewsLabel = master.reviewsCount > 0 ? `${master.reviewsCount}` : '—'
 
                 return (
                   <article
@@ -723,8 +829,34 @@ export const ClientShowcaseScreen = ({
                     role="listitem"
                     style={cardStyle}
                   >
-                    <div className="client-master-top">
-                      <div className="client-master-info">
+                    <div className="client-master-card-top">
+                      <button
+                        className="client-master-back"
+                        type="button"
+                        onClick={onBack}
+                      >
+                        ← Назад
+                      </button>
+                      <div className="client-master-head-actions">
+                        <button
+                          className="client-master-head-button"
+                          type="button"
+                          aria-label="Свернуть"
+                        >
+                          ˅
+                        </button>
+                        <button
+                          className="client-master-head-button"
+                          type="button"
+                          aria-label="Еще"
+                        >
+                          ⋮
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="client-master-overview">
+                      <div className="client-master-avatar-block">
                         <span className="client-master-avatar" aria-hidden="true">
                           {master.avatarUrl ? (
                             <img src={master.avatarUrl} alt="" loading="lazy" />
@@ -733,74 +865,110 @@ export const ClientShowcaseScreen = ({
                               {master.initials}
                             </span>
                           )}
-                          <span
-                            className={`client-master-status${
-                              master.isActive ? ' is-live' : ''
-                            }`}
-                          >
-                            {master.isActive ? 'Запись открыта' : 'Пауза'}
-                          </span>
                         </span>
-                        <div className="client-master-main">
-                          <div className="client-master-name-row">
-                            <h2 className="client-master-name">{master.name}</h2>
-                            <span className="client-master-score">
-                              {ratingLabel}
-                            </span>
-                          </div>
-                          <p className="client-master-meta">
-                            {master.primaryCategory} · {experienceLabel}
-                          </p>
-                          <div className="client-master-tags">
-                            <span className="client-master-tag">
-                              {master.locationLabel}
-                            </span>
-                            {master.reviewsCount > 0 && (
-                              <span className="client-master-tag">
-                                Отзывы {master.reviewsCount}
-                              </span>
-                            )}
-                            {master.worksAtClient && (
-                              <span className="client-master-tag">Выезд</span>
-                            )}
-                            {master.worksAtMaster && (
-                              <span className="client-master-tag">У мастера</span>
-                            )}
-                          </div>
-                        </div>
+                        <span className="client-master-chip client-master-chip--status is-accent">
+                          {recencyLabel}
+                        </span>
                       </div>
-                      <div className="client-master-media">
-                        <div className="client-master-gallery" role="list">
-                          {mediaItems.map(({ item, index }) => {
-                            const tileClassName = `client-master-gallery-item${
-                              index === 0 ? ' is-main' : ''
-                            }${item ? '' : ' is-empty'}`
-                            return (
-                              <span
-                                className={tileClassName}
-                                key={item?.url ?? `fallback-${index}`}
-                                role="listitem"
-                              >
-                                {item ? (
-                                  <img
-                                    src={item.url}
-                                    alt=""
-                                    loading="lazy"
-                                    style={{ objectPosition: item.focus }}
-                                  />
-                                ) : (
-                                  <span className="client-master-gallery-fallback">
-                                    {master.initials}
-                                  </span>
-                                )}
-                              </span>
-                            )
-                          })}
-                          <span className="client-master-signal">
-                            {master.updateLabel}
+                      <div className="client-master-overview-main">
+                        <div className="client-master-name-row">
+                          <h2 className="client-master-name">{master.name}</h2>
+                          <span className="client-master-score">
+                            {ratingLabel}
                           </span>
                         </div>
+                        <p className="client-master-meta">
+                          {master.primaryCategory} · {experienceLabel}
+                        </p>
+                        <div className="client-master-chip-row">
+                          {chipItems.map((chip, index) => (
+                            <span className="client-master-chip" key={`${chip}-${index}`}>
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="client-master-hero">
+                      {heroItem ? (
+                        <img
+                          src={heroItem.url}
+                          alt=""
+                          loading="lazy"
+                          style={{ objectPosition: heroItem.focus }}
+                        />
+                      ) : (
+                        <span className="client-master-hero-fallback">
+                          {master.initials}
+                        </span>
+                      )}
+                      {isFeatured && (
+                        <span className="client-master-hero-badge">
+                          Топ по отзывам
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="client-master-stats">
+                      <div className="client-master-stat">
+                        <span className="client-master-stat-value">{priceTag}</span>
+                        <span className="client-master-stat-label">Цена</span>
+                      </div>
+                      <div className="client-master-stat">
+                        <span className="client-master-stat-value">
+                          {slotLabels.dayLabel}
+                        </span>
+                        <span className="client-master-stat-subvalue">
+                          {slotLabels.timeLabel}
+                        </span>
+                        <span className="client-master-stat-label">Окно</span>
+                      </div>
+                      <div className="client-master-stat">
+                        <span className="client-master-stat-value">{reviewsLabel}</span>
+                        <span className="client-master-stat-label">Отзывы</span>
+                      </div>
+                    </div>
+
+                    <div className="client-master-availability">
+                      <span className="client-master-availability-label">
+                        Ближайшие слоты
+                      </span>
+                      <div className="client-master-slots">
+                        {slotIndicators.map((isOpen, index) => (
+                          <span
+                            className={`client-master-slot${
+                              isOpen ? ' is-open' : ''
+                            }`}
+                            key={`slot-${master.id}-${index}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="client-master-thumbs" role="list">
+                      {thumbSlots.map(({ item, index }) => (
+                        <span
+                          className={`client-master-thumb${
+                            item ? '' : ' is-empty'
+                          }`}
+                          key={item?.url ?? `thumb-${master.id}-${index}`}
+                          role="listitem"
+                        >
+                          {item ? (
+                            <img
+                              src={item.url}
+                              alt=""
+                              loading="lazy"
+                              style={{ objectPosition: item.focus }}
+                            />
+                          ) : (
+                            <span className="client-master-thumb-fallback">
+                              {master.initials}
+                            </span>
+                          )}
+                        </span>
+                      ))}
                     </div>
 
                     <div className="client-master-actions">
