@@ -666,6 +666,7 @@ app.get('/api/masters', async (req, res) => {
           mp.price_to AS "priceTo",
           mp.avatar_path AS "avatarPath",
           mp.cover_path AS "coverPath",
+          mp.is_active AS "isActive",
           mp.works_at_client AS "worksAtClient",
           mp.works_at_master AS "worksAtMaster",
           mp.categories,
@@ -683,7 +684,12 @@ app.get('/api/masters', async (req, res) => {
       `,
       values
     )
-    res.json(result.rows)
+    const payload = result.rows.map((row) => ({
+      ...row,
+      avatarUrl: buildPublicUrl(req, row.avatarPath),
+      coverUrl: buildPublicUrl(req, row.coverPath),
+    }))
+    res.json(payload)
   } catch (error) {
     console.error('GET /api/masters failed:', error)
     res.status(500).json({ error: 'server_error' })

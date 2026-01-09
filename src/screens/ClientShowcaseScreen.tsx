@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
-import { categoryItems, popularItems, storyItems } from '../data/clientData'
+import { categoryItems } from '../data/clientData'
 import type { MasterProfile } from '../types/app'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
@@ -61,14 +61,6 @@ const galleryShapePattern = [
 const pickGalleryShape = (seed: number) =>
   galleryShapePattern[seed % galleryShapePattern.length]
 
-const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
-  id: `fallback-showcase-${item.id}-${index}`,
-  url: item.image,
-  focusX: 0.5,
-  focusY: 0.5,
-  categories: item.categoryId ? [item.categoryId] : [],
-}))
-
 type SortMode = 'smart' | 'rating' | 'price' | 'distance' | 'available'
 
 const sortOptions: { id: SortMode; label: string }[] = [
@@ -90,21 +82,6 @@ const signalLabels = [
 const dayLabels = ['Сегодня', 'Завтра', 'Послезавтра']
 const timeSlots = ['09:00', '11:30', '13:00', '15:30', '18:00', '19:30']
 
-const fallbackProfiles: MasterProfile[] = storyItems.map((story, index) => ({
-  userId: `fallback-${story.id}`,
-  displayName: story.name,
-  categories: [categoryItems[index % categoryItems.length].id],
-  services: [],
-  portfolioUrls: [popularItems[index % popularItems.length].image],
-  avatarUrl: story.avatar,
-  worksAtClient: index % 2 === 0,
-  worksAtMaster: true,
-  experienceYears: 2 + (index % 7),
-  priceFrom: 1200 + index * 250,
-  priceTo: 2600 + index * 300,
-  isActive: true,
-}))
-
 type MasterCard = {
   id: string
   name: string
@@ -112,8 +89,8 @@ type MasterCard = {
   categoryLabels: string[]
   primaryCategory: string
   services: string[]
-  avatarUrl: string
-  heroUrl: string
+  avatarUrl: string | null
+  heroUrl: string | null
   heroFocus: string
   rating: number
   reviews: number
@@ -131,6 +108,7 @@ type MasterCard = {
   gallery: { url: string; focus: string }[]
   score: number
   slotCount: number
+  initials: string
 }
 
 const toSeed = (value: string) =>
@@ -148,6 +126,16 @@ const getCategoryLabel = (categoryId: string) =>
   categoryLabelOverrides[categoryId] ??
   categoryItems.find((item) => item.id === categoryId)?.label ??
   categoryId
+
+const getInitials = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return 'М'
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  const letters = parts.slice(0, 2).map((part) => part[0] ?? '')
+  const joined = letters.join('').toUpperCase()
+  if (joined) return joined
+  return normalized.slice(0, 2).toUpperCase()
+}
 
 const buildPriceRange = (profile: MasterProfile, seed: number) => {
   let from = profile.priceFrom ?? null
@@ -207,7 +195,7 @@ export const ClientShowcaseGalleryScreen = ({
 
         const nextPool = (Array.isArray(data) ? data : []).flatMap((profile) => {
           const categories = Array.isArray(profile.categories) ? profile.categories : []
-          return parsePortfolioItems(profile.showcaseUrls ?? [])
+          return parsePortfolioItems(profile.portfolioUrls ?? [])
             .filter((item) => isImageUrl(item.url))
             .map((item, index) => ({
               id: `${profile.userId}-${index}`,
@@ -237,15 +225,10 @@ export const ClientShowcaseGalleryScreen = ({
     }
   }, [apiBase])
 
-  const basePool = useMemo(
-    () => (showcasePool.length > 0 ? showcasePool : fallbackShowcasePool),
-    [showcasePool]
-  )
-
   const showcaseItems = useMemo(() => {
-    if (!activeCategoryId) return basePool
-    return basePool.filter((item) => item.categories.includes(activeCategoryId))
-  }, [activeCategoryId, basePool])
+    if (!activeCategoryId) return showcasePool
+    return showcasePool.filter((item) => item.categories.includes(activeCategoryId))
+  }, [activeCategoryId, showcasePool])
 
   const countLabel = isLoading
     ? 'Загрузка...'
@@ -431,11 +414,11 @@ export const ClientShowcaseScreen = ({
   }, [apiBase])
 
   const masterCards = useMemo<MasterCard[]>(() => {
-    const source = profiles.length > 0 ? profiles : fallbackProfiles
+    const source = profiles
     return source.map((profile, index) => {
       const seed = toSeed(profile.userId || profile.displayName || `${index}`)
       const portfolioItems = parsePortfolioItems(
-        profile.showcaseUrls ?? []
+        profile.portfolioUrls ?? []
       )
         .filter((item) => isImageUrl(item.url))
         .map((item) => ({
@@ -443,20 +426,18 @@ export const ClientShowcaseScreen = ({
           focus: `${(item.focusX ?? 0.5) * 100}% ${(item.focusY ?? 0.5) * 100}%`,
         }))
 
-      const fallbackImage = popularItems[index % popularItems.length]?.image
-      const heroItem = portfolioItems[0]
-      const heroUrl = heroItem?.url ?? fallbackImage
+      const heroItem = profile.coverUrl ? null : portfolioItems[0]
+      const heroUrl = profile.coverUrl ?? heroItem?.url ?? profile.avatarUrl ?? null
       const heroFocus = heroItem?.focus ?? '50% 50%'
 
-      const avatarUrl =
-        profile.avatarUrl ?? heroUrl ?? storyItems[index % storyItems.length]?.avatar
-      const gallery = portfolioItems.slice(1, 4)
+      const avatarUrl = profile.avatarUrl ?? null
+      const gallery = heroItem ? portfolioItems.slice(1, 4) : portfolioItems.slice(0, 3)
 
       const rating = clampNumber(4.5 + (seed % 45) / 100, 4.5, 5)
       const reviews = 12 + (seed % 220)
       const distance = clampNumber(0.6 + (seed % 90) / 10, 0.6, 12.5)
       const responseMinutes = 6 + (seed % 40)
-      const isAvailable = Boolean(profile.isActive ?? true) && seed % 3 !== 0
+      const isAvailable = Boolean(profile.isActive)
       const experienceYears = profile.experienceYears ?? 2 + (seed % 12)
       const { from, to } = buildPriceRange(profile, seed)
       const nextSlot = buildNextSlot(seed)
@@ -477,14 +458,14 @@ export const ClientShowcaseScreen = ({
         from / 5200
 
       return {
-        id: profile.userId || `fallback-${index}`,
+        id: profile.userId || `profile-${index}`,
         name: profile.displayName || 'Мастер',
         categories,
         categoryLabels,
         primaryCategory: categoryLabels[0],
         services: Array.isArray(profile.services) ? profile.services : [],
-        avatarUrl: avatarUrl ?? fallbackImage ?? '',
-        heroUrl: heroUrl ?? avatarUrl ?? '',
+        avatarUrl,
+        heroUrl,
         heroFocus,
         rating,
         reviews,
@@ -502,6 +483,7 @@ export const ClientShowcaseScreen = ({
         gallery,
         score,
         slotCount,
+        initials: getInitials(profile.displayName || 'Мастер'),
       }
     })
   }, [profiles])
@@ -715,7 +697,13 @@ export const ClientShowcaseScreen = ({
                     <div className="client-master-top">
                       <div className="client-master-info">
                         <span className="client-master-avatar" aria-hidden="true">
-                          <img src={master.avatarUrl} alt="" loading="lazy" />
+                          {master.avatarUrl ? (
+                            <img src={master.avatarUrl} alt="" loading="lazy" />
+                          ) : (
+                            <span className="client-master-avatar-fallback">
+                              {master.initials}
+                            </span>
+                          )}
                           <span
                             className={`client-master-status${
                               master.isAvailable ? ' is-live' : ''
@@ -750,13 +738,23 @@ export const ClientShowcaseScreen = ({
                           </div>
                         </div>
                       </div>
-                      <div className="client-master-hero">
-                        <img
-                          src={master.heroUrl}
-                          alt=""
-                          loading="lazy"
-                          style={{ objectPosition: master.heroFocus }}
-                        />
+                      <div
+                        className={`client-master-hero${
+                          master.heroUrl ? '' : ' is-empty'
+                        }`}
+                      >
+                        {master.heroUrl ? (
+                          <img
+                            src={master.heroUrl}
+                            alt=""
+                            loading="lazy"
+                            style={{ objectPosition: master.heroFocus }}
+                          />
+                        ) : (
+                          <span className="client-master-hero-placeholder">
+                            {master.initials}
+                          </span>
+                        )}
                         <span className="client-master-signal">{master.signal}</span>
                       </div>
                     </div>

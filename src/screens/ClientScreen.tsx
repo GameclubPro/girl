@@ -30,15 +30,6 @@ const collageShapes = ['is-wide', 'is-tall', 'is-small', 'is-small'] as const
 type ShowcaseShape = (typeof collageShapes)[number]
 const slotShapes: ShowcaseShape[] = [...collageShapes]
 
-const fallbackShowcasePool: ShowcaseMedia[] = popularItems.map((item, index) => ({
-  id: `fallback-${item.id}`,
-  url: item.image,
-  focusX: 0.5,
-  focusY: 0.5,
-  categories: item.categoryId ? [item.categoryId] : [],
-  shape: collageShapes[index % collageShapes.length],
-}))
-
 const shuffleItems = <T,>(items: T[]) => {
   const result = [...items]
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -94,7 +85,7 @@ export const ClientScreen = ({
 
         const nextPool = data.flatMap((profile) => {
           const categories = Array.isArray(profile.categories) ? profile.categories : []
-          return parsePortfolioItems(profile.showcaseUrls ?? [])
+          return parsePortfolioItems(profile.portfolioUrls ?? [])
             .filter((item) => isImageUrl(item.url))
             .map((item, index) => ({
               id: `${profile.userId}-${index}`,
@@ -124,12 +115,7 @@ export const ClientScreen = ({
     const pool = activeCategoryId
       ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
       : showcasePool
-    const basePool =
-      pool.length > 0
-        ? pool
-        : showcasePool.length > 0
-          ? showcasePool
-          : fallbackShowcasePool
+    const basePool = pool.length > 0 ? pool : showcasePool
     if (basePool.length === 0) return []
     const shuffled = shuffleItems(basePool)
     const poolByShape = {
@@ -190,22 +176,26 @@ export const ClientScreen = ({
               </button>
             </div>
             <div className="client-showcase-gallery" aria-label="Витрина работ">
-              {showcaseItems.map((item, index) => (
-                <span
-                  className="client-showcase-photo"
-                  key={`${item.id}-${index}`}
-                  style={{ gridArea: showcaseAreas[index % showcaseAreas.length] }}
-                >
-                  <img
-                    src={item.url}
-                    alt=""
-                    loading="lazy"
-                    style={{
-                      objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
-                    }}
-                  />
-                </span>
-              ))}
+              {showcaseItems.length > 0 ? (
+                showcaseItems.map((item, index) => (
+                  <span
+                    className="client-showcase-photo"
+                    key={`${item.id}-${index}`}
+                    style={{ gridArea: showcaseAreas[index % showcaseAreas.length] }}
+                  >
+                    <img
+                      src={item.url}
+                      alt=""
+                      loading="lazy"
+                      style={{
+                        objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
+                      }}
+                    />
+                  </span>
+                ))
+              ) : (
+                <span className="client-showcase-empty">Пока нет работ</span>
+              )}
             </div>
           </div>
         </section>
