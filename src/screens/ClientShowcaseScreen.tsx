@@ -790,23 +790,23 @@ export const ClientShowcaseScreen = ({
                               <span className="client-master-tag">У мастера</span>
                             )}
                           </div>
-                          <div className="client-master-stats">
-                            <span className="client-master-stat">
-                              <span className="client-master-stat-label">Цена</span>
-                              <span className="client-master-stat-value">{priceTag}</span>
-                            </span>
-                            <span className="client-master-stat">
-                              <span className="client-master-stat-label">Услуги</span>
-                              <span className="client-master-stat-value">
+                          <div className="client-master-metrics" aria-label="Сводка">
+                            <div className="client-master-metric is-price">
+                              <span className="client-master-metric-label">Цена</span>
+                              <span className="client-master-metric-value">{priceTag}</span>
+                            </div>
+                            <div className="client-master-metric">
+                              <span className="client-master-metric-value">
                                 {servicesCount}
                               </span>
-                            </span>
-                            <span className="client-master-stat">
-                              <span className="client-master-stat-label">Работы</span>
-                              <span className="client-master-stat-value">
+                              <span className="client-master-metric-label">Услуг</span>
+                            </div>
+                            <div className="client-master-metric">
+                              <span className="client-master-metric-value">
                                 {portfolioCount}
                               </span>
-                            </span>
+                              <span className="client-master-metric-label">Работ</span>
+                            </div>
                           </div>
                         </div>
                       </div>
