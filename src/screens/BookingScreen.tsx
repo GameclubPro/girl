@@ -374,6 +374,14 @@ export const BookingScreen = ({
 
   const selectedDay = availableDays.find((item) => item.key === selectedDayKey) ?? null
 
+  const masterCityId =
+    typeof profile?.cityId === 'number' ? profile.cityId : cityId
+  const masterDistrictId =
+    typeof profile?.districtId === 'number' ? profile.districtId : districtId
+  const masterCityName = profile?.cityName?.trim() || cityName || 'Город не указан'
+  const masterDistrictName =
+    profile?.districtName?.trim() || districtName || 'Район не указан'
+
   const priceLabel =
     selectedService?.price !== null && selectedService?.price !== undefined
       ? formatPrice(selectedService.price)
@@ -381,7 +389,7 @@ export const BookingScreen = ({
   const hasServices = serviceOptions.length > 0
   const hasCategoryChoice = availableCategoryIds.length > 1
   const hasServiceChoice = serviceOptions.length > 1
-  const hasLocation = Boolean(cityId && districtId)
+  const hasLocation = Boolean(masterCityId && masterDistrictId)
   const hasAddress = Boolean(address.trim())
   const hasSlots = Boolean(selectedDay && selectedTime)
   const canSubmit =
@@ -407,8 +415,8 @@ export const BookingScreen = ({
       return
     }
 
-    if (!cityId || !districtId) {
-      setSubmitError('Укажите город и район в профиле.')
+    if (!masterCityId || !masterDistrictId) {
+      setSubmitError('Мастер не указал город и район.')
       return
     }
 
@@ -442,8 +450,8 @@ export const BookingScreen = ({
         body: JSON.stringify({
           userId,
           masterId,
-          cityId,
-          districtId,
+          cityId: masterCityId,
+          districtId: masterDistrictId,
           address: address.trim() || null,
           categoryId,
           serviceName: serviceName.trim(),
@@ -464,6 +472,38 @@ export const BookingScreen = ({
         }
         if (data?.error === 'schedule_unavailable') {
           setSubmitError('Мастер еще не настроил расписание.')
+          return
+        }
+        if (data?.error === 'day_unavailable') {
+          setSubmitError('Мастер не принимает в этот день.')
+          return
+        }
+        if (data?.error === 'location_required') {
+          setSubmitError('Мастер не указал город и район.')
+          return
+        }
+        if (data?.error === 'address_required') {
+          setSubmitError('Для выезда нужен адрес клиента.')
+          return
+        }
+        if (data?.error === 'location_type_mismatch') {
+          setSubmitError('Мастер не работает в выбранном формате.')
+          return
+        }
+        if (data?.error === 'location_mismatch') {
+          setSubmitError('Локация мастера не совпадает с выбранной.')
+          return
+        }
+        if (data?.error === 'service_mismatch') {
+          setSubmitError('Выбранная услуга недоступна.')
+          return
+        }
+        if (data?.error === 'category_mismatch') {
+          setSubmitError('Категория услуги не совпадает с профилем мастера.')
+          return
+        }
+        if (data?.error === 'master_not_found') {
+          setSubmitError('Мастер не найден.')
           return
         }
         throw new Error('Create booking failed')
@@ -629,24 +669,24 @@ export const BookingScreen = ({
                 </div>
               )}
               <div className="request-field">
-                <span className="request-label">Город *</span>
+                <span className="request-label">Город мастера *</span>
                 <div className="request-select request-select--icon request-select--static">
                   <span className="request-select-main">
                     <span className="request-select-icon" aria-hidden="true">
                       <IconPin />
                     </span>
-                    {cityName || 'Город не указан'}
+                    {masterCityName}
                   </span>
                 </div>
               </div>
               <div className="request-field">
-                <span className="request-label">Район / метро *</span>
+                <span className="request-label">Район / метро мастера *</span>
                 <div className="request-select request-select--icon request-select--static">
                   <span className="request-select-main">
                     <span className="request-select-icon" aria-hidden="true">
                       <IconPin />
                     </span>
-                    {districtName || 'Район не указан'}
+                    {masterDistrictName}
                   </span>
                 </div>
               </div>
@@ -660,7 +700,7 @@ export const BookingScreen = ({
               )}
               {!hasLocation && (
                 <p className="request-helper">
-                  Заполните город и район в профиле, чтобы записаться.
+                  Мастер еще не указал город и район.
                 </p>
               )}
             </section>
