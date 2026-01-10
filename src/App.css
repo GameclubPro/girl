@@ -3637,21 +3637,16 @@
 }
 
 .pro-profile-ig-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: end;
+  column-gap: 16px;
+  row-gap: 10px;
   padding: 0 6px;
   margin-top: -70px;
   position: relative;
   z-index: 1;
-}
-
-.pro-profile-ig-top-info {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
 }
 
 .pro-profile-ig-avatar {
@@ -3725,6 +3720,7 @@
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 12px 18px rgba(16, 12, 11, 0.12);
+  align-self: end;
 }
 
 .pro-profile-ig-stat {
@@ -3762,6 +3758,7 @@
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
+  grid-column: 1 / -1;
 }
 
 .pro-profile-ig-name {
@@ -10098,14 +10095,10 @@ h2 {
   }
 
   .pro-profile-ig-header {
-    flex-direction: row;
-    align-items: flex-start;
+    align-items: end;
     margin-top: -56px;
-    gap: 10px;
-  }
-
-  .pro-profile-ig-top-info {
-    width: 100%;
+    column-gap: 12px;
+    row-gap: 8px;
   }
 
   .pro-profile-ig-avatar {
