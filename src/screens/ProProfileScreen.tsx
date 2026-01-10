@@ -471,6 +471,9 @@ export const ProProfileScreen = ({
     return availableServiceOptions.slice(0, 6)
   }, [availableServiceOptions, isServiceCatalogExpanded])
   const hasMoreServiceOptions = availableServiceOptions.length > 6
+  const parsedServiceAddPrice = parseNumber(serviceAddPrice)
+  const isServiceAddReady =
+    parsedServiceAddPrice !== null && parsedServiceAddPrice > 0
   const selectedServicesCount = serviceItems.length
   const selectedServicesLabel =
     selectedServicesCount > 0
@@ -996,21 +999,27 @@ export const ProProfileScreen = ({
     })
   }
 
-  const openServiceAddPanel = (serviceTitle: string) => {
-    setServiceAddTarget((current) => {
-      if (current === serviceTitle) {
-        return null
-      }
-      return serviceTitle
-    })
+  const resetServiceAddForm = () => {
     setServiceAddPrice('')
     setServiceAddDuration('')
     setServiceAddError('')
   }
 
+  const closeServiceAddPanel = () => {
+    setServiceAddTarget(null)
+    resetServiceAddForm()
+  }
+
+  const openServiceAddPanel = (serviceTitle: string) => {
+    setServiceAddTarget((current) =>
+      current === serviceTitle ? null : serviceTitle
+    )
+    resetServiceAddForm()
+  }
+
   const handleServiceAdd = () => {
     if (!serviceAddTarget) return
-    const parsedPrice = parseNumber(serviceAddPrice)
+    const parsedPrice = parsedServiceAddPrice
     if (parsedPrice === null || parsedPrice <= 0) {
       setServiceAddError('Укажите цену услуги.')
       return
@@ -1036,10 +1045,7 @@ export const ProProfileScreen = ({
       return next
     })
 
-    setServiceAddTarget(null)
-    setServiceAddPrice('')
-    setServiceAddDuration('')
-    setServiceAddError('')
+    closeServiceAddPanel()
   }
 
   const updateServiceItem = (
@@ -2659,7 +2665,11 @@ export const ProProfileScreen = ({
                               key={option.title}
                               role="listitem"
                             >
-                              <div className="pro-service-suggestion">
+                              <div
+                                className={`pro-service-suggestion${
+                                  isActive ? ' is-active' : ''
+                                }`}
+                              >
                                 <span className="pro-service-suggestion-body">
                                   <span className="pro-service-suggestion-title">
                                     {option.title}
@@ -2672,67 +2682,9 @@ export const ProProfileScreen = ({
                                   type="button"
                                   onClick={() => openServiceAddPanel(option.title)}
                                 >
-                                  {isActive ? 'Закрыть' : 'Добавить'}
+                                  {isActive ? 'Открыто' : 'Добавить'}
                                 </button>
                               </div>
-                              {isActive && (
-                                <div className="pro-service-add-panel">
-                                  <label className="pro-service-add-field">
-                                    <span className="pro-service-add-label">
-                                      Цена, ₽
-                                    </span>
-                                    <input
-                                      className="pro-input pro-service-add-input"
-                                      type="number"
-                                      value={serviceAddPrice}
-                                      onChange={(event) =>
-                                        setServiceAddPrice(event.target.value)
-                                      }
-                                      placeholder="1500"
-                                      min="0"
-                                    />
-                                  </label>
-                                  <label className="pro-service-add-field">
-                                    <span className="pro-service-add-label">
-                                      Длительность, мин
-                                    </span>
-                                    <input
-                                      className="pro-input pro-service-add-input"
-                                      type="number"
-                                      value={serviceAddDuration}
-                                      onChange={(event) =>
-                                        setServiceAddDuration(event.target.value)
-                                      }
-                                      placeholder="60"
-                                      min="0"
-                                    />
-                                  </label>
-                                  <div className="pro-service-add-actions">
-                                    <button
-                                      className="pro-service-add-confirm"
-                                      type="button"
-                                      onClick={handleServiceAdd}
-                                    >
-                                      Добавить услугу
-                                    </button>
-                                    <button
-                                      className="pro-service-add-cancel"
-                                      type="button"
-                                      onClick={() => {
-                                        setServiceAddTarget(null)
-                                        setServiceAddError('')
-                                      }}
-                                    >
-                                      Отмена
-                                    </button>
-                                  </div>
-                                  {serviceAddError && (
-                                    <p className="pro-service-add-error">
-                                      {serviceAddError}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           )
                         })}
@@ -2763,6 +2715,94 @@ export const ProProfileScreen = ({
                       </button>
                     )}
                   </div>
+
+                  {serviceAddTarget && (
+                    <div
+                      className="pro-service-add-overlay"
+                      role="dialog"
+                      aria-modal="true"
+                      onClick={(event) => {
+                        if (event.target === event.currentTarget) {
+                          closeServiceAddPanel()
+                        }
+                      }}
+                    >
+                      <div className="pro-service-add-sheet">
+                        <span className="pro-service-add-handle" aria-hidden="true" />
+                        <div className="pro-service-add-head">
+                          <p className="pro-service-add-kicker">Добавление услуги</p>
+                          <h3 className="pro-service-add-title">
+                            {serviceAddTarget}
+                          </h3>
+                          <p className="pro-service-add-subtitle">
+                            Укажите цену и длительность, чтобы услуга попала в
+                            профиль.
+                          </p>
+                        </div>
+                        {selectedServiceCategory?.label && (
+                          <span className="pro-service-add-category">
+                            {selectedServiceCategory.label}
+                          </span>
+                        )}
+                        <div className="pro-service-add-form">
+                          <label className="pro-service-add-field">
+                            <span className="pro-service-add-label">Цена, ₽</span>
+                            <input
+                              className="pro-input pro-service-add-input"
+                              type="number"
+                              value={serviceAddPrice}
+                              onChange={(event) => {
+                                setServiceAddPrice(event.target.value)
+                                if (serviceAddError) {
+                                  setServiceAddError('')
+                                }
+                              }}
+                              placeholder="1500"
+                              min="0"
+                            />
+                          </label>
+                          <label className="pro-service-add-field">
+                            <span className="pro-service-add-label">
+                              Длительность, мин
+                            </span>
+                            <input
+                              className="pro-input pro-service-add-input"
+                              type="number"
+                              value={serviceAddDuration}
+                              onChange={(event) => {
+                                setServiceAddDuration(event.target.value)
+                                if (serviceAddError) {
+                                  setServiceAddError('')
+                                }
+                              }}
+                              placeholder="60"
+                              min="0"
+                            />
+                          </label>
+                          <div className="pro-service-add-actions">
+                            <button
+                              className="pro-service-add-confirm"
+                              type="button"
+                              onClick={handleServiceAdd}
+                              disabled={!isServiceAddReady}
+                            >
+                              Добавить услугу
+                            </button>
+                            <button
+                              className="pro-service-add-cancel"
+                              type="button"
+                              onClick={closeServiceAddPanel}
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                          {serviceAddError && (
+                            <p className="pro-service-add-error">{serviceAddError}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pro-service-panel">
                     <div className="pro-service-panel-head">
