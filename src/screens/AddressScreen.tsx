@@ -75,6 +75,8 @@ export const AddressScreen = ({
     typeof location?.accuracy === 'number'
       ? `Точность ~${location.accuracy} м`
       : ''
+  const isLowAccuracy =
+    typeof location?.accuracy === 'number' && location.accuracy > 1500
 
   return (
     <div className="screen screen--address">
@@ -236,6 +238,12 @@ export const AddressScreen = ({
           <p className="address-helper">
             Мастера увидят только примерное расстояние.
           </p>
+          {isLowAccuracy && (
+            <p className="address-geo-warning">
+              Точность низкая — расстояния будут приблизительными. Включите GPS
+              и обновите геолокацию.
+            </p>
+          )}
           {locationError && <p className="address-error">{locationError}</p>}
         </div>
 

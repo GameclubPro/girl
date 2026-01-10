@@ -49,9 +49,9 @@ const formatGeoError = (error: unknown) => {
     case 'permission_denied':
       return 'Разрешите доступ к геолокации и включите точный режим (GPS).'
     case 'position_unavailable':
-      return 'Не удалось определить местоположение. Попробуйте снова.'
+      return 'Не удалось определить местоположение. Проверьте GPS и интернет.'
     case 'timeout':
-      return 'Не удалось получить точные координаты. Попробуйте еще раз.'
+      return 'Сигнал GPS слабый. Включите точный режим и попробуйте снова.'
     case 'low_accuracy': {
       const accuracy =
         typeof error.accuracy === 'number' ? Math.round(error.accuracy) : null

@@ -5481,6 +5481,13 @@
   cursor: not-allowed;
 }
 
+.pro-geo-warning {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b07a3c;
+}
+
 .pro-geo-error {
   margin: 0;
   font-size: 12px;
@@ -6147,6 +6154,13 @@
   font-size: 12px;
   font-weight: 600;
   color: #7a6f6a;
+}
+
+.address-geo-warning {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b07a3c;
 }
 
 .address-unavailable {
@@ -7554,6 +7568,28 @@ h2 {
   justify-content: space-between;
   gap: 12px;
   box-shadow: 0 10px 18px rgba(116, 90, 105, 0.14);
+}
+
+.client-geo-banner--warning {
+  border-color: rgba(214, 170, 132, 0.6);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 246, 236, 0.95) 0%,
+    rgba(255, 235, 219, 0.9) 100%
+  );
+}
+
+.client-geo-banner--warning .client-geo-title {
+  color: #7d4f2a;
+}
+
+.client-geo-banner--warning .client-geo-text {
+  color: #8b6b4f;
+}
+
+.client-geo-banner--warning .client-geo-button {
+  background: linear-gradient(135deg, #f2a25f 0%, #df7d3b 100%);
+  box-shadow: 0 10px 16px rgba(205, 120, 65, 0.25);
 }
 
 .client-geo-title {

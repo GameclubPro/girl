@@ -2,6 +2,7 @@ export type GeoResult = {
   lat: number
   lng: number
   accuracy: number
+  isApproximate: boolean
 }
 
 export type GeoFailureCode =
@@ -20,6 +21,7 @@ export type GeoFailure = {
 export type GeoRequestOptions = {
   minAccuracy?: number
   maxAccuracy?: number
+  fallbackAccuracy?: number
   maxWaitMs?: number
   timeoutMs?: number
 }
@@ -27,6 +29,7 @@ export type GeoRequestOptions = {
 const defaultOptions: Required<GeoRequestOptions> = {
   minAccuracy: 100,
   maxAccuracy: 1500,
+  fallbackAccuracy: 20000,
   maxWaitMs: 20000,
   timeoutMs: 12000,
 }
@@ -71,6 +74,9 @@ export const requestPreciseLocation = (
     let done = false
     let watchId: number | null = null
     let timeoutId: number | null = null
+    let coarseTimerId: number | null = null
+    let lastError: GeolocationPositionError | null = null
+    let coarseRequested = false
 
     const cleanup = () => {
       if (watchId !== null) {
@@ -79,9 +85,15 @@ export const requestPreciseLocation = (
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId)
       }
+      if (coarseTimerId !== null) {
+        window.clearTimeout(coarseTimerId)
+      }
     }
 
-    const finishSuccess = (position: GeolocationPosition) => {
+    const finishSuccess = (
+      position: GeolocationPosition,
+      isApproximate: boolean
+    ) => {
       if (done) return
       done = true
       cleanup()
@@ -89,6 +101,7 @@ export const requestPreciseLocation = (
         lat: position.coords.latitude,
         lng: position.coords.longitude,
         accuracy: position.coords.accuracy,
+        isApproximate,
       })
     }
 
@@ -103,7 +116,7 @@ export const requestPreciseLocation = (
       if (done) return
       best = pickBetter(best, position)
       if (position.coords.accuracy <= config.minAccuracy) {
-        finishSuccess(position)
+        finishSuccess(position, false)
       }
     }
 
@@ -113,45 +126,88 @@ export const requestPreciseLocation = (
         finishError('permission_denied')
         return
       }
-      if (error.code === error.POSITION_UNAVAILABLE) {
-        finishError('position_unavailable')
-        return
+      lastError = error
+      if (!coarseRequested) {
+        requestCoarseLocation()
       }
-      if (error.code === error.TIMEOUT) {
-        finishError('timeout')
-        return
-      }
-      finishError('unknown')
     }
 
-    const geoOptions: PositionOptions = {
+    const watchOptions: PositionOptions = {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+    }
+
+    const singleOptions: PositionOptions = {
       enableHighAccuracy: true,
       timeout: config.timeoutMs,
       maximumAge: 0,
+    }
+
+    const coarseDelayMs = Math.min(
+      4000,
+      Math.max(1500, Math.round(config.maxWaitMs * 0.2))
+    )
+    const coarseOptions: PositionOptions = {
+      enableHighAccuracy: false,
+      timeout: Math.min(10000, config.maxWaitMs),
+      maximumAge: 60000,
+    }
+    const requestCoarseLocation = () => {
+      if (coarseRequested || done) return
+      coarseRequested = true
+      navigator.geolocation.getCurrentPosition(
+        handleSuccess,
+        handleError,
+        coarseOptions
+      )
     }
 
     if (typeof navigator.geolocation.watchPosition === 'function') {
       watchId = navigator.geolocation.watchPosition(
         handleSuccess,
         handleError,
-        geoOptions
+        watchOptions
       )
     } else {
       navigator.geolocation.getCurrentPosition(
         handleSuccess,
         handleError,
-        geoOptions
+        singleOptions
       )
     }
+
+    coarseTimerId = window.setTimeout(() => {
+      requestCoarseLocation()
+    }, coarseDelayMs)
 
     timeoutId = window.setTimeout(() => {
       if (done) return
       if (!best) {
+        if (lastError) {
+          if (lastError.code === lastError.POSITION_UNAVAILABLE) {
+            finishError('position_unavailable')
+            return
+          }
+          if (lastError.code === lastError.TIMEOUT) {
+            finishError('timeout')
+            return
+          }
+          finishError('unknown')
+          return
+        }
         finishError('timeout')
         return
       }
+      const fallbackAccuracy = Math.max(
+        config.maxAccuracy,
+        config.fallbackAccuracy
+      )
       if (best.coords.accuracy <= config.maxAccuracy) {
-        finishSuccess(best)
+        finishSuccess(best, false)
+        return
+      }
+      if (best.coords.accuracy <= fallbackAccuracy) {
+        finishSuccess(best, true)
         return
       }
       finishError('low_accuracy', best.coords.accuracy)

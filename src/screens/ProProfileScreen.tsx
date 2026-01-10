@@ -94,9 +94,9 @@ const formatGeoError = (error: unknown) => {
     case 'permission_denied':
       return 'Разрешите доступ к геолокации и включите точный режим (GPS).'
     case 'position_unavailable':
-      return 'Не удалось определить местоположение. Попробуйте снова.'
+      return 'Не удалось определить местоположение. Проверьте GPS и интернет.'
     case 'timeout':
-      return 'Не удалось получить точные координаты. Попробуйте еще раз.'
+      return 'Сигнал GPS слабый. Включите точный режим и попробуйте снова.'
     case 'low_accuracy': {
       const accuracy =
         typeof error.accuracy === 'number' ? Math.round(error.accuracy) : null
@@ -427,6 +427,8 @@ export const ProProfileScreen = ({
     typeof proLocation?.accuracy === 'number'
       ? `Точность ~${proLocation.accuracy} м`
       : ''
+  const isGeoLowAccuracy =
+    typeof proLocation?.accuracy === 'number' && proLocation.accuracy > 1500
   const categoryLabels = useMemo(
     () =>
       categoryItems
@@ -2723,6 +2725,12 @@ export const ProProfileScreen = ({
                           </button>
                         )}
                       </div>
+                      {hasGeoLocation && isGeoLowAccuracy && (
+                        <p className="pro-geo-warning">
+                          Точность низкая — расстояние для клиентов будет
+                          приблизительным. Включите GPS и обновите геолокацию.
+                        </p>
+                      )}
                       {locationError && (
                         <p className="pro-geo-error">{locationError}</p>
                       )}

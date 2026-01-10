@@ -730,6 +730,11 @@ export const ClientShowcaseScreen = ({
   const hasClientLocation =
     typeof locationLat === 'number' && typeof locationLng === 'number'
   const isNearby = sortMode === 'distance'
+  const isLocationLowAccuracy =
+    typeof clientLocation?.accuracy === 'number' && clientLocation.accuracy > 1500
+  const lowAccuracyLabel = isLocationLowAccuracy
+    ? `Точность ~${clientLocation?.accuracy} м.`
+    : ''
 
   useEffect(() => {
     let cancelled = false
@@ -1087,6 +1092,25 @@ export const ClientShowcaseScreen = ({
                 disabled={isLocating}
               >
                 {isLocating ? 'Определяем...' : 'Поделиться'}
+              </button>
+            </div>
+          )}
+          {isNearby && hasClientLocation && isLocationLowAccuracy && (
+            <div className="client-geo-banner client-geo-banner--warning">
+              <div>
+                <div className="client-geo-title">Локация примерная</div>
+                <div className="client-geo-text">
+                  {lowAccuracyLabel || 'Точность низкая.'} Обновите геолокацию
+                  для точных расстояний.
+                </div>
+              </div>
+              <button
+                className="client-geo-button"
+                type="button"
+                onClick={onRequestLocation}
+                disabled={isLocating}
+              >
+                {isLocating ? 'Определяем...' : 'Уточнить'}
               </button>
             </div>
           )}
