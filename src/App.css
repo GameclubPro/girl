@@ -4702,6 +4702,10 @@
     calc(24px + env(safe-area-inset-bottom));
 }
 
+.pro-profile-editor-screen.is-inline-save {
+  --pro-editor-savebar: 0px;
+}
+
 .pro-profile-editor-shell {
   width: min(520px, 100%);
   display: flex;
@@ -4746,6 +4750,18 @@
   box-sizing: border-box;
   display: flex;
   justify-content: center;
+}
+
+.pro-profile-editor-actions.is-inline {
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border-top: none;
+  box-shadow: none;
 }
 
 .pro-profile-editor-save {

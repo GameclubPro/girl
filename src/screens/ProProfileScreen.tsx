@@ -2416,7 +2416,13 @@ export const ProProfileScreen = ({
       )}
 
       {editingSection && (
-        <div className="pro-profile-editor-screen" role="dialog" aria-modal="true">
+        <div
+          className={`pro-profile-editor-screen${
+            editingSection === 'services' ? ' is-inline-save' : ''
+          }`}
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="pro-profile-editor-shell">
             <section className="pro-profile-editor-card">
               {editingSection === 'basic' && (
@@ -2901,7 +2907,11 @@ export const ProProfileScreen = ({
                 {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
               </div>
             )}
-            <div className="pro-profile-editor-actions">
+            <div
+              className={`pro-profile-editor-actions${
+                editingSection === 'services' ? ' is-inline' : ''
+              }`}
+            >
               <button
                 className="pro-profile-action is-primary pro-profile-editor-save"
                 type="button"
