@@ -2468,8 +2468,6 @@
   border-radius: 12px;
   border: 1px solid rgba(32, 25, 20, 0.12);
   background: rgba(255, 255, 255, 0.95);
-  font-size: 14px;
-  font-weight: 700;
   color: var(--pro-ink);
   cursor: pointer;
   display: inline-flex;
@@ -2477,6 +2475,11 @@
   justify-content: center;
   box-shadow: 0 8px 12px rgba(16, 12, 11, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pro-service-settings svg {
+  width: 16px;
+  height: 16px;
 }
 
 .pro-service-settings.is-active {
@@ -4685,6 +4688,7 @@
 }
 
 .pro-profile-editor-screen {
+  --pro-editor-savebar: 96px;
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -4695,7 +4699,7 @@
   justify-content: center;
   overflow-y: auto;
   padding: calc(16px + var(--safe-top) + var(--tg-top-offset)) 18px
-    calc(24px + env(safe-area-inset-bottom));
+    calc(24px + var(--pro-editor-savebar) + env(safe-area-inset-bottom));
 }
 
 .pro-profile-editor-shell {
@@ -4723,6 +4727,22 @@
 }
 
 .pro-profile-editor-actions {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(520px, 100%);
+  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 249, 243, 0.5) 0%,
+    rgba(255, 249, 243, 0.92) 50%,
+    rgba(255, 249, 243, 0.98) 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 -16px 24px rgba(16, 12, 11, 0.14);
+  z-index: 65;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
 }

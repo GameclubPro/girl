@@ -231,6 +231,27 @@ export const IconDistrict = () => (
   </svg>
 )
 
+export const IconSettings = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="12"
+      r="3.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2.2 2.2 0 0 1-3.11 3.11l-.05-.05A1.7 1.7 0 0 0 15 20.3a1.7 1.7 0 0 0-1 1.56V22a2.2 2.2 0 0 1-4.4 0v-.07a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.88.34l-.05.05a2.2 2.2 0 0 1-3.11-3.11l.05-.05A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H2a2.2 2.2 0 0 1 0-4.4h.07a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.88l-.05-.05a2.2 2.2 0 0 1 3.11-3.11l.05.05A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.56V3a2.2 2.2 0 0 1 4.4 0v.07a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.88-.34l.05-.05a2.2 2.2 0 0 1 3.11 3.11l-.05.05A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1H22a2.2 2.2 0 0 1 0 4.4h-.07a1.7 1.7 0 0 0-1.56 1Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 export const IconAddress = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path

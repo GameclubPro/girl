@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
+import { IconSettings } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
 import type {
@@ -2824,7 +2825,7 @@ export const ProProfileScreen = ({
                                     service.name || 'услугу'
                                   }`}
                                 >
-                                  <span aria-hidden="true">⚙︎</span>
+                                  <IconSettings />
                                 </button>
                                 <span className="pro-service-name">
                                   {service.name}
