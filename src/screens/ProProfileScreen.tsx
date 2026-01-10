@@ -487,14 +487,8 @@ export const ProProfileScreen = ({
   const focusPoint = resolvePortfolioFocus(focusItem)
   const focusIndex = portfolioFocusIndex ?? 0
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_ROW_LIMIT
-  const isPortfolioCollapsed = !isPortfolioExpanded && hasPortfolioOverflow
-  const visiblePortfolioLimit =
-    isPortfolioCollapsed && !isPortfolioFull
-      ? PORTFOLIO_ROW_LIMIT - 1
-      : PORTFOLIO_ROW_LIMIT
-  const visiblePortfolioItems = isPortfolioCollapsed
-    ? portfolioGridItems.slice(0, Math.max(visiblePortfolioLimit, 0))
-    : portfolioGridItems
+  const isPortfolioCollapsed = !isPortfolioExpanded
+  const visiblePortfolioItems = portfolioGridItems
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)

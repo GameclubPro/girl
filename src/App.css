@@ -4299,13 +4299,35 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .pro-profile-portfolio-grid.is-collapsed {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  overflow: hidden;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: clamp(92px, 30vw, 140px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  gap: 10px;
+}
+
+.pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
+  display: none;
+}
+
+.pro-profile-portfolio-grid.is-collapsed .pro-profile-portfolio-item {
+  aspect-ratio: 3 / 4;
+  border-radius: 16px;
+  scroll-snap-align: start;
+}
+
+.pro-profile-portfolio-grid.is-collapsed .pro-profile-portfolio-empty {
+  min-width: 100%;
 }
 
 .pro-profile-portfolio-item {

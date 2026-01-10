@@ -359,10 +359,8 @@ export const ClientMasterProfileScreen = ({
     [portfolioItems]
   )
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_PREVIEW_LIMIT
-  const isPortfolioCollapsed = !isPortfolioExpanded && hasPortfolioOverflow
-  const visiblePortfolioItems = isPortfolioCollapsed
-    ? portfolioGridItems.slice(0, PORTFOLIO_PREVIEW_LIMIT)
-    : portfolioGridItems
+  const isPortfolioCollapsed = !isPortfolioExpanded
+  const visiblePortfolioItems = portfolioGridItems
   const portfolioCountLabel =
     portfolioGridItems.length > 0 ? `${portfolioGridItems.length} фото` : 'Нет фото'
 
