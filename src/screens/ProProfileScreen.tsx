@@ -168,6 +168,8 @@ export const ProProfileScreen = ({
   const [serviceCategoryId, setServiceCategoryId] = useState<CategoryId>(
     categoryItems[0]?.id ?? 'beauty-nails'
   )
+  const [serviceSearch, setServiceSearch] = useState('')
+  const [isServiceCatalogExpanded, setIsServiceCatalogExpanded] = useState(false)
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
   const [worksAtClient, setWorksAtClient] = useState(true)
@@ -452,6 +454,31 @@ export const ProProfileScreen = ({
     () => requestServiceCatalog[serviceCategoryId] ?? [],
     [serviceCategoryId]
   )
+  const normalizedServiceSearch = serviceSearch.trim().toLowerCase()
+  const availableServiceOptions = useMemo(
+    () =>
+      serviceCatalogOptions.filter(
+        (option) => !selectedServiceKeys.has(normalizeServiceKey(option.title))
+      ),
+    [serviceCatalogOptions, selectedServiceKeys]
+  )
+  const filteredServiceOptions = useMemo(() => {
+    if (!normalizedServiceSearch) return availableServiceOptions
+    return availableServiceOptions.filter((option) => {
+      const title = option.title.toLowerCase()
+      const subtitle = option.subtitle?.toLowerCase() ?? ''
+      return title.includes(normalizedServiceSearch) ||
+        subtitle.includes(normalizedServiceSearch)
+    })
+  }, [availableServiceOptions, normalizedServiceSearch])
+  const visibleServiceOptions = useMemo(() => {
+    if (normalizedServiceSearch || isServiceCatalogExpanded) {
+      return filteredServiceOptions
+    }
+    return filteredServiceOptions.slice(0, 6)
+  }, [filteredServiceOptions, isServiceCatalogExpanded, normalizedServiceSearch])
+  const hasMoreServiceOptions =
+    !normalizedServiceSearch && filteredServiceOptions.length > 6
   const selectedServicesCount = serviceItems.length
   const selectedServicesLabel =
     selectedServicesCount > 0
@@ -947,6 +974,11 @@ export const ProProfileScreen = ({
   const handleServiceCategoryChange = (categoryId: CategoryId) => {
     setServiceCategoryId(categoryId)
   }
+
+  useEffect(() => {
+    setServiceSearch('')
+    setIsServiceCatalogExpanded(false)
+  }, [serviceCategoryId])
 
   const syncCategorySelection = (categoryId: string, nextItems: ServiceItem[]) => {
     if (!categoryId) return
@@ -2583,53 +2615,86 @@ export const ProProfileScreen = ({
                   <div className="pro-service-panel">
                     <div className="pro-service-panel-head">
                       <div className="pro-service-panel-title">
-                        <span className="pro-label">Услуги в категории</span>
+                        <span className="pro-label">Добавить услуги</span>
                         <p className="pro-service-panel-subtitle">
-                          Тапните, чтобы добавить или убрать
+                          Поиск по названию или типу услуги
                         </p>
                       </div>
                       <span className="pro-service-count-pill">
                         {categorySelectionLabel}
                       </span>
                     </div>
-                    <div
-                      className="request-service-grid pro-service-catalog-grid"
-                      role="list"
-                      aria-label="Выберите услуги"
-                    >
-                      {serviceCatalogOptions.map((option) => {
-                        const optionKey = normalizeServiceKey(option.title)
-                        const isSelected = selectedServiceKeys.has(optionKey)
-                        return (
+                    <div className="pro-service-search">
+                      <input
+                        className="pro-input pro-service-search-input"
+                        type="search"
+                        placeholder="Например, аппаратный маникюр"
+                        value={serviceSearch}
+                        onChange={(event) => setServiceSearch(event.target.value)}
+                        aria-label="Поиск услуги"
+                      />
+                      {serviceSearch && (
+                        <button
+                          className="pro-service-search-clear"
+                          type="button"
+                          onClick={() => setServiceSearch('')}
+                          aria-label="Очистить поиск"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    {visibleServiceOptions.length > 0 && (
+                      <div className="pro-service-suggestions" role="list">
+                        {visibleServiceOptions.map((option) => (
                           <button
-                            className={`request-service-card${
-                              isSelected ? ' is-active' : ''
-                            }`}
+                            className="pro-service-suggestion"
                             key={option.title}
                             type="button"
                             onClick={() => toggleCatalogService(option.title)}
-                            aria-pressed={isSelected}
                           >
-                            <span className="request-service-text">
-                              <span className="request-service-title">
+                            <span className="pro-service-suggestion-body">
+                              <span className="pro-service-suggestion-title">
                                 {option.title}
                               </span>
-                              <span className="request-service-subtitle">
-                                {option.subtitle}
-                              </span>
+                              {option.subtitle && (
+                                <span className="pro-service-suggestion-meta">
+                                  {option.subtitle}
+                                </span>
+                              )}
                             </span>
-                            <span
-                              className="request-service-indicator"
-                              aria-hidden="true"
-                            />
+                            <span className="pro-service-suggestion-action">
+                              Добавить
+                            </span>
                           </button>
-                        )
-                      })}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                     {serviceCatalogOptions.length === 0 && (
                       <p className="pro-service-empty">
                         Пока нет услуг для этой категории.
                       </p>
+                    )}
+                    {serviceCatalogOptions.length > 0 &&
+                      filteredServiceOptions.length === 0 && (
+                        <p className="pro-service-empty">
+                          {normalizedServiceSearch
+                            ? 'Ничего не найдено. Попробуйте другой запрос.'
+                            : 'Все услуги категории уже добавлены.'}
+                        </p>
+                      )}
+                    {hasMoreServiceOptions && (
+                      <button
+                        className="pro-service-expand"
+                        type="button"
+                        onClick={() =>
+                          setIsServiceCatalogExpanded((prev) => !prev)
+                        }
+                      >
+                        {isServiceCatalogExpanded
+                          ? 'Скрыть услуги'
+                          : `Показать все (${filteredServiceOptions.length})`}
+                      </button>
                     )}
                   </div>
 
