@@ -4789,10 +4789,10 @@
 }
 
 .pro-cabinet-pill.is-primary {
-  border: none;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 12px 20px rgba(255, 107, 61, 0.25);
+  border: 1.5px solid var(--pro-accent);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .pro-cabinet-pill:focus-visible {
@@ -5278,14 +5278,14 @@
 }
 
 .pro-banner-button {
-  border: none;
+  border: 1.5px solid var(--pro-accent);
   border-radius: 14px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 10px 16px rgba(255, 107, 61, 0.2);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
 }
 
@@ -5354,14 +5354,14 @@
 }
 
 .pro-add {
-  border: none;
+  border: 1.5px solid var(--pro-accent);
   border-radius: 14px;
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 10px 16px rgba(255, 107, 61, 0.25);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
 }
 
@@ -5463,20 +5463,22 @@
 }
 
 .pro-primary {
-  border: none;
+  border: 1.5px solid var(--pro-accent);
   border-radius: 18px;
   padding: 12px 16px;
   font-size: 15px;
   font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 14px 22px rgba(255, 107, 61, 0.3);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
 }
 
 .pro-primary:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  border-color: rgba(255, 107, 61, 0.3);
+  color: rgba(255, 107, 61, 0.35);
   box-shadow: none;
 }
 
@@ -5556,8 +5558,10 @@
 }
 
 .screen--pro-requests .requests-tab.is-active {
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 10px 16px rgba(255, 107, 61, 0.2);
+  background: transparent;
+  border: 1.5px solid var(--pro-accent);
+  color: var(--pro-accent);
+  box-shadow: none;
 }
 
 .screen--pro-requests .booking-item {
@@ -5606,8 +5610,10 @@
 }
 
 .screen--pro-requests .booking-action.is-primary {
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 12px 18px rgba(255, 107, 61, 0.2);
+  background: transparent;
+  border: 1.5px solid var(--pro-accent);
+  color: var(--pro-accent);
+  box-shadow: none;
 }
 
 .screen--pro-requests .booking-price-input {
@@ -5761,14 +5767,14 @@
 }
 
 .pro-response-button {
-  border: none;
+  border: 1.5px solid var(--pro-accent);
   border-radius: 16px;
   padding: 10px 14px;
   font-size: 14px;
   font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 12px 18px rgba(255, 107, 61, 0.2);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
 }
 
