@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
-import { IconSettings } from '../components/icons'
+import { IconClock, IconHome, IconList, IconPin, IconSettings } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
 import type {
@@ -411,10 +411,34 @@ export const ProProfileScreen = ({
   const hasPrice = priceFromValue !== null || priceToValue !== null
   const hasExperience = experienceValue !== null
   const profileFacts = [
-    { label: 'Локация', value: locationLabel, isMuted: !hasLocation },
-    { label: 'Формат', value: workFormatLabel, isMuted: !hasWorkFormat },
-    { label: 'Цена', value: priceLabel, isMuted: !hasPrice },
-    { label: 'Опыт', value: experienceLabel, isMuted: !hasExperience },
+    {
+      id: 'location',
+      label: 'Локация',
+      value: locationLabel,
+      icon: <IconPin />,
+      isMuted: !hasLocation,
+    },
+    {
+      id: 'format',
+      label: 'Формат',
+      value: workFormatLabel,
+      icon: <IconHome />,
+      isMuted: !hasWorkFormat,
+    },
+    {
+      id: 'price',
+      label: 'Цена',
+      value: priceLabel,
+      icon: <IconList />,
+      isMuted: !hasPrice,
+    },
+    {
+      id: 'experience',
+      label: 'Опыт',
+      value: experienceLabel,
+      icon: <IconClock />,
+      isMuted: !hasExperience,
+    },
   ]
   const hasGeoLocation =
     typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
@@ -1853,8 +1877,16 @@ export const ProProfileScreen = ({
                     }`}
                     key={fact.label}
                   >
-                    <span className="pro-profile-fact-label">{fact.label}</span>
-                    <span className="pro-profile-fact-value">{fact.value}</span>
+                    <span
+                      className={`pro-profile-fact-icon is-${fact.id}`}
+                      aria-hidden="true"
+                    >
+                      {fact.icon}
+                    </span>
+                    <div className="pro-profile-fact-info">
+                      <span className="pro-profile-fact-value">{fact.value}</span>
+                      <span className="pro-profile-fact-label">{fact.label}</span>
+                    </div>
                   </div>
                 ))}
               </div>

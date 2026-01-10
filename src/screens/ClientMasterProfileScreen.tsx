@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
+import {
+  IconClock,
+  IconHome,
+  IconList,
+  IconPin,
+  IconUser,
+  IconUsers,
+} from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, MasterReview, MasterReviewSummary } from '../types/app'
 import {
@@ -314,10 +321,34 @@ export const ClientMasterProfileScreen = ({
     typeof profile?.experienceYears === 'number' &&
     Number.isFinite(profile.experienceYears)
   const profileFacts = [
-    { label: 'Локация', value: locationLabel, isMuted: !hasLocation },
-    { label: 'Формат', value: workFormatLabel, isMuted: !hasWorkFormat },
-    { label: 'Цена', value: priceLabel, isMuted: !hasPrice },
-    { label: 'Опыт', value: experienceLabel, isMuted: !hasExperience },
+    {
+      id: 'location',
+      label: 'Локация',
+      value: locationLabel,
+      icon: <IconPin />,
+      isMuted: !hasLocation,
+    },
+    {
+      id: 'format',
+      label: 'Формат',
+      value: workFormatLabel,
+      icon: <IconHome />,
+      isMuted: !hasWorkFormat,
+    },
+    {
+      id: 'price',
+      label: 'Цена',
+      value: priceLabel,
+      icon: <IconList />,
+      isMuted: !hasPrice,
+    },
+    {
+      id: 'experience',
+      label: 'Опыт',
+      value: experienceLabel,
+      icon: <IconClock />,
+      isMuted: !hasExperience,
+    },
   ]
   const scheduleDays = Array.isArray(profile?.scheduleDays) ? profile?.scheduleDays : []
   const scheduleLabel = buildScheduleLabel(scheduleDays)
@@ -466,8 +497,16 @@ export const ClientMasterProfileScreen = ({
                       }`}
                       key={fact.label}
                     >
-                      <span className="pro-profile-fact-label">{fact.label}</span>
-                      <span className="pro-profile-fact-value">{fact.value}</span>
+                      <span
+                        className={`pro-profile-fact-icon is-${fact.id}`}
+                        aria-hidden="true"
+                      >
+                        {fact.icon}
+                      </span>
+                      <div className="pro-profile-fact-info">
+                        <span className="pro-profile-fact-value">{fact.value}</span>
+                        <span className="pro-profile-fact-label">{fact.label}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
