@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
-import {
-  IconClock,
-  IconHome,
-  IconList,
-  IconPin,
-  IconSettings,
-  IconUser,
-} from '../components/icons'
+import { IconClock, IconHome, IconList, IconPin, IconSettings } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
 import type {
@@ -2509,6 +2502,15 @@ export const ProProfileScreen = ({
           aria-modal="true"
         >
           <div className="pro-profile-editor-shell">
+            <div className="pro-profile-editor-close-row">
+              <button
+                className="pro-profile-editor-close"
+                type="button"
+                onClick={() => setEditingSection(null)}
+              >
+                Назад
+              </button>
+            </div>
             {editingSection !== 'media' && (
               <div className="pro-profile-editor-tabs" role="tablist">
                 <button
@@ -2520,10 +2522,7 @@ export const ProProfileScreen = ({
                   aria-selected={editingSection === 'basic'}
                   onClick={() => openEditor('basic')}
                 >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconUser />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">О себе</span>
+                  О себе
                 </button>
                 <button
                   className={`pro-profile-editor-tab${
@@ -2534,10 +2533,7 @@ export const ProProfileScreen = ({
                   aria-selected={editingSection === 'location'}
                   onClick={() => openEditor('location')}
                 >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconPin />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">Локация</span>
+                  Локация
                 </button>
                 <button
                   className={`pro-profile-editor-tab${
@@ -2548,10 +2544,7 @@ export const ProProfileScreen = ({
                   aria-selected={editingSection === 'availability'}
                   onClick={() => openEditor('availability')}
                 >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconClock />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">График</span>
+                  График
                 </button>
                 <button
                   className={`pro-profile-editor-tab${
@@ -2562,10 +2555,7 @@ export const ProProfileScreen = ({
                   aria-selected={editingSection === 'services'}
                   onClick={() => openEditor('services')}
                 >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconList />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">Услуги</span>
+                  Услуги
                 </button>
               </div>
             )}
