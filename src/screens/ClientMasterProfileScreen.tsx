@@ -286,7 +286,7 @@ export const ClientMasterProfileScreen = ({
   const displayName = profile?.displayName?.trim() || 'Мастер'
   const initials = getInitials(displayName)
   const aboutValue = profile?.about?.trim() || ''
-  const aboutText = aboutValue || 'Описание пока не добавлено.'
+  const aboutText = aboutValue || 'Статус пока не добавлен.'
   const primaryCategory = categoryLabels[0]
   const reviewCount = reviewSummary?.count ?? 0
   const reviewAverage = reviewSummary?.average ?? 0
@@ -306,12 +306,19 @@ export const ClientMasterProfileScreen = ({
   const experienceLabel = formatExperience(profile?.experienceYears ?? null)
   const locationLabel = buildLocationLabel(profile)
   const workFormatLabel = buildWorkFormatLabel(profile)
-  const profileMetaPrimary = [locationLabel, workFormatLabel]
-    .filter(Boolean)
-    .join(' • ')
-  const profileMetaSecondary = [priceLabel, experienceLabel]
-    .filter(Boolean)
-    .join(' • ')
+  const hasLocation = Boolean(profile?.cityName || profile?.districtName)
+  const hasWorkFormat = Boolean(profile?.worksAtClient || profile?.worksAtMaster)
+  const hasPrice =
+    typeof profile?.priceFrom === 'number' || typeof profile?.priceTo === 'number'
+  const hasExperience =
+    typeof profile?.experienceYears === 'number' &&
+    Number.isFinite(profile.experienceYears)
+  const profileFacts = [
+    { label: 'Локация', value: locationLabel, isMuted: !hasLocation },
+    { label: 'Формат', value: workFormatLabel, isMuted: !hasWorkFormat },
+    { label: 'Цена', value: priceLabel, isMuted: !hasPrice },
+    { label: 'Опыт', value: experienceLabel, isMuted: !hasExperience },
+  ]
   const scheduleDays = Array.isArray(profile?.scheduleDays) ? profile?.scheduleDays : []
   const scheduleLabel = buildScheduleLabel(scheduleDays)
   const scheduleRange = buildScheduleRange(
@@ -440,6 +447,32 @@ export const ClientMasterProfileScreen = ({
                 </div>
               </div>
               <div className="pro-profile-ig-body">
+                <div className="pro-profile-status-card">
+                  <div className="pro-profile-status-head">
+                    <span className="pro-profile-status-title">Статус</span>
+                    <span className="pro-profile-status-tag">статус мастера</span>
+                  </div>
+                  <p
+                    className={`pro-profile-status-text${
+                      aboutValue ? '' : ' is-muted'
+                    }`}
+                  >
+                    {aboutText}
+                  </p>
+                </div>
+                <div className="pro-profile-facts-grid">
+                  {profileFacts.map((fact) => (
+                    <div
+                      className={`pro-profile-fact-card${
+                        fact.isMuted ? ' is-muted' : ''
+                      }`}
+                      key={fact.label}
+                    >
+                      <span className="pro-profile-fact-label">{fact.label}</span>
+                      <span className="pro-profile-fact-value">{fact.value}</span>
+                    </div>
+                  ))}
+                </div>
                 <div className="pro-profile-ig-tags">
                   {previewTags.length > 0 ? (
                     <>
@@ -466,15 +499,6 @@ export const ClientMasterProfileScreen = ({
                   ) : (
                     <span className="pro-profile-tag is-muted">Нет отзывов</span>
                   )}
-                </div>
-                <p
-                  className={`pro-profile-ig-about${aboutValue ? '' : ' is-muted'}`}
-                >
-                  {aboutText}
-                </p>
-                <div className="pro-profile-ig-meta">{profileMetaPrimary}</div>
-                <div className="pro-profile-ig-meta is-muted">
-                  {profileMetaSecondary}
                 </div>
               </div>
               <div className="pro-profile-ig-actions">
@@ -575,7 +599,7 @@ export const ClientMasterProfileScreen = ({
                   👤
                 </span>
                 <span className="pro-profile-card-content">
-                  <span className="pro-profile-card-title">О себе</span>
+                  <span className="pro-profile-card-title">Статус</span>
                   <span
                     className={`pro-profile-card-value${
                       aboutValue ? '' : ' is-muted'

@@ -351,7 +351,7 @@ export const ProProfileScreen = ({
   const displayNameValue =
     displayName.trim() || displayNameFallback.trim() || 'Мастер'
   const activeTone = isActive ? 'is-active' : 'is-paused'
-  const aboutPreview = about.trim() || 'Описание пока не добавлено.'
+  const aboutPreview = about.trim() || 'Статус пока не добавлен.'
   const profileInitials = useMemo(() => {
     const source = displayNameValue.trim()
     if (!source) return 'MK'
@@ -406,12 +406,16 @@ export const ProProfileScreen = ({
       : ''
     return [cityLabel, districtLabel].filter(Boolean).join(', ') || 'Город не указан'
   }, [cities, cityId, districts, districtId])
-  const profileMetaPrimary = [locationLabel, workFormatLabel]
-    .filter(Boolean)
-    .join(' • ')
-  const profileMetaSecondary = [servicePriceLabel, experienceLabel]
-    .filter(Boolean)
-    .join(' • ')
+  const hasLocation = cityId !== null || districtId !== null
+  const hasWorkFormat = worksAtClient || worksAtMaster
+  const hasPrice = priceFromValue !== null || priceToValue !== null
+  const hasExperience = experienceValue !== null
+  const profileFacts = [
+    { label: 'Локация', value: locationLabel, isMuted: !hasLocation },
+    { label: 'Формат', value: workFormatLabel, isMuted: !hasWorkFormat },
+    { label: 'Цена', value: priceLabel, isMuted: !hasPrice },
+    { label: 'Опыт', value: experienceLabel, isMuted: !hasExperience },
+  ]
   const hasGeoLocation =
     typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
   const geoUpdatedLabel = proLocation?.updatedAt
@@ -1830,6 +1834,32 @@ export const ProProfileScreen = ({
             </div>
           </div>
           <div className="pro-profile-ig-body">
+            <div className="pro-profile-status-card">
+              <div className="pro-profile-status-head">
+                <span className="pro-profile-status-title">Статус</span>
+                <span className="pro-profile-status-tag">виден клиентам</span>
+              </div>
+              <p
+                className={`pro-profile-status-text${
+                  about.trim() ? '' : ' is-muted'
+                }`}
+              >
+                {aboutPreview}
+              </p>
+            </div>
+            <div className="pro-profile-facts-grid">
+              {profileFacts.map((fact) => (
+                <div
+                  className={`pro-profile-fact-card${
+                    fact.isMuted ? ' is-muted' : ''
+                  }`}
+                  key={fact.label}
+                >
+                  <span className="pro-profile-fact-label">{fact.label}</span>
+                  <span className="pro-profile-fact-value">{fact.value}</span>
+                </div>
+              ))}
+            </div>
             <div className="pro-profile-ig-tags">
               {previewTags.length > 0 ? (
                 <>
@@ -1856,17 +1886,6 @@ export const ProProfileScreen = ({
               ) : (
                 <span className="pro-profile-tag is-muted">Нет отзывов</span>
               )}
-            </div>
-            <p
-              className={`pro-profile-ig-about${
-                about.trim() ? '' : ' is-muted'
-              }`}
-            >
-              {aboutPreview}
-            </p>
-            <div className="pro-profile-ig-meta">{profileMetaPrimary}</div>
-            <div className="pro-profile-ig-meta is-muted">
-              {profileMetaSecondary}
             </div>
           </div>
           <div className="pro-profile-ig-actions">
@@ -2615,14 +2634,14 @@ export const ProProfileScreen = ({
                   </div>
                   <div className="pro-field">
                     <label className="pro-label" htmlFor="pro-about">
-                      О себе
+                      Статус
                     </label>
                     <textarea
                       id="pro-about"
                       className="pro-textarea"
                       value={about}
                       onChange={(event) => setAbout(event.target.value)}
-                      placeholder="Коротко о вашем опыте и стиле работы"
+                      placeholder="Короткий статус, что важно клиенту"
                       rows={4}
                     />
                   </div>
