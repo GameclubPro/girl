@@ -154,7 +154,7 @@ const scheduleDayOptions = [
   { id: 'sun', label: 'Вс' },
 ]
 
-type InlineSection = Exclude<ProProfileSection, 'availability' | 'portfolio'>
+type InlineSection = Exclude<ProProfileSection, 'portfolio'>
 type CategoryId = (typeof categoryItems)[number]['id']
 const isCategoryId = (value: string): value is CategoryId =>
   categoryItems.some((item) => item.id === value)
@@ -267,11 +267,7 @@ export const ProProfileScreen = ({
   const portfolioLongPressTriggeredRef = useRef(false)
   const portfolioLongPressStartRef = useRef<{ x: number; y: number } | null>(null)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
-    focusSection && focusSection !== 'portfolio'
-      ? focusSection === 'availability'
-        ? 'location'
-        : focusSection
-      : null
+    focusSection && focusSection !== 'portfolio' ? focusSection : null
   )
   const editingSectionRef = useRef<InlineSection | null>(null)
   const autosaveSuccessTimerRef = useRef<number | null>(null)
@@ -597,7 +593,7 @@ export const ProProfileScreen = ({
       })
       return
     }
-    setEditingSection(section === 'availability' ? 'location' : section)
+    setEditingSection(section)
   }
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
@@ -744,7 +740,7 @@ export const ProProfileScreen = ({
       })
       return
     }
-    setEditingSection(focusSection === 'availability' ? 'location' : focusSection)
+    setEditingSection(focusSection)
   }, [focusSection])
 
   useEffect(() => {
@@ -2506,7 +2502,7 @@ export const ProProfileScreen = ({
           aria-modal="true"
         >
           <div className="pro-profile-editor-shell">
-            <div className="pro-profile-editor-head">
+            <div className="pro-profile-editor-close-row">
               <button
                 className="pro-profile-editor-close"
                 type="button"
@@ -2514,10 +2510,6 @@ export const ProProfileScreen = ({
               >
                 Назад
               </button>
-              <div className="pro-profile-editor-title">
-                {editingSection === 'media' ? 'Фото профиля' : 'Редактирование'}
-              </div>
-              <div className="pro-profile-editor-spacer" aria-hidden="true" />
             </div>
             {editingSection !== 'media' && (
               <div className="pro-profile-editor-tabs" role="tablist">
@@ -2541,7 +2533,18 @@ export const ProProfileScreen = ({
                   aria-selected={editingSection === 'location'}
                   onClick={() => openEditor('location')}
                 >
-                  Работа
+                  Локация
+                </button>
+                <button
+                  className={`pro-profile-editor-tab${
+                    editingSection === 'availability' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={editingSection === 'availability'}
+                  onClick={() => openEditor('availability')}
+                >
+                  График
                 </button>
                 <button
                   className={`pro-profile-editor-tab${
@@ -2825,6 +2828,11 @@ export const ProProfileScreen = ({
                       </label>
                     </div>
                   </div>
+                </>
+              )}
+
+              {editingSection === 'availability' && (
+                <>
                   <div className="pro-field">
                     <span className="pro-label">Статус</span>
                     <label className="pro-toggle">
