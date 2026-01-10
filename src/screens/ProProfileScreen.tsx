@@ -252,7 +252,7 @@ export const ProProfileScreen = ({
   const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
     null
   )
-  const [isFactsSheetOpen, setIsFactsSheetOpen] = useState(false)
+  const [isFactsExpanded, setIsFactsExpanded] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
@@ -417,6 +417,9 @@ export const ProProfileScreen = ({
     { label: 'Цена', value: priceLabel, isMuted: !hasPrice },
     { label: 'Опыт', value: experienceLabel, isMuted: !hasExperience },
   ]
+  const hasHiddenFacts = profileFacts.length > 2
+  const visibleFacts =
+    hasHiddenFacts && !isFactsExpanded ? profileFacts.slice(0, 2) : profileFacts
   const hasGeoLocation =
     typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
   const geoUpdatedLabel = proLocation?.updatedAt
@@ -483,7 +486,6 @@ export const ProProfileScreen = ({
     portfolioFocusIndex !== null ||
     isPortfolioPickerOpen ||
     portfolioQuickActionIndex !== null
-  const isOverlayOpen = isPortfolioOverlayOpen || isFactsSheetOpen
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolvePortfolioFocus(focusItem)
@@ -582,12 +584,6 @@ export const ProProfileScreen = ({
       return
     }
     setEditingSection(section === 'availability' ? 'location' : section)
-  }
-  const openFactsSheet = () => {
-    setIsFactsSheetOpen(true)
-  }
-  const closeFactsSheet = () => {
-    setIsFactsSheetOpen(false)
   }
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
@@ -713,10 +709,6 @@ export const ProProfileScreen = ({
         setIsPortfolioPickerOpen(false)
         return true
       }
-      if (isFactsSheetOpen) {
-        setIsFactsSheetOpen(false)
-        return true
-      }
       if (editingSectionRef.current) {
         setEditingSection(null)
         return true
@@ -727,12 +719,7 @@ export const ProProfileScreen = ({
     return () => {
       onBackHandlerChange(null)
     }
-  }, [
-    isFactsSheetOpen,
-    isPortfolioPickerOpen,
-    onBackHandlerChange,
-    portfolioQuickActionIndex,
-  ])
+  }, [isPortfolioPickerOpen, onBackHandlerChange, portfolioQuickActionIndex])
 
   useEffect(() => {
     if (!focusSection) return
@@ -756,13 +743,13 @@ export const ProProfileScreen = ({
   }, [editingSection])
 
   useEffect(() => {
-    if (!isOverlayOpen) return
+    if (!isPortfolioOverlayOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [isOverlayOpen])
+  }, [isPortfolioOverlayOpen])
 
   useEffect(() => {
     if (portfolioFocusIndex !== null && !portfolioItems[portfolioFocusIndex]) {
@@ -1864,6 +1851,35 @@ export const ProProfileScreen = ({
                 {aboutPreview}
               </p>
             </div>
+            <div className="pro-profile-facts">
+              <div
+                className="pro-profile-facts-grid"
+                id="pro-profile-facts-grid"
+              >
+                {visibleFacts.map((fact) => (
+                  <div
+                    className={`pro-profile-fact-card${
+                      fact.isMuted ? ' is-muted' : ''
+                    }`}
+                    key={fact.label}
+                  >
+                    <span className="pro-profile-fact-label">{fact.label}</span>
+                    <span className="pro-profile-fact-value">{fact.value}</span>
+                  </div>
+                ))}
+              </div>
+              {hasHiddenFacts && (
+                <button
+                  className="pro-profile-facts-toggle"
+                  type="button"
+                  aria-expanded={isFactsExpanded}
+                  aria-controls="pro-profile-facts-grid"
+                  onClick={() => setIsFactsExpanded((current) => !current)}
+                >
+                  {isFactsExpanded ? 'Скрыть' : 'Показать все'}
+                </button>
+              )}
+            </div>
             <div className="pro-profile-ig-tags">
               {previewTags.length > 0 ? (
                 <>
@@ -1891,17 +1907,6 @@ export const ProProfileScreen = ({
                 <span className="pro-profile-tag is-muted">Нет отзывов</span>
               )}
             </div>
-            <button
-              className="pro-profile-facts-trigger"
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={isFactsSheetOpen}
-              aria-controls="pro-profile-facts-sheet"
-              onClick={openFactsSheet}
-            >
-              <span className="pro-profile-facts-trigger-label">Детали</span>
-              <span className="pro-profile-facts-trigger-icon" aria-hidden="true" />
-            </button>
           </div>
           <div className="pro-profile-ig-actions">
             <button
@@ -2172,50 +2177,6 @@ export const ProProfileScreen = ({
           {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
         </div>
       </div>
-
-      {isFactsSheetOpen && (
-        <div
-          className="pro-profile-facts-overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={closeFactsSheet}
-        >
-          <div
-            className="pro-profile-facts-sheet"
-            id="pro-profile-facts-sheet"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <span className="pro-profile-facts-handle" aria-hidden="true" />
-            <div className="pro-profile-facts-head">
-              <p className="pro-profile-facts-kicker">Детали профиля</p>
-              <h3 className="pro-profile-facts-title">Факты</h3>
-              <p className="pro-profile-facts-subtitle">
-                Локация, формат, цена и опыт в одном месте.
-              </p>
-            </div>
-            <div className="pro-profile-facts-grid">
-              {profileFacts.map((fact) => (
-                <div
-                  className={`pro-profile-fact-card${
-                    fact.isMuted ? ' is-muted' : ''
-                  }`}
-                  key={fact.label}
-                >
-                  <span className="pro-profile-fact-label">{fact.label}</span>
-                  <span className="pro-profile-fact-value">{fact.value}</span>
-                </div>
-              ))}
-            </div>
-            <button
-              className="pro-profile-facts-close"
-              type="button"
-              onClick={closeFactsSheet}
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-      )}
 
       {portfolioLightboxItem && (
         <div
