@@ -2063,125 +2063,6 @@ export const ProProfileScreen = ({
           </div>
         </section>
 
-        <section className="pro-profile-cards animate delay-2">
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={() => openEditor('basic')}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              👤
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">О себе</span>
-              <span
-                className={`pro-profile-card-value${
-                  about.trim() ? '' : ' is-muted'
-                }`}
-              >
-                {aboutPreview}
-              </span>
-              <span className="pro-profile-card-meta">{experienceLabel}</span>
-            </span>
-            <span className="pro-profile-card-chevron" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={() => openEditor('location')}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              📍
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Работа</span>
-              <span className="pro-profile-card-value">{locationLabel}</span>
-              <span className="pro-profile-card-meta">{workFormatLabel}</span>
-              <span className="pro-profile-card-meta">{scheduleSummary}</span>
-            </span>
-            <span className="pro-profile-card-chevron" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={() => openEditor('services')}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              💸
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Услуги и цены</span>
-              <span className="pro-profile-card-value">{servicesSummary}</span>
-              <span className="pro-profile-card-meta">{priceLabel}</span>
-            </span>
-            <span className="pro-profile-card-chevron" aria-hidden="true">
-              ›
-            </span>
-          </button>
-          <button
-            className="pro-profile-card"
-            type="button"
-            onClick={onBack}
-          >
-            <span className="pro-profile-card-icon" aria-hidden="true">
-              🖼️
-            </span>
-            <span className="pro-profile-card-content">
-              <span className="pro-profile-card-title">Витрина</span>
-              <span
-                className={`pro-profile-card-value${
-                  showcaseCount > 0 ? '' : ' is-muted'
-                }`}
-              >
-                {showcaseCountLabel}
-              </span>
-              {showcasePreview.length > 0 ? (
-                <span className="pro-profile-portfolio">
-                  {showcasePreview.map((item, index) => {
-                    const showImage = isImageUrl(item.url)
-                    const focus = resolvePortfolioFocus(item)
-                    return (
-                      <span
-                        key={`${item.url}-${index}`}
-                        className={`pro-profile-portfolio-thumb${
-                          showImage ? ' has-image' : ''
-                        }`}
-                        style={
-                          showImage
-                            ? {
-                                backgroundImage: `url(${item.url})`,
-                                backgroundPosition: focus.position,
-                              }
-                            : undefined
-                        }
-                        aria-hidden="true"
-                      />
-                    )
-                  })}
-                </span>
-              ) : (
-                <button
-                  className="pro-profile-card-link"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onBack()
-                  }}
-                >
-                  Добавить
-                </button>
-              )}
-            </span>
-            <span className="pro-profile-card-chevron" aria-hidden="true">
-              ›
-            </span>
-          </button>
-        </section>
-
         <section className="pro-profile-reviews animate delay-3">
           <div className="pro-profile-reviews-head">
             <div>
@@ -2620,6 +2501,124 @@ export const ProProfileScreen = ({
           aria-modal="true"
         >
           <div className="pro-profile-editor-shell">
+            <section className="pro-profile-cards animate delay-2">
+              <button
+                className="pro-profile-card"
+                type="button"
+                onClick={() => openEditor('basic')}
+              >
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  👤
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">О себе</span>
+                  <span
+                    className={`pro-profile-card-value${
+                      about.trim() ? '' : ' is-muted'
+                    }`}
+                  >
+                    {aboutPreview}
+                  </span>
+                  <span className="pro-profile-card-meta">{experienceLabel}</span>
+                </span>
+                <span className="pro-profile-card-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+              <button
+                className="pro-profile-card"
+                type="button"
+                onClick={() => openEditor('location')}
+              >
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  📍
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">Работа</span>
+                  <span className="pro-profile-card-value">{locationLabel}</span>
+                  <span className="pro-profile-card-meta">{workFormatLabel}</span>
+                  <span className="pro-profile-card-meta">{scheduleSummary}</span>
+                </span>
+                <span className="pro-profile-card-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+              <button
+                className="pro-profile-card"
+                type="button"
+                onClick={() => openEditor('services')}
+              >
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  💸
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">Услуги и цены</span>
+                  <span className="pro-profile-card-value">{servicesSummary}</span>
+                  <span className="pro-profile-card-meta">{priceLabel}</span>
+                </span>
+                <span className="pro-profile-card-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+              <button
+                className="pro-profile-card"
+                type="button"
+                onClick={onBack}
+              >
+                <span className="pro-profile-card-icon" aria-hidden="true">
+                  🖼️
+                </span>
+                <span className="pro-profile-card-content">
+                  <span className="pro-profile-card-title">Витрина</span>
+                  <span
+                    className={`pro-profile-card-value${
+                      showcaseCount > 0 ? '' : ' is-muted'
+                    }`}
+                  >
+                    {showcaseCountLabel}
+                  </span>
+                  {showcasePreview.length > 0 ? (
+                    <span className="pro-profile-portfolio">
+                      {showcasePreview.map((item, index) => {
+                        const showImage = isImageUrl(item.url)
+                        const focus = resolvePortfolioFocus(item)
+                        return (
+                          <span
+                            key={`${item.url}-${index}`}
+                            className={`pro-profile-portfolio-thumb${
+                              showImage ? ' has-image' : ''
+                            }`}
+                            style={
+                              showImage
+                                ? {
+                                    backgroundImage: `url(${item.url})`,
+                                    backgroundPosition: focus.position,
+                                  }
+                                : undefined
+                            }
+                            aria-hidden="true"
+                          />
+                        )
+                      })}
+                    </span>
+                  ) : (
+                    <button
+                      className="pro-profile-card-link"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onBack()
+                      }}
+                    >
+                      Добавить
+                    </button>
+                  )}
+                </span>
+                <span className="pro-profile-card-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            </section>
             <section className="pro-profile-editor-card">
               {editingSection === 'basic' && (
                 <>
