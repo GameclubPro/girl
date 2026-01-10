@@ -941,7 +941,7 @@ export const ProProfileScreen = ({
     if (!profilePayload) return
     const saved = await saveProfile(profilePayload)
     if (saved) {
-      onBack()
+      setEditingSection(null)
     }
   }
 
