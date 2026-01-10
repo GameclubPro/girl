@@ -1809,7 +1809,16 @@ export const ProProfileScreen = ({
                 tabIndex={-1}
               />
             </div>
-            <div className="pro-profile-ig-right">
+            <div className="pro-profile-ig-stats">
+              {profileStats.map((stat) => (
+                <div className="pro-profile-ig-stat" key={stat.label}>
+                  <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                  <span className="pro-profile-ig-stat-label">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="pro-profile-ig-name-row">
+              <h1 className="pro-profile-ig-name">{displayNameValue}</h1>
               <button
                 className={`pro-profile-ig-status ${activeTone}`}
                 type="button"
@@ -1818,17 +1827,6 @@ export const ProProfileScreen = ({
                 <span className="pro-profile-social-dot" aria-hidden="true" />
                 {isActive ? 'Принимаю заявки' : 'Пауза'}
               </button>
-              <div className="pro-profile-ig-stats">
-                {profileStats.map((stat) => (
-                  <div className="pro-profile-ig-stat" key={stat.label}>
-                    <span className="pro-profile-ig-stat-value">{stat.value}</span>
-                    <span className="pro-profile-ig-stat-label">{stat.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="pro-profile-ig-name-row">
-              <h1 className="pro-profile-ig-name">{displayNameValue}</h1>
             </div>
           </div>
           <div className="pro-profile-ig-body">

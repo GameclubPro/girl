@@ -421,26 +421,22 @@ export const ClientMasterProfileScreen = ({
                     <span aria-hidden="true">{initials}</span>
                   )}
                 </div>
-                <div className="pro-profile-ig-right">
+                <div className="pro-profile-ig-stats">
+                  {profileStats.map((stat) => (
+                    <div className="pro-profile-ig-stat" key={stat.label}>
+                      <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                      <span className="pro-profile-ig-stat-label">
+                        {stat.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="pro-profile-ig-name-row">
+                  <h1 className="pro-profile-ig-name">{displayName}</h1>
                   <span className={`pro-profile-ig-status ${activeTone}`}>
                     <span className="pro-profile-social-dot" aria-hidden="true" />
                     {isActive ? 'Запись открыта' : 'Пауза'}
                   </span>
-                  <div className="pro-profile-ig-stats">
-                    {profileStats.map((stat) => (
-                      <div className="pro-profile-ig-stat" key={stat.label}>
-                        <span className="pro-profile-ig-stat-value">
-                          {stat.value}
-                        </span>
-                        <span className="pro-profile-ig-stat-label">
-                          {stat.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="pro-profile-ig-name-row">
-                  <h1 className="pro-profile-ig-name">{displayName}</h1>
                 </div>
               </div>
               <div className="pro-profile-ig-body">
