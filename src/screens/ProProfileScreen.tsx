@@ -385,14 +385,6 @@ export const ProProfileScreen = ({
         : worksAtMaster
           ? 'У мастера'
           : 'Формат не указан'
-  const servicesSummary =
-    serviceItems.length > 0
-      ? formatCount(serviceItems.length, 'услуга', 'услуги', 'услуг')
-      : 'Нет услуг'
-  const showcaseCountRaw = showcaseItems.filter((item) => item.url.trim()).length
-  const showcaseCount = Math.min(showcaseCountRaw, MAX_SHOWCASE_ITEMS)
-  const showcaseCountLabel =
-    showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
   const reviewCount = reviewSummary?.count ?? 0
   const reviewAverage = reviewSummary?.average ?? 0
   const reviewDistribution = reviewSummary?.distribution ?? []
@@ -405,12 +397,6 @@ export const ProProfileScreen = ({
     { label: 'Рейтинг', value: reviewAverageLabel },
     { label: 'Отзывы', value: String(reviewCount) },
   ]
-  const scheduleSummary =
-    scheduleDays.length > 0
-      ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
-      : isActive
-        ? 'Открыт'
-        : 'Пауза'
   const locationLabel = useMemo(() => {
     const cityLabel = cityId
       ? cities.find((city) => city.id === cityId)?.name
@@ -452,10 +438,6 @@ export const ProProfileScreen = ({
   const serviceNames = useMemo(
     () => serviceItems.filter((item) => item.name.trim()).map((item) => item.name),
     [serviceItems]
-  )
-  const showcasePreview = useMemo(
-    () => showcaseItems.filter((item) => item.url.trim()).slice(0, 3),
-    [showcaseItems]
   )
   const portfolioGridItems = useMemo(
     () =>
