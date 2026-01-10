@@ -3645,10 +3645,10 @@
 }
 
 .pro-profile-portfolio-panel-action.is-primary {
-  border: none;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 12px 20px rgba(255, 107, 61, 0.25);
+  border: 1.5px solid var(--pro-accent);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .pro-profile-portfolio-panel-action:focus-visible {
@@ -4156,14 +4156,14 @@
 }
 
 .pro-portfolio-lightbox-close {
-  border: none;
+  border: 1.5px solid var(--pro-accent);
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 12px 18px rgba(255, 107, 61, 0.22);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
 }
 
@@ -4335,10 +4335,10 @@
 }
 
 .pro-profile-action.is-primary {
-  border: none;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
-  box-shadow: 0 12px 20px rgba(255, 107, 61, 0.25);
+  border: 1.5px solid var(--pro-accent);
+  color: var(--pro-accent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .pro-profile-action:focus-visible {
