@@ -9908,6 +9908,10 @@ h2 {
     animation: none;
   }
 
+  .pro-shell--hybrid .pro-profile-hero .pro-profile-social-glow {
+    animation: none;
+  }
+
   .pro-avatar.is-loading::after {
     animation: none;
   }
