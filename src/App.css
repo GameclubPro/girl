@@ -1632,47 +1632,6 @@
   letter-spacing: 1px;
 }
 
-.pro-avatar-action,
-.pro-avatar-clear {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.92);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--pro-ink);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 10px 16px rgba(15, 12, 12, 0.2);
-}
-
-.pro-avatar-action:disabled,
-.pro-avatar-clear:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.pro-avatar-action {
-  bottom: -6px;
-  right: -6px;
-}
-
-.pro-avatar-clear {
-  top: -6px;
-  right: -6px;
-}
-
-.pro-avatar-action:focus-visible,
-.pro-avatar-clear:focus-visible {
-  outline: 3px solid rgba(46, 196, 182, 0.45);
-  outline-offset: 2px;
-}
-
 .pro-hero-info {
   display: flex;
   flex-direction: column;
@@ -3401,15 +3360,6 @@
   pointer-events: none;
 }
 
-.pro-profile-cover-actions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  gap: 6px;
-  z-index: 2;
-}
-
 .pro-profile-social-body {
   padding: 0 16px;
   margin-top: -30px;
@@ -3636,6 +3586,23 @@
   border: none;
   box-shadow: none;
   filter: drop-shadow(0 18px 30px rgba(16, 12, 11, 0.22));
+}
+
+.pro-profile-ig-cover.is-editable,
+.pro-profile-ig-avatar.is-editable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.pro-profile-ig-cover.is-editable[aria-disabled='true'],
+.pro-profile-ig-avatar.is-editable[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.pro-profile-ig-cover.is-editable:focus-visible,
+.pro-profile-ig-avatar.is-editable:focus-visible {
+  outline: 3px solid rgba(255, 107, 61, 0.35);
+  outline-offset: 3px;
 }
 
 .pro-profile-ig-cover.has-image {
@@ -5274,7 +5241,7 @@
 
 .pro-profile-editor-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -10380,8 +10347,6 @@ h2 {
   .pro-profile-action,
   .pro-template-chip,
   .pro-cover-action,
-  .pro-avatar-action,
-  .pro-avatar-clear,
   .pro-add,
   .pro-service-remove,
   .pro-portfolio-remove,
@@ -10411,8 +10376,6 @@ h2 {
   .pro-profile-action:hover,
   .pro-template-chip:hover,
   .pro-cover-action:hover,
-  .pro-avatar-action:hover,
-  .pro-avatar-clear:hover,
   .pro-add:hover,
   .pro-service-remove:hover,
   .pro-portfolio-remove:hover,
@@ -10441,8 +10404,6 @@ h2 {
   .pro-profile-card:hover,
   .pro-profile-action:hover,
   .pro-cover-action:hover,
-  .pro-avatar-action:hover,
-  .pro-avatar-clear:hover,
   .pro-add:hover,
   .pro-service-remove:hover,
   .pro-portfolio-remove:hover,

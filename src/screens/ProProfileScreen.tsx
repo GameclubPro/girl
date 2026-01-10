@@ -563,6 +563,10 @@ export const ProProfileScreen = ({
     setPortfolioError('')
     setPortfolioQuickActionIndex(index)
   }
+  const openMediaEditor = () => {
+    if (isAvatarUploading || isCoverUploading) return
+    setEditingSection('media')
+  }
   const openEditor = (section: ProProfileSection) => {
     if (section === 'portfolio') {
       portfolioPanelRef.current?.scrollIntoView({
@@ -1742,11 +1746,22 @@ export const ProProfileScreen = ({
       <div className="pro-shell pro-shell--ig">
         <section className="pro-profile-ig animate delay-1">
           <div
-            className={`pro-profile-ig-cover${coverUrl ? ' has-image' : ''}${
-              isCoverUploading ? ' is-loading' : ''
-            }`}
+            className={`pro-profile-ig-cover is-editable${
+              coverUrl ? ' has-image' : ''
+            }${isCoverUploading ? ' is-loading' : ''}`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
             aria-busy={isCoverUploading}
+            aria-disabled={isCoverUploading}
+            role="button"
+            tabIndex={0}
+            aria-label="Открыть редактор шапки"
+            onClick={openMediaEditor}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                openMediaEditor()
+              }
+            }}
           >
             <div className="pro-profile-ig-cover-glow" aria-hidden="true" />
             <input
@@ -1759,37 +1774,24 @@ export const ProProfileScreen = ({
               aria-hidden="true"
               tabIndex={-1}
             />
-            <div className="pro-profile-cover-actions">
-              <button
-                className="pro-cover-action"
-                type="button"
-                onClick={handleCoverSelect}
-                disabled={isCoverUploading}
-              >
-                {isCoverUploading
-                  ? 'Загрузка...'
-                  : coverUrl
-                    ? 'Сменить обложку'
-                    : 'Добавить обложку'}
-              </button>
-              {coverUrl && (
-                <button
-                  className="pro-cover-action is-muted"
-                  type="button"
-                  onClick={handleCoverClear}
-                  disabled={isCoverUploading}
-                >
-                  Убрать
-                </button>
-              )}
-            </div>
           </div>
           <div className="pro-profile-ig-header">
             <div
-              className={`pro-profile-ig-avatar${
+              className={`pro-profile-ig-avatar is-editable${
                 isAvatarUploading ? ' is-loading' : ''
               }`}
               aria-busy={isAvatarUploading}
+              aria-disabled={isAvatarUploading}
+              role="button"
+              tabIndex={0}
+              aria-label="Открыть редактор аватара"
+              onClick={openMediaEditor}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  openMediaEditor()
+                }
+              }}
             >
               {avatarUrl ? (
                 <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
@@ -1806,26 +1808,6 @@ export const ProProfileScreen = ({
                 aria-hidden="true"
                 tabIndex={-1}
               />
-              <button
-                className="pro-avatar-action"
-                type="button"
-                onClick={handleAvatarSelect}
-                disabled={isAvatarUploading}
-                aria-label="Обновить аватар"
-              >
-                +
-              </button>
-              {avatarUrl && (
-                <button
-                  className="pro-avatar-clear"
-                  type="button"
-                  onClick={handleAvatarClear}
-                  disabled={isAvatarUploading}
-                  aria-label="Удалить аватар"
-                >
-                  ×
-                </button>
-              )}
             </div>
             <div className="pro-profile-ig-stats">
               {profileStats.map((stat) => (
@@ -2491,55 +2473,48 @@ export const ProProfileScreen = ({
               >
                 Назад
               </button>
-              <div className="pro-profile-editor-title">Редактирование</div>
+              <div className="pro-profile-editor-title">
+                {editingSection === 'media' ? 'Фото профиля' : 'Редактирование'}
+              </div>
               <div className="pro-profile-editor-spacer" aria-hidden="true" />
             </div>
-            <div className="pro-profile-editor-tabs" role="tablist">
-              <button
-                className={`pro-profile-editor-tab${
-                  editingSection === 'basic' ? ' is-active' : ''
-                }`}
-                type="button"
-                role="tab"
-                aria-selected={editingSection === 'basic'}
-                onClick={() => openEditor('basic')}
-              >
-                О себе
-              </button>
-              <button
-                className={`pro-profile-editor-tab${
-                  editingSection === 'media' ? ' is-active' : ''
-                }`}
-                type="button"
-                role="tab"
-                aria-selected={editingSection === 'media'}
-                onClick={() => openEditor('media')}
-              >
-                Фото
-              </button>
-              <button
-                className={`pro-profile-editor-tab${
-                  editingSection === 'location' ? ' is-active' : ''
-                }`}
-                type="button"
-                role="tab"
-                aria-selected={editingSection === 'location'}
-                onClick={() => openEditor('location')}
-              >
-                Работа
-              </button>
-              <button
-                className={`pro-profile-editor-tab${
-                  editingSection === 'services' ? ' is-active' : ''
-                }`}
-                type="button"
-                role="tab"
-                aria-selected={editingSection === 'services'}
-                onClick={() => openEditor('services')}
-              >
-                Услуги
-              </button>
-            </div>
+            {editingSection !== 'media' && (
+              <div className="pro-profile-editor-tabs" role="tablist">
+                <button
+                  className={`pro-profile-editor-tab${
+                    editingSection === 'basic' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={editingSection === 'basic'}
+                  onClick={() => openEditor('basic')}
+                >
+                  О себе
+                </button>
+                <button
+                  className={`pro-profile-editor-tab${
+                    editingSection === 'location' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={editingSection === 'location'}
+                  onClick={() => openEditor('location')}
+                >
+                  Работа
+                </button>
+                <button
+                  className={`pro-profile-editor-tab${
+                    editingSection === 'services' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={editingSection === 'services'}
+                  onClick={() => openEditor('services')}
+                >
+                  Услуги
+                </button>
+              </div>
+            )}
             <section className="pro-profile-editor-card">
               {editingSection === 'media' && (
                 <div className="pro-profile-editor-media">
