@@ -2144,22 +2144,10 @@
 
 .pro-service-panel-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
-}
-
-.pro-service-panel-title {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pro-service-panel-subtitle {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--pro-muted);
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .pro-service-count-pill {
@@ -2170,6 +2158,25 @@
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(32, 25, 20, 0.12);
   color: var(--pro-ink);
+  white-space: nowrap;
+}
+
+.pro-service-panel-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pro-service-range-pill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(32, 25, 20, 0.12);
+  color: var(--pro-muted);
   white-space: nowrap;
 }
 

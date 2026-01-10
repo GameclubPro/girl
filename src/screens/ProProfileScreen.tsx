@@ -38,6 +38,19 @@ const parseNumber = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const getServicePriceRange = (items: ServiceItem[]) => {
+  const prices = items
+    .map((item) => item.price)
+    .filter((value): value is number => typeof value === 'number' && value > 0)
+  if (prices.length === 0) {
+    return { min: null, max: null }
+  }
+  return {
+    min: Math.min(...prices),
+    max: Math.max(...prices),
+  }
+}
+
 const formatCount = (value: number, one: string, few: string, many: string) => {
   const mod10 = value % 10
   const mod100 = value % 100
@@ -143,7 +156,6 @@ const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
 const PORTFOLIO_ROW_LIMIT = 4
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
-const PRICE_RANGE_ERROR = 'Минимальная цена не может быть выше максимальной.'
 
 export const ProProfileScreen = ({
   apiBase,
@@ -161,8 +173,6 @@ export const ProProfileScreen = ({
   const [displayName, setDisplayName] = useState(displayNameFallback)
   const [about, setAbout] = useState('')
   const [experienceYears, setExperienceYears] = useState('')
-  const [priceFrom, setPriceFrom] = useState('')
-  const [priceTo, setPriceTo] = useState('')
   const [categories, setCategories] = useState<string[]>([])
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>([])
   const [serviceCategoryId, setServiceCategoryId] = useState<CategoryId>(
@@ -256,11 +266,15 @@ export const ProProfileScreen = ({
       }),
     [portfolioStrings, showcaseStrings]
   )
+  const servicePriceRange = useMemo(
+    () => getServicePriceRange(serviceItems),
+    [serviceItems]
+  )
+  const priceFromValue = servicePriceRange.min
+  const priceToValue = servicePriceRange.max
   const profilePayload = useMemo<ProfilePayload | null>(() => {
     if (!userId) return null
     const normalizedName = displayName.trim()
-    const parsedPriceFrom = parseNumber(priceFrom)
-    const parsedPriceTo = parseNumber(priceTo)
     return {
       userId,
       displayName: normalizedName,
@@ -268,8 +282,8 @@ export const ProProfileScreen = ({
       cityId,
       districtId,
       experienceYears: parseNumber(experienceYears),
-      priceFrom: parsedPriceFrom,
-      priceTo: parsedPriceTo,
+      priceFrom: priceFromValue,
+      priceTo: priceToValue,
       isActive,
       scheduleDays: [...scheduleDays],
       scheduleStart: scheduleStart.trim() || null,
@@ -290,8 +304,8 @@ export const ProProfileScreen = ({
     experienceYears,
     isActive,
     portfolioStrings,
-    priceFrom,
-    priceTo,
+    priceFromValue,
+    priceToValue,
     scheduleDays,
     scheduleEnd,
     scheduleStart,
@@ -316,14 +330,8 @@ export const ProProfileScreen = ({
     return initials || 'MK'
   }, [displayNameValue])
   const experienceValue = parseNumber(experienceYears)
-  const priceFromValue = parseNumber(priceFrom)
-  const priceToValue = parseNumber(priceTo)
-  const hasInvalidPriceRange =
-    priceFromValue !== null &&
-    priceToValue !== null &&
-    priceFromValue > priceToValue
   const saveButtonLabel = isSaving ? 'Сохраняем...' : 'Сохранить'
-  const canSave = Boolean(profilePayload) && !hasInvalidPriceRange && !isSaving
+  const canSave = Boolean(profilePayload) && !isSaving
   const priceLabel =
     priceFromValue !== null && priceToValue !== null
       ? `${priceFromValue}–${priceToValue} ₽`
@@ -332,6 +340,8 @@ export const ProProfileScreen = ({
         : priceToValue !== null
           ? `до ${priceToValue} ₽`
           : 'Цена не указана'
+  const servicePriceLabel =
+    priceFromValue !== null || priceToValue !== null ? priceLabel : 'Нет цены'
   const experienceLabel =
     experienceValue !== null ? `${experienceValue} лет` : 'Опыт не указан'
   const workFormatLabel =
@@ -529,22 +539,6 @@ export const ProProfileScreen = ({
       setSaveSuccess('')
     }, 2000)
   }
-
-  useEffect(() => {
-    if (hasInvalidPriceRange) {
-      if (saveError !== PRICE_RANGE_ERROR) {
-        if (autosaveSuccessTimerRef.current) {
-          window.clearTimeout(autosaveSuccessTimerRef.current)
-        }
-        setSaveSuccess('')
-        setSaveError(PRICE_RANGE_ERROR)
-      }
-      return
-    }
-    if (saveError === PRICE_RANGE_ERROR) {
-      setSaveError('')
-    }
-  }, [hasInvalidPriceRange, saveError])
 
   useEffect(() => {
     editingSectionRef.current = editingSection
@@ -773,14 +767,6 @@ export const ProProfileScreen = ({
           data.experienceYears !== null && data.experienceYears !== undefined
             ? String(data.experienceYears)
             : ''
-        const nextPriceFrom =
-          data.priceFrom !== null && data.priceFrom !== undefined
-            ? String(data.priceFrom)
-            : ''
-        const nextPriceTo =
-          data.priceTo !== null && data.priceTo !== undefined
-            ? String(data.priceTo)
-            : ''
         const nextIsActive = data.isActive ?? true
         const nextScheduleDays = data.scheduleDays ?? []
         const nextScheduleStart = data.scheduleStart ?? ''
@@ -800,8 +786,6 @@ export const ProProfileScreen = ({
         setCityId(nextCityId)
         setDistrictId(nextDistrictId)
         setExperienceYears(nextExperienceYears)
-        setPriceFrom(nextPriceFrom)
-        setPriceTo(nextPriceTo)
         setIsActive(nextIsActive)
         setScheduleDays(nextScheduleDays)
         setScheduleStart(nextScheduleStart)
@@ -820,6 +804,8 @@ export const ProProfileScreen = ({
         setAvatarUrl(data.avatarUrl ?? '')
         setCoverUrl(data.coverUrl ?? '')
 
+        const nextPriceRange = getServicePriceRange(nextServiceItems)
+
         lastSavedRef.current = JSON.stringify({
           userId,
           displayName: nextDisplayName.trim(),
@@ -827,8 +813,8 @@ export const ProProfileScreen = ({
           cityId: nextCityId,
           districtId: nextDistrictId,
           experienceYears: parseNumber(nextExperienceYears),
-          priceFrom: parseNumber(nextPriceFrom),
-          priceTo: parseNumber(nextPriceTo),
+          priceFrom: nextPriceRange.min,
+          priceTo: nextPriceRange.max,
           isActive: nextIsActive,
           scheduleDays: [...nextScheduleDays],
           scheduleStart: nextScheduleStart.trim() || null,
@@ -907,15 +893,6 @@ export const ProProfileScreen = ({
     if (!payload.userId) return false
     if (isSavingRef.current) {
       queuedPayloadRef.current = payload
-      return false
-    }
-    if (
-      payload.priceFrom !== null &&
-      payload.priceTo !== null &&
-      payload.priceFrom > payload.priceTo
-    ) {
-      setSaveError(PRICE_RANGE_ERROR)
-      persistSaveMessage('')
       return false
     }
 
@@ -2616,12 +2593,7 @@ export const ProProfileScreen = ({
                 <>
                   <div className="pro-service-panel pro-service-panel--category">
                     <div className="pro-service-panel-head">
-                      <div className="pro-service-panel-title">
-                        <span className="pro-label">Категория</span>
-                        <p className="pro-service-panel-subtitle">
-                          Выберите категорию и отметьте услуги
-                        </p>
-                      </div>
+                      <span className="pro-label">Категория</span>
                       <span className="pro-service-count-pill">
                         {selectedServicesLabel}
                       </span>
@@ -2645,12 +2617,7 @@ export const ProProfileScreen = ({
 
                   <div className="pro-service-panel">
                     <div className="pro-service-panel-head">
-                      <div className="pro-service-panel-title">
-                        <span className="pro-label">Добавить услуги</span>
-                        <p className="pro-service-panel-subtitle">
-                          Выбирайте услуги и сразу указывайте цену
-                        </p>
-                      </div>
+                      <span className="pro-label">Добавить услуги</span>
                       <span className="pro-service-count-pill">
                         {categorySelectionLabel}
                       </span>
@@ -2806,15 +2773,15 @@ export const ProProfileScreen = ({
 
                   <div className="pro-service-panel">
                     <div className="pro-service-panel-head">
-                      <div className="pro-service-panel-title">
-                        <span className="pro-label">Ваши услуги</span>
-                        <p className="pro-service-panel-subtitle">
-                          Добавьте цену и длительность
-                        </p>
+                      <span className="pro-label">Ваши услуги</span>
+                      <div className="pro-service-panel-pills">
+                        <span className="pro-service-count-pill">
+                          {selectedServicesLabel}
+                        </span>
+                        <span className="pro-service-range-pill">
+                          {servicePriceLabel}
+                        </span>
                       </div>
-                      <span className="pro-service-count-pill">
-                        {selectedServicesLabel}
-                      </span>
                     </div>
                     <div className="pro-service-grid pro-service-grid--stacked">
                       {serviceItems.length > 0 ? (
@@ -2888,46 +2855,6 @@ export const ProProfileScreen = ({
                     </div>
                   </div>
 
-                  <div className="pro-service-panel">
-                    <div className="pro-service-panel-head">
-                      <div className="pro-service-panel-title">
-                        <span className="pro-label">Диапазон цен</span>
-                        <p className="pro-service-panel-subtitle">
-                          Показывается в профиле
-                        </p>
-                      </div>
-                    </div>
-                    <div className="pro-field pro-field--split">
-                      <div>
-                        <label className="pro-label" htmlFor="price-from">
-                          Цена от
-                        </label>
-                        <input
-                          id="price-from"
-                          className="pro-input"
-                          type="number"
-                          value={priceFrom}
-                          onChange={(event) => setPriceFrom(event.target.value)}
-                          placeholder="1500"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="pro-label" htmlFor="price-to">
-                          Цена до
-                        </label>
-                        <input
-                          id="price-to"
-                          className="pro-input"
-                          type="number"
-                          value={priceTo}
-                          onChange={(event) => setPriceTo(event.target.value)}
-                          placeholder="3000"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </>
               )}
 
