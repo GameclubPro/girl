@@ -4118,16 +4118,38 @@
   border-color: rgba(32, 25, 20, 0.1);
 }
 
-.pro-shell--ig .pro-profile-portfolio-grid,
-.pro-shell--ig .pro-profile-portfolio-grid.is-collapsed {
+.pro-shell--ig .pro-profile-portfolio-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pro-shell--ig .pro-profile-portfolio-grid.is-collapsed {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: clamp(110px, 36vw, 170px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
   gap: 6px;
 }
 
+.pro-shell--ig .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
+  display: none;
+}
+
+.pro-shell--ig .pro-profile-portfolio-grid.is-collapsed .pro-profile-portfolio-item {
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  scroll-snap-align: start;
+}
+
 .pro-shell--ig .pro-profile-portfolio-item {
-  border-radius: 12px;
+  border-radius: 10px;
   border-color: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 8px 12px rgba(16, 12, 11, 0.08);
+  box-shadow: 0 6px 10px rgba(16, 12, 11, 0.08);
 }
 
 .pro-shell--ig .pro-profile-cards {
@@ -4301,13 +4323,13 @@
 
 .pro-profile-portfolio-panel {
   border-radius: 24px;
-  padding: 14px;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.82);
   box-shadow: 0 18px 28px rgba(16, 12, 11, 0.12);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   position: relative;
   overflow: hidden;
 }
@@ -4332,50 +4354,63 @@
 
 .pro-profile-portfolio-panel-head {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   position: relative;
   z-index: 1;
 }
 
 .pro-profile-portfolio-panel-kicker {
   margin: 0;
-  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(32, 25, 20, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--pro-muted);
+  white-space: nowrap;
 }
 
 .pro-profile-portfolio-panel-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(32, 25, 20, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 16px rgba(16, 12, 11, 0.1);
 }
 
 .pro-profile-portfolio-panel-count {
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(32, 25, 20, 0.12);
-  box-shadow: 0 10px 16px rgba(16, 12, 11, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(32, 25, 20, 0.1);
+  box-shadow: none;
 }
 
 .pro-profile-portfolio-panel-action {
-  border: 1px solid rgba(32, 25, 20, 0.12);
+  border: 1px solid rgba(255, 107, 61, 0.35);
   background: rgba(255, 255, 255, 0.92);
   border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 11px;
+  padding: 6px 10px;
+  font-size: 9px;
   font-weight: 700;
-  color: var(--pro-ink);
+  color: var(--pro-accent);
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(18, 14, 12, 0.12);
+  box-shadow: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   appearance: none;
   font-family: inherit;
 }
@@ -4397,20 +4432,20 @@
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 4px;
 }
 
 .pro-profile-portfolio-grid.is-collapsed {
   grid-template-columns: none;
   grid-auto-flow: column;
-  grid-auto-columns: clamp(92px, 30vw, 140px);
+  grid-auto-columns: clamp(110px, 36vw, 170px);
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 6px;
+  padding-bottom: 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 10px;
+  gap: 6px;
 }
 
 .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
@@ -4419,7 +4454,7 @@
 
 .pro-profile-portfolio-grid.is-collapsed .pro-profile-portfolio-item {
   aspect-ratio: 3 / 4;
-  border-radius: 16px;
+  border-radius: 14px;
   scroll-snap-align: start;
 }
 
@@ -4429,11 +4464,11 @@
 
 .pro-profile-portfolio-item {
   position: relative;
-  border-radius: 10px;
+  border-radius: 9px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 5px 10px rgba(16, 12, 11, 0.1);
+  box-shadow: 0 4px 8px rgba(16, 12, 11, 0.08);
   cursor: pointer;
   padding: 0;
   aspect-ratio: 1 / 1;
@@ -10258,7 +10293,7 @@ h2 {
   }
 
   .pro-profile-portfolio-panel {
-    padding: 12px;
+    padding: 10px;
   }
 
   .pro-profile-portfolio-panel-head {
@@ -10268,7 +10303,6 @@ h2 {
 
   .pro-profile-portfolio-panel-controls {
     width: 100%;
-    flex-direction: row;
     justify-content: space-between;
     align-items: center;
   }
