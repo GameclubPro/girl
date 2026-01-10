@@ -2609,7 +2609,7 @@ export const ProProfileScreen = ({
 
               {editingSection === 'services' && (
                 <>
-                  <div className="pro-service-panel pro-service-panel--category">
+                  <div className="pro-service-block pro-service-block--category">
                     <div className="pro-service-panel-head">
                       <span className="pro-label">Категория</span>
                       <span className="pro-service-count-pill">
@@ -2633,7 +2633,7 @@ export const ProProfileScreen = ({
                     </select>
                   </div>
 
-                  <div className="pro-service-panel">
+                  <div className="pro-service-block">
                     <div className="pro-service-panel-head">
                       <span className="pro-label">Добавить услуги</span>
                       <span className="pro-service-count-pill">
@@ -2789,7 +2789,7 @@ export const ProProfileScreen = ({
                     </div>
                   )}
 
-                  <div className="pro-service-panel">
+                  <div className="pro-service-block">
                     <div className="pro-service-panel-head">
                       <span className="pro-label">Ваши услуги</span>
                       <div className="pro-service-panel-pills">

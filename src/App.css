@@ -2131,12 +2131,7 @@
   color: var(--pro-muted);
 }
 
-.pro-service-panel {
-  border-radius: 18px;
-  padding: 12px;
-  border: 1px solid rgba(32, 25, 20, 0.12);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 14px 20px rgba(16, 12, 11, 0.08);
+.pro-service-block {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2180,7 +2175,7 @@
   white-space: nowrap;
 }
 
-.pro-service-panel--category .request-select-input {
+.pro-service-block--category .request-select-input {
   border-color: rgba(32, 25, 20, 0.16);
   box-shadow: 0 12px 18px rgba(16, 12, 11, 0.1);
 }
