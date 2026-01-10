@@ -183,6 +183,7 @@ export const ProProfileScreen = ({
   const [serviceAddPrice, setServiceAddPrice] = useState('')
   const [serviceAddDuration, setServiceAddDuration] = useState('')
   const [serviceAddError, setServiceAddError] = useState('')
+  const [openServiceMetaKeys, setOpenServiceMetaKeys] = useState<string[]>([])
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
   const [worksAtClient, setWorksAtClient] = useState(true)
@@ -1025,6 +1026,19 @@ export const ProProfileScreen = ({
     closeServiceAddPanel()
   }
 
+  const buildServiceMetaKey = (service: ServiceItem, index: number) =>
+    service.name.trim() ? service.name.trim() : `service-${index}`
+
+  const isServiceMetaOpen = (key: string) => openServiceMetaKeys.includes(key)
+
+  const toggleServiceMeta = (key: string) => {
+    setOpenServiceMetaKeys((current) =>
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key]
+    )
+  }
+
   const updateServiceItem = (
     index: number,
     updates: Partial<ServiceItem>
@@ -1041,6 +1055,10 @@ export const ProProfileScreen = ({
       const removed = current[index]
       const next = current.filter((_, itemIndex) => itemIndex !== index)
       if (removed) {
+        const removedMetaKey = buildServiceMetaKey(removed, index)
+        setOpenServiceMetaKeys((prev) =>
+          prev.filter((item) => item !== removedMetaKey)
+        )
         const removedKey = normalizeServiceKey(removed.name)
         const matchedCategory = Object.entries(requestServiceCatalog).find(
           ([, options]) =>
@@ -2787,12 +2805,27 @@ export const ProProfileScreen = ({
                       {serviceItems.length > 0 ? (
                         serviceItems.map((service, index) => {
                           const metaLabel = formatServiceMeta(service)
+                          const serviceMetaKey = buildServiceMetaKey(service, index)
+                          const isMetaOpen = isServiceMetaOpen(serviceMetaKey)
                           return (
                             <div
                               className="pro-service-card"
                               key={`${service.name}-${index}`}
                             >
                               <div className="pro-service-card-head">
+                                <button
+                                  className={`pro-service-settings${
+                                    isMetaOpen ? ' is-active' : ''
+                                  }`}
+                                  type="button"
+                                  onClick={() => toggleServiceMeta(serviceMetaKey)}
+                                  aria-pressed={isMetaOpen}
+                                  aria-label={`Настроить ${
+                                    service.name || 'услугу'
+                                  }`}
+                                >
+                                  <span aria-hidden="true">⚙︎</span>
+                                </button>
                                 <span className="pro-service-name">
                                   {service.name}
                                 </span>
@@ -2805,43 +2838,45 @@ export const ProProfileScreen = ({
                                   ×
                                 </button>
                               </div>
-                              <div className="pro-service-meta">
-                                <label className="pro-service-meta-field">
-                                  <span className="pro-service-meta-label">
-                                    Цена, ₽
-                                  </span>
-                                  <input
-                                    className="pro-input pro-service-meta-input"
-                                    type="number"
-                                    value={service.price ?? ''}
-                                    onChange={(event) =>
-                                      updateServiceItem(index, {
-                                        price: parseNumber(event.target.value),
-                                      })
-                                    }
-                                    placeholder="1500"
-                                    min="0"
-                                  />
-                                </label>
-                                <label className="pro-service-meta-field">
-                                  <span className="pro-service-meta-label">
-                                    Длительность, мин
-                                  </span>
-                                  <input
-                                    className="pro-input pro-service-meta-input"
-                                    type="number"
-                                    value={service.duration ?? ''}
-                                    onChange={(event) =>
-                                      updateServiceItem(index, {
-                                        duration: parseNumber(event.target.value),
-                                      })
-                                    }
-                                    placeholder="60"
-                                    min="0"
-                                  />
-                                </label>
-                              </div>
-                              {metaLabel && (
+                              {isMetaOpen && (
+                                <div className="pro-service-meta">
+                                  <label className="pro-service-meta-field">
+                                    <span className="pro-service-meta-label">
+                                      Цена, ₽
+                                    </span>
+                                    <input
+                                      className="pro-input pro-service-meta-input"
+                                      type="number"
+                                      value={service.price ?? ''}
+                                      onChange={(event) =>
+                                        updateServiceItem(index, {
+                                          price: parseNumber(event.target.value),
+                                        })
+                                      }
+                                      placeholder="1500"
+                                      min="0"
+                                    />
+                                  </label>
+                                  <label className="pro-service-meta-field">
+                                    <span className="pro-service-meta-label">
+                                      Длительность, мин
+                                    </span>
+                                    <input
+                                      className="pro-input pro-service-meta-input"
+                                      type="number"
+                                      value={service.duration ?? ''}
+                                      onChange={(event) =>
+                                        updateServiceItem(index, {
+                                          duration: parseNumber(event.target.value),
+                                        })
+                                      }
+                                      placeholder="60"
+                                      min="0"
+                                    />
+                                  </label>
+                                </div>
+                              )}
+                              {metaLabel && !isMetaOpen && (
                                 <div className="pro-service-meta-preview">
                                   {metaLabel}
                                 </div>
