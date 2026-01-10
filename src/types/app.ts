@@ -9,6 +9,15 @@ export type District = {
   name: string
 }
 
+export type UserLocation = {
+  lat: number
+  lng: number
+  accuracy?: number | null
+  updatedAt?: string | null
+  shareToClients?: boolean
+  shareToMasters?: boolean
+}
+
 export type Role = 'client' | 'pro'
 
 export type ProfileStatus = 'draft' | 'ready' | 'complete'
@@ -46,6 +55,7 @@ export type MasterProfile = {
   updatedAt?: string | null
   reviewsCount?: number | null
   reviewsAverage?: number | null
+  distanceKm?: number | null
 }
 
 export type MasterReview = {
@@ -85,6 +95,7 @@ export type ServiceRequest = {
   status: 'open' | 'closed'
   createdAt: string
   responsesCount?: number
+  distanceKm?: number | null
 }
 
 export type BookingStatus =
@@ -118,6 +129,7 @@ export type Booking = {
   photoUrls: string[]
   comment?: string | null
   createdAt: string
+  distanceKm?: number | null
 }
 
 export type RequestResponse = {

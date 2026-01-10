@@ -17,7 +17,13 @@ import { RequestScreen } from './screens/RequestScreen'
 import { StartScreen } from './screens/StartScreen'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
-import type { City, District, ProProfileSection, Role } from './types/app'
+import type {
+  City,
+  District,
+  ProProfileSection,
+  Role,
+  UserLocation,
+} from './types/app'
 import './App.css'
 
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(
@@ -61,13 +67,18 @@ function App() {
   const [cityQuery, setCityQuery] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
   const [isLoadingCities, setIsLoadingCities] = useState(false)
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [locationError, setLocationError] = useState('')
   const [clientCategoryId, setClientCategoryId] = useState<string | null>(null)
   const [requestCategoryId, setRequestCategoryId] = useState<string>(
     categoryItems[0]?.id ?? ''
   )
+  const [clientLocation, setClientLocation] = useState<UserLocation | null>(null)
+  const [shareDistanceToMasters, setShareDistanceToMasters] = useState(false)
   const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
   const [selectedShowcaseItem, setSelectedShowcaseItem] =
     useState<ShowcaseMedia | null>(null)
@@ -84,13 +95,6 @@ function App() {
       .filter(Boolean)
       .join(' ')
       .trim() || telegramUser?.username?.trim() || ''
-
-  const handleAddressChange = (value: string) => {
-    setAddress(value)
-    if (saveError) {
-      setSaveError('')
-    }
-  }
 
   const handleDistrictChange = (value: number | null) => {
     setDistrictId(value)
@@ -133,9 +137,124 @@ function App() {
     }
   }
 
+  const setLocationState = (location: UserLocation | null) => {
+    setClientLocation(location)
+    setShareDistanceToMasters(Boolean(location?.shareToMasters))
+  }
+
+  const saveLocation = useCallback(
+    async (
+      location: { lat: number; lng: number; accuracy?: number | null },
+      shareOverride?: boolean
+    ) => {
+      if (!userId) return
+      setLocationError('')
+
+      try {
+        const response = await fetch(`${apiBase}/api/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            lat: location.lat,
+            lng: location.lng,
+            accuracy: location.accuracy ?? null,
+            shareToMasters:
+              typeof shareOverride === 'boolean'
+                ? shareOverride
+                : shareDistanceToMasters,
+            shareToClients: false,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Save location failed')
+        }
+
+        const data = (await response.json()) as {
+          location?: UserLocation | null
+        }
+        setLocationState(data.location ?? null)
+      } catch (error) {
+        setLocationError('Не удалось сохранить геолокацию. Попробуйте еще раз.')
+      } finally {
+        setIsLocating(false)
+      }
+    },
+    [apiBase, shareDistanceToMasters, userId]
+  )
+
+  const handleRequestLocation = useCallback(() => {
+    if (!userId) return
+    if (!navigator.geolocation) {
+      setLocationError('Геолокация недоступна на вашем устройстве.')
+      return
+    }
+    setLocationError('')
+    setIsLocating(true)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: Math.round(position.coords.accuracy),
+        }
+        void saveLocation(nextLocation, shareDistanceToMasters)
+      },
+      (error) => {
+        setIsLocating(false)
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError('Разрешите доступ к геолокации, чтобы включить поиск рядом.')
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setLocationError('Не удалось определить геопозицию. Попробуйте еще раз.')
+        } else if (error.code === error.TIMEOUT) {
+          setLocationError('Истекло время запроса геолокации. Попробуйте снова.')
+        } else {
+          setLocationError('Не удалось получить геолокацию.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+    )
+  }, [saveLocation, shareDistanceToMasters, userId])
+
+  const handleClearLocation = useCallback(async () => {
+    if (!userId) return
+    setLocationError('')
+    setIsLocating(true)
+
+    try {
+      const response = await fetch(
+        `${apiBase}/api/location?userId=${encodeURIComponent(userId)}`,
+        { method: 'DELETE' }
+      )
+
+      if (!response.ok) {
+        throw new Error('Clear location failed')
+      }
+
+      setLocationState(null)
+      setShareDistanceToMasters(false)
+    } catch (error) {
+      setLocationError('Не удалось очистить геолокацию.')
+    } finally {
+      setIsLocating(false)
+    }
+  }, [apiBase, userId])
+
+  const handleShareDistanceToggle = useCallback(
+    async (value: boolean) => {
+      setShareDistanceToMasters(value)
+      if (!clientLocation) return
+      setIsLocating(true)
+      await saveLocation(clientLocation, value)
+    },
+    [clientLocation, saveLocation]
+  )
+
   const handleSaveAddress = useCallback(async () => {
-    if (!cityId || !districtId || !address.trim()) {
-      setSaveError('Укажите город, район и адрес.')
+    if (!cityId || !districtId) {
+      setSaveError('Укажите город и район.')
       return
     }
 
@@ -150,7 +269,7 @@ function App() {
           userId,
           cityId,
           districtId,
-          address: address.trim(),
+          address: null,
         }),
       })
 
@@ -158,13 +277,14 @@ function App() {
         throw new Error('Save failed')
       }
 
+      setAddress('')
       setView(role === 'pro' ? 'pro-profile' : 'client')
     } catch (error) {
-      setSaveError('Не удалось сохранить адрес. Попробуйте еще раз.')
+      setSaveError('Не удалось сохранить город и район. Попробуйте еще раз.')
     } finally {
       setIsSaving(false)
     }
-  }, [address, cityId, districtId, role, userId])
+  }, [cityId, districtId, role, userId])
 
   useEffect(() => {
     if (!telegramUser?.id) return
@@ -264,6 +384,7 @@ function App() {
         )
 
         if (response.status === 404) {
+          setAddress('')
           return
         }
         if (!response.ok) {
@@ -278,9 +399,7 @@ function App() {
 
         if (cancelled) return
 
-        if (typeof data.address === 'string') {
-          setAddress(data.address)
-        }
+        setAddress('')
         if (typeof data.cityId === 'number') {
           setCityId(data.cityId)
         }
@@ -289,7 +408,7 @@ function App() {
         }
       } catch (error) {
         if (!cancelled) {
-          setSaveError('Не удалось загрузить адрес.')
+          setSaveError('Не удалось загрузить город и район.')
         }
       } finally {
         if (!cancelled) {
@@ -298,8 +417,38 @@ function App() {
       }
     }
 
+    const loadLocation = async () => {
+      setIsLoadingLocation(true)
+      setLocationError('')
+
+      try {
+        const response = await fetch(
+          `${apiBase}/api/location?userId=${encodeURIComponent(userId)}`
+        )
+        if (response.status === 404) {
+          setLocationState(null)
+          return
+        }
+        if (!response.ok) {
+          throw new Error('Load location failed')
+        }
+        const data = (await response.json()) as UserLocation
+        if (cancelled) return
+        setLocationState(data)
+      } catch (error) {
+        if (!cancelled) {
+          setLocationError('Не удалось загрузить геолокацию.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingLocation(false)
+        }
+      }
+    }
+
     loadCities()
     loadAddress()
+    loadLocation()
 
     return () => {
       cancelled = true
@@ -528,6 +677,10 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
         onViewRequests={() => setView('requests')}
+        clientLocation={clientLocation}
+        isLocating={isLocating}
+        onRequestLocation={handleRequestLocation}
+        locationError={locationError}
         onCreateBooking={(masterId) =>
           openBooking(masterId, {
             returnView: 'client-showcase',
@@ -743,15 +896,25 @@ function App() {
         cityId={cityId}
         districtId={districtId}
         cityQuery={cityQuery}
-        address={address}
         isSaving={isSaving}
-        isLoading={isLoadingAddress || isLoadingCities || isLoadingDistricts}
+        isLoading={
+          isLoadingAddress ||
+          isLoadingCities ||
+          isLoadingDistricts ||
+          isLoadingLocation
+        }
         saveError={saveError}
+        location={clientLocation}
+        isLocating={isLocating}
+        locationError={locationError}
+        shareDistanceToMasters={shareDistanceToMasters}
         onCityQueryChange={handleCityQueryChange}
         onCitySelect={handleCitySelect}
         onDistrictChange={handleDistrictChange}
-        onAddressChange={handleAddressChange}
         onContinue={handleSaveAddress}
+        onRequestLocation={handleRequestLocation}
+        onClearLocation={handleClearLocation}
+        onShareDistanceChange={handleShareDistanceToggle}
       />
     )
   }

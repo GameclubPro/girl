@@ -60,6 +60,14 @@ const formatDateTime = (value?: string | null) => {
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const formatDistance = (value?: number | null) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
+  if (value < 1) {
+    return `${Math.round(value * 1000)} м`
+  }
+  return `${value.toFixed(1).replace('.', ',')} км`
+}
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'К'
@@ -554,6 +562,7 @@ export const ProRequestsScreen = ({
                       ?.label ?? item.categoryId
                   const locationLabel =
                     locationLabelMap[item.locationType] ?? 'Не важно'
+                  const distanceLabel = formatDistance(item.distanceKm)
                   const dateLabel =
                     item.dateOption === 'choose'
                       ? formatDateTime(item.dateTime) || 'По договоренности'
@@ -585,6 +594,7 @@ export const ProRequestsScreen = ({
                         {locationLabel}
                         {item.cityName ? ` • ${item.cityName}` : ''}
                         {item.districtName ? ` • ${item.districtName}` : ''}
+                        {distanceLabel ? ` • ${distanceLabel}` : ''}
                       </div>
                       <div className="request-item-meta">{dateLabel}</div>
                       {responseStatusLabel && (
@@ -689,6 +699,7 @@ export const ProRequestsScreen = ({
                     )?.label ?? booking.categoryId
                   const locationLabel =
                     locationLabelMap[booking.locationType] ?? 'Не важно'
+                  const distanceLabel = formatDistance(booking.distanceKm)
                   const scheduledLabel = formatDateTime(booking.scheduledAt)
                   const hasServicePrice = typeof booking.servicePrice === 'number'
                   const priceLabel = hasServicePrice
@@ -737,6 +748,7 @@ export const ProRequestsScreen = ({
                         {locationLabel}
                         {booking.cityName ? ` • ${booking.cityName}` : ''}
                         {booking.districtName ? ` • ${booking.districtName}` : ''}
+                        {distanceLabel ? ` • ${distanceLabel}` : ''}
                       </div>
                       {booking.locationType === 'client' && booking.address && (
                         <div className="booking-item-meta">

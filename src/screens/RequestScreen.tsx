@@ -92,14 +92,12 @@ export const RequestScreen = ({
   }, [dateOption])
 
   const hasLocation = Boolean(cityId && districtId)
-  const hasAddress = Boolean(address.trim())
   const hasDateTime =
     dateOption !== 'choose' || Boolean(dateValue && timeValue)
   const canSubmit =
     Boolean(categoryId) &&
     Boolean(serviceName.trim()) &&
     hasLocation &&
-    (locationType !== 'client' || hasAddress) &&
     hasDateTime &&
     !isSubmitting
 
@@ -115,11 +113,6 @@ export const RequestScreen = ({
 
     if (!cityId || !districtId) {
       setSubmitError('Укажите город и район в профиле.')
-      return
-    }
-
-    if (locationType === 'client' && !address.trim()) {
-      setSubmitError('Для выезда укажите адрес в профиле.')
       return
     }
 
@@ -277,9 +270,9 @@ export const RequestScreen = ({
           </div>
           {locationType === 'client' && (
             <div className="request-field">
-              <span className="request-label">Адрес для выезда *</span>
+              <span className="request-label">Адрес для выезда</span>
               <div className="request-select request-select--static">
-                {address.trim() || 'Адрес не указан'}
+                {address.trim() || 'Адрес уточняется после подтверждения'}
               </div>
             </div>
           )}

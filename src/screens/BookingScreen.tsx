@@ -390,13 +390,11 @@ export const BookingScreen = ({
   const hasCategoryChoice = availableCategoryIds.length > 1
   const hasServiceChoice = serviceOptions.length > 1
   const hasLocation = Boolean(masterCityId && masterDistrictId)
-  const hasAddress = Boolean(address.trim())
   const hasSlots = Boolean(selectedDay && selectedTime)
   const canSubmit =
     Boolean(categoryId) &&
     Boolean(serviceName) &&
     hasLocation &&
-    (locationType !== 'client' || hasAddress) &&
     hasSlots &&
     !isSubmitting
 
@@ -417,11 +415,6 @@ export const BookingScreen = ({
 
     if (!masterCityId || !masterDistrictId) {
       setSubmitError('Мастер не указал город и район.')
-      return
-    }
-
-    if (locationType === 'client' && !address.trim()) {
-      setSubmitError('Для выезда укажите адрес в профиле.')
       return
     }
 
@@ -480,10 +473,6 @@ export const BookingScreen = ({
         }
         if (data?.error === 'location_required') {
           setSubmitError('Мастер не указал город и район.')
-          return
-        }
-        if (data?.error === 'address_required') {
-          setSubmitError('Для выезда нужен адрес клиента.')
           return
         }
         if (data?.error === 'location_type_mismatch') {
@@ -692,9 +681,9 @@ export const BookingScreen = ({
               </div>
               {locationType === 'client' && (
                 <div className="request-field">
-                  <span className="request-label">Адрес для выезда *</span>
+                  <span className="request-label">Адрес для выезда</span>
                   <div className="request-select request-select--static">
-                    {address.trim() || 'Адрес не указан'}
+                    {address.trim() || 'Адрес уточняется после подтверждения'}
                   </div>
                 </div>
               )}

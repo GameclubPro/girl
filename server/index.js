@@ -61,6 +61,16 @@ const parseOptionalInt = (value) => {
   return Number.isInteger(parsed) ? parsed : null
 }
 
+const parseOptionalFloat = (value) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 const normalizeServiceName = (value) => normalizeText(value).toLowerCase()
 
 const parseServiceItem = (value) => {
@@ -110,6 +120,23 @@ const buildDayBounds = (date) => {
   const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
   return { start, end }
 }
+
+const toRadians = (value) => (value * Math.PI) / 180
+
+const calculateDistanceKm = (lat1, lng1, lat2, lng2) => {
+  const earthRadiusKm = 6371
+  const deltaLat = toRadians(lat2 - lat1)
+  const deltaLng = toRadians(lng2 - lng1)
+  const lat1Rad = toRadians(lat1)
+  const lat2Rad = toRadians(lat2)
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(deltaLng / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return earthRadiusKm * c
+}
+
+const roundDistanceKm = (value) => Math.round(value * 10) / 10
 
 const sanitizePathSegment = (value) => {
   const normalized = normalizeText(value)
@@ -248,6 +275,25 @@ const loadMasterProfile = async (userId) => {
   return result.rows[0] ?? null
 }
 
+const loadUserLocation = async (userId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        user_id AS "userId",
+        lat,
+        lng,
+        accuracy,
+        share_to_clients AS "shareToClients",
+        share_to_masters AS "shareToMasters",
+        updated_at AS "updatedAt"
+      FROM user_locations
+      WHERE user_id = $1
+    `,
+    [userId]
+  )
+  return result.rows[0] ?? null
+}
+
 const ensureSchema = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -286,6 +332,44 @@ const ensureSchema = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_locations (
+      user_id TEXT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+      lat DOUBLE PRECISION,
+      lng DOUBLE PRECISION,
+      accuracy INTEGER,
+      share_to_clients BOOLEAN NOT NULL DEFAULT false,
+      share_to_masters BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_locations
+    ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_locations
+    ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_locations
+    ADD COLUMN IF NOT EXISTS accuracy INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_locations
+    ADD COLUMN IF NOT EXISTS share_to_clients BOOLEAN NOT NULL DEFAULT false;
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_locations
+    ADD COLUMN IF NOT EXISTS share_to_masters BOOLEAN NOT NULL DEFAULT false;
   `)
 
   await pool.query(`
@@ -661,11 +745,7 @@ app.post('/api/address', async (req, res) => {
   }
 
   const normalizedAddress = typeof address === 'string' ? address.trim() : ''
-
-  if (!normalizedAddress) {
-    res.status(400).json({ error: 'address_required' })
-    return
-  }
+  const addressValue = normalizedAddress || null
 
   const parsedCityId = Number(cityId)
   const parsedDistrictId = Number(districtId)
@@ -708,7 +788,7 @@ app.post('/api/address', async (req, res) => {
             address = EXCLUDED.address,
             updated_at = NOW()
       `,
-      [normalizedUserId, parsedCityId, parsedDistrictId, normalizedAddress]
+      [normalizedUserId, parsedCityId, parsedDistrictId, addressValue]
     )
 
     res.json({ ok: true })
@@ -718,11 +798,120 @@ app.post('/api/address', async (req, res) => {
   }
 })
 
+app.get('/api/location', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const location = await loadUserLocation(normalizedUserId)
+    if (!location) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    res.json(location)
+  } catch (error) {
+    console.error('GET /api/location failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/location', async (req, res) => {
+  const { userId, lat, lng, accuracy, shareToClients, shareToMasters } =
+    req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const parsedLat = parseOptionalFloat(lat)
+  const parsedLng = parseOptionalFloat(lng)
+  if (parsedLat === null || parsedLng === null) {
+    res.status(400).json({ error: 'location_required' })
+    return
+  }
+  if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+    res.status(400).json({ error: 'location_invalid' })
+    return
+  }
+
+  const parsedAccuracy = parseOptionalInt(accuracy)
+  const nextShareToClients = Boolean(shareToClients)
+  const nextShareToMasters = Boolean(shareToMasters)
+
+  try {
+    await ensureUser(normalizedUserId)
+
+    await pool.query(
+      `
+        INSERT INTO user_locations (
+          user_id,
+          lat,
+          lng,
+          accuracy,
+          share_to_clients,
+          share_to_masters
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (user_id) DO UPDATE
+        SET lat = EXCLUDED.lat,
+            lng = EXCLUDED.lng,
+            accuracy = EXCLUDED.accuracy,
+            share_to_clients = EXCLUDED.share_to_clients,
+            share_to_masters = EXCLUDED.share_to_masters,
+            updated_at = NOW()
+      `,
+      [
+        normalizedUserId,
+        parsedLat,
+        parsedLng,
+        parsedAccuracy,
+        nextShareToClients,
+        nextShareToMasters,
+      ]
+    )
+
+    const location = await loadUserLocation(normalizedUserId)
+    res.json({ ok: true, location })
+  } catch (error) {
+    console.error('POST /api/location failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.delete('/api/location', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    await pool.query(`DELETE FROM user_locations WHERE user_id = $1`, [
+      normalizedUserId,
+    ])
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('DELETE /api/location failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.get('/api/masters', async (req, res) => {
   const cityId = Number(req.query.cityId)
   const districtId = Number(req.query.districtId)
   const categoryId = normalizeText(req.query.categoryId ?? req.query.category)
   const limitParam = Number(req.query.limit)
+  const clientLat = parseOptionalFloat(req.query.clientLat)
+  const clientLng = parseOptionalFloat(req.query.clientLng)
+  const sortMode = normalizeText(req.query.sort)
+  const hasClientLocation = clientLat !== null && clientLng !== null
 
   const conditions = []
   const values = []
@@ -776,11 +965,15 @@ app.get('/api/masters', async (req, res) => {
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
-          mp.updated_at AS "updatedAt"
+          mp.updated_at AS "updatedAt",
+          ul.lat AS "locationLat",
+          ul.lng AS "locationLng",
+          ul.share_to_clients AS "shareToClients"
         FROM master_profiles mp
         LEFT JOIN cities c ON c.id = mp.city_id
         LEFT JOIN districts d ON d.id = mp.district_id
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
+        LEFT JOIN user_locations ul ON ul.user_id = mp.user_id
         LEFT JOIN (
           SELECT
             master_id,
@@ -796,9 +989,42 @@ app.get('/api/masters', async (req, res) => {
       values
     )
     const payload = result.rows.map((row) => {
+      const distanceKm =
+        hasClientLocation &&
+        row.shareToClients &&
+        typeof row.locationLat === 'number' &&
+        typeof row.locationLng === 'number'
+          ? roundDistanceKm(
+              calculateDistanceKm(
+                clientLat,
+                clientLng,
+                row.locationLat,
+                row.locationLng
+              )
+            )
+          : null
       const average = Number(row.reviewsAverage)
       return {
-        ...row,
+        userId: row.userId,
+        displayName: row.displayName,
+        about: row.about,
+        cityId: row.cityId,
+        districtId: row.districtId,
+        cityName: row.cityName,
+        districtName: row.districtName,
+        experienceYears: row.experienceYears,
+        priceFrom: row.priceFrom,
+        priceTo: row.priceTo,
+        isActive: row.isActive,
+        scheduleDays: row.scheduleDays,
+        worksAtClient: row.worksAtClient,
+        worksAtMaster: row.worksAtMaster,
+        categories: row.categories,
+        services: row.services,
+        portfolioUrls: row.portfolioUrls,
+        showcaseUrls: row.showcaseUrls,
+        updatedAt: row.updatedAt,
+        distanceKm,
         reviewsAverage: Number.isFinite(average) ? average : 0,
         reviewsCount: Number.isFinite(Number(row.reviewsCount))
           ? Number(row.reviewsCount)
@@ -807,6 +1033,18 @@ app.get('/api/masters', async (req, res) => {
         coverUrl: buildPublicUrl(req, row.coverPath),
       }
     })
+    if (sortMode === 'distance' && hasClientLocation) {
+      payload.sort((a, b) => {
+        const aDistance =
+          typeof a.distanceKm === 'number' ? a.distanceKm : Number.POSITIVE_INFINITY
+        const bDistance =
+          typeof b.distanceKm === 'number' ? b.distanceKm : Number.POSITIVE_INFINITY
+        if (aDistance !== bDistance) {
+          return aDistance - bDistance
+        }
+        return Number(new Date(b.updatedAt ?? 0)) - Number(new Date(a.updatedAt ?? 0))
+      })
+    }
     res.json(payload)
   } catch (error) {
     console.error('GET /api/masters failed:', error)
@@ -1473,6 +1711,7 @@ app.get('/api/pro/requests', async (req, res) => {
       return
     }
 
+    const masterLocation = await loadUserLocation(normalizedUserId)
     const result = await pool.query(
       `
         SELECT
@@ -1498,10 +1737,14 @@ app.get('/api/pro/requests', async (req, res) => {
           rr.status AS "responseStatus",
           rr.price AS "responsePrice",
           rr.comment AS "responseComment",
-          rr.created_at AS "responseCreatedAt"
+          rr.created_at AS "responseCreatedAt",
+          ul.lat AS "clientLat",
+          ul.lng AS "clientLng",
+          ul.share_to_masters AS "clientShareToMasters"
         FROM service_requests r
         LEFT JOIN cities c ON c.id = r.city_id
         LEFT JOIN districts d ON d.id = r.district_id
+        LEFT JOIN user_locations ul ON ul.user_id = r.user_id
         LEFT JOIN request_responses rr
           ON rr.request_id = r.id AND rr.master_id = $1
         WHERE r.status = 'open'
@@ -1520,7 +1763,32 @@ app.get('/api/pro/requests', async (req, res) => {
       [normalizedUserId, cityId, districtId, categories, worksAtClient, worksAtMaster]
     )
 
-    res.json({ ...summary, isActive: profile.isActive, requests: result.rows })
+    const payload = result.rows.map((row) => {
+      const distanceKm =
+        masterLocation &&
+        row.clientShareToMasters &&
+        typeof row.clientLat === 'number' &&
+        typeof row.clientLng === 'number' &&
+        typeof masterLocation.lat === 'number' &&
+        typeof masterLocation.lng === 'number'
+          ? roundDistanceKm(
+              calculateDistanceKm(
+                masterLocation.lat,
+                masterLocation.lng,
+                row.clientLat,
+                row.clientLng
+              )
+            )
+          : null
+      return {
+        ...row,
+        distanceKm,
+        clientLat: undefined,
+        clientLng: undefined,
+        clientShareToMasters: undefined,
+      }
+    })
+    res.json({ ...summary, isActive: profile.isActive, requests: payload })
   } catch (error) {
     console.error('GET /api/pro/requests failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -1592,6 +1860,7 @@ app.get('/api/pro/bookings', async (req, res) => {
   }
 
   try {
+    const masterLocation = await loadUserLocation(normalizedUserId)
     const result = await pool.query(
       `
         SELECT
@@ -1616,11 +1885,15 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.status,
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
-          b.created_at AS "createdAt"
+          b.created_at AS "createdAt",
+          ul.lat AS "clientLat",
+          ul.lng AS "clientLng",
+          ul.share_to_masters AS "clientShareToMasters"
         FROM service_bookings b
         LEFT JOIN users u ON u.user_id = b.client_id
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
+        LEFT JOIN user_locations ul ON ul.user_id = b.client_id
         WHERE b.master_id = $1
         ORDER BY b.created_at DESC
       `,
@@ -1633,9 +1906,29 @@ app.get('/api/pro/bookings', async (req, res) => {
         .join(' ')
         .trim()
       const clientName = nameParts || (row.clientUsername ? `@${row.clientUsername}` : 'Клиент')
+      const distanceKm =
+        masterLocation &&
+        row.clientShareToMasters &&
+        typeof row.clientLat === 'number' &&
+        typeof row.clientLng === 'number' &&
+        typeof masterLocation.lat === 'number' &&
+        typeof masterLocation.lng === 'number'
+          ? roundDistanceKm(
+              calculateDistanceKm(
+                masterLocation.lat,
+                masterLocation.lng,
+                row.clientLat,
+                row.clientLng
+              )
+            )
+          : null
       return {
         ...row,
         clientName,
+        distanceKm,
+        clientLat: undefined,
+        clientLng: undefined,
+        clientShareToMasters: undefined,
       }
     })
 
@@ -1700,11 +1993,6 @@ app.post('/api/bookings', async (req, res) => {
   const parsedDistrictId = Number(districtId)
   if (!Number.isInteger(parsedCityId) || !Number.isInteger(parsedDistrictId)) {
     res.status(400).json({ error: 'location_required' })
-    return
-  }
-
-  if (normalizedLocationType === 'client' && !normalizedAddress) {
-    res.status(400).json({ error: 'address_required' })
     return
   }
 
@@ -2428,11 +2716,6 @@ app.post('/api/requests', async (req, res) => {
   const parsedDistrictId = Number(districtId)
   if (!Number.isInteger(parsedCityId) || !Number.isInteger(parsedDistrictId)) {
     res.status(400).json({ error: 'location_required' })
-    return
-  }
-
-  if (normalizedLocationType === 'client' && !normalizedAddress) {
-    res.status(400).json({ error: 'address_required' })
     return
   }
 

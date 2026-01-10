@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { IconFilter, IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems } from '../data/clientData'
-import type { MasterProfile } from '../types/app'
+import type { MasterProfile, UserLocation } from '../types/app'
 import {
   isImageUrl,
   parsePortfolioItems,
@@ -17,6 +17,10 @@ type ClientShowcaseScreenProps = {
   onViewRequests: () => void
   onCreateBooking: (masterId: string) => void
   onViewProfile: (masterId: string) => void
+  clientLocation: UserLocation | null
+  isLocating: boolean
+  onRequestLocation: () => void
+  locationError: string
 }
 
 type ClientShowcaseGalleryScreenProps = {
@@ -115,6 +119,7 @@ const pickGalleryShape = (seed: number) =>
 type SortMode =
   | 'recent'
   | 'active'
+  | 'distance'
   | 'experience'
   | 'price'
   | 'portfolio'
@@ -123,6 +128,7 @@ type SortMode =
 const sortOptions: { id: SortMode; label: string }[] = [
   { id: 'recent', label: 'Актуальные' },
   { id: 'active', label: 'Запись открыта' },
+  { id: 'distance', label: 'Ближайшие' },
   { id: 'rating', label: 'Отзывы' },
   { id: 'experience', label: 'Опыт' },
   { id: 'price', label: 'Бюджет' },
@@ -156,6 +162,7 @@ type MasterCard = {
   cityName: string | null
   districtName: string | null
   locationLabel: string
+  distanceKm: number | null
   about: string | null
   updatedAt: string | null
   updatedAtTs: number
@@ -264,10 +271,21 @@ const formatRecencyChip = (updatedAtTs: number) => {
   return 'Недавно'
 }
 
-const buildDistanceLabel = (seed: number, hasLocation: boolean) => {
-  if (!hasLocation) return 'Рядом'
-  const value = 1 + (seed % 80) / 10
+const formatDistanceLabel = (value: number) => {
+  if (value < 1) {
+    return `${Math.round(value * 1000)} м`
+  }
   return `${value.toFixed(1).replace('.', ',')} км`
+}
+
+const buildDistanceLabel = (
+  distanceKm?: number | null,
+  fallback: string | null = 'Рядом'
+) => {
+  if (typeof distanceKm === 'number' && Number.isFinite(distanceKm)) {
+    return formatDistanceLabel(distanceKm)
+  }
+  return fallback
 }
 
 const buildResponseLabel = (seed: number) =>
@@ -693,6 +711,10 @@ export const ClientShowcaseScreen = ({
   onViewRequests,
   onCreateBooking,
   onViewProfile,
+  clientLocation,
+  isLocating,
+  onRequestLocation,
+  locationError,
 }: ClientShowcaseScreenProps) => {
   const [profiles, setProfiles] = useState<MasterProfile[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -703,6 +725,10 @@ export const ClientShowcaseScreen = ({
   const [onlyActive, setOnlyActive] = useState(false)
   const [onlyAtClient, setOnlyAtClient] = useState(false)
   const [onlyAtMaster, setOnlyAtMaster] = useState(false)
+  const hasClientLocation =
+    typeof clientLocation?.lat === 'number' &&
+    typeof clientLocation?.lng === 'number'
+  const isNearby = sortMode === 'distance'
 
   useEffect(() => {
     let cancelled = false
@@ -711,7 +737,15 @@ export const ClientShowcaseScreen = ({
       setIsLoading(true)
       setLoadError('')
       try {
-        const response = await fetch(`${apiBase}/api/masters`)
+        const params = new URLSearchParams()
+        if (sortMode === 'distance' && hasClientLocation) {
+          params.set('clientLat', String(clientLocation?.lat))
+          params.set('clientLng', String(clientLocation?.lng))
+          params.set('sort', 'distance')
+        }
+        const queryString = params.toString()
+        const url = queryString ? `${apiBase}/api/masters?${queryString}` : `${apiBase}/api/masters`
+        const response = await fetch(url)
         if (!response.ok) {
           throw new Error('Load masters failed')
         }
@@ -736,7 +770,7 @@ export const ClientShowcaseScreen = ({
     return () => {
       cancelled = true
     }
-  }, [apiBase])
+  }, [apiBase, clientLocation?.lat, clientLocation?.lng, hasClientLocation, sortMode])
 
   const masterCards = useMemo<MasterCard[]>(() => {
     const source = profiles
@@ -776,6 +810,8 @@ export const ClientShowcaseScreen = ({
       const updateLabel = formatUpdatedLabel(updatedAt)
       const about = profile.about?.trim() || null
       const locationLabel = buildLocationLabel(profile)
+      const distanceKm =
+        typeof profile.distanceKm === 'number' ? profile.distanceKm : null
 
       const categories = Array.isArray(profile.categories) ? profile.categories : []
       const categoryLabels =
@@ -805,6 +841,7 @@ export const ClientShowcaseScreen = ({
         cityName: profile.cityName ?? null,
         districtName: profile.districtName ?? null,
         locationLabel,
+        distanceKm,
         about,
         updatedAt,
         updatedAtTs,
@@ -866,6 +903,20 @@ export const ClientShowcaseScreen = ({
           return (b.experienceYears ?? 0) - (a.experienceYears ?? 0)
         case 'portfolio':
           return b.portfolioCount - a.portfolioCount
+        case 'distance': {
+          const aDistance =
+            typeof a.distanceKm === 'number'
+              ? a.distanceKm
+              : Number.POSITIVE_INFINITY
+          const bDistance =
+            typeof b.distanceKm === 'number'
+              ? b.distanceKm
+              : Number.POSITIVE_INFINITY
+          if (aDistance !== bDistance) {
+            return aDistance - bDistance
+          }
+          return b.updatedAtTs - a.updatedAtTs
+        }
         case 'recent':
         default:
           return b.updatedAtTs - a.updatedAtTs
@@ -878,11 +929,14 @@ export const ClientShowcaseScreen = ({
     () => new Set(filteredMasters.slice(0, 2).map((master) => master.id)),
     [filteredMasters]
   )
-  const hasActiveFilters = onlyActive || onlyAtClient || onlyAtMaster
+  const hasActiveFilters = onlyActive || onlyAtClient || onlyAtMaster || isNearby
   const resetFilters = () => {
     setOnlyActive(false)
     setOnlyAtClient(false)
     setOnlyAtMaster(false)
+    if (sortMode === 'distance') {
+      setSortMode('recent')
+    }
   }
 
   return (
@@ -983,6 +1037,17 @@ export const ClientShowcaseScreen = ({
                   Запись открыта
                 </button>
                 <button
+                  className={`client-master-toggle${isNearby ? ' is-active' : ''}`}
+                  type="button"
+                  onClick={() =>
+                    setSortMode((current) =>
+                      current === 'distance' ? 'recent' : 'distance'
+                    )
+                  }
+                >
+                  Ближайшие
+                </button>
+                <button
                   className={`client-master-toggle${onlyAtClient ? ' is-active' : ''}`}
                   type="button"
                   onClick={() => setOnlyAtClient((prev) => !prev)}
@@ -997,6 +1062,27 @@ export const ClientShowcaseScreen = ({
                   У мастера
                 </button>
               </div>
+            </div>
+          )}
+          {isNearby && !hasClientLocation && (
+            <div className="client-geo-banner">
+              <div>
+                <div className="client-geo-title">Включите геолокацию</div>
+                <div className="client-geo-text">
+                  Покажем ближайших мастеров и расстояние до них.
+                </div>
+                {locationError && (
+                  <div className="client-geo-error">{locationError}</div>
+                )}
+              </div>
+              <button
+                className="client-geo-button"
+                type="button"
+                onClick={onRequestLocation}
+                disabled={isLocating}
+              >
+                {isLocating ? 'Определяем...' : 'Поделиться'}
+              </button>
             </div>
           )}
           <p className="client-master-summary">
@@ -1051,9 +1137,10 @@ export const ClientShowcaseScreen = ({
                     ? `${master.reviewsAverage.toFixed(1)} ★`
                     : 'Новый'
                 const seed = toSeed(master.id)
+                const distanceFallback = isNearby ? 'Гео не задано' : 'Рядом'
                 const distanceLabel = buildDistanceLabel(
-                  seed,
-                  master.locationLabel !== 'Локация не указана'
+                  master.distanceKm,
+                  distanceFallback
                 )
                 const responseLabel = buildResponseLabel(seed)
                 const recencyLabel = formatRecencyChip(master.updatedAtTs)

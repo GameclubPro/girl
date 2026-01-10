@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { IconSettings } from '../components/icons'
@@ -11,6 +11,7 @@ import type {
   MasterReview,
   MasterReviewSummary,
   ProProfileSection,
+  UserLocation,
 } from '../types/app'
 import {
   formatServiceMeta,
@@ -193,6 +194,10 @@ export const ProProfileScreen = ({
   const [scheduleDays, setScheduleDays] = useState<string[]>([])
   const [scheduleStart, setScheduleStart] = useState('')
   const [scheduleEnd, setScheduleEnd] = useState('')
+  const [proLocation, setProLocation] = useState<UserLocation | null>(null)
+  const [shareDistanceToClients, setShareDistanceToClients] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
+  const [locationError, setLocationError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -382,6 +387,20 @@ export const ProProfileScreen = ({
       : ''
     return [cityLabel, districtLabel].filter(Boolean).join(', ') || 'Город не указан'
   }, [cities, cityId, districts, districtId])
+  const hasGeoLocation =
+    typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
+  const geoUpdatedLabel = proLocation?.updatedAt
+    ? new Date(proLocation.updatedAt).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : ''
+  const geoAccuracyLabel =
+    typeof proLocation?.accuracy === 'number'
+      ? `Точность ~${proLocation.accuracy} м`
+      : ''
   const categoryLabels = useMemo(
     () =>
       categoryItems
@@ -541,6 +560,117 @@ export const ProProfileScreen = ({
       setSaveSuccess('')
     }, 2000)
   }
+
+  const setLocationState = (location: UserLocation | null) => {
+    setProLocation(location)
+    setShareDistanceToClients(Boolean(location?.shareToClients))
+  }
+
+  const saveLocation = useCallback(
+    async (
+      location: { lat: number; lng: number; accuracy?: number | null },
+      shareOverride?: boolean
+    ) => {
+      if (!userId) return
+      setLocationError('')
+
+      try {
+        const response = await fetch(`${apiBase}/api/location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            lat: location.lat,
+            lng: location.lng,
+            accuracy: location.accuracy ?? null,
+            shareToClients:
+              typeof shareOverride === 'boolean'
+                ? shareOverride
+                : shareDistanceToClients,
+            shareToMasters: false,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Save location failed')
+        }
+
+        const data = (await response.json()) as { location?: UserLocation | null }
+        setLocationState(data.location ?? null)
+      } catch (error) {
+        setLocationError('Не удалось сохранить геолокацию. Попробуйте еще раз.')
+      } finally {
+        setIsLocating(false)
+      }
+    },
+    [apiBase, shareDistanceToClients, userId]
+  )
+
+  const handleRequestLocation = useCallback(() => {
+    if (!userId) return
+    if (!navigator.geolocation) {
+      setLocationError('Геолокация недоступна на вашем устройстве.')
+      return
+    }
+    setLocationError('')
+    setIsLocating(true)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: Math.round(position.coords.accuracy),
+        }
+        void saveLocation(nextLocation, shareDistanceToClients)
+      },
+      (error) => {
+        setIsLocating(false)
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError('Разрешите доступ к геолокации для показа расстояния.')
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setLocationError('Не удалось определить геопозицию. Попробуйте еще раз.')
+        } else if (error.code === error.TIMEOUT) {
+          setLocationError('Истекло время запроса геолокации. Попробуйте снова.')
+        } else {
+          setLocationError('Не удалось получить геолокацию.')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+    )
+  }, [saveLocation, shareDistanceToClients, userId])
+
+  const handleClearLocation = useCallback(async () => {
+    if (!userId) return
+    setLocationError('')
+    setIsLocating(true)
+
+    try {
+      const response = await fetch(
+        `${apiBase}/api/location?userId=${encodeURIComponent(userId)}`,
+        { method: 'DELETE' }
+      )
+      if (!response.ok) {
+        throw new Error('Clear location failed')
+      }
+      setLocationState(null)
+      setShareDistanceToClients(false)
+    } catch (error) {
+      setLocationError('Не удалось очистить геолокацию.')
+    } finally {
+      setIsLocating(false)
+    }
+  }, [apiBase, userId])
+
+  const handleShareDistanceToggle = useCallback(
+    async (value: boolean) => {
+      setShareDistanceToClients(value)
+      if (!proLocation) return
+      setIsLocating(true)
+      await saveLocation(proLocation, value)
+    },
+    [proLocation, saveLocation]
+  )
 
   useEffect(() => {
     editingSectionRef.current = editingSection
@@ -846,6 +976,41 @@ export const ProProfileScreen = ({
       cancelled = true
     }
   }, [apiBase, displayNameFallback, userId])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const loadLocation = async () => {
+      setLocationError('')
+      try {
+        const response = await fetch(
+          `${apiBase}/api/location?userId=${encodeURIComponent(userId)}`
+        )
+        if (response.status === 404) {
+          setLocationState(null)
+          return
+        }
+        if (!response.ok) {
+          throw new Error('Load location failed')
+        }
+        const data = (await response.json()) as UserLocation
+        if (!cancelled) {
+          setLocationState(data)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLocationError('Не удалось загрузить геолокацию.')
+        }
+      }
+    }
+
+    loadLocation()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
 
   useEffect(() => {
     if (!userId) return
@@ -2515,6 +2680,66 @@ export const ProProfileScreen = ({
                           </option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+                  <div className="pro-field">
+                    <span className="pro-label">Геолокация (по желанию)</span>
+                    <div className="pro-geo-card">
+                      <div className="pro-geo-row">
+                        <div>
+                          <div className="pro-geo-title">
+                            {hasGeoLocation
+                              ? 'Геолокация сохранена'
+                              : 'Геолокация не задана'}
+                          </div>
+                          {hasGeoLocation && (
+                            <div className="pro-geo-meta">
+                              {geoUpdatedLabel
+                                ? `Обновлено ${geoUpdatedLabel}`
+                                : 'Недавно'}
+                              {geoAccuracyLabel ? ` • ${geoAccuracyLabel}` : ''}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className="pro-geo-action"
+                          type="button"
+                          onClick={handleRequestLocation}
+                          disabled={isLocating}
+                        >
+                          {isLocating
+                            ? 'Определяем...'
+                            : hasGeoLocation
+                              ? 'Обновить'
+                              : 'Поделиться'}
+                        </button>
+                      </div>
+                      <div className="pro-geo-actions">
+                        {hasGeoLocation && (
+                          <button
+                            className="pro-geo-clear"
+                            type="button"
+                            onClick={handleClearLocation}
+                            disabled={isLocating}
+                          >
+                            Удалить геолокацию
+                          </button>
+                        )}
+                        <label className="pro-toggle">
+                          <input
+                            type="checkbox"
+                            checked={shareDistanceToClients}
+                            onChange={(event) =>
+                              handleShareDistanceToggle(event.target.checked)
+                            }
+                            disabled={!hasGeoLocation || isLocating}
+                          />
+                          Показывать расстояние клиентам
+                        </label>
+                      </div>
+                      {locationError && (
+                        <p className="pro-geo-error">{locationError}</p>
+                      )}
                     </div>
                   </div>
                   <div className="pro-field">
