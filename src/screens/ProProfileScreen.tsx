@@ -1910,13 +1910,6 @@ export const ProProfileScreen = ({
           </div>
           <div className="pro-profile-ig-actions">
             <button
-              className="pro-profile-ig-button pro-profile-ig-button--primary"
-              type="button"
-              onClick={onViewRequests}
-            >
-              К заявкам
-            </button>
-            <button
               className="pro-profile-ig-button"
               type="button"
               onClick={() => openEditor('basic')}
