@@ -1907,10 +1907,8 @@ export const ProProfileScreen = ({
           className="pro-profile-portfolio-panel animate delay-2"
         >
           <div className="pro-profile-portfolio-panel-head">
-            <div>
-              <p className="pro-profile-portfolio-panel-kicker">Портфолио</p>
-            </div>
             <div className="pro-profile-portfolio-panel-controls">
+              <p className="pro-profile-portfolio-panel-kicker">Портфолио</p>
               <span className="pro-profile-portfolio-panel-count">
                 {portfolioItems.length} из {MAX_PORTFOLIO_ITEMS}
               </span>
