@@ -315,19 +315,6 @@ export const ClientMasterProfileScreen = ({
     serviceItems.length > 0
       ? formatServiceCount(serviceItems.length)
       : 'Нет услуг'
-  const distanceLabel =
-    typeof profile?.distanceKm === 'number' && Number.isFinite(profile.distanceKm)
-      ? `${profile.distanceKm.toFixed(1)} км`
-      : ''
-  const heroStats = [
-    { label: 'Формат', value: workFormatLabel },
-    { label: 'Опыт', value: experienceLabel },
-    { label: 'Локация', value: locationLabel },
-    { label: 'Цена', value: priceLabel },
-  ]
-  if (distanceLabel) {
-    heroStats.splice(2, 0, { label: 'До вас', value: distanceLabel })
-  }
   const showcaseCount = showcaseItems.filter((item) => item.url.trim()).length
   const showcaseCountLabel = showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
   const showcasePreview = useMemo(
@@ -466,17 +453,9 @@ export const ClientMasterProfileScreen = ({
                     </p>
                   </div>
                 </div>
-                <div className="pro-profile-hero-stats">
-                  {heroStats.map((stat) => (
-                    <div className="pro-profile-hero-stat" key={stat.label}>
-                      <span className="pro-profile-hero-stat-label">{stat.label}</span>
-                      <span className="pro-profile-hero-stat-value">{stat.value}</span>
-                    </div>
-                  ))}
-                </div>
                 <div className="pro-profile-social-actions pro-profile-hero-actions">
                   <button
-                    className="pro-profile-action is-primary"
+                    className="pro-profile-action"
                     type="button"
                     onClick={onCreateBooking}
                   >

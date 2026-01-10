@@ -413,12 +413,6 @@ export const ProProfileScreen = ({
       : ''
     return [cityLabel, districtLabel].filter(Boolean).join(', ') || 'Город не указан'
   }, [cities, cityId, districts, districtId])
-  const heroStats = [
-    { label: 'Опыт', value: experienceLabel },
-    { label: 'Формат', value: workFormatLabel },
-    { label: 'Локация', value: locationLabel },
-    { label: 'Цена', value: servicePriceLabel },
-  ]
   const hasGeoLocation =
     typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
   const geoUpdatedLabel = proLocation?.updatedAt
@@ -1887,17 +1881,9 @@ export const ProProfileScreen = ({
                 </p>
               </div>
             </div>
-            <div className="pro-profile-hero-stats">
-              {heroStats.map((stat) => (
-                <div className="pro-profile-hero-stat" key={stat.label}>
-                  <span className="pro-profile-hero-stat-label">{stat.label}</span>
-                  <span className="pro-profile-hero-stat-value">{stat.value}</span>
-                </div>
-              ))}
-            </div>
             <div className="pro-profile-social-actions pro-profile-hero-actions">
               <button
-                className="pro-profile-action is-primary"
+                className="pro-profile-action"
                 type="button"
                 onClick={onViewRequests}
               >
@@ -3148,7 +3134,7 @@ export const ProProfileScreen = ({
               }`}
             >
               <button
-                className="pro-profile-action is-primary pro-profile-editor-save"
+                className="pro-profile-action pro-profile-editor-save"
                 type="button"
                 onClick={handleSave}
                 disabled={!canSave}
