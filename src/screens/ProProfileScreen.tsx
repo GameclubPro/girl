@@ -2508,6 +2508,17 @@ export const ProProfileScreen = ({
               </button>
               <button
                 className={`pro-profile-editor-tab${
+                  editingSection === 'media' ? ' is-active' : ''
+                }`}
+                type="button"
+                role="tab"
+                aria-selected={editingSection === 'media'}
+                onClick={() => openEditor('media')}
+              >
+                Фото
+              </button>
+              <button
+                className={`pro-profile-editor-tab${
                   editingSection === 'location' ? ' is-active' : ''
                 }`}
                 type="button"
@@ -2530,6 +2541,88 @@ export const ProProfileScreen = ({
               </button>
             </div>
             <section className="pro-profile-editor-card">
+              {editingSection === 'media' && (
+                <div className="pro-profile-editor-media">
+                  <div className="pro-profile-editor-media-group">
+                    <div className="pro-profile-editor-media-label">Аватар</div>
+                    <div className="pro-profile-editor-media-row">
+                      <div
+                        className={`pro-profile-editor-media-avatar${
+                          isAvatarUploading ? ' is-loading' : ''
+                        }`}
+                        aria-busy={isAvatarUploading}
+                      >
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="Аватар" />
+                        ) : (
+                          <span aria-hidden="true">{profileInitials}</span>
+                        )}
+                      </div>
+                      <div className="pro-profile-editor-media-actions">
+                        <button
+                          className="pro-profile-editor-media-action"
+                          type="button"
+                          onClick={handleAvatarSelect}
+                          disabled={isAvatarUploading}
+                        >
+                          Сменить
+                        </button>
+                        {avatarUrl && (
+                          <button
+                            className="pro-profile-editor-media-action is-danger"
+                            type="button"
+                            onClick={handleAvatarClear}
+                            disabled={isAvatarUploading}
+                          >
+                            Удалить
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pro-profile-editor-media-group">
+                    <div className="pro-profile-editor-media-label">Шапка</div>
+                    <div
+                      className={`pro-profile-editor-media-cover${
+                        coverUrl ? ' has-image' : ''
+                      }${isCoverUploading ? ' is-loading' : ''}`}
+                      style={
+                        coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined
+                      }
+                      aria-busy={isCoverUploading}
+                    >
+                      {!coverUrl && (
+                        <span className="pro-profile-editor-media-cover-text">
+                          Шапка не задана
+                        </span>
+                      )}
+                    </div>
+                    <div className="pro-profile-editor-media-actions is-row">
+                      <button
+                        className="pro-profile-editor-media-action"
+                        type="button"
+                        onClick={handleCoverSelect}
+                        disabled={isCoverUploading}
+                      >
+                        Сменить
+                      </button>
+                      {coverUrl && (
+                        <button
+                          className="pro-profile-editor-media-action is-danger"
+                          type="button"
+                          onClick={handleCoverClear}
+                          disabled={isCoverUploading}
+                        >
+                          Удалить
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {mediaError && <p className="pro-error">{mediaError}</p>}
+                </div>
+              )}
               {editingSection === 'basic' && (
                 <>
                   <div className="pro-field">

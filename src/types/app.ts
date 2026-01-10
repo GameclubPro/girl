@@ -24,6 +24,7 @@ export type ProfileStatus = 'draft' | 'ready' | 'complete'
 
 export type ProProfileSection =
   | 'basic'
+  | 'media'
   | 'services'
   | 'location'
   | 'availability'
