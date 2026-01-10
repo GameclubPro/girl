@@ -398,6 +398,13 @@ export const ProProfileScreen = ({
   const reviewDistribution = reviewSummary?.distribution ?? []
   const reviewCountLabel =
     reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
+  const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
+  const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
+  const profileStats = [
+    { label: 'Работы', value: String(portfolioCount) },
+    { label: 'Рейтинг', value: reviewAverageLabel },
+    { label: 'Отзывы', value: String(reviewCount) },
+  ]
   const scheduleSummary =
     scheduleDays.length > 0
       ? formatCount(scheduleDays.length, 'день', 'дня', 'дней')
@@ -413,6 +420,12 @@ export const ProProfileScreen = ({
       : ''
     return [cityLabel, districtLabel].filter(Boolean).join(', ') || 'Город не указан'
   }, [cities, cityId, districts, districtId])
+  const profileMetaPrimary = [locationLabel, workFormatLabel]
+    .filter(Boolean)
+    .join(' • ')
+  const profileMetaSecondary = [servicePriceLabel, experienceLabel]
+    .filter(Boolean)
+    .join(' • ')
   const hasGeoLocation =
     typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
   const geoUpdatedLabel = proLocation?.updatedAt
@@ -1744,16 +1757,16 @@ export const ProProfileScreen = ({
 
   return (
     <div className="screen screen--pro">
-      <div className="pro-shell pro-shell--hybrid">
-        <section className="pro-profile-social pro-profile-hero animate delay-1">
+      <div className="pro-shell pro-shell--ig">
+        <section className="pro-profile-ig animate delay-1">
           <div
-            className={`pro-profile-social-cover${coverUrl ? ' has-image' : ''}${
+            className={`pro-profile-ig-cover${coverUrl ? ' has-image' : ''}${
               isCoverUploading ? ' is-loading' : ''
             }`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
             aria-busy={isCoverUploading}
           >
-            <div className="pro-profile-social-glow" aria-hidden="true" />
+            <div className="pro-profile-ig-cover-glow" aria-hidden="true" />
             <input
               ref={coverInputRef}
               className="pro-file-input"
@@ -1789,107 +1802,124 @@ export const ProProfileScreen = ({
               )}
             </div>
           </div>
-          <div className="pro-profile-hero-card">
-            <div className="pro-profile-social-body">
-              <div
-                className={`pro-profile-social-avatar${
-                  isAvatarUploading ? ' is-loading' : ''
-                }`}
-                aria-busy={isAvatarUploading}
-              >
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
-                ) : (
-                  <span aria-hidden="true">{profileInitials}</span>
-                )}
-                <input
-                  ref={avatarInputRef}
-                  className="pro-file-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  disabled={isAvatarUploading}
-                  aria-hidden="true"
-                  tabIndex={-1}
-                />
-                <button
-                  className="pro-avatar-action"
-                  type="button"
-                  onClick={handleAvatarSelect}
-                  disabled={isAvatarUploading}
-                  aria-label="Обновить аватар"
-                >
-                  +
-                </button>
-                {avatarUrl && (
-                  <button
-                    className="pro-avatar-clear"
-                    type="button"
-                    onClick={handleAvatarClear}
-                    disabled={isAvatarUploading}
-                    aria-label="Удалить аватар"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-              <div className="pro-profile-social-content">
-                <div className="pro-profile-social-header">
-                  <h1 className="pro-profile-social-name">{displayNameValue}</h1>
-                  <button
-                    className={`pro-profile-social-status ${activeTone}`}
-                    type="button"
-                    onClick={() => setIsActive((current) => !current)}
-                  >
-                    <span className="pro-profile-social-dot" aria-hidden="true" />
-                    {isActive ? 'Принимаю заявки' : 'Пауза'}
-                  </button>
-                </div>
-                <div className="pro-profile-social-tags">
-                  {previewTags.length > 0 ? (
-                    <>
-                      {previewTags.map((label, index) => (
-                        <span className="pro-profile-tag" key={`${label}-${index}`}>
-                          {label}
-                        </span>
-                      ))}
-                      {previewTagRemainder > 0 && (
-                        <span className="pro-profile-tag is-muted">
-                          +{previewTagRemainder}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="pro-profile-tag is-muted">
-                      Теги появятся здесь
-                    </span>
-                  )}
-                  {reviewCount > 0 ? (
-                    <span className="pro-profile-tag is-review">
-                      ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
-                    </span>
-                  ) : (
-                    <span className="pro-profile-tag is-muted">Нет отзывов</span>
-                  )}
-                </div>
-                <p
-                  className={`pro-profile-social-about${
-                    about.trim() ? '' : ' is-muted'
-                  }`}
-                >
-                  {aboutPreview}
-                </p>
-              </div>
-            </div>
-            <div className="pro-profile-social-actions pro-profile-hero-actions">
+          <div className="pro-profile-ig-header">
+            <div
+              className={`pro-profile-ig-avatar${
+                isAvatarUploading ? ' is-loading' : ''
+              }`}
+              aria-busy={isAvatarUploading}
+            >
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
+              ) : (
+                <span aria-hidden="true">{profileInitials}</span>
+              )}
+              <input
+                ref={avatarInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                disabled={isAvatarUploading}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
               <button
-                className="pro-profile-action"
+                className="pro-avatar-action"
                 type="button"
-                onClick={onViewRequests}
+                onClick={handleAvatarSelect}
+                disabled={isAvatarUploading}
+                aria-label="Обновить аватар"
               >
-                К заявкам
+                +
+              </button>
+              {avatarUrl && (
+                <button
+                  className="pro-avatar-clear"
+                  type="button"
+                  onClick={handleAvatarClear}
+                  disabled={isAvatarUploading}
+                  aria-label="Удалить аватар"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div className="pro-profile-ig-stats">
+              {profileStats.map((stat) => (
+                <div className="pro-profile-ig-stat" key={stat.label}>
+                  <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                  <span className="pro-profile-ig-stat-label">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="pro-profile-ig-body">
+            <div className="pro-profile-ig-name-row">
+              <h1 className="pro-profile-ig-name">{displayNameValue}</h1>
+              <button
+                className={`pro-profile-ig-status ${activeTone}`}
+                type="button"
+                onClick={() => setIsActive((current) => !current)}
+              >
+                <span className="pro-profile-social-dot" aria-hidden="true" />
+                {isActive ? 'Принимаю заявки' : 'Пауза'}
               </button>
             </div>
+            <div className="pro-profile-ig-tags">
+              {previewTags.length > 0 ? (
+                <>
+                  {previewTags.map((label, index) => (
+                    <span className="pro-profile-tag" key={`${label}-${index}`}>
+                      {label}
+                    </span>
+                  ))}
+                  {previewTagRemainder > 0 && (
+                    <span className="pro-profile-tag is-muted">
+                      +{previewTagRemainder}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="pro-profile-tag is-muted">
+                  Теги появятся здесь
+                </span>
+              )}
+              {reviewCount > 0 ? (
+                <span className="pro-profile-tag is-review">
+                  ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                </span>
+              ) : (
+                <span className="pro-profile-tag is-muted">Нет отзывов</span>
+              )}
+            </div>
+            <p
+              className={`pro-profile-ig-about${
+                about.trim() ? '' : ' is-muted'
+              }`}
+            >
+              {aboutPreview}
+            </p>
+            <div className="pro-profile-ig-meta">{profileMetaPrimary}</div>
+            <div className="pro-profile-ig-meta is-muted">
+              {profileMetaSecondary}
+            </div>
+          </div>
+          <div className="pro-profile-ig-actions">
+            <button
+              className="pro-profile-ig-button pro-profile-ig-button--primary"
+              type="button"
+              onClick={onViewRequests}
+            >
+              К заявкам
+            </button>
+            <button
+              className="pro-profile-ig-button"
+              type="button"
+              onClick={() => openEditor('basic')}
+            >
+              Редактировать
+            </button>
           </div>
         </section>
 

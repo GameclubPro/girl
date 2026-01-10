@@ -292,6 +292,13 @@ export const ClientMasterProfileScreen = ({
   const reviewAverage = reviewSummary?.average ?? 0
   const reviewDistribution = reviewSummary?.distribution ?? []
   const reviewCountLabel = reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
+  const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
+  const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
+  const profileStats = [
+    { label: 'Работы', value: String(portfolioCount) },
+    { label: 'Рейтинг', value: reviewAverageLabel },
+    { label: 'Отзывы', value: String(reviewCount) },
+  ]
   const priceLabel = formatPriceRange(
     profile?.priceFrom ?? null,
     profile?.priceTo ?? null
@@ -299,6 +306,12 @@ export const ClientMasterProfileScreen = ({
   const experienceLabel = formatExperience(profile?.experienceYears ?? null)
   const locationLabel = buildLocationLabel(profile)
   const workFormatLabel = buildWorkFormatLabel(profile)
+  const profileMetaPrimary = [locationLabel, workFormatLabel]
+    .filter(Boolean)
+    .join(' • ')
+  const profileMetaSecondary = [priceLabel, experienceLabel]
+    .filter(Boolean)
+    .join(' • ')
   const scheduleDays = Array.isArray(profile?.scheduleDays) ? profile?.scheduleDays : []
   const scheduleLabel = buildScheduleLabel(scheduleDays)
   const scheduleRange = buildScheduleRange(
@@ -358,7 +371,7 @@ export const ClientMasterProfileScreen = ({
 
   return (
     <div className="screen screen--client screen--client-master-profile">
-      <div className="pro-shell pro-shell--hybrid">
+      <div className="pro-shell pro-shell--ig">
         <header className="master-profile-header">
           <button
             className="pro-back"
@@ -384,91 +397,99 @@ export const ClientMasterProfileScreen = ({
           </div>
         ) : profile ? (
           <>
-            <section className="pro-profile-social pro-profile-hero animate delay-1">
+            <section className="pro-profile-ig animate delay-1">
               <div
-                className={`pro-profile-social-cover${coverUrl ? ' has-image' : ''}`}
+                className={`pro-profile-ig-cover${coverUrl ? ' has-image' : ''}`}
                 style={
                   coverUrl
                     ? { backgroundImage: `url(${coverUrl})`, backgroundPosition: coverFocus }
                     : undefined
                 }
               >
-                <div className="pro-profile-social-glow" aria-hidden="true" />
+                <div className="pro-profile-ig-cover-glow" aria-hidden="true" />
                 {!coverUrl && (
                   <span className="master-profile-cover-fallback" aria-hidden="true">
                     {initials}
                   </span>
                 )}
               </div>
-              <div className="pro-profile-hero-card">
-                <div className="pro-profile-social-body">
-                  <div className="pro-profile-social-avatar">
-                    {profile.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
-                    ) : (
-                      <span aria-hidden="true">{initials}</span>
-                    )}
-                  </div>
-                  <div className="pro-profile-social-content">
-                    <div className="pro-profile-social-header">
-                      <h1 className="pro-profile-social-name">{displayName}</h1>
-                      <span className={`pro-profile-social-status ${activeTone}`}>
-                        <span className="pro-profile-social-dot" aria-hidden="true" />
-                        {isActive ? 'Запись открыта' : 'Пауза'}
-                      </span>
+              <div className="pro-profile-ig-header">
+                <div className="pro-profile-ig-avatar">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
+                  ) : (
+                    <span aria-hidden="true">{initials}</span>
+                  )}
+                </div>
+                <div className="pro-profile-ig-stats">
+                  {profileStats.map((stat) => (
+                    <div className="pro-profile-ig-stat" key={stat.label}>
+                      <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                      <span className="pro-profile-ig-stat-label">{stat.label}</span>
                     </div>
-                    <div className="pro-profile-social-tags">
-                      {previewTags.length > 0 ? (
-                        <>
-                          {previewTags.map((label, index) => (
-                            <span className="pro-profile-tag" key={`${label}-${index}`}>
-                              {label}
-                            </span>
-                          ))}
-                          {previewTagRemainder > 0 && (
-                            <span className="pro-profile-tag is-muted">
-                              +{previewTagRemainder}
-                            </span>
-                          )}
-                        </>
-                      ) : (
+                  ))}
+                </div>
+              </div>
+              <div className="pro-profile-ig-body">
+                <div className="pro-profile-ig-name-row">
+                  <h1 className="pro-profile-ig-name">{displayName}</h1>
+                  <span className={`pro-profile-ig-status ${activeTone}`}>
+                    <span className="pro-profile-social-dot" aria-hidden="true" />
+                    {isActive ? 'Запись открыта' : 'Пауза'}
+                  </span>
+                </div>
+                <div className="pro-profile-ig-tags">
+                  {previewTags.length > 0 ? (
+                    <>
+                      {previewTags.map((label, index) => (
+                        <span className="pro-profile-tag" key={`${label}-${index}`}>
+                          {label}
+                        </span>
+                      ))}
+                      {previewTagRemainder > 0 && (
                         <span className="pro-profile-tag is-muted">
-                          Теги появятся здесь
+                          +{previewTagRemainder}
                         </span>
                       )}
-                      {reviewCount > 0 ? (
-                        <span className="pro-profile-tag is-review">
-                          ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
-                        </span>
-                      ) : (
-                        <span className="pro-profile-tag is-muted">Нет отзывов</span>
-                      )}
-                    </div>
-                    <p
-                      className={`pro-profile-social-about${
-                        aboutValue ? '' : ' is-muted'
-                      }`}
-                    >
-                      {aboutText}
-                    </p>
-                  </div>
+                    </>
+                  ) : (
+                    <span className="pro-profile-tag is-muted">
+                      Теги появятся здесь
+                    </span>
+                  )}
+                  {reviewCount > 0 ? (
+                    <span className="pro-profile-tag is-review">
+                      ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                    </span>
+                  ) : (
+                    <span className="pro-profile-tag is-muted">Нет отзывов</span>
+                  )}
                 </div>
-                <div className="pro-profile-social-actions pro-profile-hero-actions">
-                  <button
-                    className="pro-profile-action"
-                    type="button"
-                    onClick={onCreateBooking}
-                  >
-                    Записаться
-                  </button>
-                  <button
-                    className="pro-profile-action"
-                    type="button"
-                    onClick={onViewMasters}
-                  >
-                    Все мастера
-                  </button>
+                <p
+                  className={`pro-profile-ig-about${aboutValue ? '' : ' is-muted'}`}
+                >
+                  {aboutText}
+                </p>
+                <div className="pro-profile-ig-meta">{profileMetaPrimary}</div>
+                <div className="pro-profile-ig-meta is-muted">
+                  {profileMetaSecondary}
                 </div>
+              </div>
+              <div className="pro-profile-ig-actions">
+                <button
+                  className="pro-profile-ig-button pro-profile-ig-button--primary"
+                  type="button"
+                  onClick={onCreateBooking}
+                >
+                  Записаться
+                </button>
+                <button
+                  className="pro-profile-ig-button"
+                  type="button"
+                  onClick={onViewMasters}
+                >
+                  Все мастера
+                </button>
               </div>
             </section>
 
