@@ -725,9 +725,10 @@ export const ClientShowcaseScreen = ({
   const [onlyActive, setOnlyActive] = useState(false)
   const [onlyAtClient, setOnlyAtClient] = useState(false)
   const [onlyAtMaster, setOnlyAtMaster] = useState(false)
+  const locationLat = clientLocation?.lat
+  const locationLng = clientLocation?.lng
   const hasClientLocation =
-    typeof clientLocation?.lat === 'number' &&
-    typeof clientLocation?.lng === 'number'
+    typeof locationLat === 'number' && typeof locationLng === 'number'
   const isNearby = sortMode === 'distance'
 
   useEffect(() => {
@@ -738,13 +739,17 @@ export const ClientShowcaseScreen = ({
       setLoadError('')
       try {
         const params = new URLSearchParams()
+        if (typeof locationLat === 'number' && typeof locationLng === 'number') {
+          params.set('clientLat', String(locationLat))
+          params.set('clientLng', String(locationLng))
+        }
         if (sortMode === 'distance' && hasClientLocation) {
-          params.set('clientLat', String(clientLocation?.lat))
-          params.set('clientLng', String(clientLocation?.lng))
           params.set('sort', 'distance')
         }
         const queryString = params.toString()
-        const url = queryString ? `${apiBase}/api/masters?${queryString}` : `${apiBase}/api/masters`
+        const url = queryString
+          ? `${apiBase}/api/masters?${queryString}`
+          : `${apiBase}/api/masters`
         const response = await fetch(url)
         if (!response.ok) {
           throw new Error('Load masters failed')
@@ -770,7 +775,7 @@ export const ClientShowcaseScreen = ({
     return () => {
       cancelled = true
     }
-  }, [apiBase, clientLocation?.lat, clientLocation?.lng, hasClientLocation, sortMode])
+  }, [apiBase, locationLat, locationLng, hasClientLocation, sortMode])
 
   const masterCards = useMemo<MasterCard[]>(() => {
     const source = profiles
