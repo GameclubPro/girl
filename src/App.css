@@ -6020,29 +6020,6 @@
   cursor: not-allowed;
 }
 
-.address-geo-toggle {
-  border: 1px solid rgba(98, 86, 78, 0.18);
-  border-radius: 14px;
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #5f5855;
-  background: #ffffff;
-  text-align: left;
-  cursor: pointer;
-}
-
-.address-geo-toggle.is-active {
-  border-color: rgba(143, 98, 228, 0.4);
-  background: rgba(230, 218, 250, 0.7);
-  color: #6f52ba;
-}
-
-.address-geo-toggle:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .address-field {
   display: flex;
   flex-direction: column;

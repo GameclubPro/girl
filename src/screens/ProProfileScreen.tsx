@@ -195,7 +195,6 @@ export const ProProfileScreen = ({
   const [scheduleStart, setScheduleStart] = useState('')
   const [scheduleEnd, setScheduleEnd] = useState('')
   const [proLocation, setProLocation] = useState<UserLocation | null>(null)
-  const [shareDistanceToClients, setShareDistanceToClients] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -563,14 +562,10 @@ export const ProProfileScreen = ({
 
   const setLocationState = (location: UserLocation | null) => {
     setProLocation(location)
-    setShareDistanceToClients(Boolean(location?.shareToClients))
   }
 
   const saveLocation = useCallback(
-    async (
-      location: { lat: number; lng: number; accuracy?: number | null },
-      shareOverride?: boolean
-    ) => {
+    async (location: { lat: number; lng: number; accuracy?: number | null }) => {
       if (!userId) return
       setLocationError('')
 
@@ -583,11 +578,8 @@ export const ProProfileScreen = ({
             lat: location.lat,
             lng: location.lng,
             accuracy: location.accuracy ?? null,
-            shareToClients:
-              typeof shareOverride === 'boolean'
-                ? shareOverride
-                : shareDistanceToClients,
-            shareToMasters: false,
+            shareToClients: true,
+            shareToMasters: true,
           }),
         })
 
@@ -603,7 +595,7 @@ export const ProProfileScreen = ({
         setIsLocating(false)
       }
     },
-    [apiBase, shareDistanceToClients, userId]
+    [apiBase, userId]
   )
 
   const handleRequestLocation = useCallback(() => {
@@ -622,7 +614,7 @@ export const ProProfileScreen = ({
           lng: position.coords.longitude,
           accuracy: Math.round(position.coords.accuracy),
         }
-        void saveLocation(nextLocation, shareDistanceToClients)
+        void saveLocation(nextLocation)
       },
       (error) => {
         setIsLocating(false)
@@ -638,7 +630,7 @@ export const ProProfileScreen = ({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
     )
-  }, [saveLocation, shareDistanceToClients, userId])
+  }, [saveLocation, userId])
 
   const handleClearLocation = useCallback(async () => {
     if (!userId) return
@@ -654,23 +646,12 @@ export const ProProfileScreen = ({
         throw new Error('Clear location failed')
       }
       setLocationState(null)
-      setShareDistanceToClients(false)
     } catch (error) {
       setLocationError('Не удалось очистить геолокацию.')
     } finally {
       setIsLocating(false)
     }
   }, [apiBase, userId])
-
-  const handleShareDistanceToggle = useCallback(
-    async (value: boolean) => {
-      setShareDistanceToClients(value)
-      if (!proLocation) return
-      setIsLocating(true)
-      await saveLocation(proLocation, value)
-    },
-    [proLocation, saveLocation]
-  )
 
   useEffect(() => {
     editingSectionRef.current = editingSection
@@ -2725,17 +2706,6 @@ export const ProProfileScreen = ({
                             Удалить геолокацию
                           </button>
                         )}
-                        <label className="pro-toggle">
-                          <input
-                            type="checkbox"
-                            checked={shareDistanceToClients}
-                            onChange={(event) =>
-                              handleShareDistanceToggle(event.target.checked)
-                            }
-                            disabled={!hasGeoLocation || isLocating}
-                          />
-                          Показывать расстояние клиентам
-                        </label>
                       </div>
                       {locationError && (
                         <p className="pro-geo-error">{locationError}</p>

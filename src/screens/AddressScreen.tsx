@@ -16,14 +16,12 @@ export const AddressScreen = ({
   location,
   isLocating,
   locationError,
-  shareDistanceToMasters,
   onCityQueryChange,
   onCitySelect,
   onDistrictChange,
   onContinue,
   onRequestLocation,
   onClearLocation,
-  onShareDistanceChange,
 }: {
   role: Role
   cities: City[]
@@ -37,14 +35,12 @@ export const AddressScreen = ({
   location: UserLocation | null
   isLocating: boolean
   locationError: string
-  shareDistanceToMasters: boolean
   onCityQueryChange: (value: string) => void
   onCitySelect: (city: City) => void
   onDistrictChange: (value: number | null) => void
   onContinue: () => void
   onRequestLocation: () => void
   onClearLocation: () => void
-  onShareDistanceChange: (value: boolean) => void
 }) => {
   const [isCityFocused, setIsCityFocused] = useState(false)
   const roleLabel = role === 'client' ? 'Заказчик' : 'Исполнительница'
@@ -237,17 +233,6 @@ export const AddressScreen = ({
             )}
           </div>
 
-          <button
-            className={`address-geo-toggle${
-              shareDistanceToMasters ? ' is-active' : ''
-            }`}
-            type="button"
-            onClick={() => onShareDistanceChange(!shareDistanceToMasters)}
-            disabled={!hasLocation || isLocating}
-            aria-pressed={shareDistanceToMasters}
-          >
-            Показывать расстояние мастерам
-          </button>
           <p className="address-helper">
             Мастера увидят только примерное расстояние.
           </p>

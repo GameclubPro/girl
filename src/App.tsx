@@ -78,7 +78,6 @@ function App() {
     categoryItems[0]?.id ?? ''
   )
   const [clientLocation, setClientLocation] = useState<UserLocation | null>(null)
-  const [shareDistanceToMasters, setShareDistanceToMasters] = useState(false)
   const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
   const [selectedShowcaseItem, setSelectedShowcaseItem] =
     useState<ShowcaseMedia | null>(null)
@@ -139,14 +138,10 @@ function App() {
 
   const setLocationState = (location: UserLocation | null) => {
     setClientLocation(location)
-    setShareDistanceToMasters(Boolean(location?.shareToMasters))
   }
 
   const saveLocation = useCallback(
-    async (
-      location: { lat: number; lng: number; accuracy?: number | null },
-      shareOverride?: boolean
-    ) => {
+    async (location: { lat: number; lng: number; accuracy?: number | null }) => {
       if (!userId) return
       setLocationError('')
 
@@ -159,11 +154,8 @@ function App() {
             lat: location.lat,
             lng: location.lng,
             accuracy: location.accuracy ?? null,
-            shareToMasters:
-              typeof shareOverride === 'boolean'
-                ? shareOverride
-                : shareDistanceToMasters,
-            shareToClients: false,
+            shareToMasters: true,
+            shareToClients: true,
           }),
         })
 
@@ -181,7 +173,7 @@ function App() {
         setIsLocating(false)
       }
     },
-    [apiBase, shareDistanceToMasters, userId]
+    [apiBase, userId]
   )
 
   const handleRequestLocation = useCallback(() => {
@@ -200,7 +192,7 @@ function App() {
           lng: position.coords.longitude,
           accuracy: Math.round(position.coords.accuracy),
         }
-        void saveLocation(nextLocation, shareDistanceToMasters)
+        void saveLocation(nextLocation)
       },
       (error) => {
         setIsLocating(false)
@@ -216,7 +208,7 @@ function App() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
     )
-  }, [saveLocation, shareDistanceToMasters, userId])
+  }, [saveLocation, userId])
 
   const handleClearLocation = useCallback(async () => {
     if (!userId) return
@@ -234,23 +226,12 @@ function App() {
       }
 
       setLocationState(null)
-      setShareDistanceToMasters(false)
     } catch (error) {
       setLocationError('Не удалось очистить геолокацию.')
     } finally {
       setIsLocating(false)
     }
   }, [apiBase, userId])
-
-  const handleShareDistanceToggle = useCallback(
-    async (value: boolean) => {
-      setShareDistanceToMasters(value)
-      if (!clientLocation) return
-      setIsLocating(true)
-      await saveLocation(clientLocation, value)
-    },
-    [clientLocation, saveLocation]
-  )
 
   const handleSaveAddress = useCallback(async () => {
     if (!cityId || !districtId) {
@@ -907,14 +888,12 @@ function App() {
         location={clientLocation}
         isLocating={isLocating}
         locationError={locationError}
-        shareDistanceToMasters={shareDistanceToMasters}
         onCityQueryChange={handleCityQueryChange}
         onCitySelect={handleCitySelect}
         onDistrictChange={handleDistrictChange}
         onContinue={handleSaveAddress}
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}
-        onShareDistanceChange={handleShareDistanceToggle}
       />
     )
   }

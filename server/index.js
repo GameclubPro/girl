@@ -340,8 +340,8 @@ const ensureSchema = async () => {
       lat DOUBLE PRECISION,
       lng DOUBLE PRECISION,
       accuracy INTEGER,
-      share_to_clients BOOLEAN NOT NULL DEFAULT false,
-      share_to_masters BOOLEAN NOT NULL DEFAULT false,
+      share_to_clients BOOLEAN NOT NULL DEFAULT true,
+      share_to_masters BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -364,12 +364,34 @@ const ensureSchema = async () => {
 
   await pool.query(`
     ALTER TABLE user_locations
-    ADD COLUMN IF NOT EXISTS share_to_clients BOOLEAN NOT NULL DEFAULT false;
+    ADD COLUMN IF NOT EXISTS share_to_clients BOOLEAN NOT NULL DEFAULT true;
   `)
 
   await pool.query(`
     ALTER TABLE user_locations
-    ADD COLUMN IF NOT EXISTS share_to_masters BOOLEAN NOT NULL DEFAULT false;
+    ADD COLUMN IF NOT EXISTS share_to_masters BOOLEAN NOT NULL DEFAULT true;
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_locations
+    ALTER COLUMN share_to_clients SET DEFAULT true;
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_locations
+    ALTER COLUMN share_to_masters SET DEFAULT true;
+  `)
+
+  await pool.query(`
+    UPDATE user_locations
+    SET share_to_clients = true
+    WHERE share_to_clients IS NOT TRUE;
+  `)
+
+  await pool.query(`
+    UPDATE user_locations
+    SET share_to_masters = true
+    WHERE share_to_masters IS NOT TRUE;
   `)
 
   await pool.query(`
@@ -820,8 +842,7 @@ app.get('/api/location', async (req, res) => {
 })
 
 app.post('/api/location', async (req, res) => {
-  const { userId, lat, lng, accuracy, shareToClients, shareToMasters } =
-    req.body ?? {}
+  const { userId, lat, lng, accuracy } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
 
   if (!normalizedUserId) {
@@ -841,8 +862,8 @@ app.post('/api/location', async (req, res) => {
   }
 
   const parsedAccuracy = parseOptionalInt(accuracy)
-  const nextShareToClients = Boolean(shareToClients)
-  const nextShareToMasters = Boolean(shareToMasters)
+  const nextShareToClients = true
+  const nextShareToMasters = true
 
   try {
     await ensureUser(normalizedUserId)
