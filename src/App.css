@@ -4773,7 +4773,7 @@
   padding: 12px 16px;
   font-size: 13px;
   justify-content: center;
-  box-shadow: 0 16px 24px rgba(255, 107, 61, 0.22);
+  box-shadow: 0 10px 16px rgba(255, 107, 61, 0.12);
 }
 
 .pro-cabinet-pill {
@@ -5555,6 +5555,7 @@
 
 .screen--pro-requests .requests-tab {
   color: var(--pro-muted);
+  border: 1.5px solid transparent;
 }
 
 .screen--pro-requests .requests-tab.is-active {
@@ -9450,7 +9451,7 @@ h2 {
   }
 
   .pro-primary:hover {
-    box-shadow: 0 16px 26px rgba(255, 107, 61, 0.36);
+    box-shadow: 0 10px 16px rgba(255, 107, 61, 0.18);
   }
 
   .pro-secondary:hover {
