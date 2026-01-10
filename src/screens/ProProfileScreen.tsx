@@ -168,8 +168,11 @@ export const ProProfileScreen = ({
   const [serviceCategoryId, setServiceCategoryId] = useState<CategoryId>(
     categoryItems[0]?.id ?? 'beauty-nails'
   )
-  const [serviceSearch, setServiceSearch] = useState('')
   const [isServiceCatalogExpanded, setIsServiceCatalogExpanded] = useState(false)
+  const [serviceAddTarget, setServiceAddTarget] = useState<string | null>(null)
+  const [serviceAddPrice, setServiceAddPrice] = useState('')
+  const [serviceAddDuration, setServiceAddDuration] = useState('')
+  const [serviceAddError, setServiceAddError] = useState('')
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
   const [worksAtClient, setWorksAtClient] = useState(true)
@@ -454,7 +457,6 @@ export const ProProfileScreen = ({
     () => requestServiceCatalog[serviceCategoryId] ?? [],
     [serviceCategoryId]
   )
-  const normalizedServiceSearch = serviceSearch.trim().toLowerCase()
   const availableServiceOptions = useMemo(
     () =>
       serviceCatalogOptions.filter(
@@ -462,23 +464,13 @@ export const ProProfileScreen = ({
       ),
     [serviceCatalogOptions, selectedServiceKeys]
   )
-  const filteredServiceOptions = useMemo(() => {
-    if (!normalizedServiceSearch) return availableServiceOptions
-    return availableServiceOptions.filter((option) => {
-      const title = option.title.toLowerCase()
-      const subtitle = option.subtitle?.toLowerCase() ?? ''
-      return title.includes(normalizedServiceSearch) ||
-        subtitle.includes(normalizedServiceSearch)
-    })
-  }, [availableServiceOptions, normalizedServiceSearch])
   const visibleServiceOptions = useMemo(() => {
-    if (normalizedServiceSearch || isServiceCatalogExpanded) {
-      return filteredServiceOptions
+    if (isServiceCatalogExpanded) {
+      return availableServiceOptions
     }
-    return filteredServiceOptions.slice(0, 6)
-  }, [filteredServiceOptions, isServiceCatalogExpanded, normalizedServiceSearch])
-  const hasMoreServiceOptions =
-    !normalizedServiceSearch && filteredServiceOptions.length > 6
+    return availableServiceOptions.slice(0, 6)
+  }, [availableServiceOptions, isServiceCatalogExpanded])
+  const hasMoreServiceOptions = availableServiceOptions.length > 6
   const selectedServicesCount = serviceItems.length
   const selectedServicesLabel =
     selectedServicesCount > 0
@@ -976,8 +968,11 @@ export const ProProfileScreen = ({
   }
 
   useEffect(() => {
-    setServiceSearch('')
     setIsServiceCatalogExpanded(false)
+    setServiceAddTarget(null)
+    setServiceAddPrice('')
+    setServiceAddDuration('')
+    setServiceAddError('')
   }, [serviceCategoryId])
 
   const syncCategorySelection = (categoryId: string, nextItems: ServiceItem[]) => {
@@ -1001,20 +996,50 @@ export const ProProfileScreen = ({
     })
   }
 
-  const toggleCatalogService = (serviceTitle: string) => {
-    if (!serviceTitle.trim()) return
+  const openServiceAddPanel = (serviceTitle: string) => {
+    setServiceAddTarget((current) => {
+      if (current === serviceTitle) {
+        return null
+      }
+      return serviceTitle
+    })
+    setServiceAddPrice('')
+    setServiceAddDuration('')
+    setServiceAddError('')
+  }
+
+  const handleServiceAdd = () => {
+    if (!serviceAddTarget) return
+    const parsedPrice = parseNumber(serviceAddPrice)
+    if (parsedPrice === null || parsedPrice <= 0) {
+      setServiceAddError('Укажите цену услуги.')
+      return
+    }
+    const parsedDuration = parseNumber(serviceAddDuration)
+    const targetName = serviceAddTarget
+
     setServiceItems((current) => {
-      const key = normalizeServiceKey(serviceTitle)
-      const index = current.findIndex(
+      const key = normalizeServiceKey(targetName)
+      const exists = current.some(
         (item) => normalizeServiceKey(item.name) === key
       )
-      const next =
-        index === -1
-          ? [...current, { name: serviceTitle, price: null, duration: null }]
-          : current.filter((_, itemIndex) => itemIndex !== index)
+      if (exists) return current
+      const next = [
+        ...current,
+        {
+          name: targetName,
+          price: parsedPrice,
+          duration: parsedDuration,
+        },
+      ]
       syncCategorySelection(serviceCategoryId, next)
       return next
     })
+
+    setServiceAddTarget(null)
+    setServiceAddPrice('')
+    setServiceAddDuration('')
+    setServiceAddError('')
   }
 
   const updateServiceItem = (
@@ -2617,57 +2642,100 @@ export const ProProfileScreen = ({
                       <div className="pro-service-panel-title">
                         <span className="pro-label">Добавить услуги</span>
                         <p className="pro-service-panel-subtitle">
-                          Поиск по названию или типу услуги
+                          Выбирайте услуги и сразу указывайте цену
                         </p>
                       </div>
                       <span className="pro-service-count-pill">
                         {categorySelectionLabel}
                       </span>
                     </div>
-                    <div className="pro-service-search">
-                      <input
-                        className="pro-input pro-service-search-input"
-                        type="search"
-                        placeholder="Например, аппаратный маникюр"
-                        value={serviceSearch}
-                        onChange={(event) => setServiceSearch(event.target.value)}
-                        aria-label="Поиск услуги"
-                      />
-                      {serviceSearch && (
-                        <button
-                          className="pro-service-search-clear"
-                          type="button"
-                          onClick={() => setServiceSearch('')}
-                          aria-label="Очистить поиск"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
                     {visibleServiceOptions.length > 0 && (
                       <div className="pro-service-suggestions" role="list">
-                        {visibleServiceOptions.map((option) => (
-                          <button
-                            className="pro-service-suggestion"
-                            key={option.title}
-                            type="button"
-                            onClick={() => toggleCatalogService(option.title)}
-                          >
-                            <span className="pro-service-suggestion-body">
-                              <span className="pro-service-suggestion-title">
-                                {option.title}
-                              </span>
-                              {option.subtitle && (
-                                <span className="pro-service-suggestion-meta">
-                                  {option.subtitle}
+                        {visibleServiceOptions.map((option) => {
+                          const isActive = serviceAddTarget === option.title
+                          return (
+                            <div
+                              className="pro-service-suggestion-row"
+                              key={option.title}
+                              role="listitem"
+                            >
+                              <div className="pro-service-suggestion">
+                                <span className="pro-service-suggestion-body">
+                                  <span className="pro-service-suggestion-title">
+                                    {option.title}
+                                  </span>
                                 </span>
+                                <button
+                                  className={`pro-service-suggestion-action${
+                                    isActive ? ' is-active' : ''
+                                  }`}
+                                  type="button"
+                                  onClick={() => openServiceAddPanel(option.title)}
+                                >
+                                  {isActive ? 'Закрыть' : 'Добавить'}
+                                </button>
+                              </div>
+                              {isActive && (
+                                <div className="pro-service-add-panel">
+                                  <label className="pro-service-add-field">
+                                    <span className="pro-service-add-label">
+                                      Цена, ₽
+                                    </span>
+                                    <input
+                                      className="pro-input pro-service-add-input"
+                                      type="number"
+                                      value={serviceAddPrice}
+                                      onChange={(event) =>
+                                        setServiceAddPrice(event.target.value)
+                                      }
+                                      placeholder="1500"
+                                      min="0"
+                                    />
+                                  </label>
+                                  <label className="pro-service-add-field">
+                                    <span className="pro-service-add-label">
+                                      Длительность, мин
+                                    </span>
+                                    <input
+                                      className="pro-input pro-service-add-input"
+                                      type="number"
+                                      value={serviceAddDuration}
+                                      onChange={(event) =>
+                                        setServiceAddDuration(event.target.value)
+                                      }
+                                      placeholder="60"
+                                      min="0"
+                                    />
+                                  </label>
+                                  <div className="pro-service-add-actions">
+                                    <button
+                                      className="pro-service-add-confirm"
+                                      type="button"
+                                      onClick={handleServiceAdd}
+                                    >
+                                      Добавить услугу
+                                    </button>
+                                    <button
+                                      className="pro-service-add-cancel"
+                                      type="button"
+                                      onClick={() => {
+                                        setServiceAddTarget(null)
+                                        setServiceAddError('')
+                                      }}
+                                    >
+                                      Отмена
+                                    </button>
+                                  </div>
+                                  {serviceAddError && (
+                                    <p className="pro-service-add-error">
+                                      {serviceAddError}
+                                    </p>
+                                  )}
+                                </div>
                               )}
-                            </span>
-                            <span className="pro-service-suggestion-action">
-                              Добавить
-                            </span>
-                          </button>
-                        ))}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                     {serviceCatalogOptions.length === 0 && (
@@ -2676,11 +2744,9 @@ export const ProProfileScreen = ({
                       </p>
                     )}
                     {serviceCatalogOptions.length > 0 &&
-                      filteredServiceOptions.length === 0 && (
+                      availableServiceOptions.length === 0 && (
                         <p className="pro-service-empty">
-                          {normalizedServiceSearch
-                            ? 'Ничего не найдено. Попробуйте другой запрос.'
-                            : 'Все услуги категории уже добавлены.'}
+                          Все услуги категории уже добавлены.
                         </p>
                       )}
                     {hasMoreServiceOptions && (
@@ -2693,7 +2759,7 @@ export const ProProfileScreen = ({
                       >
                         {isServiceCatalogExpanded
                           ? 'Скрыть услуги'
-                          : `Показать все (${filteredServiceOptions.length})`}
+                          : `Показать все (${availableServiceOptions.length})`}
                       </button>
                     )}
                   </div>
