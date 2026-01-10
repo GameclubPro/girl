@@ -23,6 +23,7 @@ import {
 } from '../utils/profileContent'
 import type { PortfolioItem, ServiceItem } from '../utils/profileContent'
 import { getProfileStatusSummary } from '../utils/profileStatus'
+import { isGeoFailure, requestPreciseLocation } from '../utils/geo'
 
 type ProProfileScreenProps = {
   apiBase: string
@@ -81,6 +82,32 @@ const formatReviewDate = (value: string) => {
     month: 'short',
     year: 'numeric',
   })
+}
+
+const formatGeoError = (error: unknown) => {
+  if (!isGeoFailure(error)) {
+    return 'Не удалось получить геолокацию.'
+  }
+  switch (error.code) {
+    case 'unsupported':
+      return 'Геолокация недоступна на вашем устройстве.'
+    case 'permission_denied':
+      return 'Разрешите доступ к геолокации и включите точный режим (GPS).'
+    case 'position_unavailable':
+      return 'Не удалось определить местоположение. Попробуйте снова.'
+    case 'timeout':
+      return 'Не удалось получить точные координаты. Попробуйте еще раз.'
+    case 'low_accuracy': {
+      const accuracy =
+        typeof error.accuracy === 'number' ? Math.round(error.accuracy) : null
+      return accuracy
+        ? `Точность слишком низкая (${accuracy} м). Включите GPS и попробуйте снова.`
+        : 'Точность слишком низкая. Включите GPS и попробуйте снова.'
+    }
+    case 'unknown':
+    default:
+      return 'Не удалось получить геолокацию.'
+  }
 }
 
 const buildReviewerName = (review: MasterReview) => {
@@ -598,38 +625,27 @@ export const ProProfileScreen = ({
     [apiBase, userId]
   )
 
-  const handleRequestLocation = useCallback(() => {
+  const handleRequestLocation = useCallback(async () => {
     if (!userId) return
-    if (!navigator.geolocation) {
-      setLocationError('Геолокация недоступна на вашем устройстве.')
-      return
-    }
     setLocationError('')
     setIsLocating(true)
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const nextLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: Math.round(position.coords.accuracy),
-        }
-        void saveLocation(nextLocation)
-      },
-      (error) => {
-        setIsLocating(false)
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationError('Разрешите доступ к геолокации для показа расстояния.')
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          setLocationError('Не удалось определить геопозицию. Попробуйте еще раз.')
-        } else if (error.code === error.TIMEOUT) {
-          setLocationError('Истекло время запроса геолокации. Попробуйте снова.')
-        } else {
-          setLocationError('Не удалось получить геолокацию.')
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
-    )
+    try {
+      const position = await requestPreciseLocation({
+        minAccuracy: 100,
+        maxAccuracy: 1500,
+        maxWaitMs: 20000,
+        timeoutMs: 12000,
+      })
+      await saveLocation({
+        lat: position.lat,
+        lng: position.lng,
+        accuracy: Math.round(position.accuracy),
+      })
+    } catch (error) {
+      setIsLocating(false)
+      setLocationError(formatGeoError(error))
+    }
   }, [saveLocation, userId])
 
   const handleClearLocation = useCallback(async () => {
