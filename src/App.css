@@ -3878,27 +3878,6 @@
   overflow: hidden;
 }
 
-.pro-profile-facts-toggle {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(32, 25, 20, 0.12);
-  background: rgba(255, 255, 255, 0.9);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--pro-ink);
-  cursor: pointer;
-  appearance: none;
-  font-family: inherit;
-}
-
-.pro-profile-facts-toggle:focus-visible {
-  outline: 3px solid rgba(255, 107, 61, 0.3);
-  outline-offset: 2px;
-}
 
 .pro-profile-ig-name-row {
   display: flex;
@@ -10293,9 +10272,6 @@ h2 {
     padding: 9px 10px;
   }
 
-  .pro-profile-facts-toggle {
-    padding: 5px 10px;
-  }
 
   .pro-profile-ig-actions {
     grid-template-columns: minmax(0, 1fr);

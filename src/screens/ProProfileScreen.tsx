@@ -252,7 +252,6 @@ export const ProProfileScreen = ({
   const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
     null
   )
-  const [isFactsExpanded, setIsFactsExpanded] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
@@ -417,9 +416,6 @@ export const ProProfileScreen = ({
     { label: 'Цена', value: priceLabel, isMuted: !hasPrice },
     { label: 'Опыт', value: experienceLabel, isMuted: !hasExperience },
   ]
-  const hasHiddenFacts = profileFacts.length > 2
-  const visibleFacts =
-    hasHiddenFacts && !isFactsExpanded ? profileFacts.slice(0, 2) : profileFacts
   const hasGeoLocation =
     typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
   const geoUpdatedLabel = proLocation?.updatedAt
@@ -1856,7 +1852,7 @@ export const ProProfileScreen = ({
                 className="pro-profile-facts-grid"
                 id="pro-profile-facts-grid"
               >
-                {visibleFacts.map((fact) => (
+                {profileFacts.map((fact) => (
                   <div
                     className={`pro-profile-fact-card${
                       fact.isMuted ? ' is-muted' : ''
@@ -1868,17 +1864,6 @@ export const ProProfileScreen = ({
                   </div>
                 ))}
               </div>
-              {hasHiddenFacts && (
-                <button
-                  className="pro-profile-facts-toggle"
-                  type="button"
-                  aria-expanded={isFactsExpanded}
-                  aria-controls="pro-profile-facts-grid"
-                  onClick={() => setIsFactsExpanded((current) => !current)}
-                >
-                  {isFactsExpanded ? 'Скрыть' : 'Показать все'}
-                </button>
-              )}
             </div>
             <div className="pro-profile-ig-tags">
               {previewTags.length > 0 ? (
