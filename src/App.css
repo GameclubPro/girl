@@ -4688,7 +4688,7 @@
 }
 
 .pro-profile-editor-screen {
-  --pro-editor-savebar: 96px;
+  --pro-editor-savebar: 120px;
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -4699,7 +4699,7 @@
   justify-content: center;
   overflow-y: auto;
   padding: calc(16px + var(--safe-top) + var(--tg-top-offset)) 18px
-    calc(24px + var(--pro-editor-savebar) + env(safe-area-inset-bottom));
+    calc(24px + env(safe-area-inset-bottom));
 }
 
 .pro-profile-editor-shell {
@@ -4707,6 +4707,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding-bottom: calc(var(--pro-editor-savebar) + env(safe-area-inset-bottom));
 }
 
 .pro-profile-editor-card {
