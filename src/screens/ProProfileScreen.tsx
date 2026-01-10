@@ -252,6 +252,7 @@ export const ProProfileScreen = ({
   const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
     null
   )
+  const [isFactsExpanded, setIsFactsExpanded] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
@@ -416,6 +417,9 @@ export const ProProfileScreen = ({
     { label: 'Цена', value: priceLabel, isMuted: !hasPrice },
     { label: 'Опыт', value: experienceLabel, isMuted: !hasExperience },
   ]
+  const hasHiddenFacts = profileFacts.length > 2
+  const visibleFacts =
+    hasHiddenFacts && !isFactsExpanded ? profileFacts.slice(0, 2) : profileFacts
   const hasGeoLocation =
     typeof proLocation?.lat === 'number' && typeof proLocation?.lng === 'number'
   const geoUpdatedLabel = proLocation?.updatedAt
@@ -1847,18 +1851,34 @@ export const ProProfileScreen = ({
                 {aboutPreview}
               </p>
             </div>
-            <div className="pro-profile-facts-grid">
-              {profileFacts.map((fact) => (
-                <div
-                  className={`pro-profile-fact-card${
-                    fact.isMuted ? ' is-muted' : ''
-                  }`}
-                  key={fact.label}
+            <div className="pro-profile-facts">
+              <div
+                className="pro-profile-facts-grid"
+                id="pro-profile-facts-grid"
+              >
+                {visibleFacts.map((fact) => (
+                  <div
+                    className={`pro-profile-fact-card${
+                      fact.isMuted ? ' is-muted' : ''
+                    }`}
+                    key={fact.label}
+                  >
+                    <span className="pro-profile-fact-label">{fact.label}</span>
+                    <span className="pro-profile-fact-value">{fact.value}</span>
+                  </div>
+                ))}
+              </div>
+              {hasHiddenFacts && (
+                <button
+                  className="pro-profile-facts-toggle"
+                  type="button"
+                  aria-expanded={isFactsExpanded}
+                  aria-controls="pro-profile-facts-grid"
+                  onClick={() => setIsFactsExpanded((current) => !current)}
                 >
-                  <span className="pro-profile-fact-label">{fact.label}</span>
-                  <span className="pro-profile-fact-value">{fact.value}</span>
-                </div>
-              ))}
+                  {isFactsExpanded ? 'Скрыть' : 'Показать все'}
+                </button>
+              )}
             </div>
             <div className="pro-profile-ig-tags">
               {previewTags.length > 0 ? (
