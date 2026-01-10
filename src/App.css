@@ -3638,12 +3638,20 @@
 
 .pro-profile-ig-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   padding: 0 6px;
   margin-top: -70px;
   position: relative;
   z-index: 1;
+}
+
+.pro-profile-ig-top-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
 }
 
 .pro-profile-ig-avatar {
@@ -3750,9 +3758,10 @@
 
 .pro-profile-ig-name-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
 }
 
 .pro-profile-ig-name {
@@ -10093,6 +10102,10 @@ h2 {
     align-items: flex-start;
     margin-top: -56px;
     gap: 10px;
+  }
+
+  .pro-profile-ig-top-info {
+    width: 100%;
   }
 
   .pro-profile-ig-avatar {
