@@ -315,6 +315,19 @@ export const ClientMasterProfileScreen = ({
     serviceItems.length > 0
       ? formatServiceCount(serviceItems.length)
       : 'Нет услуг'
+  const distanceLabel =
+    typeof profile?.distanceKm === 'number' && Number.isFinite(profile.distanceKm)
+      ? `${profile.distanceKm.toFixed(1)} км`
+      : ''
+  const heroStats = [
+    { label: 'Формат', value: workFormatLabel },
+    { label: 'Опыт', value: experienceLabel },
+    { label: 'Локация', value: locationLabel },
+    { label: 'Цена', value: priceLabel },
+  ]
+  if (distanceLabel) {
+    heroStats.splice(2, 0, { label: 'До вас', value: distanceLabel })
+  }
   const showcaseCount = showcaseItems.filter((item) => item.url.trim()).length
   const showcaseCountLabel = showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
   const showcasePreview = useMemo(
@@ -358,7 +371,7 @@ export const ClientMasterProfileScreen = ({
 
   return (
     <div className="screen screen--client screen--client-master-profile">
-      <div className="pro-shell">
+      <div className="pro-shell pro-shell--hybrid">
         <header className="master-profile-header">
           <button
             className="pro-back"
@@ -384,7 +397,7 @@ export const ClientMasterProfileScreen = ({
           </div>
         ) : profile ? (
           <>
-            <section className="pro-profile-social animate delay-1">
+            <section className="pro-profile-social pro-profile-hero animate delay-1">
               <div
                 className={`pro-profile-social-cover${coverUrl ? ' has-image' : ''}`}
                 style={
@@ -400,73 +413,83 @@ export const ClientMasterProfileScreen = ({
                   </span>
                 )}
               </div>
-              <div className="pro-profile-social-body">
-                <div className="pro-profile-social-avatar">
-                  {profile.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
-                  ) : (
-                    <span aria-hidden="true">{initials}</span>
-                  )}
+              <div className="pro-profile-hero-card">
+                <div className="pro-profile-social-body">
+                  <div className="pro-profile-social-avatar">
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
+                    ) : (
+                      <span aria-hidden="true">{initials}</span>
+                    )}
+                  </div>
+                  <div className="pro-profile-social-content">
+                    <div className="pro-profile-social-header">
+                      <h1 className="pro-profile-social-name">{displayName}</h1>
+                      <span className={`pro-profile-social-status ${activeTone}`}>
+                        <span className="pro-profile-social-dot" aria-hidden="true" />
+                        {isActive ? 'Запись открыта' : 'Пауза'}
+                      </span>
+                    </div>
+                    <div className="pro-profile-social-tags">
+                      {previewTags.length > 0 ? (
+                        <>
+                          {previewTags.map((label, index) => (
+                            <span className="pro-profile-tag" key={`${label}-${index}`}>
+                              {label}
+                            </span>
+                          ))}
+                          {previewTagRemainder > 0 && (
+                            <span className="pro-profile-tag is-muted">
+                              +{previewTagRemainder}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="pro-profile-tag is-muted">
+                          Теги появятся здесь
+                        </span>
+                      )}
+                      {reviewCount > 0 ? (
+                        <span className="pro-profile-tag is-review">
+                          ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                        </span>
+                      ) : (
+                        <span className="pro-profile-tag is-muted">Нет отзывов</span>
+                      )}
+                    </div>
+                    <p
+                      className={`pro-profile-social-about${
+                        aboutValue ? '' : ' is-muted'
+                      }`}
+                    >
+                      {aboutText}
+                    </p>
+                  </div>
                 </div>
-                <div className="pro-profile-social-content">
-                  <div className="pro-profile-social-header">
-                    <h1 className="pro-profile-social-name">{displayName}</h1>
-                    <span className={`pro-profile-social-status ${activeTone}`}>
-                      <span className="pro-profile-social-dot" aria-hidden="true" />
-                      {isActive ? 'Запись открыта' : 'Пауза'}
-                    </span>
-                  </div>
-                  <div className="pro-profile-social-tags">
-                    {previewTags.length > 0 ? (
-                      <>
-                        {previewTags.map((label, index) => (
-                          <span className="pro-profile-tag" key={`${label}-${index}`}>
-                            {label}
-                          </span>
-                        ))}
-                        {previewTagRemainder > 0 && (
-                          <span className="pro-profile-tag is-muted">
-                            +{previewTagRemainder}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="pro-profile-tag is-muted">
-                        Теги появятся здесь
-                      </span>
-                    )}
-                    {reviewCount > 0 ? (
-                      <span className="pro-profile-tag is-review">
-                        ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
-                      </span>
-                    ) : (
-                      <span className="pro-profile-tag is-muted">Нет отзывов</span>
-                    )}
-                  </div>
-                  <p
-                    className={`pro-profile-social-about${
-                      aboutValue ? '' : ' is-muted'
-                    }`}
+                <div className="pro-profile-hero-stats">
+                  {heroStats.map((stat) => (
+                    <div className="pro-profile-hero-stat" key={stat.label}>
+                      <span className="pro-profile-hero-stat-label">{stat.label}</span>
+                      <span className="pro-profile-hero-stat-value">{stat.value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="pro-profile-social-actions pro-profile-hero-actions">
+                  <button
+                    className="pro-profile-action is-primary"
+                    type="button"
+                    onClick={onCreateBooking}
                   >
-                    {aboutText}
-                  </p>
+                    Записаться
+                  </button>
+                  <button
+                    className="pro-profile-action"
+                    type="button"
+                    onClick={onViewMasters}
+                  >
+                    Все мастера
+                  </button>
                 </div>
-              </div>
-              <div className="pro-profile-social-actions">
-                <button
-                  className="pro-profile-action is-primary"
-                  type="button"
-                  onClick={onCreateBooking}
-                >
-                  Записаться
-                </button>
-                <button
-                  className="pro-profile-action"
-                  type="button"
-                  onClick={onViewMasters}
-                >
-                  Все мастера
-                </button>
               </div>
             </section>
 
