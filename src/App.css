@@ -10098,7 +10098,7 @@ h2 {
   }
 
   .pro-profile-ig-header {
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
     margin-top: -56px;
     gap: 10px;
