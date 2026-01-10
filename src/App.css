@@ -4737,7 +4737,7 @@
   bottom: 0;
   transform: translateX(-50%);
   width: min(520px, 100%);
-  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  padding: 12px 18px calc(18px + env(safe-area-inset-bottom));
   background: linear-gradient(
     180deg,
     rgba(255, 249, 243, 0.5) 0%,
@@ -4758,7 +4758,7 @@
   bottom: auto;
   transform: none;
   width: 100%;
-  padding: 0;
+  padding: 0 0 12px;
   background: none;
   border-top: none;
   box-shadow: none;
