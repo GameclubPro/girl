@@ -192,7 +192,14 @@ const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
 const PORTFOLIO_ROW_LIMIT = 4
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
-const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
+const showcaseRatioClasses = [
+  'is-square',
+  'is-portrait',
+  'is-landscape',
+  'is-square',
+  'is-portrait',
+  'is-landscape',
+]
 
 export const ProProfileScreen = ({
   apiBase,
@@ -2457,13 +2464,15 @@ export const ProProfileScreen = ({
                       aria-label="Витрина работ"
                     >
                       {showcaseMosaicItems.map((item, index) => {
-                        const gridArea = showcaseAreas[index]
                         const hasItem = Boolean(item?.url)
                         const isImage = item?.url ? isImageUrl(item.url) : false
                         const caption = item?.title?.trim() || 'Работа'
                         const focus = resolvePortfolioFocus(item)
+                        const ratioClass =
+                          showcaseRatioClasses[index] ?? showcaseRatioClasses[0]
                         const cardClassName = [
                           'pro-cabinet-showcase-card',
+                          ratioClass,
                           showcaseDragOverIndex === index ? 'is-drag-over' : '',
                         ]
                           .filter(Boolean)
@@ -2481,7 +2490,6 @@ export const ProProfileScreen = ({
                           <article
                             className={cardClassName}
                             key={`${item?.url ?? 'add'}-${index}`}
-                            style={gridArea ? { gridArea } : undefined}
                             role="listitem"
                           >
                             {hasItem ? (
