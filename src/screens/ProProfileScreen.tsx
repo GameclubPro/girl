@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties, PointerEvent } from 'react'
+import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
   IconClock,
@@ -192,6 +192,7 @@ const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
 const PORTFOLIO_ROW_LIMIT = 4
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const showcaseAreas = ['a', 'b', 'c', 'd', 'e', 'f']
 
 export const ProProfileScreen = ({
   apiBase,
@@ -222,6 +223,9 @@ export const ProProfileScreen = ({
   const [openServiceMetaKeys, setOpenServiceMetaKeys] = useState<string[]>([])
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
+  const [portfolioView, setPortfolioView] = useState<'portfolio' | 'showcase'>(
+    'portfolio'
+  )
   const [worksAtClient, setWorksAtClient] = useState(true)
   const [worksAtMaster, setWorksAtMaster] = useState(false)
   const [isActive, setIsActive] = useState(true)
@@ -254,9 +258,17 @@ export const ProProfileScreen = ({
   const [portfolioQuickActionIndex, setPortfolioQuickActionIndex] = useState<
     number | null
   >(null)
+  const [showcaseDragOverIndex, setShowcaseDragOverIndex] = useState<
+    number | null
+  >(null)
   const [isPortfolioUploading, setIsPortfolioUploading] = useState(false)
+  const [isShowcaseUploading, setIsShowcaseUploading] = useState(false)
   const [portfolioError, setPortfolioError] = useState('')
+  const [showcaseError, setShowcaseError] = useState('')
   const [portfolioFocusIndex, setPortfolioFocusIndex] = useState<number | null>(
+    null
+  )
+  const [showcaseFocusIndex, setShowcaseFocusIndex] = useState<number | null>(
     null
   )
   const avatarInputRef = useRef<HTMLInputElement>(null)
@@ -265,9 +277,15 @@ export const ProProfileScreen = ({
   const portfolioCameraInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceIndexRef = useRef<number | null>(null)
+  const showcaseUploadInputRef = useRef<HTMLInputElement>(null)
+  const showcaseReplaceInputRef = useRef<HTMLInputElement>(null)
+  const showcaseReplaceIndexRef = useRef<number | null>(null)
+  const showcaseDragIndexRef = useRef<number | null>(null)
   const portfolioFocusPointerRef = useRef(false)
+  const showcaseFocusPointerRef = useRef(false)
   const portfolioLightboxIndexRef = useRef<number | null>(null)
   const portfolioFocusIndexRef = useRef<number | null>(null)
+  const showcaseFocusIndexRef = useRef<number | null>(null)
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
   const portfolioAutosaveTimerRef = useRef<number | null>(null)
   const portfolioLongPressTimerRef = useRef<number | null>(null)
@@ -394,6 +412,12 @@ export const ProProfileScreen = ({
   const reviewCountLabel =
     reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
+  const showcaseCount = showcaseItems.length
+  const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
+  const showcaseCountLabel = `${showcaseCount} из ${MAX_SHOWCASE_ITEMS}`
+  const portfolioPanelKicker = portfolioView === 'portfolio' ? 'Портфолио' : 'Витрина'
+  const portfolioPanelCountLabel =
+    portfolioView === 'portfolio' ? portfolioCountLabel : showcaseCountLabel
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
   const profileStats = [
     { label: 'Работы', value: String(portfolioCount) },
@@ -486,6 +510,14 @@ export const ProProfileScreen = ({
         .slice(0, 6),
     [portfolioItems]
   )
+  const hasShowcase = showcaseItems.length > 0
+  const showShowcaseAddTile = showcaseItems.length < MAX_SHOWCASE_ITEMS
+  const showcaseMosaicItems = showShowcaseAddTile
+    ? [...showcaseItems, null]
+    : showcaseItems
+  const showcaseSubtitle = hasShowcase
+    ? `Работ в витрине: ${showcaseCountLabel}`
+    : `Добавьте до ${MAX_SHOWCASE_ITEMS} лучших работ`
   const isPortfolioFull = portfolioItems.length >= MAX_PORTFOLIO_ITEMS
   const portfolioLightboxItem =
     portfolioLightboxIndex !== null ? portfolioItems[portfolioLightboxIndex] ?? null : null
@@ -507,12 +539,17 @@ export const ProProfileScreen = ({
   const isPortfolioOverlayOpen =
     portfolioLightboxIndex !== null ||
     portfolioFocusIndex !== null ||
+    showcaseFocusIndex !== null ||
     isPortfolioPickerOpen ||
     portfolioQuickActionIndex !== null
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolvePortfolioFocus(focusItem)
   const focusIndex = portfolioFocusIndex ?? 0
+  const showcaseFocusItem =
+    showcaseFocusIndex !== null ? showcaseItems[showcaseFocusIndex] ?? null : null
+  const showcaseFocusPoint = resolvePortfolioFocus(showcaseFocusItem)
+  const showcaseFocusIndexValue = showcaseFocusIndex ?? 0
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_ROW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded
   const visiblePortfolioItems = portfolioGridItems
@@ -708,8 +745,16 @@ export const ProProfileScreen = ({
   }, [portfolioFocusIndex])
 
   useEffect(() => {
+    showcaseFocusIndexRef.current = showcaseFocusIndex
+  }, [showcaseFocusIndex])
+
+  useEffect(() => {
     if (!onBackHandlerChange) return
     const handler = () => {
+      if (showcaseFocusIndexRef.current !== null) {
+        closeShowcaseFocusEditor()
+        return true
+      }
       if (portfolioFocusIndexRef.current !== null) {
         closePortfolioFocusEditor()
         return true
@@ -776,6 +821,13 @@ export const ProProfileScreen = ({
   }, [portfolioFocusIndex, portfolioItems])
 
   useEffect(() => {
+    if (showcaseFocusIndex !== null && !showcaseItems[showcaseFocusIndex]) {
+      setShowcaseFocusIndex(null)
+      showcaseFocusPointerRef.current = false
+    }
+  }, [showcaseFocusIndex, showcaseItems])
+
+  useEffect(() => {
     if (
       portfolioLightboxIndex !== null &&
       !portfolioItems[portfolioLightboxIndex]
@@ -796,7 +848,7 @@ export const ProProfileScreen = ({
   useEffect(() => {
     if (!profilePayload) return
     if (!hasLoadedRef.current) return
-    if (isPortfolioUploading) return
+    if (isPortfolioUploading || isShowcaseUploading) return
     if (portfolioAutosaveTimerRef.current) {
       window.clearTimeout(portfolioAutosaveTimerRef.current)
     }
@@ -808,7 +860,7 @@ export const ProProfileScreen = ({
         window.clearTimeout(portfolioAutosaveTimerRef.current)
       }
     }
-  }, [isPortfolioUploading, portfolioAutosaveKey])
+  }, [isPortfolioUploading, isShowcaseUploading, portfolioAutosaveKey])
 
   useEffect(() => {
     hasLoadedRef.current = false
@@ -934,7 +986,10 @@ export const ProProfileScreen = ({
           0,
           MAX_PORTFOLIO_ITEMS
         )
-        const nextShowcaseItems = parsePortfolioItems(data.showcaseUrls ?? [])
+        const nextShowcaseItems = parsePortfolioItems(data.showcaseUrls ?? []).slice(
+          0,
+          MAX_SHOWCASE_ITEMS
+        )
 
         setDisplayName(nextDisplayName)
         setAbout(nextAbout)
@@ -1622,6 +1677,234 @@ export const ProProfileScreen = ({
     event.target.value = ''
   }
 
+  const handleShowcaseUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    if (showcaseItems.length >= MAX_SHOWCASE_ITEMS) {
+      setShowcaseError(`Можно добавить максимум ${MAX_SHOWCASE_ITEMS} работ.`)
+      return
+    }
+    const remaining = MAX_SHOWCASE_ITEMS - showcaseItems.length
+    const selection = Array.from(files).slice(0, remaining)
+    for (const file of selection) {
+      const errorMessage = validatePortfolioFile(file)
+      if (errorMessage) {
+        setShowcaseError(errorMessage)
+        return
+      }
+    }
+    setIsShowcaseUploading(true)
+    setShowcaseError('')
+    try {
+      const uploadedUrls: string[] = []
+      for (const file of selection) {
+        const url = await uploadPortfolioFile(file)
+        uploadedUrls.push(url)
+      }
+      setShowcaseItems((current) => {
+        const next = [
+          ...uploadedUrls.map((url) => ({
+            url,
+            title: null,
+            focusX: 0.5,
+            focusY: 0.5,
+          })),
+          ...current,
+        ]
+        return next.slice(0, MAX_SHOWCASE_ITEMS)
+      })
+      setShowcaseError('')
+    } catch (error) {
+      setShowcaseError(
+        error instanceof Error ? error.message : 'Не удалось загрузить файл.'
+      )
+    } finally {
+      setIsShowcaseUploading(false)
+    }
+  }
+
+  const handleShowcaseUploadChange = (event: ChangeEvent<HTMLInputElement>) => {
+    void handleShowcaseUpload(event.target.files)
+    event.target.value = ''
+  }
+
+  const handleShowcaseAddClick = () => {
+    if (isShowcaseUploading) return
+    setShowcaseError('')
+    showcaseUploadInputRef.current?.click()
+  }
+
+  const handleShowcaseReplaceClick = (index: number) => {
+    setShowcaseError('')
+    showcaseReplaceIndexRef.current = index
+    showcaseReplaceInputRef.current?.click()
+  }
+
+  const handleShowcaseReplace = async (file: File, index: number) => {
+    const errorMessage = validatePortfolioFile(file)
+    if (errorMessage) {
+      setShowcaseError(errorMessage)
+      return
+    }
+    const previousUrl = showcaseItems[index]?.url
+    setIsShowcaseUploading(true)
+    setShowcaseError('')
+    try {
+      const url = await uploadPortfolioFile(file)
+      setShowcaseItems((current) =>
+        current.map((item, itemIndex) =>
+          itemIndex === index ? { ...item, url, focusX: 0.5, focusY: 0.5 } : item
+        )
+      )
+      if (previousUrl) {
+        setPortfolioItems((current) =>
+          current.map((item) =>
+            item.url === previousUrl
+              ? { ...item, url, focusX: 0.5, focusY: 0.5 }
+              : item
+          )
+        )
+      }
+      setShowcaseError('')
+    } catch (error) {
+      setShowcaseError(
+        error instanceof Error ? error.message : 'Не удалось загрузить файл.'
+      )
+    } finally {
+      setIsShowcaseUploading(false)
+    }
+  }
+
+  const handleShowcaseReplaceChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    const index = showcaseReplaceIndexRef.current
+    if (!file || index === null || index === undefined) {
+      event.target.value = ''
+      return
+    }
+    void handleShowcaseReplace(file, index)
+    event.target.value = ''
+  }
+
+  const removeShowcaseItem = (index: number) => {
+    setShowcaseItems((current) =>
+      current.filter((_, itemIndex) => itemIndex !== index)
+    )
+    setShowcaseError('')
+  }
+
+  const handleShowcaseDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    if (isShowcaseUploading) return
+    showcaseDragIndexRef.current = index
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleShowcaseDragOver = (
+    event: DragEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    if (isShowcaseUploading) return
+    event.preventDefault()
+    setShowcaseDragOverIndex(index)
+  }
+
+  const handleShowcaseDragLeave = () => {
+    setShowcaseDragOverIndex(null)
+  }
+
+  const handleShowcaseDrop = (index: number, hasItem: boolean) => {
+    const fromIndex = showcaseDragIndexRef.current
+    const targetIndex = hasItem ? index : showcaseItems.length
+    if (fromIndex === null || fromIndex === targetIndex) {
+      setShowcaseDragOverIndex(null)
+      return
+    }
+    setShowcaseItems((current) => {
+      if (fromIndex < 0 || fromIndex >= current.length) return current
+      const next = [...current]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(targetIndex, 0, moved)
+      return next
+    })
+    showcaseDragIndexRef.current = null
+    setShowcaseDragOverIndex(null)
+  }
+
+  const handleShowcaseDragEnd = () => {
+    showcaseDragIndexRef.current = null
+    setShowcaseDragOverIndex(null)
+  }
+
+  const openShowcaseFocusEditor = (index: number) => {
+    const item = showcaseItems[index]
+    if (!item || !isImageUrl(item.url)) return
+    setShowcaseFocusIndex(index)
+  }
+
+  const closeShowcaseFocusEditor = () => {
+    setShowcaseFocusIndex(null)
+    showcaseFocusPointerRef.current = false
+  }
+
+  const updateShowcaseFocusFromEvent = (
+    event: PointerEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = clampUnit((event.clientX - rect.left) / rect.width)
+    const y = clampUnit((event.clientY - rect.top) / rect.height)
+    const focusUrl = showcaseItems[index]?.url
+    setShowcaseItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, focusX: x, focusY: y } : item
+      )
+    )
+    if (focusUrl) {
+      setPortfolioItems((current) =>
+        current.map((item) =>
+          item.url === focusUrl ? { ...item, focusX: x, focusY: y } : item
+        )
+      )
+    }
+  }
+
+  const handleShowcaseFocusPointerDown = (
+    event: PointerEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    showcaseFocusPointerRef.current = true
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    updateShowcaseFocusFromEvent(event, index)
+  }
+
+  const handleShowcaseFocusPointerMove = (
+    event: PointerEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    if (!showcaseFocusPointerRef.current) return
+    updateShowcaseFocusFromEvent(event, index)
+  }
+
+  const handleShowcaseFocusPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    showcaseFocusPointerRef.current = false
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const handleShowcaseTileClick = (index: number) => {
+    const item = showcaseItems[index]
+    if (!item) return
+    if (!isImageUrl(item.url)) {
+      window.open(item.url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    openShowcaseFocusEditor(index)
+  }
+
   const clearPortfolioLongPress = () => {
     if (portfolioLongPressTimerRef.current) {
       window.clearTimeout(portfolioLongPressTimerRef.current)
@@ -1687,6 +1970,7 @@ export const ProProfileScreen = ({
     if (!item?.url) return
     const isSelected = showcaseItems.some((current) => current.url === item.url)
     setPortfolioError('')
+    setShowcaseError('')
     if (isSelected) {
       setShowcaseItems((current) =>
         current.filter((currentItem) => currentItem.url !== item.url)
@@ -1942,12 +2226,46 @@ export const ProProfileScreen = ({
           className="pro-profile-portfolio-panel animate delay-2"
         >
           <div className="pro-profile-portfolio-panel-head">
-            <div className="pro-profile-portfolio-panel-controls">
-              <p className="pro-profile-portfolio-panel-kicker">Портфолио</p>
+            <div className="pro-profile-portfolio-panel-meta">
+              <p className="pro-profile-portfolio-panel-kicker">
+                {portfolioPanelKicker}
+              </p>
               <span className="pro-profile-portfolio-panel-count">
-                {portfolioItems.length} из {MAX_PORTFOLIO_ITEMS}
+                {portfolioPanelCountLabel}
               </span>
-              {hasPortfolioOverflow && (
+            </div>
+            <div className="pro-profile-portfolio-panel-controls">
+              <div
+                className="pro-profile-portfolio-panel-nav"
+                role="tablist"
+                aria-label="Портфолио и витрина"
+              >
+                <button
+                  className={`pro-profile-portfolio-panel-tab${
+                    portfolioView === 'portfolio' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={portfolioView === 'portfolio'}
+                  aria-controls="pro-profile-portfolio-content"
+                  onClick={() => setPortfolioView('portfolio')}
+                >
+                  Портфолио
+                </button>
+                <button
+                  className={`pro-profile-portfolio-panel-tab${
+                    portfolioView === 'showcase' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={portfolioView === 'showcase'}
+                  aria-controls="pro-profile-showcase-content"
+                  onClick={() => setPortfolioView('showcase')}
+                >
+                  Витрина
+                </button>
+              </div>
+              {portfolioView === 'portfolio' && hasPortfolioOverflow && (
                 <button
                   className="pro-profile-portfolio-panel-action"
                   type="button"
@@ -1959,116 +2277,275 @@ export const ProProfileScreen = ({
               )}
             </div>
           </div>
-          <input
-            ref={portfolioUploadInputRef}
-            className="pro-file-input"
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handlePortfolioUploadChange}
-            disabled={isPortfolioUploading}
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-          <input
-            ref={portfolioCameraInputRef}
-            className="pro-file-input"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handlePortfolioCameraChange}
-            disabled={isPortfolioUploading}
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-          <input
-            ref={portfolioReplaceInputRef}
-            className="pro-file-input"
-            type="file"
-            accept="image/*"
-            onChange={handlePortfolioReplaceChange}
-            disabled={isPortfolioUploading}
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-          {portfolioError && (
-            <div className="pro-profile-editor-messages">
-              <p className="pro-error">{portfolioError}</p>
+          {portfolioView === 'portfolio' ? (
+            <div
+              id="pro-profile-portfolio-content"
+              role="tabpanel"
+              aria-label="Портфолио"
+            >
+              <input
+                ref={portfolioUploadInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handlePortfolioUploadChange}
+                disabled={isPortfolioUploading}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <input
+                ref={portfolioCameraInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePortfolioCameraChange}
+                disabled={isPortfolioUploading}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <input
+                ref={portfolioReplaceInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                onChange={handlePortfolioReplaceChange}
+                disabled={isPortfolioUploading}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              {portfolioError && (
+                <div className="pro-profile-editor-messages">
+                  <p className="pro-error">{portfolioError}</p>
+                </div>
+              )}
+              <div
+                className={`pro-profile-portfolio-grid${
+                  isPortfolioCollapsed ? ' is-collapsed' : ''
+                }`}
+                role="list"
+                aria-label="Портфолио"
+              >
+                {visiblePortfolioItems.length > 0 ? (
+                  visiblePortfolioItems.map(({ item, index }) => {
+                    const focus = resolvePortfolioFocus(item)
+                    const showImage = isImageUrl(item.url)
+                    const isInShowcase = showcaseItems.some(
+                      (showcaseItem) => showcaseItem.url === item.url
+                    )
+                    return (
+                      <button
+                        className="pro-profile-portfolio-item"
+                        key={`${item.url}-${index}`}
+                        type="button"
+                        onClick={() => handlePortfolioThumbClick(index)}
+                        onPointerDown={(event) =>
+                          handlePortfolioThumbPointerDown(event, index)
+                        }
+                        onPointerMove={handlePortfolioThumbPointerMove}
+                        onPointerUp={handlePortfolioThumbPointerUp}
+                        onPointerLeave={handlePortfolioThumbPointerUp}
+                        onPointerCancel={handlePortfolioThumbPointerUp}
+                        role="listitem"
+                        aria-label={`Открыть работу ${index + 1}`}
+                      >
+                        {showImage ? (
+                          <img
+                            src={item.url}
+                            alt=""
+                            loading="lazy"
+                            style={{ objectPosition: focus.position }}
+                          />
+                        ) : (
+                          <span className="pro-profile-portfolio-fallback">LINK</span>
+                        )}
+                        {isInShowcase && (
+                          <span
+                            className="pro-profile-portfolio-badge"
+                            aria-hidden="true"
+                            title="В витрине"
+                          >
+                            ✦
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <div className="pro-profile-portfolio-empty" role="listitem">
+                    Пока нет фото. Добавьте первые работы.
+                  </div>
+                )}
+                {!isPortfolioFull && (
+                  <button
+                    className="pro-profile-portfolio-item is-add"
+                    type="button"
+                    onClick={handlePortfolioAddClick}
+                    role="listitem"
+                    disabled={isPortfolioUploading}
+                    aria-label="Добавить фото"
+                  >
+                    <span className="pro-profile-portfolio-add-icon">+</span>
+                    <span className="pro-profile-portfolio-add-label">
+                      Добавить
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div
+              id="pro-profile-showcase-content"
+              role="tabpanel"
+              aria-label="Витрина"
+            >
+              <input
+                ref={showcaseUploadInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleShowcaseUploadChange}
+                disabled={isShowcaseUploading}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <input
+                ref={showcaseReplaceInputRef}
+                className="pro-file-input"
+                type="file"
+                accept="image/*"
+                onChange={handleShowcaseReplaceChange}
+                disabled={isShowcaseUploading}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              {showcaseError && (
+                <div className="pro-profile-editor-messages">
+                  <p className="pro-error">{showcaseError}</p>
+                </div>
+              )}
+              <div className="pro-profile-showcase-panel">
+                {!hasShowcase ? (
+                  <div className="pro-profile-showcase-empty">
+                    <button
+                      className="pro-cabinet-showcase-add"
+                      type="button"
+                      onClick={handleShowcaseAddClick}
+                      disabled={isShowcaseUploading}
+                    >
+                      + Добавить работу
+                    </button>
+                    <div className="pro-cabinet-showcase-preview">
+                      <div className="pro-cabinet-showcase-sample">
+                        <span className="pro-cabinet-showcase-sample-icon">✦</span>
+                        <span className="pro-cabinet-showcase-sample-label">
+                          Пример витрины
+                        </span>
+                      </div>
+                      <p className="pro-cabinet-showcase-hint">
+                        Перетащите, чтобы задать порядок. Нажмите на фото, чтобы
+                        выбрать фокус кадра.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="pro-profile-showcase-subtitle">
+                      {showcaseSubtitle}
+                    </p>
+                    <div
+                      className="pro-cabinet-showcase-grid"
+                      role="list"
+                      aria-label="Витрина работ"
+                    >
+                      {showcaseMosaicItems.map((item, index) => {
+                        const gridArea = showcaseAreas[index]
+                        const hasItem = Boolean(item?.url)
+                        const isImage = item?.url ? isImageUrl(item.url) : false
+                        const caption = item?.title?.trim() || 'Работа'
+                        const focus = resolvePortfolioFocus(item)
+                        const cardClassName = [
+                          'pro-cabinet-showcase-card',
+                          showcaseDragOverIndex === index ? 'is-drag-over' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')
+                        const mediaClassName = [
+                          'pro-cabinet-showcase-media',
+                          hasItem ? 'is-draggable' : '',
+                          !isImage && hasItem ? 'is-link' : '',
+                          !hasItem ? 'is-add' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')
+
+                        return (
+                          <article
+                            className={cardClassName}
+                            key={`${item?.url ?? 'add'}-${index}`}
+                            style={gridArea ? { gridArea } : undefined}
+                            role="listitem"
+                          >
+                            {hasItem ? (
+                              <button
+                                className={mediaClassName}
+                                type="button"
+                                onClick={() => handleShowcaseTileClick(index)}
+                                draggable
+                                onDragStart={(event) =>
+                                  handleShowcaseDragStart(event, index)
+                                }
+                                onDragOver={(event) =>
+                                  handleShowcaseDragOver(event, index)
+                                }
+                                onDragLeave={handleShowcaseDragLeave}
+                                onDrop={() => handleShowcaseDrop(index, true)}
+                                onDragEnd={handleShowcaseDragEnd}
+                              >
+                                {isImage ? (
+                                  <img
+                                    src={item?.url ?? ''}
+                                    alt={caption}
+                                    loading="lazy"
+                                    style={{ objectPosition: focus.position }}
+                                  />
+                                ) : (
+                                  <span className="pro-cabinet-showcase-link">
+                                    LINK
+                                  </span>
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                className={mediaClassName}
+                                type="button"
+                                onClick={handleShowcaseAddClick}
+                                onDragOver={(event) =>
+                                  handleShowcaseDragOver(event, index)
+                                }
+                                onDrop={() => handleShowcaseDrop(index, false)}
+                                disabled={isShowcaseUploading}
+                              >
+                                <span className="pro-cabinet-showcase-add-icon">
+                                  +
+                                </span>
+                              </button>
+                            )}
+                          </article>
+                        )
+                      })}
+                    </div>
+                    <p className="pro-cabinet-showcase-hint">
+                      Перетащите, чтобы задать порядок. Нажмите на фото, чтобы
+                      выбрать фокус кадра.
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           )}
-          <div
-            className={`pro-profile-portfolio-grid${
-              isPortfolioCollapsed ? ' is-collapsed' : ''
-            }`}
-            role="list"
-            aria-label="Портфолио"
-          >
-            {visiblePortfolioItems.length > 0 ? (
-              visiblePortfolioItems.map(({ item, index }) => {
-                const focus = resolvePortfolioFocus(item)
-                const showImage = isImageUrl(item.url)
-                const isInShowcase = showcaseItems.some(
-                  (showcaseItem) => showcaseItem.url === item.url
-                )
-                return (
-                  <button
-                    className="pro-profile-portfolio-item"
-                    key={`${item.url}-${index}`}
-                    type="button"
-                    onClick={() => handlePortfolioThumbClick(index)}
-                    onPointerDown={(event) =>
-                      handlePortfolioThumbPointerDown(event, index)
-                    }
-                    onPointerMove={handlePortfolioThumbPointerMove}
-                    onPointerUp={handlePortfolioThumbPointerUp}
-                    onPointerLeave={handlePortfolioThumbPointerUp}
-                    onPointerCancel={handlePortfolioThumbPointerUp}
-                    role="listitem"
-                    aria-label={`Открыть работу ${index + 1}`}
-                  >
-                    {showImage ? (
-                      <img
-                        src={item.url}
-                        alt=""
-                        loading="lazy"
-                        style={{ objectPosition: focus.position }}
-                      />
-                    ) : (
-                      <span className="pro-profile-portfolio-fallback">LINK</span>
-                    )}
-                    {isInShowcase && (
-                      <span
-                        className="pro-profile-portfolio-badge"
-                        aria-hidden="true"
-                        title="В витрине"
-                      >
-                        ✦
-                      </span>
-                    )}
-                  </button>
-                )
-              })
-            ) : (
-              <div className="pro-profile-portfolio-empty" role="listitem">
-                Пока нет фото. Добавьте первые работы.
-              </div>
-            )}
-            {!isPortfolioFull && (
-              <button
-                className="pro-profile-portfolio-item is-add"
-                type="button"
-                onClick={handlePortfolioAddClick}
-                role="listitem"
-                disabled={isPortfolioUploading}
-                aria-label="Добавить фото"
-              >
-                <span className="pro-profile-portfolio-add-icon">+</span>
-                <span className="pro-profile-portfolio-add-label">
-                  Добавить
-                </span>
-              </button>
-            )}
-          </div>
         </section>
 
         <section className="pro-profile-reviews animate delay-3">
@@ -2488,6 +2965,75 @@ export const ProProfileScreen = ({
                 onClick={() => {
                   removePortfolioItem(focusIndex)
                   closePortfolioFocusEditor()
+                }}
+              >
+                Удалить
+              </button>
+            </div>
+            <p className="pro-portfolio-focus-hint">
+              Перетащите точку, чтобы выбрать главный фокус кадра.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showcaseFocusItem && (
+        <div className="pro-portfolio-focus-overlay" role="dialog" aria-modal="true">
+          <div className="pro-portfolio-focus-card">
+            <div className="pro-portfolio-focus-header">
+              <div>
+                <p className="pro-portfolio-focus-kicker">Кадрирование</p>
+                <h3 className="pro-portfolio-focus-title">Выберите фокус</h3>
+              </div>
+              <button
+                className="pro-portfolio-focus-close"
+                type="button"
+                onClick={closeShowcaseFocusEditor}
+              >
+                Готово
+              </button>
+            </div>
+            <div
+              className="pro-portfolio-focus-preview"
+              onPointerDown={(event) =>
+                handleShowcaseFocusPointerDown(event, showcaseFocusIndexValue)
+              }
+              onPointerMove={(event) =>
+                handleShowcaseFocusPointerMove(event, showcaseFocusIndexValue)
+              }
+              onPointerUp={handleShowcaseFocusPointerUp}
+              onPointerLeave={handleShowcaseFocusPointerUp}
+              role="presentation"
+            >
+              <img
+                src={showcaseFocusItem.url}
+                alt={showcaseFocusItem.title ?? 'Фокус'}
+                style={{ objectPosition: showcaseFocusPoint.position }}
+              />
+              <span
+                className="pro-portfolio-focus-point"
+                style={{
+                  left: `${showcaseFocusPoint.x * 100}%`,
+                  top: `${showcaseFocusPoint.y * 100}%`,
+                }}
+                aria-hidden="true"
+              />
+            </div>
+            <div className="pro-portfolio-focus-actions">
+              <button
+                className="pro-portfolio-focus-action"
+                type="button"
+                onClick={() => handleShowcaseReplaceClick(showcaseFocusIndexValue)}
+                disabled={isShowcaseUploading}
+              >
+                Заменить
+              </button>
+              <button
+                className="pro-portfolio-focus-action is-danger"
+                type="button"
+                onClick={() => {
+                  removeShowcaseItem(showcaseFocusIndexValue)
+                  closeShowcaseFocusEditor()
                 }}
               >
                 Удалить
