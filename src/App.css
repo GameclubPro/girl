@@ -4570,7 +4570,7 @@
   font-family: inherit;
   color: inherit;
   -webkit-touch-callout: none;
-  transform: scale(1);
+  transform: scale(0.85);
   transform-origin: center;
   transition: transform 0.25s ease;
 }
@@ -4584,7 +4584,7 @@
 }
 
 .pro-profile-portfolio-item:hover {
-  transform: scale(1.02);
+  transform: scale(0.88);
 }
 
 .pro-profile-portfolio-item:hover img {
