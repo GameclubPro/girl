@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+} from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import {
@@ -27,6 +34,11 @@ type RequestScreenProps = {
   cityName: string
   districtName: string
   address: string
+}
+
+type RequestPhoto = {
+  url: string
+  path: string
 }
 
 const getServiceOptions = (categoryId: string) =>
@@ -62,9 +74,14 @@ export const RequestScreen = ({
     requestBudgetOptions[0] ?? 'не важно'
   )
   const [details, setDetails] = useState('')
+  const [photos, setPhotos] = useState<RequestPhoto[]>([])
+  const [uploadError, setUploadError] = useState('')
+  const [uploadingCount, setUploadingCount] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const maxPhotos = 5
 
   const serviceOptions = useMemo(
     () => getServiceOptions(categoryId),
@@ -91,15 +108,107 @@ export const RequestScreen = ({
     return match?.label ?? ''
   }, [dateOption])
 
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result === 'string') {
+          resolve(result)
+        } else {
+          reject(new Error('invalid_data'))
+        }
+      }
+      reader.onerror = () => reject(new Error('read_failed'))
+      reader.readAsDataURL(file)
+    })
+
+  const handleAddPhotos = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    setUploadError('')
+
+    if (files.length === 0) return
+
+    const remaining = maxPhotos - photos.length
+    if (remaining <= 0) {
+      setUploadError('Можно добавить максимум 5 фото.')
+      return
+    }
+
+    const queue = files.slice(0, remaining)
+    setUploadingCount((current) => current + queue.length)
+
+    for (const file of queue) {
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Поддерживаются только изображения.')
+        setUploadingCount((current) => Math.max(0, current - 1))
+        continue
+      }
+
+      try {
+        const dataUrl = await readFileAsDataUrl(file)
+        const response = await fetch(`${apiBase}/api/requests/media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, dataUrl }),
+        })
+
+        if (!response.ok) {
+          throw new Error('upload_failed')
+        }
+
+        const payload = (await response.json()) as {
+          url?: string | null
+          path?: string | null
+        }
+
+        if (!payload.url || !payload.path) {
+          throw new Error('upload_failed')
+        }
+
+        setPhotos((current) => [
+          ...current,
+          { url: payload.url, path: payload.path },
+        ])
+      } catch (error) {
+        setUploadError('Не удалось загрузить фото. Попробуйте еще раз.')
+      } finally {
+        setUploadingCount((current) => Math.max(0, current - 1))
+      }
+    }
+  }
+
+  const handleRemovePhoto = async (photo: RequestPhoto) => {
+    setPhotos((current) => current.filter((item) => item.path !== photo.path))
+    try {
+      await fetch(`${apiBase}/api/requests/media`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, path: photo.path }),
+      })
+    } catch (error) {
+      setUploadError('Не удалось удалить фото. Попробуйте снова.')
+    }
+  }
+
   const hasLocation = Boolean(cityId && districtId)
   const hasDateTime =
     dateOption !== 'choose' || Boolean(dateValue && timeValue)
+  const isUploading = uploadingCount > 0
   const canSubmit =
     Boolean(categoryId) &&
     Boolean(serviceName.trim()) &&
     hasLocation &&
     hasDateTime &&
-    !isSubmitting
+    !isSubmitting &&
+    !isUploading
+  const canAddPhotos =
+    photos.length < maxPhotos && !isSubmitting && !isUploading
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -113,6 +222,11 @@ export const RequestScreen = ({
 
     if (!cityId || !districtId) {
       setSubmitError('Укажите город и район в профиле.')
+      return
+    }
+
+    if (isUploading) {
+      setSubmitError('Дождитесь загрузки фото.')
       return
     }
 
@@ -149,6 +263,7 @@ export const RequestScreen = ({
           dateTime,
           budget,
           details: details.trim() || null,
+          photoUrls: photos.map((photo) => photo.url),
         }),
       })
 
@@ -362,18 +477,58 @@ export const RequestScreen = ({
           </div>
           <div className="request-field">
             <span className="request-label">Фото примера (желательно)</span>
+            <input
+              ref={fileInputRef}
+              className="request-upload-input"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoChange}
+            />
             <div className="request-upload">
               <div className="request-upload-media" aria-hidden="true">
                 <IconPhoto />
               </div>
               <div className="request-upload-body">
                 <div className="request-upload-title">Добавить фото-пример</div>
-                <div className="request-upload-meta">1-5 фото • до/после</div>
+                <div className="request-upload-meta">
+                  {photos.length > 0
+                    ? `Добавлено ${photos.length}/${maxPhotos}`
+                    : '1-5 фото • до/после'}
+                </div>
               </div>
-              <button className="request-upload-button" type="button">
-                Добавить
+              <button
+                className="request-upload-button"
+                type="button"
+                onClick={handleAddPhotos}
+                disabled={!canAddPhotos}
+              >
+                {photos.length > 0 ? 'Добавить еще' : 'Добавить'}
               </button>
             </div>
+            {uploadingCount > 0 && (
+              <p className="request-upload-status">
+                Загружаем фото: {uploadingCount}
+              </p>
+            )}
+            {uploadError && <p className="request-upload-error">{uploadError}</p>}
+            {photos.length > 0 && (
+              <div className="request-upload-grid" role="list">
+                {photos.map((photo) => (
+                  <div className="request-upload-thumb" role="listitem" key={photo.path}>
+                    <img src={photo.url} alt="" loading="lazy" />
+                    <button
+                      className="request-upload-remove"
+                      type="button"
+                      onClick={() => handleRemovePhoto(photo)}
+                      aria-label="Удалить фото"
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

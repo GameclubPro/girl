@@ -54,6 +54,40 @@ const formatDateTime = (value?: string | null) => {
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const formatRating = (average?: number | null, count?: number | null) => {
+  const safeCount = typeof count === 'number' ? count : 0
+  const safeAverage = typeof average === 'number' ? average : 0
+  if (safeCount <= 0) return 'Новый мастер'
+  return `★ ${safeAverage.toFixed(1)} (${safeCount})`
+}
+
+const formatExperience = (years?: number | null) => {
+  if (typeof years !== 'number' || years <= 0) return ''
+  const last = years % 10
+  const suffix =
+    years % 100 >= 11 && years % 100 <= 14
+      ? 'лет'
+      : last === 1
+        ? 'год'
+        : last >= 2 && last <= 4
+          ? 'года'
+          : 'лет'
+  return `Опыт ${years} ${suffix}`
+}
+
+const formatPriceRange = (from?: number | null, to?: number | null) => {
+  if (typeof from === 'number' && typeof to === 'number') {
+    return `Прайс: ${formatPrice(from)} — ${formatPrice(to)}`
+  }
+  if (typeof from === 'number') {
+    return `Прайс от ${formatPrice(from)}`
+  }
+  if (typeof to === 'number') {
+    return `Прайс до ${formatPrice(to)}`
+  }
+  return ''
+}
+
 const formatTimeLeft = (value?: string | null) => {
   if (!value) return ''
   const parsed = new Date(value)
@@ -487,6 +521,33 @@ export const ClientRequestsScreen = ({
                             const responseStatusLabel =
                               responseStatusLabelMap[responseItem.status] ??
                               responseItem.status
+                            const masterName = responseItem.displayName || 'Мастер'
+                            const masterInitials = getInitials(masterName)
+                            const ratingLabel = formatRating(
+                              responseItem.reviewsAverage,
+                              responseItem.reviewsCount
+                            )
+                            const experienceLabel = formatExperience(
+                              responseItem.experienceYears
+                            )
+                            const priceLabel =
+                              responseItem.price !== null &&
+                              responseItem.price !== undefined
+                                ? formatPrice(responseItem.price)
+                                : ''
+                            const priceRangeLabel =
+                              responseItem.price === null ||
+                              responseItem.price === undefined
+                                ? formatPriceRange(
+                                    responseItem.priceFrom,
+                                    responseItem.priceTo
+                                  )
+                                : ''
+                            const previewUrls = Array.isArray(
+                              responseItem.previewUrls
+                            )
+                              ? responseItem.previewUrls
+                              : []
                             const isAccepted = responseItem.status === 'accepted'
                             const isRejected = responseItem.status === 'rejected'
                             const canRespondAction =
@@ -504,17 +565,40 @@ export const ClientRequestsScreen = ({
                                 }`}
                                 key={responseItem.id}
                               >
-                                <div className="response-top">
-                                  <div className="response-name">
-                                    {responseItem.displayName || 'Мастер'}
-                                  </div>
-                                  {responseItem.price !== null &&
-                                    responseItem.price !== undefined && (
-                                      <span className="response-price">
-                                        {responseItem.price} ₽
-                                      </span>
+                                <div className="response-head">
+                                  <div className="response-avatar" aria-hidden="true">
+                                    {responseItem.avatarUrl ? (
+                                      <img src={responseItem.avatarUrl} alt="" />
+                                    ) : (
+                                      <span>{masterInitials}</span>
                                     )}
+                                  </div>
+                                  <div className="response-main">
+                                    <div className="response-name">{masterName}</div>
+                                    <div className="response-subline">
+                                      {experienceLabel && (
+                                        <span className="response-pill">
+                                          {experienceLabel}
+                                        </span>
+                                      )}
+                                      {ratingLabel && (
+                                        <span className="response-rating">
+                                          {ratingLabel}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {priceLabel && (
+                                    <span className="response-price">
+                                      {priceLabel}
+                                    </span>
+                                  )}
                                 </div>
+                                {priceRangeLabel && (
+                                  <div className="response-meta">
+                                    {priceRangeLabel}
+                                  </div>
+                                )}
                                 {responseItem.comment && (
                                   <div className="response-comment">
                                     {responseItem.comment}
@@ -523,6 +607,19 @@ export const ClientRequestsScreen = ({
                                 {responseItem.proposedTime && (
                                   <div className="response-meta">
                                     Время: {responseItem.proposedTime}
+                                  </div>
+                                )}
+                                {previewUrls.length > 0 && (
+                                  <div className="response-preview" role="list">
+                                    {previewUrls.map((url, index) => (
+                                      <span
+                                        className="response-preview-thumb"
+                                        key={`${responseItem.id}-preview-${index}`}
+                                        role="listitem"
+                                      >
+                                        <img src={url} alt="" loading="lazy" />
+                                      </span>
+                                    ))}
                                   </div>
                                 )}
                                 <div className="response-meta">

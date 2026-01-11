@@ -151,4 +151,8 @@ export type RequestResponse = {
   proposedTime?: string | null
   status: 'sent' | 'accepted' | 'rejected' | 'expired'
   createdAt: string
+  avatarUrl?: string | null
+  reviewsAverage?: number | null
+  reviewsCount?: number | null
+  previewUrls?: string[]
 }

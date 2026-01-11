@@ -225,6 +225,33 @@ const getImageExtension = (mime) => {
   return 'bin'
 }
 
+const buildRequestUploadPath = (safeUserId, mime) => {
+  const ext = getImageExtension(mime)
+  const filename = `request-${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`
+  const relativePath = path.posix.join('requests', safeUserId, filename)
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  return { relativePath, absolutePath }
+}
+
+const normalizeUploadPath = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return ''
+  const withoutProtocol = normalized.replace(/^https?:\/\/[^/]+/i, '')
+  const withoutPrefix = withoutProtocol
+    .replace(/^\/+/, '')
+    .replace(/^uploads\//, '')
+  return path.posix.normalize(withoutPrefix)
+}
+
+const isSafeRequestUploadPath = (safeUserId, relativePath) => {
+  if (!relativePath || relativePath.includes('..')) return false
+  const prefix = `requests/${safeUserId}/`
+  if (!relativePath.startsWith(prefix)) return false
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  const safeBase = path.join(uploadsRoot, 'requests', safeUserId)
+  return path.normalize(absolutePath).startsWith(safeBase)
+}
+
 const buildPublicUrl = (req, relativePath) => {
   const normalized = normalizeText(relativePath)
   if (!normalized) return null
@@ -1764,6 +1791,81 @@ app.post('/api/masters/portfolio', async (req, res) => {
   }
 })
 
+app.post('/api/requests/media', async (req, res) => {
+  const { userId, dataUrl } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const parsed = parseImageDataUrl(dataUrl)
+  if (!parsed) {
+    res.status(400).json({ error: 'invalid_image' })
+    return
+  }
+
+  if (parsed.buffer.length > MAX_UPLOAD_BYTES) {
+    res.status(413).json({ error: 'image_too_large' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    const { relativePath, absolutePath } = buildRequestUploadPath(
+      safeUserId,
+      parsed.mime
+    )
+
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true })
+    await fs.writeFile(absolutePath, parsed.buffer)
+
+    res.json({
+      ok: true,
+      url: buildPublicUrl(req, relativePath),
+      path: relativePath,
+    })
+  } catch (error) {
+    console.error('POST /api/requests/media failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.delete('/api/requests/media', async (req, res) => {
+  const { userId, path: requestPath } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedPath = normalizeUploadPath(requestPath)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!normalizedPath) {
+    res.status(400).json({ error: 'path_required' })
+    return
+  }
+
+  try {
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    if (!isSafeRequestUploadPath(safeUserId, normalizedPath)) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    const absolutePath = path.join(uploadsRoot, normalizedPath)
+    await fs.unlink(absolutePath).catch(() => {})
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('DELETE /api/requests/media failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.delete('/api/masters/media', async (req, res) => {
   const { userId, kind } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
@@ -2912,20 +3014,75 @@ app.get('/api/requests/:id/responses', async (req, res) => {
           mp.experience_years AS "experienceYears",
           mp.price_from AS "priceFrom",
           mp.price_to AS "priceTo",
+          mp.avatar_path AS "avatarPath",
+          mp.portfolio_urls AS "portfolioUrls",
+          COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           rr.price,
           rr.comment,
           rr.proposed_time AS "proposedTime",
           rr.status,
-          rr.created_at AS "createdAt"
+          rr.created_at AS "createdAt",
+          COALESCE(mr.reviews_count, 0) AS "reviewsCount",
+          COALESCE(mr.reviews_average, 0) AS "reviewsAverage"
         FROM request_responses rr
         LEFT JOIN master_profiles mp ON mp.user_id = rr.master_id
+        LEFT JOIN master_showcases ms ON ms.user_id = rr.master_id
+        LEFT JOIN (
+          SELECT
+            master_id,
+            COUNT(*)::int AS reviews_count,
+            AVG(rating)::float AS reviews_average
+          FROM master_reviews
+          GROUP BY master_id
+        ) mr ON mr.master_id = rr.master_id
         WHERE rr.request_id = $1
         ORDER BY rr.created_at DESC
       `,
       [requestId]
     )
 
-    res.json(result.rows)
+    const payload = result.rows.map((row) => {
+      const showcaseUrls = Array.isArray(row.showcaseUrls) ? row.showcaseUrls : []
+      const portfolioUrls = Array.isArray(row.portfolioUrls) ? row.portfolioUrls : []
+      const previewSource = showcaseUrls.length > 0 ? showcaseUrls : portfolioUrls
+      const previewUrls = previewSource
+        .filter(Boolean)
+        .slice(0, 3)
+        .map((value) => {
+          const normalized = normalizeText(value)
+          if (!normalized) return null
+          const sanitized = normalized.startsWith('uploads/')
+            ? normalized.slice('uploads/'.length)
+            : normalized
+          return buildPublicUrl(req, sanitized)
+        })
+        .filter(Boolean)
+      const average = Number(row.reviewsAverage)
+      const reviewsAverage = Number.isFinite(average) ? average : 0
+      const reviewsCount = Number.isFinite(Number(row.reviewsCount))
+        ? Number(row.reviewsCount)
+        : 0
+      return {
+        id: row.id,
+        requestId: row.requestId,
+        masterId: row.masterId,
+        displayName: row.displayName,
+        experienceYears: row.experienceYears,
+        priceFrom: row.priceFrom,
+        priceTo: row.priceTo,
+        price: row.price,
+        comment: row.comment,
+        proposedTime: row.proposedTime,
+        status: row.status,
+        createdAt: row.createdAt,
+        avatarUrl: buildPublicUrl(req, row.avatarPath),
+        reviewsAverage,
+        reviewsCount,
+        previewUrls,
+      }
+    })
+
+    res.json(payload)
   } catch (error) {
     console.error('GET /api/requests/:id/responses failed:', error)
     res.status(500).json({ error: 'server_error' })
