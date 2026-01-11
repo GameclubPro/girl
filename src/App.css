@@ -4508,6 +4508,7 @@
 }
 
 .pro-profile-showcase-panel .pro-cabinet-showcase-grid {
+  --showcase-grid-width: min(100%, calc(70dvh * 8 / 7));
   grid-template-columns: repeat(8, minmax(0, 1fr));
   grid-template-rows: repeat(7, minmax(0, 1fr));
   grid-template-areas:
@@ -4519,11 +4520,8 @@
     'la la la la lb lb lb lb'
     'la la la la lb lb lb lb';
   gap: 0;
-  width: 100%;
-  max-width: calc(70dvh * 8 / 7);
-  height: auto;
-  max-height: 70dvh;
-  aspect-ratio: 8 / 7;
+  width: var(--showcase-grid-width);
+  height: calc(var(--showcase-grid-width) * 7 / 8);
   margin-inline: auto;
 }
 
