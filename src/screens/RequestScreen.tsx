@@ -167,13 +167,15 @@ export const RequestScreen = ({
           path?: string | null
         }
 
-        if (!payload.url || !payload.path) {
+        if (typeof payload.url !== 'string' || typeof payload.path !== 'string') {
           throw new Error('upload_failed')
         }
 
+        const nextUrl = payload.url
+        const nextPath = payload.path
         setPhotos((current) => [
           ...current,
-          { url: payload.url, path: payload.path },
+          { url: nextUrl, path: nextPath },
         ])
       } catch (error) {
         setUploadError('Не удалось загрузить фото. Попробуйте еще раз.')
