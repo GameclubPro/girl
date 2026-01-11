@@ -2226,45 +2226,45 @@ export const ProProfileScreen = ({
           className="pro-profile-portfolio-panel animate delay-2"
         >
           <div className="pro-profile-portfolio-panel-head">
-            <div className="pro-profile-portfolio-panel-meta">
-              <p className="pro-profile-portfolio-panel-kicker">
-                {portfolioPanelKicker}
-              </p>
+            <div className="pro-profile-portfolio-panel-controls">
+              <div className="pro-profile-portfolio-panel-left">
+                <p className="pro-profile-portfolio-panel-kicker">
+                  {portfolioPanelKicker}
+                </p>
+                <div
+                  className="pro-profile-portfolio-panel-nav"
+                  role="tablist"
+                  aria-label="Портфолио и витрина"
+                >
+                  <button
+                    className={`pro-profile-portfolio-panel-tab${
+                      portfolioView === 'portfolio' ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    role="tab"
+                    aria-selected={portfolioView === 'portfolio'}
+                    aria-controls="pro-profile-portfolio-content"
+                    onClick={() => setPortfolioView('portfolio')}
+                  >
+                    Портфолио
+                  </button>
+                  <button
+                    className={`pro-profile-portfolio-panel-tab${
+                      portfolioView === 'showcase' ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    role="tab"
+                    aria-selected={portfolioView === 'showcase'}
+                    aria-controls="pro-profile-showcase-content"
+                    onClick={() => setPortfolioView('showcase')}
+                  >
+                    Витрина
+                  </button>
+                </div>
+              </div>
               <span className="pro-profile-portfolio-panel-count">
                 {portfolioPanelCountLabel}
               </span>
-            </div>
-            <div className="pro-profile-portfolio-panel-controls">
-              <div
-                className="pro-profile-portfolio-panel-nav"
-                role="tablist"
-                aria-label="Портфолио и витрина"
-              >
-                <button
-                  className={`pro-profile-portfolio-panel-tab${
-                    portfolioView === 'portfolio' ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={portfolioView === 'portfolio'}
-                  aria-controls="pro-profile-portfolio-content"
-                  onClick={() => setPortfolioView('portfolio')}
-                >
-                  Портфолио
-                </button>
-                <button
-                  className={`pro-profile-portfolio-panel-tab${
-                    portfolioView === 'showcase' ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={portfolioView === 'showcase'}
-                  aria-controls="pro-profile-showcase-content"
-                  onClick={() => setPortfolioView('showcase')}
-                >
-                  Витрина
-                </button>
-              </div>
               {portfolioView === 'portfolio' && hasPortfolioOverflow && (
                 <button
                   className="pro-profile-portfolio-panel-action"

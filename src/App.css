@@ -4113,8 +4113,8 @@
   opacity: 0.2;
 }
 
-.pro-shell--ig .pro-profile-portfolio-panel-meta,
-.pro-shell--ig .pro-profile-portfolio-panel-nav {
+.pro-shell--ig .pro-profile-portfolio-panel-nav,
+.pro-shell--ig .pro-profile-portfolio-panel-kicker {
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(32, 25, 20, 0.1);
 }
@@ -4301,8 +4301,8 @@
   opacity: 0.35;
 }
 
-.pro-shell--hybrid .pro-profile-portfolio-panel-meta,
 .pro-shell--hybrid .pro-profile-portfolio-panel-nav,
+.pro-shell--hybrid .pro-profile-portfolio-panel-kicker,
 .pro-shell--hybrid .pro-profile-portfolio-panel-count,
 .pro-shell--hybrid .pro-profile-reviews-count-pill {
   background: rgba(255, 255, 255, 0.96);
@@ -4369,22 +4369,12 @@
   z-index: 1;
 }
 
-.pro-profile-portfolio-panel-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+.pro-profile-portfolio-panel-kicker {
+  margin: 0;
+  padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid rgba(32, 25, 20, 0.1);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 8px 14px rgba(16, 12, 11, 0.08);
-}
-
-.pro-profile-portfolio-panel-kicker {
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -4394,12 +4384,19 @@
 }
 
 .pro-profile-portfolio-panel-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.pro-profile-portfolio-panel-left {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: 6px;
-  margin-left: auto;
+  min-width: 0;
 }
 
 .pro-profile-portfolio-panel-count {
@@ -4411,6 +4408,7 @@
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(32, 25, 20, 0.12);
   box-shadow: none;
+  justify-self: center;
 }
 
 .pro-profile-portfolio-panel-nav {
@@ -4465,6 +4463,7 @@
   text-transform: uppercase;
   appearance: none;
   font-family: inherit;
+  justify-self: end;
 }
 
 .pro-profile-portfolio-panel-action.is-primary {
@@ -10406,8 +10405,8 @@ h2 {
 
   .pro-profile-portfolio-panel-controls {
     width: 100%;
-    justify-content: space-between;
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 6px;
   }
 
   .pro-profile-showcase-panel {

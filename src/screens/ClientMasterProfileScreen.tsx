@@ -558,13 +558,15 @@ export const ClientMasterProfileScreen = ({
 
             <section className="pro-profile-portfolio-panel animate delay-2">
               <div className="pro-profile-portfolio-panel-head">
-                <div className="pro-profile-portfolio-panel-meta">
-                  <p className="pro-profile-portfolio-panel-kicker">Портфолио</p>
+                <div className="pro-profile-portfolio-panel-controls">
+                  <div className="pro-profile-portfolio-panel-left">
+                    <p className="pro-profile-portfolio-panel-kicker">
+                      Портфолио
+                    </p>
+                  </div>
                   <span className="pro-profile-portfolio-panel-count">
                     {portfolioCountLabel}
                   </span>
-                </div>
-                <div className="pro-profile-portfolio-panel-controls">
                   {hasPortfolioOverflow && (
                     <button
                       className="pro-profile-portfolio-panel-action"
