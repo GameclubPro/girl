@@ -4104,7 +4104,7 @@
 }
 
 .pro-shell--ig .pro-profile-portfolio-panel {
-  border-radius: 22px;
+  border-radius: 0;
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(32, 25, 20, 0.08);
   box-shadow: 0 16px 24px rgba(16, 12, 11, 0.1);
@@ -4518,7 +4518,7 @@
 }
 
 .pro-profile-portfolio-grid {
-  --portfolio-grid-gap: clamp(6px, 2.6vw, 12px);
+  --portfolio-grid-gap: clamp(4px, 2vw, 10px);
   position: relative;
   z-index: 1;
   display: grid;
