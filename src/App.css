@@ -1066,7 +1066,7 @@
     linear-gradient(180deg, #fff9f3 0%, #f5f1ea 55%, #eef4f4 100%);
   color: var(--pro-ink);
   position: relative;
-  overflow-x: hidden;
+  overflow-x: visible;
   padding: var(--pro-pad-top) var(--pro-pad-x)
     calc(120px + env(safe-area-inset-bottom));
 }
@@ -1085,6 +1085,7 @@
 .screen--pro-cabinet {
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
+  overflow-x: hidden;
 }
 
 .pro-shell {
@@ -6680,6 +6681,7 @@
 .screen--pro-requests {
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
+  overflow-x: hidden;
 }
 
 .screen--pro-requests .requests-list {
@@ -9029,7 +9031,7 @@ h2 {
     linear-gradient(180deg, #fff9f3 0%, #f5f1ea 55%, #eef4f4 100%);
   color: var(--pro-ink);
   position: relative;
-  overflow-x: hidden;
+  overflow-x: visible;
   padding: var(--pro-pad-top) var(--pro-pad-x)
     calc(120px + env(safe-area-inset-bottom));
 }
