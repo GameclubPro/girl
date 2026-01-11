@@ -834,6 +834,10 @@ function App() {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           setView('request')
         }}
+        onViewProfile={(masterId) => {
+          setSelectedMasterId(masterId)
+          setView('client-master-profile')
+        }}
       />
     )
   }

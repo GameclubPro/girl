@@ -7433,6 +7433,71 @@
   padding: 6px 10px;
   border-radius: 999px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.response-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.response-preview-stack {
+  display: flex;
+  align-items: center;
+}
+
+.response-preview-avatar,
+.response-preview-more {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  display: grid;
+  place-items: center;
+  background: #f0ebf6;
+  color: #5b4493;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: -6px;
+  box-shadow: 0 6px 10px rgba(71, 55, 87, 0.15);
+}
+
+.response-preview-avatar:first-child,
+.response-preview-more:first-child {
+  margin-left: 0;
+}
+
+.response-preview-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+.response-preview-more {
+  background: #6f58e8;
+  color: #ffffff;
+}
+
+.response-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.response-link:focus-visible {
+  outline: 2px solid rgba(124, 91, 241, 0.4);
+  outline-offset: 2px;
+  border-radius: 14px;
 }
 
 .request-responses {

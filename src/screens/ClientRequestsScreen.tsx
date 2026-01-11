@@ -115,12 +115,14 @@ type ClientRequestsScreenProps = {
   apiBase: string
   userId: string
   onCreateRequest: () => void
+  onViewProfile: (masterId: string) => void
 }
 
 export const ClientRequestsScreen = ({
   apiBase,
   userId,
   onCreateRequest,
+  onViewProfile,
 }: ClientRequestsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
   const [requests, setRequests] = useState<ServiceRequest[]>([])
@@ -447,6 +449,13 @@ export const ClientRequestsScreen = ({
                     categoryItems.find((category) => category.id === item.categoryId)
                       ?.label ?? item.categoryId
                   const responseCount = item.responsesCount ?? 0
+                  const responsePreview = Array.isArray(item.responsePreview)
+                    ? item.responsePreview
+                    : []
+                  const responseOverflow =
+                    responseCount > responsePreview.length
+                      ? responseCount - responsePreview.length
+                      : 0
                   const dispatchedCount = item.dispatchedCount ?? 0
                   const dispatchBatch =
                     item.dispatchBatch ??
@@ -498,8 +507,36 @@ export const ClientRequestsScreen = ({
                           type="button"
                           onClick={() => toggleResponses(item.id)}
                         >
-                          {isResponsesOpen ? 'Скрыть отклики' : 'Отклики'}
-                          {responseCount > 0 ? ` (${responseCount})` : ''}
+                          <span className="response-toggle-label">
+                            {isResponsesOpen ? 'Скрыть отклики' : 'Отклики'}
+                            {responseCount > 0 ? ` (${responseCount})` : ''}
+                          </span>
+                          {!isResponsesOpen && responsePreview.length > 0 && (
+                            <span className="response-preview-stack" aria-hidden="true">
+                              {responsePreview.map((preview) => {
+                                const initials = getInitials(
+                                  preview.displayName || 'Мастер'
+                                )
+                                return (
+                                  <span
+                                    className="response-preview-avatar"
+                                    key={preview.masterId}
+                                  >
+                                    {preview.avatarUrl ? (
+                                      <img src={preview.avatarUrl} alt="" />
+                                    ) : (
+                                      <span>{initials}</span>
+                                    )}
+                                  </span>
+                                )
+                              })}
+                              {responseOverflow > 0 && (
+                                <span className="response-preview-more">
+                                  +{responseOverflow}
+                                </span>
+                              )}
+                            </span>
+                          )}
                         </button>
                       </div>
                       {isResponsesOpen && (
@@ -565,35 +602,42 @@ export const ClientRequestsScreen = ({
                                 }`}
                                 key={responseItem.id}
                               >
-                                <div className="response-head">
-                                  <div className="response-avatar" aria-hidden="true">
-                                    {responseItem.avatarUrl ? (
-                                      <img src={responseItem.avatarUrl} alt="" />
-                                    ) : (
-                                      <span>{masterInitials}</span>
-                                    )}
-                                  </div>
-                                  <div className="response-main">
-                                    <div className="response-name">{masterName}</div>
-                                    <div className="response-subline">
-                                      {experienceLabel && (
-                                        <span className="response-pill">
-                                          {experienceLabel}
-                                        </span>
-                                      )}
-                                      {ratingLabel && (
-                                        <span className="response-rating">
-                                          {ratingLabel}
-                                        </span>
+                                <button
+                                  className="response-link"
+                                  type="button"
+                                  aria-label={`Открыть профиль ${masterName}`}
+                                  onClick={() => onViewProfile(responseItem.masterId)}
+                                >
+                                  <div className="response-head">
+                                    <div className="response-avatar" aria-hidden="true">
+                                      {responseItem.avatarUrl ? (
+                                        <img src={responseItem.avatarUrl} alt="" />
+                                      ) : (
+                                        <span>{masterInitials}</span>
                                       )}
                                     </div>
+                                    <div className="response-main">
+                                      <div className="response-name">{masterName}</div>
+                                      <div className="response-subline">
+                                        {experienceLabel && (
+                                          <span className="response-pill">
+                                            {experienceLabel}
+                                          </span>
+                                        )}
+                                        {ratingLabel && (
+                                          <span className="response-rating">
+                                            {ratingLabel}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {priceLabel && (
+                                      <span className="response-price">
+                                        {priceLabel}
+                                      </span>
+                                    )}
                                   </div>
-                                  {priceLabel && (
-                                    <span className="response-price">
-                                      {priceLabel}
-                                    </span>
-                                  )}
-                                </div>
+                                </button>
                                 {priceRangeLabel && (
                                   <div className="response-meta">
                                     {priceRangeLabel}

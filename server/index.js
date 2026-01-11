@@ -2894,6 +2894,7 @@ app.get('/api/requests', async (req, res) => {
             FROM request_responses rr
             WHERE rr.request_id = r.id
           )::int AS "responsesCount",
+          COALESCE(rp.preview, '[]'::json) AS "responsePreview",
           (
             SELECT COUNT(*)
             FROM request_dispatches rd
@@ -2914,13 +2915,57 @@ app.get('/api/requests', async (req, res) => {
         FROM service_requests r
         LEFT JOIN cities c ON c.id = r.city_id
         LEFT JOIN districts d ON d.id = r.district_id
+        LEFT JOIN LATERAL (
+          SELECT json_agg(
+            json_build_object(
+              'masterId', preview.master_id,
+              'displayName', preview.display_name,
+              'avatarPath', preview.avatar_path
+            )
+          ) AS preview
+          FROM (
+            SELECT
+              rr.master_id,
+              mp.display_name,
+              mp.avatar_path
+            FROM request_responses rr
+            LEFT JOIN master_profiles mp ON mp.user_id = rr.master_id
+            WHERE rr.request_id = r.id
+            ORDER BY rr.created_at DESC
+            LIMIT 3
+          ) preview
+        ) rp ON true
         WHERE r.user_id = $1
         ORDER BY r.created_at DESC
       `,
       [normalizedUserId]
     )
+    const payload = result.rows.map((row) => {
+      let previews = []
+      if (Array.isArray(row.responsePreview)) {
+        previews = row.responsePreview
+      } else if (typeof row.responsePreview === 'string') {
+        try {
+          const parsed = JSON.parse(row.responsePreview)
+          if (Array.isArray(parsed)) {
+            previews = parsed
+          }
+        } catch (error) {
+          previews = []
+        }
+      }
+      const responsePreview = previews.map((item) => ({
+        masterId: item.masterId,
+        displayName: item.displayName ?? null,
+        avatarUrl: buildPublicUrl(req, item.avatarPath),
+      }))
+      return {
+        ...row,
+        responsePreview,
+      }
+    })
 
-    res.json(result.rows)
+    res.json(payload)
   } catch (error) {
     console.error('GET /api/requests failed:', error)
     res.status(500).json({ error: 'server_error' })

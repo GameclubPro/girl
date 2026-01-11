@@ -102,6 +102,11 @@ export type ServiceRequest = {
   dispatchExpiresAt?: string | null
   dispatchStatus?: string | null
   dispatchSentAt?: string | null
+  responsePreview?: {
+    masterId: string
+    displayName?: string | null
+    avatarUrl?: string | null
+  }[]
 }
 
 export type BookingStatus =
