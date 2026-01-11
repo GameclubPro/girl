@@ -66,15 +66,15 @@ type CategoryPalette = {
 }
 
 const categoryPalettes: Record<string, CategoryPalette> = {
-  'beauty-nails': { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  'brows-lashes': { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  hair: { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  'makeup-look': { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  'cosmetology-care': { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  'massage-body': { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  'fitness-health': { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  'home-family': { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
-  default: { accent: '#1ca89e', soft: '#f5f7fb', ink: '#0b3f3b' },
+  'beauty-nails': { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  'brows-lashes': { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  hair: { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  'makeup-look': { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  'cosmetology-care': { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  'massage-body': { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  'fitness-health': { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  'home-family': { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
+  default: { accent: '#5b36d6', soft: '#f5f7fb', ink: '#2a1a4a' },
 }
 
 const pickPalette = (categories: string[]) =>
