@@ -4135,6 +4135,9 @@
   grid-auto-columns: clamp(110px, 36vw, 170px);
   overflow-x: auto;
   overflow-y: hidden;
+  padding-inline: 6px;
+  margin-inline: -6px;
+  scroll-padding-inline: 6px;
   padding-bottom: 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -4522,6 +4525,9 @@
   grid-auto-columns: clamp(110px, 36vw, 170px);
   overflow-x: auto;
   overflow-y: hidden;
+  padding-inline: 6px;
+  margin-inline: -6px;
+  scroll-padding-inline: 6px;
   padding-bottom: 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
