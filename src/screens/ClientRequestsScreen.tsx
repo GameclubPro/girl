@@ -523,28 +523,32 @@ export const ClientRequestsScreen = ({
                                 className="response-preview-stack"
                                 aria-hidden="true"
                               >
-                                {responsePreview.map((preview) => {
-                                  const initials = getInitials(
-                                    preview.displayName || 'Мастер'
-                                  )
-                                  return (
-                                    <span
-                                      className="response-preview-avatar"
-                                      key={preview.masterId}
-                                    >
-                                      {preview.avatarUrl ? (
-                                        <img src={preview.avatarUrl} alt="" />
-                                      ) : (
-                                        <span>{initials}</span>
-                                      )}
-                                    </span>
-                                  )
-                                })}
-                                {responseOverflow > 0 && (
-                                  <span className="response-preview-more">
-                                    +{responseOverflow}
+                              {responsePreview.map((preview, index) => {
+                                const initials = getInitials(
+                                  preview.displayName || 'Мастер'
+                                )
+                                return (
+                                  <span
+                                    className="response-preview-avatar"
+                                    key={preview.masterId}
+                                    style={{ zIndex: 10 + index }}
+                                  >
+                                    {preview.avatarUrl ? (
+                                      <img src={preview.avatarUrl} alt="" />
+                                    ) : (
+                                      <span>{initials}</span>
+                                    )}
                                   </span>
-                                )}
+                                )
+                              })}
+                              {responseOverflow > 0 && (
+                                <span
+                                  className="response-preview-more"
+                                  style={{ zIndex: 10 + responsePreview.length }}
+                                >
+                                  +{responseOverflow}
+                                </span>
+                              )}
                               </span>
                               <span className="response-preview-chevron" aria-hidden="true">
                                 ›

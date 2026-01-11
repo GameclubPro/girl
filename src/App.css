@@ -7483,22 +7483,25 @@
 .response-preview-stack {
   display: flex;
   align-items: center;
+  padding-left: 2px;
 }
 
 .response-preview-avatar,
 .response-preview-more {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.95);
   display: grid;
   place-items: center;
-  background: #f3ecff;
+  background: radial-gradient(circle at 30% 20%, #ffffff 0%, #f1eaff 60%, #e6d9ff 100%);
   color: #5b4493;
   font-size: 10px;
   font-weight: 700;
-  margin-left: -8px;
-  box-shadow: 0 8px 14px rgba(71, 55, 87, 0.18);
+  margin-left: -10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    0 8px 14px rgba(71, 55, 87, 0.18);
+  position: relative;
 }
 
 .response-preview-avatar:first-child,
@@ -7517,6 +7520,7 @@
 .response-preview-more {
   background: linear-gradient(135deg, #7c5bf1 0%, #6b47d9 100%);
   color: #ffffff;
+  font-size: 9px;
 }
 
 .response-preview-chevron {
@@ -7532,6 +7536,7 @@
   text-align: left;
   cursor: pointer;
   width: 100%;
+  display: block;
 }
 
 .response-link:focus-visible {
@@ -7567,8 +7572,8 @@
 .response-avatar {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #f2ebff 0%, #efe4ff 100%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 20%, #ffffff 0%, #f1eaff 55%, #e6d9ff 100%);
   display: grid;
   place-items: center;
   color: #5b4493;
@@ -7576,6 +7581,8 @@
   font-size: 14px;
   overflow: hidden;
   flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 18px rgba(71, 55, 87, 0.18);
 }
 
 .response-avatar img {

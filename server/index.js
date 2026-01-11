@@ -243,6 +243,28 @@ const normalizeUploadPath = (value) => {
   return path.posix.normalize(withoutPrefix)
 }
 
+const resolvePublicUrl = (req, value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  if (/^https?:\/\//i.test(normalized)) return normalized
+  const safePath = normalizeUploadPath(normalized)
+  return buildPublicUrl(req, safePath)
+}
+
+const extractPortfolioUrl = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return ''
+  if (normalized.startsWith('pf:')) {
+    try {
+      const payload = JSON.parse(normalized.slice(3))
+      return normalizeText(payload?.url)
+    } catch (error) {
+      return ''
+    }
+  }
+  return normalized
+}
+
 const isSafeRequestUploadPath = (safeUserId, relativePath) => {
   if (!relativePath || relativePath.includes('..')) return false
   const prefix = `requests/${safeUserId}/`
@@ -2957,7 +2979,7 @@ app.get('/api/requests', async (req, res) => {
       const responsePreview = previews.map((item) => ({
         masterId: item.masterId,
         displayName: item.displayName ?? null,
-        avatarUrl: buildPublicUrl(req, item.avatarPath),
+        avatarUrl: resolvePublicUrl(req, item.avatarPath),
       }))
       return {
         ...row,
@@ -3091,16 +3113,10 @@ app.get('/api/requests/:id/responses', async (req, res) => {
       const portfolioUrls = Array.isArray(row.portfolioUrls) ? row.portfolioUrls : []
       const previewSource = showcaseUrls.length > 0 ? showcaseUrls : portfolioUrls
       const previewUrls = previewSource
+        .map((value) => extractPortfolioUrl(value))
         .filter(Boolean)
         .slice(0, 3)
-        .map((value) => {
-          const normalized = normalizeText(value)
-          if (!normalized) return null
-          const sanitized = normalized.startsWith('uploads/')
-            ? normalized.slice('uploads/'.length)
-            : normalized
-          return buildPublicUrl(req, sanitized)
-        })
+        .map((value) => resolvePublicUrl(req, value))
         .filter(Boolean)
       const average = Number(row.reviewsAverage)
       const reviewsAverage = Number.isFinite(average) ? average : 0
@@ -3120,7 +3136,7 @@ app.get('/api/requests/:id/responses', async (req, res) => {
         proposedTime: row.proposedTime,
         status: row.status,
         createdAt: row.createdAt,
-        avatarUrl: buildPublicUrl(req, row.avatarPath),
+        avatarUrl: resolvePublicUrl(req, row.avatarPath),
         reviewsAverage,
         reviewsCount,
         previewUrls,
