@@ -253,7 +253,7 @@
 }
 
 .request-service-card.is-active .request-service-indicator {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   border-color: transparent;
   color: #ffffff;
 }
@@ -275,7 +275,7 @@
 }
 
 .request-chip.is-active {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   border-color: transparent;
   box-shadow: 0 8px 14px rgba(15, 82, 186, 0.26);
@@ -303,7 +303,7 @@
 }
 
 .request-segment-button.is-active {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   box-shadow: 0 8px 14px rgba(15, 82, 186, 0.28);
 }
@@ -428,7 +428,7 @@
   font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 8px 12px rgba(15, 82, 186, 0.25);
   cursor: pointer;
 }
@@ -472,7 +472,7 @@
   font-size: 16px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 14px 22px rgba(15, 82, 186, 0.32);
   cursor: pointer;
 }
@@ -727,7 +727,7 @@
 
 .booking-slot.is-active {
   border-color: transparent;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.24);
 }
@@ -826,7 +826,7 @@
 }
 
 .requests-tab.is-active {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   box-shadow: 0 8px 14px rgba(15, 82, 186, 0.26);
 }
@@ -1072,7 +1072,7 @@
 
 .booking-action.is-primary {
   border-color: transparent;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.24);
 }
@@ -2115,7 +2115,7 @@
   color: #ffffff;
   font-size: 28px;
   font-weight: 700;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 16px 28px rgba(22, 18, 16, 0.24);
   z-index: 1;
 }
@@ -6711,7 +6711,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
 }
 
 .pro-progress-bar span {
@@ -6768,7 +6768,7 @@
   font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 8px 12px rgba(15, 82, 186, 0.25);
   cursor: pointer;
 }
@@ -7458,7 +7458,7 @@
 }
 
 .response-toggle.has-responses .response-toggle-pill {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   box-shadow: 0 8px 16px rgba(123, 89, 229, 0.22);
 }
@@ -7520,7 +7520,7 @@
 }
 
 .response-preview-more {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   font-size: 9px;
 }
@@ -7697,7 +7697,7 @@
 }
 
 .response-action.is-primary {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   border-color: transparent;
   box-shadow: 0 6px 12px rgba(92, 63, 204, 0.25);
@@ -8165,7 +8165,7 @@
   font-size: 15px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 12px 18px rgba(15, 82, 186, 0.3);
   cursor: pointer;
 }
@@ -8325,7 +8325,7 @@ h1 {
   right: 0;
   bottom: 2px;
   height: 6px;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   opacity: 0.6;
   border-radius: 999px;
   z-index: -1;
@@ -8604,7 +8604,7 @@ h2 {
 }
 
 .cta--primary {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   box-shadow: 0 12px 18px rgba(15, 82, 186, 0.35);
 }
@@ -8687,7 +8687,7 @@ h2 {
 .client-category-chip.is-active {
   border-color: transparent;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.28);
 }
 
@@ -8767,7 +8767,7 @@ h2 {
   font-size: 12px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 12px 18px rgba(15, 82, 186, 0.35);
   cursor: pointer;
   align-self: flex-start;
@@ -9093,7 +9093,7 @@ h2 {
 }
 
 .client-gallery-detail-like.is-active {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   border-color: transparent;
   color: #ffffff;
   box-shadow: 0 12px 18px rgba(111, 80, 214, 0.28);
@@ -9252,7 +9252,7 @@ h2 {
   font-size: 16px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 16px 22px rgba(109, 79, 208, 0.28);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -9352,14 +9352,14 @@ h2 {
 .client-master-filter.is-active {
   border-color: transparent;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.35);
 }
 
 .client-master-filter.is-open {
   border-color: transparent;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.35);
   transform: translateY(-1px);
 }
@@ -9401,7 +9401,7 @@ h2 {
 .client-master-sort-pill.is-active {
   border-color: transparent;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.28);
 }
 
@@ -9471,7 +9471,7 @@ h2 {
 
 .client-master-toggle.is-active {
   border-color: transparent;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   color: #ffffff;
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.28);
 }
@@ -9519,7 +9519,7 @@ h2 {
 }
 
 .client-geo-banner--warning .client-geo-button {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 10px 16px rgba(205, 120, 65, 0.25);
 }
 
@@ -9550,7 +9550,7 @@ h2 {
   font-size: 12px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 10px 16px rgba(15, 82, 186, 0.25);
   cursor: pointer;
   white-space: nowrap;
@@ -9614,7 +9614,7 @@ h2 {
 }
 
 .client-master-card.is-featured .client-master-score {
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 10px 18px rgba(15, 82, 186, 0.3);
 }
 
@@ -9674,7 +9674,7 @@ h2 {
   color: #ffffff;
   padding: 4px 9px;
   border-radius: 999px;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 8px 12px rgba(15, 82, 186, 0.28);
   white-space: nowrap;
 }
@@ -9704,7 +9704,7 @@ h2 {
 
 .client-master-chip.is-accent {
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   border-color: transparent;
   box-shadow: 0 8px 12px rgba(15, 82, 186, 0.25);
 }
@@ -9839,7 +9839,7 @@ h2 {
   font-size: 15px;
   font-weight: 700;
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   box-shadow: 0 14px 22px rgba(15, 82, 186, 0.28);
   cursor: pointer;
 }
@@ -10130,7 +10130,7 @@ h2 {
 
 .client-master-profile-status.is-active {
   color: #ffffff;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
   border-color: transparent;
 }
 
@@ -10338,7 +10338,7 @@ h2 {
 .client-master-review-bar-fill {
   height: 100%;
   display: block;
-  background: #0f52ba;
+  background: var(--sapphire-dark);
 }
 
 .client-master-review-list {
@@ -11609,6 +11609,45 @@ h2 {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+/* Outline primary actions instead of filled sapphire */
+.request-service-card.is-active .request-service-indicator,
+.request-chip.is-active,
+.request-segment-button.is-active,
+.request-upload-button,
+.request-submit,
+.booking-day.is-active,
+.booking-slot.is-active,
+.requests-tab.is-active,
+.booking-action.is-primary,
+.cabinet-next-button,
+.response-toggle.has-responses .response-toggle-pill,
+.response-action.is-primary,
+.address-primary,
+.cta--primary,
+.client-category-chip.is-active,
+.client-showcase-cta,
+.client-gallery-detail-like.is-active,
+.client-gallery-detail-cta,
+.client-master-filter.is-active,
+.client-master-filter.is-open,
+.client-master-sort-pill.is-active,
+.client-master-toggle.is-active,
+.client-geo-banner--warning .client-geo-button,
+.client-geo-button,
+.client-master-cta,
+.client-master-profile-status.is-active {
+  background: transparent;
+  color: var(--sapphire-dark);
+  border: 1.5px solid var(--sapphire-dark);
+  box-shadow: none;
+}
+
+.request-service-card.is-active {
+  background: transparent;
+  border-color: var(--sapphire-dark);
+  box-shadow: none;
 }
 
 @media (hover: hover) and (pointer: fine) {
