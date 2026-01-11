@@ -2226,6 +2226,9 @@ export const ProProfileScreen = ({
         >
           <div className="pro-profile-portfolio-panel-head">
             <div className="pro-profile-portfolio-panel-controls">
+              <span className="pro-profile-portfolio-panel-count">
+                {portfolioPanelCountLabel}
+              </span>
               <div className="pro-profile-portfolio-panel-left">
                 <div
                   className="pro-profile-portfolio-panel-nav"
@@ -2258,9 +2261,6 @@ export const ProProfileScreen = ({
                   </button>
                 </div>
               </div>
-              <span className="pro-profile-portfolio-panel-count">
-                {portfolioPanelCountLabel}
-              </span>
               {portfolioView === 'portfolio' && hasPortfolioOverflow && (
                 <button
                   className="pro-profile-portfolio-panel-action"
