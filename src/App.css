@@ -4126,22 +4126,23 @@
 
 .pro-shell--ig .pro-profile-portfolio-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
+  gap: var(--portfolio-grid-gap);
+  padding-inline: calc(var(--portfolio-grid-gap) / 2);
 }
 
 .pro-shell--ig .pro-profile-portfolio-grid.is-collapsed {
   grid-template-columns: none;
   grid-auto-flow: column;
-  grid-auto-columns: clamp(110px, 36vw, 170px);
+  grid-auto-columns: clamp(94px, 31vw, 145px);
   overflow-x: auto;
   overflow-y: hidden;
-  padding-inline: 6px;
-  scroll-padding-inline: 6px;
+  padding-inline: calc(var(--portfolio-grid-gap) / 2);
+  scroll-padding-inline: calc(var(--portfolio-grid-gap) / 2);
   padding-bottom: 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 0;
+  gap: var(--portfolio-grid-gap);
 }
 
 .pro-shell--ig .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
@@ -4517,26 +4518,28 @@
 }
 
 .pro-profile-portfolio-grid {
+  --portfolio-grid-gap: clamp(12px, 5vw, 22px);
   position: relative;
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
+  gap: var(--portfolio-grid-gap);
+  padding-inline: calc(var(--portfolio-grid-gap) / 2);
 }
 
 .pro-profile-portfolio-grid.is-collapsed {
   grid-template-columns: none;
   grid-auto-flow: column;
-  grid-auto-columns: clamp(110px, 36vw, 170px);
+  grid-auto-columns: clamp(94px, 31vw, 145px);
   overflow-x: auto;
   overflow-y: hidden;
-  padding-inline: 6px;
-  scroll-padding-inline: 6px;
+  padding-inline: calc(var(--portfolio-grid-gap) / 2);
+  scroll-padding-inline: calc(var(--portfolio-grid-gap) / 2);
   padding-bottom: 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 0;
+  gap: var(--portfolio-grid-gap);
 }
 
 .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
@@ -4570,9 +4573,9 @@
   font-family: inherit;
   color: inherit;
   -webkit-touch-callout: none;
-  transform: scale(0.85);
+  transform: scale(1);
   transform-origin: center;
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .pro-profile-portfolio-item img {
@@ -4584,7 +4587,7 @@
 }
 
 .pro-profile-portfolio-item:hover {
-  transform: scale(0.88);
+  transform: translateY(-2px);
 }
 
 .pro-profile-portfolio-item:hover img {
