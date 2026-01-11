@@ -4141,7 +4141,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 2px;
+  gap: 1px;
 }
 
 .pro-shell--ig .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
@@ -4536,7 +4536,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 2px;
+  gap: 1px;
 }
 
 .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
