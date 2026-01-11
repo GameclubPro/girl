@@ -192,13 +192,13 @@ const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
 const PORTFOLIO_ROW_LIMIT = 4
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
-const showcaseRatioClasses = [
-  'is-square',
-  'is-portrait',
-  'is-landscape',
-  'is-square',
-  'is-portrait',
-  'is-landscape',
+const showcaseSlotClasses = [
+  'is-slot-portrait-a',
+  'is-slot-portrait-b',
+  'is-slot-square-a',
+  'is-slot-square-b',
+  'is-slot-landscape-a',
+  'is-slot-landscape-b',
 ]
 
 export const ProProfileScreen = ({
@@ -2468,11 +2468,11 @@ export const ProProfileScreen = ({
                         const isImage = item?.url ? isImageUrl(item.url) : false
                         const caption = item?.title?.trim() || 'Работа'
                         const focus = resolvePortfolioFocus(item)
-                        const ratioClass =
-                          showcaseRatioClasses[index] ?? showcaseRatioClasses[0]
+                        const slotClass =
+                          showcaseSlotClasses[index] ?? showcaseSlotClasses[0]
                         const cardClassName = [
                           'pro-cabinet-showcase-card',
-                          ratioClass,
+                          slotClass,
                           showcaseDragOverIndex === index ? 'is-drag-over' : '',
                         ]
                           .filter(Boolean)

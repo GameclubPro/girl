@@ -4508,35 +4508,47 @@
 }
 
 .pro-profile-showcase-panel .pro-cabinet-showcase-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto;
-  grid-template-areas: none;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  grid-template-areas:
+    'pa pa pa pb pb pb sa sa'
+    'pa pa pa pb pb pb sa sa'
+    'pa pa pa pb pb pb sb sb'
+    'pa pa pa pb pb pb sb sb'
+    'la la la la lb lb lb lb'
+    'la la la la lb lb lb lb'
+    'la la la la lb lb lb lb';
+  gap: 0;
+  width: 100%;
+  max-width: calc(70dvh * 8 / 7);
   height: auto;
   max-height: 70dvh;
-  aspect-ratio: auto;
-  align-items: start;
+  aspect-ratio: 8 / 7;
+  margin-inline: auto;
 }
 
-.pro-profile-showcase-panel .pro-cabinet-showcase-card {
-  height: auto;
-  align-self: start;
+.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-slot-portrait-a {
+  grid-area: pa;
 }
 
-.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-square {
-  --showcase-tile-ratio: 1 / 1;
+.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-slot-portrait-b {
+  grid-area: pb;
 }
 
-.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-portrait {
-  --showcase-tile-ratio: 3 / 4;
+.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-slot-square-a {
+  grid-area: sa;
 }
 
-.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-landscape {
-  --showcase-tile-ratio: 4 / 3;
+.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-slot-square-b {
+  grid-area: sb;
 }
 
-.pro-profile-showcase-panel .pro-cabinet-showcase-media {
-  height: auto;
-  aspect-ratio: var(--showcase-tile-ratio, 1 / 1);
+.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-slot-landscape-a {
+  grid-area: la;
+}
+
+.pro-profile-showcase-panel .pro-cabinet-showcase-card.is-slot-landscape-b {
+  grid-area: lb;
 }
 
 .pro-profile-showcase-panel .pro-cabinet-showcase-add-icon {
@@ -10441,7 +10453,7 @@ h2 {
   }
 
   .pro-profile-showcase-panel .pro-cabinet-showcase-grid {
-    gap: 5px;
+    gap: 0;
   }
 
   .pro-portfolio-sheet-actions {
