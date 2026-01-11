@@ -4126,7 +4126,7 @@
 
 .pro-shell--ig .pro-profile-portfolio-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px;
+  gap: 0;
 }
 
 .pro-shell--ig .pro-profile-portfolio-grid.is-collapsed {
@@ -4141,7 +4141,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 1px;
+  gap: 0;
 }
 
 .pro-shell--ig .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
@@ -4521,7 +4521,7 @@
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px;
+  gap: 0;
 }
 
 .pro-profile-portfolio-grid.is-collapsed {
@@ -4536,7 +4536,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 1px;
+  gap: 0;
 }
 
 .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
@@ -4570,7 +4570,7 @@
   font-family: inherit;
   color: inherit;
   -webkit-touch-callout: none;
-  transform: scale(0.9);
+  transform: scale(1);
   transform-origin: center;
   transition: transform 0.25s ease;
 }
@@ -4584,7 +4584,7 @@
 }
 
 .pro-profile-portfolio-item:hover {
-  transform: scale(0.93);
+  transform: scale(1.02);
 }
 
 .pro-profile-portfolio-item:hover img {
