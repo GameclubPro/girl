@@ -12,7 +12,7 @@ const app = express()
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 4000)
 const corsOrigin = process.env.CORS_ORIGIN ?? '*'
 const uploadsRoot = path.join(process.cwd(), 'uploads')
-const MAX_UPLOAD_BYTES = 3 * 1024 * 1024
+const MAX_UPLOAD_BYTES = 6 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const REQUEST_INITIAL_BATCH_SIZE = 15
 const REQUEST_EXPANDED_BATCH_SIZE = 20
@@ -21,7 +21,7 @@ const REQUEST_DISPATCH_SCAN_INTERVAL_MS = 60_000
 const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
 
 app.use(cors({ origin: corsOrigin }))
-app.use(express.json({ limit: '6mb' }))
+app.use(express.json({ limit: '12mb' }))
 app.use('/uploads', express.static(uploadsRoot))
 
 const createPool = () => {

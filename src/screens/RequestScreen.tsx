@@ -82,6 +82,7 @@ export const RequestScreen = ({
   const [submitSuccess, setSubmitSuccess] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const maxPhotos = 5
+  const maxUploadBytes = 6 * 1024 * 1024
 
   const serviceOptions = useMemo(
     () => getServiceOptions(categoryId),
@@ -149,6 +150,11 @@ export const RequestScreen = ({
         setUploadingCount((current) => Math.max(0, current - 1))
         continue
       }
+      if (file.size > maxUploadBytes) {
+        setUploadError('Фото слишком большое. Максимум 6 МБ.')
+        setUploadingCount((current) => Math.max(0, current - 1))
+        continue
+      }
 
       try {
         const dataUrl = await readFileAsDataUrl(file)
@@ -158,6 +164,10 @@ export const RequestScreen = ({
           body: JSON.stringify({ userId, dataUrl }),
         })
 
+        if (response.status === 413) {
+          setUploadError('Фото слишком большое. Максимум 6 МБ.')
+          continue
+        }
         if (!response.ok) {
           throw new Error('upload_failed')
         }
@@ -496,7 +506,7 @@ export const RequestScreen = ({
                 <div className="request-upload-meta">
                   {photos.length > 0
                     ? `Добавлено ${photos.length}/${maxPhotos}`
-                    : '1-5 фото • до/после'}
+                    : '1-5 фото • до 6 МБ'}
                 </div>
               </div>
               <button
