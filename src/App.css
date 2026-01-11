@@ -4136,7 +4136,6 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-inline: 6px;
-  margin-inline: -6px;
   scroll-padding-inline: 6px;
   padding-bottom: 4px;
   scrollbar-width: none;
@@ -4526,7 +4525,6 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-inline: 6px;
-  margin-inline: -6px;
   scroll-padding-inline: 6px;
   padding-bottom: 4px;
   scrollbar-width: none;
