@@ -4375,9 +4375,10 @@
 .pro-profile-portfolio-panel-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  row-gap: 8px;
   width: 100%;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 #pro-profile-portfolio-content,
@@ -4394,26 +4395,31 @@
 }
 
 .pro-profile-portfolio-panel-count {
-  padding: 3px 7px;
+  padding: 5px 10px;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.06em;
   color: var(--pro-ink);
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(32, 25, 20, 0.12);
-  box-shadow: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 245, 245, 0.92));
+  border: 1px solid rgba(32, 25, 20, 0.1);
+  box-shadow:
+    0 6px 12px rgba(16, 12, 11, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
   white-space: nowrap;
 }
 
 .pro-profile-portfolio-panel-nav {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
+  gap: 6px;
+  padding: 3px;
   border-radius: 999px;
-  border: 1px solid rgba(32, 25, 20, 0.12);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 8px 14px rgba(16, 12, 11, 0.08);
+  border: 1px solid rgba(32, 25, 20, 0.1);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 10px 18px rgba(16, 12, 11, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   white-space: nowrap;
 }
 
@@ -4421,22 +4427,29 @@
   border: 1px solid transparent;
   background: transparent;
   border-radius: 999px;
-  padding: 5px 9px;
-  font-size: 9px;
+  padding: 7px 12px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--pro-muted);
   cursor: pointer;
   appearance: none;
   font-family: inherit;
+  min-height: 30px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.2s ease,
+    background 0.2s ease, border-color 0.2s ease;
 }
 
 .pro-profile-portfolio-panel-tab.is-active {
-  border-color: rgba(32, 25, 20, 0.12);
-  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(32, 25, 20, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 245, 245, 0.92));
   color: var(--pro-ink);
-  box-shadow: 0 8px 12px rgba(16, 12, 11, 0.1);
+  box-shadow: 0 10px 16px rgba(16, 12, 11, 0.12);
+}
+
+.pro-profile-portfolio-panel-tab:active {
+  transform: scale(0.98);
 }
 
 .pro-profile-portfolio-panel-tab:focus-visible {
@@ -4445,20 +4458,28 @@
 }
 
 .pro-profile-portfolio-panel-action {
-  border: 1px solid rgba(255, 107, 61, 0.35);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 107, 61, 0.5);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 107, 61, 0.18),
+    rgba(255, 255, 255, 0.96)
+  );
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 9px;
+  padding: 7px 12px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--pro-accent);
   cursor: pointer;
-  box-shadow: none;
+  box-shadow:
+    0 10px 18px rgba(255, 107, 61, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   appearance: none;
   font-family: inherit;
   margin-left: auto;
+  min-height: 30px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .pro-profile-portfolio-panel-action.is-primary {
@@ -4468,9 +4489,24 @@
   box-shadow: none;
 }
 
+.pro-profile-portfolio-panel-action:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 6px 12px rgba(255, 107, 61, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
 .pro-profile-portfolio-panel-action:focus-visible {
   outline: 3px solid rgba(255, 107, 61, 0.3);
   outline-offset: 2px;
+}
+
+@supports (backdrop-filter: blur(10px)) {
+  .pro-profile-portfolio-panel-count,
+  .pro-profile-portfolio-panel-nav,
+  .pro-profile-portfolio-panel-action {
+    backdrop-filter: blur(12px) saturate(1.15);
+  }
 }
 
 .pro-profile-showcase-panel {
@@ -10450,7 +10486,8 @@ h2 {
 
   .pro-profile-portfolio-panel-controls {
     width: 100%;
-    gap: 6px;
+    gap: 8px;
+    row-gap: 6px;
   }
 
   .pro-profile-showcase-panel {
