@@ -503,38 +503,52 @@ export const ClientRequestsScreen = ({
                       )}
                       <div className="request-item-actions">
                         <button
-                          className="response-toggle"
+                          className={`response-toggle${
+                            responseCount > 0 ? ' has-responses' : ''
+                          }${isResponsesOpen ? ' is-open' : ''}`}
                           type="button"
                           onClick={() => toggleResponses(item.id)}
                         >
-                          <span className="response-toggle-label">
-                            {isResponsesOpen ? 'Скрыть отклики' : 'Отклики'}
-                            {responseCount > 0 ? ` (${responseCount})` : ''}
+                          <span className="response-toggle-pill">
+                            <span className="response-toggle-text">
+                              {isResponsesOpen ? 'Скрыть' : 'Отклики'}
+                            </span>
+                            <span className="response-toggle-count">
+                              ({responseCount})
+                            </span>
                           </span>
                           {!isResponsesOpen && responsePreview.length > 0 && (
-                            <span className="response-preview-stack" aria-hidden="true">
-                              {responsePreview.map((preview) => {
-                                const initials = getInitials(
-                                  preview.displayName || 'Мастер'
-                                )
-                                return (
-                                  <span
-                                    className="response-preview-avatar"
-                                    key={preview.masterId}
-                                  >
-                                    {preview.avatarUrl ? (
-                                      <img src={preview.avatarUrl} alt="" />
-                                    ) : (
-                                      <span>{initials}</span>
-                                    )}
+                            <span className="response-toggle-preview">
+                              <span
+                                className="response-preview-stack"
+                                aria-hidden="true"
+                              >
+                                {responsePreview.map((preview) => {
+                                  const initials = getInitials(
+                                    preview.displayName || 'Мастер'
+                                  )
+                                  return (
+                                    <span
+                                      className="response-preview-avatar"
+                                      key={preview.masterId}
+                                    >
+                                      {preview.avatarUrl ? (
+                                        <img src={preview.avatarUrl} alt="" />
+                                      ) : (
+                                        <span>{initials}</span>
+                                      )}
+                                    </span>
+                                  )
+                                })}
+                                {responseOverflow > 0 && (
+                                  <span className="response-preview-more">
+                                    +{responseOverflow}
                                   </span>
-                                )
-                              })}
-                              {responseOverflow > 0 && (
-                                <span className="response-preview-more">
-                                  +{responseOverflow}
-                                </span>
-                              )}
+                                )}
+                              </span>
+                              <span className="response-preview-chevron" aria-hidden="true">
+                                ›
+                              </span>
                             </span>
                           )}
                         </button>
