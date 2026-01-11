@@ -4518,7 +4518,7 @@
 }
 
 .pro-profile-portfolio-grid {
-  --portfolio-grid-gap: clamp(12px, 5vw, 22px);
+  --portfolio-grid-gap: clamp(8px, 3.2vw, 16px);
   position: relative;
   z-index: 1;
   display: grid;
