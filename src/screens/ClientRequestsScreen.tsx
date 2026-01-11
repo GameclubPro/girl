@@ -54,6 +54,19 @@ const formatDateTime = (value?: string | null) => {
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const formatTimeLeft = (value?: string | null) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const diffMs = parsed.getTime() - Date.now()
+  if (diffMs <= 0) return ''
+  const minutesTotal = Math.ceil(diffMs / 60000)
+  const hours = Math.floor(minutesTotal / 60)
+  const minutes = minutesTotal % 60
+  if (hours <= 0) return `${minutesTotal} мин`
+  return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
+}
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'М'
@@ -88,6 +101,10 @@ export const ClientRequestsScreen = ({
   )
   const [responsesError, setResponsesError] = useState('')
   const [responsesErrorId, setResponsesErrorId] = useState<number | null>(null)
+  const [responseActionId, setResponseActionId] = useState<number | null>(null)
+  const [responseActionError, setResponseActionError] = useState<
+    Record<number, string>
+  >({})
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isBookingsLoading, setIsBookingsLoading] = useState(false)
   const [bookingsError, setBookingsError] = useState('')
@@ -264,6 +281,64 @@ export const ClientRequestsScreen = ({
     }
   }
 
+  const handleResponseAction = async (
+    requestId: number,
+    responseId: number,
+    action: 'accept' | 'reject'
+  ) => {
+    if (responseActionId !== null) return
+
+    setResponseActionId(responseId)
+    setResponseActionError((current) => ({ ...current, [responseId]: '' }))
+
+    try {
+      const response = await fetch(
+        `${apiBase}/api/requests/${requestId}/responses/${responseId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action }),
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Response update failed')
+      }
+
+      setResponsesByRequestId((current) => {
+        const items = current[requestId] ?? []
+        const next = items.map((item) => {
+          if (item.id === responseId) {
+            return {
+              ...item,
+              status: action === 'accept' ? 'accepted' : 'rejected',
+            }
+          }
+          if (action === 'accept' && item.status === 'sent') {
+            return { ...item, status: 'rejected' }
+          }
+          return item
+        })
+        return { ...current, [requestId]: next }
+      })
+
+      if (action === 'accept') {
+        setRequests((current) =>
+          current.map((request) =>
+            request.id === requestId ? { ...request, status: 'closed' } : request
+          )
+        )
+      }
+    } catch (error) {
+      setResponseActionError((current) => ({
+        ...current,
+        [responseId]: 'Не удалось обновить отклик.',
+      }))
+    } finally {
+      setResponseActionId((current) => (current === responseId ? null : current))
+    }
+  }
+
   return (
     <div className="screen screen--requests">
       <div className="requests-shell">
@@ -334,6 +409,13 @@ export const ClientRequestsScreen = ({
                     categoryItems.find((category) => category.id === item.categoryId)
                       ?.label ?? item.categoryId
                   const responseCount = item.responsesCount ?? 0
+                  const dispatchedCount = item.dispatchedCount ?? 0
+                  const dispatchBatch =
+                    item.dispatchBatch ??
+                    (dispatchedCount > 0 ? 1 : 0)
+                  const dispatchTimeLeft = formatTimeLeft(item.dispatchExpiresAt)
+                  const isWaitingForResponses =
+                    item.status === 'open' && responseCount === 0
                   const responses = responsesByRequestId[item.id] ?? []
                   const isResponsesOpen = expandedRequestId === item.id
 
@@ -343,7 +425,7 @@ export const ClientRequestsScreen = ({
                         <div className="request-item-title">{item.serviceName}</div>
                         <span
                           className={`request-status${
-                            item.status === 'open' ? ' is-open' : ''
+                            item.status === 'open' ? ' is-open' : ' is-closed'
                           }`}
                         >
                           {statusLabel}
@@ -359,6 +441,19 @@ export const ClientRequestsScreen = ({
                         {item.districtName ? ` • ${item.districtName}` : ''}
                       </div>
                       <div className="request-item-meta">{dateLabel}</div>
+                      {dispatchedCount > 0 && (
+                        <div className="request-item-meta request-item-meta--hint">
+                          Отправлено: {dispatchedCount}
+                          {dispatchBatch ? ` • Волна ${dispatchBatch}` : ''}
+                        </div>
+                      )}
+                      {isWaitingForResponses && (
+                        <div className="request-item-meta request-item-meta--hint">
+                          {dispatchTimeLeft
+                            ? `Осталось ${dispatchTimeLeft} до расширения поиска`
+                            : 'Поиск расширяется, подбираем больше мастеров'}
+                        </div>
+                      )}
                       <div className="request-item-actions">
                         <button
                           className="response-toggle"
@@ -388,9 +483,23 @@ export const ClientRequestsScreen = ({
                             const responseStatusLabel =
                               responseStatusLabelMap[responseItem.status] ??
                               responseItem.status
+                            const isAccepted = responseItem.status === 'accepted'
+                            const isRejected = responseItem.status === 'rejected'
+                            const canRespondAction =
+                              item.status === 'open' && responseItem.status === 'sent'
+                            const isActionLoading = responseActionId === responseItem.id
 
                             return (
-                              <div className="response-card" key={responseItem.id}>
+                              <div
+                                className={`response-card${
+                                  isAccepted
+                                    ? ' is-accepted'
+                                    : isRejected
+                                      ? ' is-rejected'
+                                      : ''
+                                }`}
+                                key={responseItem.id}
+                              >
                                 <div className="response-top">
                                   <div className="response-name">
                                     {responseItem.displayName || 'Мастер'}
@@ -415,6 +524,43 @@ export const ClientRequestsScreen = ({
                                 <div className="response-meta">
                                   Статус: {responseStatusLabel}
                                 </div>
+                                {canRespondAction && (
+                                  <div className="response-actions">
+                                    <button
+                                      className="response-action is-primary"
+                                      type="button"
+                                      onClick={() =>
+                                        handleResponseAction(
+                                          item.id,
+                                          responseItem.id,
+                                          'accept'
+                                        )
+                                      }
+                                      disabled={isActionLoading}
+                                    >
+                                      Выбрать мастера
+                                    </button>
+                                    <button
+                                      className="response-action"
+                                      type="button"
+                                      onClick={() =>
+                                        handleResponseAction(
+                                          item.id,
+                                          responseItem.id,
+                                          'reject'
+                                        )
+                                      }
+                                      disabled={isActionLoading}
+                                    >
+                                      Отклонить
+                                    </button>
+                                  </div>
+                                )}
+                                {responseActionError[responseItem.id] && (
+                                  <p className="response-error">
+                                    {responseActionError[responseItem.id]}
+                                  </p>
+                                )}
                               </div>
                             )
                           })}

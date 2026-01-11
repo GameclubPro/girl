@@ -14,6 +14,11 @@ const corsOrigin = process.env.CORS_ORIGIN ?? '*'
 const uploadsRoot = path.join(process.cwd(), 'uploads')
 const MAX_UPLOAD_BYTES = 3 * 1024 * 1024
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const REQUEST_INITIAL_BATCH_SIZE = 15
+const REQUEST_EXPANDED_BATCH_SIZE = 20
+const REQUEST_RESPONSE_WINDOW_MINUTES = 30
+const REQUEST_DISPATCH_SCAN_INTERVAL_MS = 60_000
+const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
 
 app.use(cors({ origin: corsOrigin }))
 app.use(express.json({ limit: '6mb' }))
@@ -137,6 +142,66 @@ const calculateDistanceKm = (lat1, lng1, lat2, lng2) => {
 }
 
 const roundDistanceKm = (value) => Math.round(value * 10) / 10
+
+const addMinutes = (date, minutes) =>
+  new Date(date.getTime() + minutes * 60 * 1000)
+
+const addDays = (date, days) => {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+const normalizeDayKeys = (value) =>
+  Array.isArray(value)
+    ? value
+        .map((item) => normalizeText(item).toLowerCase())
+        .filter(Boolean)
+    : []
+
+const isScheduleCompatible = (profile, request) => {
+  const scheduleDays = normalizeDayKeys(profile?.scheduleDays)
+  const scheduleStartMinutes = parseTimeToMinutes(profile?.scheduleStart)
+  const scheduleEndMinutes = parseTimeToMinutes(profile?.scheduleEnd)
+  const hasTimeWindow =
+    scheduleStartMinutes !== null &&
+    scheduleEndMinutes !== null &&
+    scheduleStartMinutes < scheduleEndMinutes
+
+  const requestDateOption = normalizeText(request?.dateOption)
+  const requestDateTime = normalizeText(request?.dateTime)
+
+  if (requestDateOption === 'choose' && requestDateTime) {
+    const scheduledDate = new Date(requestDateTime)
+    if (Number.isNaN(scheduledDate.getTime())) return false
+    if (scheduleDays.length === 0 || !hasTimeWindow) return false
+    const dayKey = getDayKeyFromDate(scheduledDate)
+    if (!scheduleDays.includes(dayKey)) return false
+    const scheduledMinutes =
+      scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
+    if (
+      scheduledMinutes < scheduleStartMinutes ||
+      scheduledMinutes > scheduleEndMinutes
+    ) {
+      return false
+    }
+    return true
+  }
+
+  if (requestDateOption === 'today' || requestDateOption === 'tomorrow') {
+    if (scheduleDays.length === 0) return true
+    const baseDate = new Date()
+    baseDate.setHours(0, 0, 0, 0)
+    const day = requestDateOption === 'tomorrow' ? addDays(baseDate, 1) : baseDate
+    const dayKey = getDayKeyFromDate(day)
+    return scheduleDays.includes(dayKey)
+  }
+
+  return true
+}
+
+const buildDispatchExpiry = (baseDate = new Date()) =>
+  addMinutes(baseDate, REQUEST_RESPONSE_WINDOW_MINUTES)
 
 const sanitizePathSegment = (value) => {
   const normalized = normalizeText(value)
@@ -292,6 +357,280 @@ const loadUserLocation = async (userId) => {
     [userId]
   )
   return result.rows[0] ?? null
+}
+
+const loadRequestForDispatch = async (requestId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        user_id AS "userId",
+        city_id AS "cityId",
+        district_id AS "districtId",
+        category_id AS "categoryId",
+        location_type AS "locationType",
+        date_option AS "dateOption",
+        date_time AS "dateTime",
+        status
+      FROM service_requests
+      WHERE id = $1
+    `,
+    [requestId]
+  )
+
+  return result.rows[0] ?? null
+}
+
+const fetchDispatchCandidates = async (request) => {
+  const parsedCityId = parseOptionalInt(request?.cityId)
+  const parsedDistrictId = parseOptionalInt(request?.districtId)
+  const normalizedCategoryId = normalizeText(request?.categoryId)
+  const normalizedLocationType = normalizeText(request?.locationType)
+  const requestUserId = normalizeText(request?.userId)
+
+  if (
+    !requestUserId ||
+    parsedCityId === null ||
+    parsedDistrictId === null ||
+    !normalizedCategoryId ||
+    !['client', 'master', 'any'].includes(normalizedLocationType)
+  ) {
+    return []
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        mp.user_id AS "userId",
+        mp.display_name AS "displayName",
+        mp.schedule_days AS "scheduleDays",
+        mp.schedule_start AS "scheduleStart",
+        mp.schedule_end AS "scheduleEnd",
+        mp.updated_at AS "updatedAt",
+        ul.lat AS "locationLat",
+        ul.lng AS "locationLng",
+        ul.share_to_clients AS "shareToClients",
+        COALESCE(mr.reviews_count, 0) AS "reviewsCount",
+        COALESCE(mr.reviews_average, 0) AS "reviewsAverage"
+      FROM master_profiles mp
+      LEFT JOIN user_locations ul ON ul.user_id = mp.user_id
+      LEFT JOIN (
+        SELECT
+          master_id,
+          COUNT(*)::int AS reviews_count,
+          AVG(rating)::float AS reviews_average
+        FROM master_reviews
+        GROUP BY master_id
+      ) mr ON mr.master_id = mp.user_id
+      WHERE mp.is_active = true
+        AND mp.user_id <> $1
+        AND mp.city_id = $2
+        AND mp.district_id = $3
+        AND $4 = ANY(mp.categories)
+        AND (
+          ($5 = 'client' AND mp.works_at_client)
+          OR ($5 = 'master' AND mp.works_at_master)
+          OR ($5 = 'any' AND (mp.works_at_client OR mp.works_at_master))
+        )
+        AND mp.display_name IS NOT NULL
+        AND mp.display_name <> ''
+        AND NOT EXISTS (
+          SELECT 1
+          FROM request_dispatches rd
+          WHERE rd.request_id = $6
+            AND rd.master_id = mp.user_id
+        )
+      ORDER BY mp.updated_at DESC
+      LIMIT $7
+    `,
+    [
+      requestUserId,
+      parsedCityId,
+      parsedDistrictId,
+      normalizedCategoryId,
+      normalizedLocationType,
+      request?.id ?? 0,
+      REQUEST_DISPATCH_CANDIDATE_LIMIT,
+    ]
+  )
+
+  return result.rows
+}
+
+const rankDispatchCandidates = (candidates, clientLocation) => {
+  const hasClientLocation =
+    clientLocation?.shareToMasters &&
+    typeof clientLocation.lat === 'number' &&
+    typeof clientLocation.lng === 'number'
+
+  return [...candidates]
+    .map((candidate) => {
+      let distanceKm = null
+      if (
+        hasClientLocation &&
+        candidate.shareToClients &&
+        typeof candidate.locationLat === 'number' &&
+        typeof candidate.locationLng === 'number'
+      ) {
+        distanceKm = calculateDistanceKm(
+          clientLocation.lat,
+          clientLocation.lng,
+          candidate.locationLat,
+          candidate.locationLng
+        )
+      }
+      return { ...candidate, distanceKm }
+    })
+    .sort((a, b) => {
+      const aDistance =
+        typeof a.distanceKm === 'number' ? a.distanceKm : Number.POSITIVE_INFINITY
+      const bDistance =
+        typeof b.distanceKm === 'number' ? b.distanceKm : Number.POSITIVE_INFINITY
+      if (aDistance !== bDistance) {
+        return aDistance - bDistance
+      }
+      const aAverage = Number(a.reviewsAverage) || 0
+      const bAverage = Number(b.reviewsAverage) || 0
+      if (aAverage !== bAverage) {
+        return bAverage - aAverage
+      }
+      const aCount = Number(a.reviewsCount) || 0
+      const bCount = Number(b.reviewsCount) || 0
+      if (aCount !== bCount) {
+        return bCount - aCount
+      }
+      return (
+        Number(new Date(b.updatedAt ?? 0)) - Number(new Date(a.updatedAt ?? 0))
+      )
+    })
+}
+
+const dispatchRequestBatch = async (request, batchSize, batch) => {
+  if (!request || request.status !== 'open') {
+    return { dispatched: 0, expiresAt: null }
+  }
+  if (!Number.isFinite(batchSize) || batchSize <= 0) {
+    return { dispatched: 0, expiresAt: null }
+  }
+
+  const clientLocation = await loadUserLocation(request.userId)
+  const candidates = await fetchDispatchCandidates(request)
+  const scheduleFiltered = candidates.filter((candidate) =>
+    isScheduleCompatible(candidate, request)
+  )
+  const ranked = rankDispatchCandidates(scheduleFiltered, clientLocation)
+  const selected = ranked.slice(0, batchSize)
+
+  if (selected.length === 0) {
+    return { dispatched: 0, expiresAt: null }
+  }
+
+  const now = new Date()
+  const expiresAt = buildDispatchExpiry(now)
+  const values = []
+  const placeholders = selected.map((candidate, index) => {
+    const offset = index * 5
+    values.push(
+      request.id,
+      candidate.userId,
+      Number.isInteger(batch) && batch > 0 ? batch : 1,
+      now.toISOString(),
+      expiresAt.toISOString()
+    )
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${
+      offset + 5
+    })`
+  })
+
+  await pool.query(
+    `
+      INSERT INTO request_dispatches (
+        request_id,
+        master_id,
+        batch,
+        sent_at,
+        expires_at
+      )
+      VALUES ${placeholders.join(', ')}
+      ON CONFLICT (request_id, master_id) DO NOTHING
+    `,
+    values
+  )
+
+  return { dispatched: selected.length, expiresAt }
+}
+
+const expireStaleDispatches = async () => {
+  await pool.query(
+    `
+      UPDATE request_dispatches
+      SET status = 'expired',
+          updated_at = NOW()
+      WHERE status = 'sent'
+        AND expires_at <= NOW()
+    `
+  )
+}
+
+let dispatchCycleRunning = false
+
+const runRequestDispatchCycle = async () => {
+  if (dispatchCycleRunning) return
+  dispatchCycleRunning = true
+
+  try {
+    await expireStaleDispatches()
+
+    const result = await pool.query(
+      `
+        SELECT
+          r.id,
+          r.user_id AS "userId",
+          r.city_id AS "cityId",
+          r.district_id AS "districtId",
+          r.category_id AS "categoryId",
+          r.location_type AS "locationType",
+          r.date_option AS "dateOption",
+          r.date_time AS "dateTime",
+          r.status,
+          COALESCE(MAX(rd.batch), 0)::int AS "lastBatch",
+          COUNT(rd.id)::int AS "dispatchCount"
+        FROM service_requests r
+        LEFT JOIN request_dispatches rd ON rd.request_id = r.id
+        WHERE r.status = 'open'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM request_responses rr
+            WHERE rr.request_id = r.id
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM request_dispatches rd2
+            WHERE rd2.request_id = r.id
+              AND rd2.status = 'sent'
+              AND rd2.expires_at > NOW()
+          )
+        GROUP BY r.id
+      `
+    )
+
+    for (const request of result.rows) {
+      const dispatchCount = Number(request.dispatchCount) || 0
+      const batchSize =
+        dispatchCount === 0
+          ? REQUEST_INITIAL_BATCH_SIZE
+          : REQUEST_EXPANDED_BATCH_SIZE
+      const batchNumber = dispatchCount === 0 ? 1 : (request.lastBatch ?? 0) + 1
+
+      if (batchSize > 0) {
+        await dispatchRequestBatch(request, batchSize, batchNumber)
+      }
+    }
+  } catch (error) {
+    console.error('Request dispatch cycle failed:', error)
+  } finally {
+    dispatchCycleRunning = false
+  }
 }
 
 const ensureSchema = async () => {
@@ -543,6 +882,37 @@ const ensureSchema = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS request_dispatches (
+      id SERIAL PRIMARY KEY,
+      request_id INTEGER NOT NULL REFERENCES service_requests(id) ON DELETE CASCADE,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      batch INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'sent',
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      responded_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (request_id, master_id)
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS request_dispatches_request_idx
+    ON request_dispatches (request_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS request_dispatches_master_status_idx
+    ON request_dispatches (master_id, status);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS request_dispatches_request_status_idx
+    ON request_dispatches (request_id, status, expires_at);
   `)
 
   await pool.query(`
@@ -1725,13 +2095,6 @@ app.get('/api/pro/requests', async (req, res) => {
       return
     }
 
-    const { cityId, districtId, categories, worksAtClient, worksAtMaster } = profile
-
-    if (!summary.isFilterReady) {
-      res.json({ ...summary, isActive: profile.isActive, requests: [] })
-      return
-    }
-
     const masterLocation = await loadUserLocation(normalizedUserId)
     const result = await pool.query(
       `
@@ -1754,34 +2117,37 @@ app.get('/api/pro/requests', async (req, res) => {
           r.photo_urls AS "photoUrls",
           r.status,
           r.created_at AS "createdAt",
+          rd.batch AS "dispatchBatch",
+          rd.status AS "dispatchStatus",
+          rd.sent_at AS "dispatchSentAt",
+          rd.expires_at AS "dispatchExpiresAt",
           rr.id AS "responseId",
           rr.status AS "responseStatus",
           rr.price AS "responsePrice",
           rr.comment AS "responseComment",
+          rr.proposed_time AS "responseProposedTime",
           rr.created_at AS "responseCreatedAt",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
           ul.share_to_masters AS "clientShareToMasters"
-        FROM service_requests r
+        FROM request_dispatches rd
+        JOIN service_requests r ON r.id = rd.request_id
         LEFT JOIN cities c ON c.id = r.city_id
         LEFT JOIN districts d ON d.id = r.district_id
         LEFT JOIN user_locations ul ON ul.user_id = r.user_id
         LEFT JOIN request_responses rr
-          ON rr.request_id = r.id AND rr.master_id = $1
-        WHERE r.status = 'open'
-          AND r.user_id <> $1
-          AND r.city_id = $2
-          AND r.district_id = $3
-          AND r.category_id = ANY($4)
+          ON rr.request_id = r.id AND rr.master_id = rd.master_id
+        WHERE rd.master_id = $1
           AND (
-            (r.location_type = 'client' AND $5)
-            OR (r.location_type = 'master' AND $6)
-            OR (r.location_type = 'any' AND ($5 OR $6))
+            (rd.status = 'sent' AND rd.expires_at > NOW())
+            OR rr.id IS NOT NULL
           )
+          AND (r.status = 'open' OR rr.id IS NOT NULL)
+          AND r.user_id <> $1
         ORDER BY r.created_at DESC
         LIMIT 50
       `,
-      [normalizedUserId, cityId, districtId, categories, worksAtClient, worksAtMaster]
+      [normalizedUserId]
     )
 
     const payload = result.rows.map((row) => {
@@ -2425,7 +2791,24 @@ app.get('/api/requests', async (req, res) => {
             SELECT COUNT(*)
             FROM request_responses rr
             WHERE rr.request_id = r.id
-          )::int AS "responsesCount"
+          )::int AS "responsesCount",
+          (
+            SELECT COUNT(*)
+            FROM request_dispatches rd
+            WHERE rd.request_id = r.id
+          )::int AS "dispatchedCount",
+          (
+            SELECT COALESCE(MAX(rd.batch), 0)
+            FROM request_dispatches rd
+            WHERE rd.request_id = r.id
+          )::int AS "dispatchBatch",
+          (
+            SELECT MAX(rd.expires_at)
+            FROM request_dispatches rd
+            WHERE rd.request_id = r.id
+              AND rd.status = 'sent'
+              AND rd.expires_at > NOW()
+          ) AS "dispatchExpiresAt"
         FROM service_requests r
         LEFT JOIN cities c ON c.id = r.city_id
         LEFT JOIN districts d ON d.id = r.district_id
@@ -2648,6 +3031,53 @@ app.post('/api/requests/:id/responses', async (req, res) => {
       return
     }
 
+    const responseCheck = await pool.query(
+      `
+        SELECT id, status
+        FROM request_responses
+        WHERE request_id = $1
+          AND master_id = $2
+      `,
+      [requestId, normalizedUserId]
+    )
+    const existingResponse = responseCheck.rows[0] ?? null
+
+    const dispatchCheck = await pool.query(
+      `
+        SELECT status, expires_at AS "expiresAt"
+        FROM request_dispatches
+        WHERE request_id = $1
+          AND master_id = $2
+      `,
+      [requestId, normalizedUserId]
+    )
+    const dispatch = dispatchCheck.rows[0] ?? null
+
+    if (!dispatch && !existingResponse) {
+      res.status(403).json({ error: 'not_assigned' })
+      return
+    }
+
+    if (existingResponse && existingResponse.status !== 'sent') {
+      res.status(409).json({ error: 'response_locked' })
+      return
+    }
+
+    if (!existingResponse) {
+      if (!dispatch || dispatch.status !== 'sent') {
+        res.status(409).json({ error: 'response_window_closed' })
+        return
+      }
+
+      const expiresAtMs = dispatch.expiresAt
+        ? new Date(dispatch.expiresAt).getTime()
+        : null
+      if (!expiresAtMs || Number.isNaN(expiresAtMs) || expiresAtMs <= Date.now()) {
+        res.status(409).json({ error: 'response_window_closed' })
+        return
+      }
+    }
+
     await ensureUser(normalizedUserId)
 
     const result = await pool.query(
@@ -2678,9 +3108,170 @@ app.post('/api/requests/:id/responses', async (req, res) => {
       ]
     )
 
+    await pool.query(
+      `
+        UPDATE request_dispatches
+        SET status = 'responded',
+            responded_at = NOW(),
+            updated_at = NOW()
+        WHERE request_id = $1
+          AND master_id = $2
+      `,
+      [requestId, normalizedUserId]
+    )
+
     res.json({ ok: true, id: result.rows[0]?.id, createdAt: result.rows[0]?.createdAt })
   } catch (error) {
     console.error('POST /api/requests/:id/responses failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
+  const requestId = Number(req.params.id)
+  const responseId = Number(req.params.responseId)
+
+  if (!Number.isInteger(requestId) || !Number.isInteger(responseId)) {
+    res.status(400).json({ error: 'requestId_invalid' })
+    return
+  }
+
+  const { userId, action } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedAction = normalizeText(action)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!['accept', 'reject'].includes(normalizedAction)) {
+    res.status(400).json({ error: 'action_invalid' })
+    return
+  }
+
+  try {
+    const requestResult = await pool.query(
+      `
+        SELECT
+          user_id AS "userId",
+          status
+        FROM service_requests
+        WHERE id = $1
+      `,
+      [requestId]
+    )
+
+    if (requestResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const request = requestResult.rows[0]
+    if (request.userId !== normalizedUserId) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    if (request.status !== 'open') {
+      res.status(409).json({ error: 'request_closed' })
+      return
+    }
+
+    const responseResult = await pool.query(
+      `
+        SELECT
+          id,
+          status
+        FROM request_responses
+        WHERE id = $1
+          AND request_id = $2
+      `,
+      [responseId, requestId]
+    )
+
+    if (responseResult.rows.length === 0) {
+      res.status(404).json({ error: 'response_not_found' })
+      return
+    }
+
+    const response = responseResult.rows[0]
+
+    if (normalizedAction === 'accept') {
+      if (response.status === 'rejected') {
+        res.status(409).json({ error: 'response_rejected' })
+        return
+      }
+
+      if (response.status !== 'accepted') {
+        await pool.query(
+          `
+            UPDATE request_responses
+            SET status = 'accepted',
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [responseId]
+        )
+
+        await pool.query(
+          `
+            UPDATE request_responses
+            SET status = 'rejected',
+                updated_at = NOW()
+            WHERE request_id = $1
+              AND id <> $2
+              AND status = 'sent'
+          `,
+          [requestId, responseId]
+        )
+
+        await pool.query(
+          `
+            UPDATE service_requests
+            SET status = 'closed',
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [requestId]
+        )
+
+        await pool.query(
+          `
+            UPDATE request_dispatches
+            SET status = 'expired',
+                updated_at = NOW()
+            WHERE request_id = $1
+              AND status = 'sent'
+          `,
+          [requestId]
+        )
+      }
+
+      res.json({ ok: true, status: 'accepted', requestStatus: 'closed' })
+      return
+    }
+
+    if (response.status === 'accepted') {
+      res.status(409).json({ error: 'response_accepted' })
+      return
+    }
+
+    if (response.status !== 'rejected') {
+      await pool.query(
+        `
+          UPDATE request_responses
+          SET status = 'rejected',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [responseId]
+      )
+    }
+
+    res.json({ ok: true, status: 'rejected' })
+  } catch (error) {
+    console.error('PATCH /api/requests/:id/responses/:responseId failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -2811,7 +3402,38 @@ app.post('/api/requests', async (req, res) => {
       ]
     )
 
-    res.json({ ok: true, id: result.rows[0]?.id, createdAt: result.rows[0]?.createdAt })
+    const requestId = result.rows[0]?.id
+    let dispatchInfo = { dispatched: 0, expiresAt: null }
+
+    if (requestId) {
+      try {
+        dispatchInfo = await dispatchRequestBatch(
+          {
+            id: requestId,
+            userId: normalizedUserId,
+            cityId: parsedCityId,
+            districtId: parsedDistrictId,
+            categoryId: normalizedCategoryId,
+            locationType: normalizedLocationType,
+            dateOption: normalizedDateOption,
+            dateTime: parsedDateTime,
+            status: 'open',
+          },
+          REQUEST_INITIAL_BATCH_SIZE,
+          1
+        )
+      } catch (dispatchError) {
+        console.error('Initial request dispatch failed:', dispatchError)
+      }
+    }
+
+    res.json({
+      ok: true,
+      id: requestId,
+      createdAt: result.rows[0]?.createdAt,
+      dispatchedCount: dispatchInfo.dispatched,
+      dispatchExpiresAt: dispatchInfo.expiresAt,
+    })
   } catch (error) {
     console.error('POST /api/requests failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -2825,6 +3447,10 @@ const start = async () => {
   app.listen(port, () => {
     console.log(`API listening on :${port}`)
   })
+  void runRequestDispatchCycle()
+  setInterval(() => {
+    void runRequestDispatchCycle()
+  }, REQUEST_DISPATCH_SCAN_INTERVAL_MS)
 }
 
 start().catch((error) => {

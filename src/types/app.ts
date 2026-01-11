@@ -97,6 +97,11 @@ export type ServiceRequest = {
   createdAt: string
   responsesCount?: number
   distanceKm?: number | null
+  dispatchedCount?: number | null
+  dispatchBatch?: number | null
+  dispatchExpiresAt?: string | null
+  dispatchStatus?: string | null
+  dispatchSentAt?: string | null
 }
 
 export type BookingStatus =

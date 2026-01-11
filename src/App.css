@@ -802,6 +802,12 @@
   color: #7f7386;
 }
 
+.request-item-meta--hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9a8ca5;
+}
+
 .request-status {
   border-radius: 999px;
   padding: 4px 10px;
@@ -814,6 +820,21 @@
 .request-status.is-open {
   color: #4f3c75;
   background: rgba(212, 196, 240, 0.9);
+}
+
+.request-status.is-closed {
+  color: #7b6c84;
+  background: rgba(228, 222, 233, 0.9);
+}
+
+.request-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.request-tags .request-chip {
+  cursor: default;
 }
 
 .booking-list {
@@ -7393,6 +7414,36 @@
   color: #8a7d97;
 }
 
+.response-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.response-action {
+  border: 1px solid rgba(120, 103, 140, 0.2);
+  background: #ffffff;
+  color: #5e5167;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.response-action.is-primary {
+  background: linear-gradient(135deg, #6f58e8 0%, #5c3fcc 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 12px rgba(92, 63, 204, 0.25);
+}
+
+.response-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .response-status,
 .response-error {
   margin: 0;
@@ -7404,6 +7455,16 @@
 .response-error {
   color: #b44b4b;
   font-weight: 700;
+}
+
+.response-card.is-accepted {
+  border-color: rgba(79, 156, 104, 0.35);
+  background: rgba(240, 252, 245, 0.9);
+}
+
+.response-card.is-rejected {
+  border-color: rgba(176, 91, 91, 0.25);
+  background: rgba(255, 246, 246, 0.95);
 }
 
 .pro-request-item {

@@ -68,6 +68,19 @@ const formatDistance = (value?: number | null) => {
   return `${value.toFixed(1).replace('.', ',')} км`
 }
 
+const formatTimeLeft = (value?: string | null) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const diffMs = parsed.getTime() - Date.now()
+  if (diffMs <= 0) return ''
+  const minutesTotal = Math.ceil(diffMs / 60000)
+  const hours = Math.floor(minutesTotal / 60)
+  const minutes = minutesTotal % 60
+  if (hours <= 0) return `${minutesTotal} мин`
+  return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
+}
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'К'
@@ -83,6 +96,7 @@ type ProRequest = ServiceRequest & {
   responseStatus?: string | null
   responsePrice?: number | null
   responseComment?: string | null
+  responseProposedTime?: string | null
   responseCreatedAt?: string | null
 }
 
@@ -166,7 +180,7 @@ export const ProRequestsScreen = ({
                     ? String(item.responsePrice)
                     : '',
                 comment: item.responseComment ?? '',
-                proposedTime: '',
+                proposedTime: item.responseProposedTime ?? '',
               }
             }
           })
@@ -414,6 +428,14 @@ export const ProRequestsScreen = ({
         }
       )
 
+      if (response.status === 403) {
+        setSubmitError((current) => ({
+          ...current,
+          [requestId]: 'Эта заявка больше недоступна.',
+        }))
+        return
+      }
+
       if (response.status === 409) {
         const data = (await response.json().catch(() => null)) as
           | { error?: string; missingFields?: string[] }
@@ -426,6 +448,30 @@ export const ProRequestsScreen = ({
           }))
           return
         }
+        if (data?.error === 'response_window_closed') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Окно отклика истекло.',
+          }))
+          return
+        }
+
+        if (data?.error === 'response_locked') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Отклик уже принят или отклонен.',
+          }))
+          return
+        }
+
+        if (data?.error === 'request_closed') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Заявка уже закрыта клиентом.',
+          }))
+          return
+        }
+
         setSubmitError((current) => ({
           ...current,
           [requestId]: 'Заполните минимум профиля, чтобы откликаться.',
@@ -453,6 +499,7 @@ export const ProRequestsScreen = ({
                 responseStatus: 'sent',
                 responsePrice: hasPrice ? Number(priceValue) : null,
                 responseComment: draft.comment.trim() || null,
+                responseProposedTime: draft.proposedTime.trim() || null,
               }
             : item
         )
@@ -567,24 +614,47 @@ export const ProRequestsScreen = ({
                     item.dateOption === 'choose'
                       ? formatDateTime(item.dateTime) || 'По договоренности'
                       : dateLabelMap[item.dateOption]
+                  const statusLabel = item.status === 'open' ? 'Открыта' : 'Закрыта'
+                  const tagItems = Array.isArray(item.tags) ? item.tags : []
+                  const photoItems = Array.isArray(item.photoUrls)
+                    ? item.photoUrls
+                    : []
                   const responseStatusLabel = item.responseStatus
                     ? responseStatusLabelMap[
                         item.responseStatus as keyof typeof responseStatusLabelMap
                       ] ?? item.responseStatus
                     : ''
+                  const dispatchTimeLeft = formatTimeLeft(item.dispatchExpiresAt)
+                  const dispatchBatchLabel = item.dispatchBatch
+                    ? `Волна ${item.dispatchBatch}`
+                    : ''
+                  const isFinalResponse = ['accepted', 'rejected', 'expired'].includes(
+                    item.responseStatus ?? ''
+                  )
                   const draft = drafts[item.id] ?? {
                     price: '',
                     comment: '',
                     proposedTime: '',
                   }
                   const isSubmitting = submittingId === item.id
-                  const canRespond = missingFields.length === 0 && isActive
+                  const canRespond =
+                    missingFields.length === 0 &&
+                    isActive &&
+                    item.status === 'open' &&
+                    !isFinalResponse &&
+                    (item.responseStatus === 'sent' || Boolean(dispatchTimeLeft))
 
                   return (
                     <div className="pro-request-item" key={item.id}>
                       <div className="request-item-top">
                         <div className="request-item-title">{item.serviceName}</div>
-                        <span className="request-status is-open">Открыта</span>
+                        <span
+                          className={`request-status${
+                            item.status === 'open' ? ' is-open' : ' is-closed'
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
                       </div>
                       <div className="request-item-meta">
                         {categoryLabel}
@@ -597,6 +667,33 @@ export const ProRequestsScreen = ({
                         {distanceLabel ? ` • ${distanceLabel}` : ''}
                       </div>
                       <div className="request-item-meta">{dateLabel}</div>
+                      {item.status === 'open' &&
+                        !item.responseStatus &&
+                        (dispatchTimeLeft || dispatchBatchLabel) && (
+                          <div className="request-item-meta request-item-meta--hint">
+                            {dispatchBatchLabel}
+                            {dispatchBatchLabel && dispatchTimeLeft ? ' • ' : ''}
+                            {dispatchTimeLeft
+                              ? `Осталось ${dispatchTimeLeft} на отклик`
+                              : 'Окно отклика истекло'}
+                          </div>
+                        )}
+                      {item.locationType === 'client' && item.address && (
+                        <div className="request-item-meta">Адрес: {item.address}</div>
+                      )}
+                      {tagItems.length > 0 && (
+                        <div className="request-tags" role="list">
+                          {tagItems.map((tag) => (
+                            <span
+                              className="request-chip is-active"
+                              key={`${item.id}-${tag}`}
+                              role="listitem"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {responseStatusLabel && (
                         <div className="request-item-meta">
                           Ваш отклик: {responseStatusLabel}
@@ -604,6 +701,19 @@ export const ProRequestsScreen = ({
                       )}
                       {item.details && (
                         <div className="request-item-details">{item.details}</div>
+                      )}
+                      {photoItems.length > 0 && (
+                        <div className="booking-photo-strip" role="list">
+                          {photoItems.map((url, index) => (
+                            <span
+                              className="booking-photo-thumb"
+                              key={`${item.id}-photo-${index}`}
+                              role="listitem"
+                            >
+                              <img src={url} alt="" loading="lazy" />
+                            </span>
+                          ))}
+                        </div>
                       )}
 
                       <div className="pro-response-form">
