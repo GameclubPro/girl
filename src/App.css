@@ -4372,11 +4372,11 @@
 }
 
 .pro-profile-portfolio-panel-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
+  flex-wrap: nowrap;
 }
 
 #pro-profile-portfolio-content,
@@ -4388,9 +4388,7 @@
 
 .pro-profile-portfolio-panel-left {
   display: inline-flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
   min-width: 0;
 }
 
@@ -4403,7 +4401,7 @@
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(32, 25, 20, 0.12);
   box-shadow: none;
-  justify-self: center;
+  white-space: nowrap;
 }
 
 .pro-profile-portfolio-panel-nav {
@@ -4415,6 +4413,7 @@
   border: 1px solid rgba(32, 25, 20, 0.12);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 8px 14px rgba(16, 12, 11, 0.08);
+  white-space: nowrap;
 }
 
 .pro-profile-portfolio-panel-tab {
@@ -4458,7 +4457,7 @@
   text-transform: uppercase;
   appearance: none;
   font-family: inherit;
-  justify-self: end;
+  margin-left: auto;
 }
 
 .pro-profile-portfolio-panel-action.is-primary {
