@@ -321,19 +321,7 @@ function App() {
     webApp.expand()
     webApp.requestFullscreen?.()
     webApp.disableVerticalSwipes?.()
-    const isPro =
-      view === 'pro-cabinet' || view === 'pro-profile' || view === 'pro-requests'
-    const isClient =
-      view === 'client' ||
-      view === 'client-showcase' ||
-      view === 'client-gallery' ||
-      view === 'client-gallery-detail' ||
-      view === 'client-master-profile' ||
-      view === 'booking' ||
-      view === 'request' ||
-      view === 'requests' ||
-      isPro
-    const themeColor = isPro ? '#fff3e8' : isClient ? '#f3edf7' : '#f7f2ef'
+    const themeColor = '#ffffff'
     webApp.setHeaderColor?.(themeColor)
     webApp.setBackgroundColor?.(themeColor)
   }, [view])
