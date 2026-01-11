@@ -307,15 +307,19 @@ export const ClientRequestsScreen = ({
 
       setResponsesByRequestId((current) => {
         const items = current[requestId] ?? []
-        const next = items.map((item) => {
+        const acceptedStatus: RequestResponse['status'] = 'accepted'
+        const rejectedStatus: RequestResponse['status'] = 'rejected'
+        const nextStatus: RequestResponse['status'] =
+          action === 'accept' ? acceptedStatus : rejectedStatus
+        const next = items.map((item): RequestResponse => {
           if (item.id === responseId) {
             return {
               ...item,
-              status: action === 'accept' ? 'accepted' : 'rejected',
+              status: nextStatus,
             }
           }
           if (action === 'accept' && item.status === 'sent') {
-            return { ...item, status: 'rejected' }
+            return { ...item, status: rejectedStatus }
           }
           return item
         })
