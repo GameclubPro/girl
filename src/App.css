@@ -4113,8 +4113,7 @@
   opacity: 0.2;
 }
 
-.pro-shell--ig .pro-profile-portfolio-panel-nav,
-.pro-shell--ig .pro-profile-portfolio-panel-kicker {
+.pro-shell--ig .pro-profile-portfolio-panel-nav {
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(32, 25, 20, 0.1);
 }
@@ -4139,7 +4138,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 6px;
+  gap: 4px;
 }
 
 .pro-shell--ig .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {
@@ -4302,7 +4301,6 @@
 }
 
 .pro-shell--hybrid .pro-profile-portfolio-panel-nav,
-.pro-shell--hybrid .pro-profile-portfolio-panel-kicker,
 .pro-shell--hybrid .pro-profile-portfolio-panel-count,
 .pro-shell--hybrid .pro-profile-reviews-count-pill {
   background: rgba(255, 255, 255, 0.96);
@@ -4367,20 +4365,6 @@
   gap: 10px;
   position: relative;
   z-index: 1;
-}
-
-.pro-profile-portfolio-panel-kicker {
-  margin: 0;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(32, 25, 20, 0.1);
-  background: rgba(255, 255, 255, 0.9);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--pro-muted);
-  white-space: nowrap;
 }
 
 .pro-profile-portfolio-panel-controls {
@@ -4540,7 +4524,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  gap: 6px;
+  gap: 4px;
 }
 
 .pro-profile-portfolio-grid.is-collapsed::-webkit-scrollbar {

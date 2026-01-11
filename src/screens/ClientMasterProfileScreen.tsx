@@ -559,11 +559,7 @@ export const ClientMasterProfileScreen = ({
             <section className="pro-profile-portfolio-panel animate delay-2">
               <div className="pro-profile-portfolio-panel-head">
                 <div className="pro-profile-portfolio-panel-controls">
-                  <div className="pro-profile-portfolio-panel-left">
-                    <p className="pro-profile-portfolio-panel-kicker">
-                      Портфолио
-                    </p>
-                  </div>
+                  <div className="pro-profile-portfolio-panel-left" />
                   <span className="pro-profile-portfolio-panel-count">
                     {portfolioCountLabel}
                   </span>

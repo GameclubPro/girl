@@ -415,7 +415,6 @@ export const ProProfileScreen = ({
   const showcaseCount = showcaseItems.length
   const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
   const showcaseCountLabel = `${showcaseCount} из ${MAX_SHOWCASE_ITEMS}`
-  const portfolioPanelKicker = portfolioView === 'portfolio' ? 'Портфолио' : 'Витрина'
   const portfolioPanelCountLabel =
     portfolioView === 'portfolio' ? portfolioCountLabel : showcaseCountLabel
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
@@ -2228,9 +2227,6 @@ export const ProProfileScreen = ({
           <div className="pro-profile-portfolio-panel-head">
             <div className="pro-profile-portfolio-panel-controls">
               <div className="pro-profile-portfolio-panel-left">
-                <p className="pro-profile-portfolio-panel-kicker">
-                  {portfolioPanelKicker}
-                </p>
                 <div
                   className="pro-profile-portfolio-panel-nav"
                   role="tablist"
