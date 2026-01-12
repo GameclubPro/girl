@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   IconClock,
   IconHome,
@@ -35,6 +35,8 @@ const scheduleLabels: Record<string, string> = {
   sat: 'Сб',
   sun: 'Вс',
 }
+
+const scheduleOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 const getCategoryLabel = (categoryId: string) =>
   categoryItems.find((item) => item.id === categoryId)?.label ?? categoryId
@@ -102,6 +104,17 @@ const buildScheduleRange = (start?: string | null, end?: string | null) => {
   if (normalizedStart) return `с ${normalizedStart}`
   if (normalizedEnd) return `до ${normalizedEnd}`
   return 'Время не указано'
+}
+
+const parseTimeToMinutes = (value?: string | null) => {
+  const normalized = typeof value === 'string' ? value.trim() : ''
+  if (!normalized) return null
+  const [hoursRaw, minutesRaw] = normalized.split(':')
+  const hours = Number(hoursRaw)
+  const minutes = Number(minutesRaw)
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  return hours * 60 + minutes
 }
 
 const buildScheduleLabel = (days: string[]) =>
@@ -183,6 +196,7 @@ export const ClientMasterProfileScreen = ({
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
     number | null
   >(null)
+  const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false)
 
   useEffect(() => {
     if (!masterId) return
@@ -267,6 +281,7 @@ export const ClientMasterProfileScreen = ({
   useEffect(() => {
     setIsPortfolioExpanded(false)
     setPortfolioLightboxIndex(null)
+    setIsScheduleInfoOpen(false)
   }, [masterId])
 
   const serviceItems = useMemo(
@@ -351,11 +366,41 @@ export const ClientMasterProfileScreen = ({
     },
   ]
   const scheduleDays = Array.isArray(profile?.scheduleDays) ? profile?.scheduleDays : []
-  const scheduleLabel = buildScheduleLabel(scheduleDays)
+  const scheduleDayKeys = useMemo(
+    () =>
+      scheduleDays
+        .map((day) => day.trim().toLowerCase())
+        .filter((day) => Boolean(day)),
+    [scheduleDays]
+  )
+  const scheduleDaySet = useMemo(() => new Set(scheduleDayKeys), [scheduleDayKeys])
+  const scheduleWeek = useMemo(
+    () =>
+      scheduleOrder.map((day) => ({
+        id: day,
+        label: scheduleLabels[day] ?? day,
+        isActive: scheduleDaySet.has(day),
+      })),
+    [scheduleDaySet]
+  )
+  const scheduleLabel = buildScheduleLabel(scheduleDayKeys)
   const scheduleRange = buildScheduleRange(
     profile?.scheduleStart,
     profile?.scheduleEnd
   )
+  const scheduleStartMinutes = parseTimeToMinutes(profile?.scheduleStart)
+  const scheduleEndMinutes = parseTimeToMinutes(profile?.scheduleEnd)
+  const hasScheduleTimebar =
+    scheduleStartMinutes !== null &&
+    scheduleEndMinutes !== null &&
+    scheduleEndMinutes > scheduleStartMinutes
+  const scheduleTimeStyle = hasScheduleTimebar
+    ? ({
+        '--schedule-start': `${(scheduleStartMinutes / 1440) * 100}%`,
+        '--schedule-width': `${((scheduleEndMinutes - scheduleStartMinutes) / 1440) * 100}%`,
+      } as CSSProperties)
+    : undefined
+  const hasScheduleRange = scheduleRange !== 'Время не указано'
   const scheduleMeta =
     scheduleDays.length > 0 && scheduleRange !== 'Время не указано'
       ? `${scheduleLabel} · ${scheduleRange}`
@@ -624,6 +669,83 @@ export const ClientMasterProfileScreen = ({
                     У мастера пока нет работ.
                   </div>
                 )}
+              </div>
+            </section>
+
+            <section className="pro-profile-schedule-panel animate delay-2">
+              <div className="pro-profile-schedule-head">
+                <div>
+                  <h3 className="pro-profile-schedule-title">График работы</h3>
+                  <p className="pro-profile-schedule-subtitle">
+                    {scheduleDays.length > 0 ? 'Дни приема' : 'График не указан'}
+                  </p>
+                </div>
+                <div className="pro-profile-schedule-info-wrap">
+                  <button
+                    className="pro-profile-schedule-info"
+                    type="button"
+                    aria-label="Показать график"
+                    aria-expanded={isScheduleInfoOpen}
+                    aria-controls="pro-profile-schedule-popover"
+                    onClick={() => setIsScheduleInfoOpen((current) => !current)}
+                  >
+                    i
+                  </button>
+                  {isScheduleInfoOpen && (
+                    <div
+                      className="pro-profile-schedule-popover"
+                      id="pro-profile-schedule-popover"
+                      role="tooltip"
+                    >
+                      <p className="pro-profile-schedule-popover-title">
+                        Расписание
+                      </p>
+                      <p className="pro-profile-schedule-popover-meta">
+                        {scheduleLabel}
+                      </p>
+                      <p
+                        className={`pro-profile-schedule-popover-time${
+                          hasScheduleRange ? '' : ' is-muted'
+                        }`}
+                      >
+                        {scheduleRange}
+                      </p>
+                      <div
+                        className={`pro-profile-schedule-timebar${
+                          hasScheduleTimebar ? '' : ' is-muted'
+                        }`}
+                        style={scheduleTimeStyle}
+                      />
+                      <div className="pro-profile-schedule-timebar-scale">
+                        <span>0:00</span>
+                        <span>24:00</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="pro-profile-schedule-week" role="list">
+                {scheduleWeek.map((day) => (
+                  <span
+                    className={`pro-profile-schedule-day${
+                      day.isActive ? ' is-active' : ''
+                    }`}
+                    key={day.id}
+                    role="listitem"
+                  >
+                    {day.label}
+                  </span>
+                ))}
+              </div>
+              <div className="pro-profile-schedule-range">
+                <span className="pro-profile-schedule-range-label">Время</span>
+                <span
+                  className={`pro-profile-schedule-range-value${
+                    hasScheduleRange ? '' : ' is-muted'
+                  }`}
+                >
+                  {scheduleRange}
+                </span>
               </div>
             </section>
 
