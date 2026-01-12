@@ -1401,7 +1401,7 @@
 }
 
 .pro-cabinet-calendar-day.is-today .pro-cabinet-calendar-day-number {
-  color: var(--pro-accent);
+  color: var(--accent-strong);
 }
 
 .pro-cabinet-calendar-day-name {
@@ -1445,9 +1445,9 @@
 }
 
 .pro-cabinet-calendar-day-dot.is-request {
-  background: rgba(11, 11, 11, 0.2);
-  color: var(--pro-accent-2);
-  border-color: rgba(11, 11, 11, 0.4);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .pro-cabinet-calendar-summary {
@@ -1477,8 +1477,9 @@
 }
 
 .pro-cabinet-calendar-summary-pill.is-request {
-  border-color: rgba(11, 11, 11, 0.35);
-  color: var(--pro-accent-2);
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
 }
 
 .pro-cabinet-calendar-summary-date {
@@ -1569,8 +1570,8 @@
 }
 
 .pro-cabinet-calendar-item-dot.is-request {
-  background: var(--pro-accent-2);
-  box-shadow: 0 0 0 6px rgba(11, 11, 11, 0.14);
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 6px var(--accent-soft);
 }
 
 .pro-cabinet-calendar-item-body {
@@ -2206,9 +2207,9 @@
 }
 
 .pro-status-chip.is-active {
-  background: rgba(11, 11, 11, 0.18);
-  color: #4a4a4a;
-  border-color: rgba(11, 11, 11, 0.45);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .pro-status-chip.is-paused {
@@ -3975,9 +3976,9 @@
 }
 
 .pro-profile-social-status.is-active {
-  background: rgba(11, 11, 11, 0.18);
-  color: #4a4a4a;
-  border-color: rgba(11, 11, 11, 0.45);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .pro-profile-social-status.is-paused {
@@ -4295,7 +4296,7 @@
   bottom: 10px;
   width: 3px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 155, 99, 0.95), rgba(11, 11, 11, 0.85));
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent-soft));
   pointer-events: none;
   z-index: 0;
 }
@@ -4335,18 +4336,18 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: rgba(11, 11, 11, 0.9);
-  box-shadow: 0 0 0 3px rgba(11, 11, 11, 0.2);
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .pro-profile-status-tag {
   font-size: 9px;
   font-weight: 700;
-  color: var(--pro-muted);
+  color: var(--accent-strong);
   padding: 4px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--accent-strong);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -4437,9 +4438,9 @@
 }
 
 .pro-profile-fact-icon.is-price {
-  background: rgba(11, 11, 11, 0.16);
-  border-color: rgba(11, 11, 11, 0.35);
-  color: var(--ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
 }
 
 .pro-profile-fact-icon.is-experience {
@@ -4514,9 +4515,9 @@
 }
 
 .pro-profile-ig-status.is-active {
-  background: rgba(11, 11, 11, 0.18);
-  color: #4a4a4a;
-  border-color: rgba(11, 11, 11, 0.45);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .pro-profile-ig-status.is-paused {
@@ -4993,7 +4994,7 @@
   padding: 7px 12px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--pro-accent);
+  color: var(--accent-strong);
   cursor: pointer;
   box-shadow:
     0 10px 18px rgba(11, 11, 11, 0.12),
@@ -5008,8 +5009,8 @@
 }
 
 .pro-profile-portfolio-panel-action.is-primary {
-  border: 1.5px solid var(--pro-accent);
-  color: var(--pro-accent);
+  border: 1.5px solid var(--accent-strong);
+  color: var(--accent-strong);
   background: transparent;
   box-shadow: none;
 }
@@ -5229,14 +5230,14 @@
   width: 22px;
   height: 22px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--accent-strong);
   background: rgba(255, 255, 255, 0.9);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  color: var(--pro-ink);
-  box-shadow: 0 8px 12px rgba(11, 16, 32, 0.12);
+  color: var(--accent-strong);
+  box-shadow: 0 8px 12px var(--accent-soft);
 }
 
 .pro-profile-portfolio-add-label {
@@ -6001,7 +6002,7 @@
 .pro-profile-reviews-stars {
   font-size: 12px;
   letter-spacing: 1px;
-  color: var(--pro-accent);
+  color: var(--accent-strong);
 }
 
 .pro-profile-reviews-count {
@@ -6035,7 +6036,7 @@
 .pro-profile-reviews-bar-fill {
   height: 100%;
   display: block;
-  background: linear-gradient(135deg, var(--pro-accent) 0%, var(--pro-accent-2) 100%);
+  background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
 }
 
 .pro-profile-reviews-list {
@@ -7322,9 +7323,9 @@
 }
 
 .screen--pro-requests .request-status.is-open {
-  border-color: rgba(11, 11, 11, 0.35);
-  background: rgba(11, 11, 11, 0.18);
-  color: var(--ink);
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .screen--pro-requests .requests-tabs {
@@ -7339,8 +7340,8 @@
 
 .screen--pro-requests .requests-tab.is-active {
   background: transparent;
-  border: 1.5px solid var(--pro-accent);
-  color: var(--pro-accent);
+  border: 1.5px solid var(--accent-strong);
+  color: var(--accent-strong);
   box-shadow: none;
 }
 
@@ -7391,8 +7392,8 @@
 
 .screen--pro-requests .booking-action.is-primary {
   background: transparent;
-  border: 1.5px solid var(--pro-accent);
-  color: var(--pro-accent);
+  border: 1.5px solid var(--accent-strong);
+  color: var(--accent-strong);
   box-shadow: none;
 }
 
