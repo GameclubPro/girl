@@ -856,6 +856,8 @@ function App() {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           setView('request')
         }}
+        onViewHome={() => setView('client')}
+        onViewMasters={() => setView('client-showcase')}
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)
           setView('client-master-profile')

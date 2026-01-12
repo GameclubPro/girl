@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { Booking, RequestResponse, ServiceRequest } from '../types/app'
 
@@ -115,6 +116,8 @@ type ClientRequestsScreenProps = {
   apiBase: string
   userId: string
   onCreateRequest: () => void
+  onViewHome: () => void
+  onViewMasters: () => void
   onViewProfile: (masterId: string) => void
 }
 
@@ -122,6 +125,8 @@ export const ClientRequestsScreen = ({
   apiBase,
   userId,
   onCreateRequest,
+  onViewHome,
+  onViewMasters,
   onViewProfile,
 }: ClientRequestsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
@@ -383,7 +388,7 @@ export const ClientRequestsScreen = ({
     <div className="screen screen--requests">
       <div className="requests-shell">
         <header className="requests-header animate delay-1">
-          <div className="request-headings">
+          <div className="request-heading-block">
             <h1 className="request-title">Мои заявки и записи</h1>
             <p className="request-subtitle">История заявок и записей</p>
           </div>
@@ -884,6 +889,33 @@ export const ClientRequestsScreen = ({
           )}
         </section>
       </div>
+
+      <nav className="bottom-nav" aria-label="Навигация">
+        <button className="nav-item" type="button" onClick={onViewHome}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconHome />
+          </span>
+          Главная
+        </button>
+        <button className="nav-item" type="button" onClick={onViewMasters}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconUsers />
+          </span>
+          Мастера
+        </button>
+        <button className="nav-item is-active" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconList />
+          </span>
+          Мои заявки
+        </button>
+        <button className="nav-item" type="button">
+          <span className="nav-icon" aria-hidden="true">
+            <IconUser />
+          </span>
+          Профиль
+        </button>
+      </nav>
     </div>
   )
 }

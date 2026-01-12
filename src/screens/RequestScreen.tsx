@@ -295,7 +295,7 @@ export const RequestScreen = ({
     <div className="screen screen--request">
       <div className="request-shell">
         <header className="request-header animate delay-1">
-          <div className="request-headings">
+          <div className="request-heading-block">
             <h1 className="request-title">Создать заявку</h1>
             <p className="request-subtitle">Услуга • где • когда • детали</p>
           </div>

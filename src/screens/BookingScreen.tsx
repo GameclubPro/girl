@@ -733,7 +733,7 @@ export const BookingScreen = ({
           <button className="request-back" type="button" onClick={onBack}>
             ←
           </button>
-          <div className="request-headings">
+          <div className="request-heading-block">
             <h1 className="request-title">Запись к мастеру</h1>
             <p className="request-subtitle">Услуга • место • время</p>
           </div>
