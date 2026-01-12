@@ -1355,8 +1355,10 @@
 }
 
 .screen--requests .booking-item-head {
-  flex-wrap: wrap;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
 }
 
 .booking-item-avatar {
@@ -1385,6 +1387,15 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+}
+
+.booking-item-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
 }
 
 .booking-item-master {
@@ -1417,6 +1428,13 @@
   max-width: 100%;
   flex-basis: 100%;
   align-self: flex-start;
+}
+
+.screen--requests .booking-item-actions .booking-status {
+  text-align: right;
+  max-width: 45vw;
+  flex-basis: auto;
+  align-self: flex-end;
 }
 
 .booking-status.is-waiting {
@@ -1498,6 +1516,10 @@
   align-items: center;
 }
 
+.booking-action-row--top {
+  justify-content: flex-end;
+}
+
 .booking-action-icon {
   border: 1px solid rgba(var(--shadow-rgb), 0.18);
   background: #ffffff;
@@ -1523,6 +1545,21 @@
 .booking-action-icon svg {
   width: 100%;
   height: 100%;
+}
+
+.booking-item-actions .booking-action-icon {
+  font-size: 11px;
+  padding: 4px 8px;
+  min-height: 30px;
+}
+
+.booking-item-actions .booking-action-icon-symbol {
+  width: 14px;
+  height: 14px;
+}
+
+.booking-item-actions .booking-action-note {
+  text-align: right;
 }
 
 .booking-action-icon:active {

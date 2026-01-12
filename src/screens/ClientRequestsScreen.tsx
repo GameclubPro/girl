@@ -1221,9 +1221,93 @@ export const ClientRequestsScreen = ({
                             {booking.serviceName}
                           </div>
                         </div>
-                        <span className={`booking-status ${statusTone}`}>
-                          {statusLabel}
-                        </span>
+                        <div className="booking-item-actions">
+                          <span className={`booking-status ${statusTone}`}>
+                            {statusLabel}
+                          </span>
+                          {actionVariant && actionVariant !== 'reviewed' && (
+                            <div className="booking-action-row booking-action-row--top">
+                              {actionVariant === 'reschedule' && (
+                                <button
+                                  className="booking-action-icon is-reschedule"
+                                  type="button"
+                                  onClick={() => onRescheduleBooking(booking)}
+                                  disabled={isActionLoading}
+                                >
+                                  <span
+                                    className="booking-action-icon-symbol"
+                                    aria-hidden="true"
+                                  >
+                                    <IconSwap />
+                                  </span>
+                                  Перенести
+                                </button>
+                              )}
+                              {actionVariant === 'cancel' && (
+                                <button
+                                  className="booking-action-icon is-cancel"
+                                  type="button"
+                                  onClick={() =>
+                                    handleBookingAction(booking.id, 'client-cancel')
+                                  }
+                                  disabled={isActionLoading}
+                                >
+                                  <span
+                                    className="booking-action-icon-symbol"
+                                    aria-hidden="true"
+                                  >
+                                    <IconClose />
+                                  </span>
+                                  Отменить
+                                </button>
+                              )}
+                              {actionVariant === 'review' && (
+                                <button
+                                  className="booking-action-icon is-review"
+                                  type="button"
+                                  onClick={() => {
+                                    setReviewOpenId((current) =>
+                                      current === booking.id ? null : booking.id
+                                    )
+                                    setReviewErrors((current) => ({
+                                      ...current,
+                                      [booking.id]: '',
+                                    }))
+                                  }}
+                                >
+                                  <span
+                                    className="booking-action-icon-symbol"
+                                    aria-hidden="true"
+                                  >
+                                    <IconStar />
+                                  </span>
+                                  Отзыв
+                                </button>
+                              )}
+                              {actionVariant === 'delete' && (
+                                <button
+                                  className="booking-action-icon is-delete"
+                                  type="button"
+                                  onClick={() =>
+                                    handleBookingAction(booking.id, 'client-delete')
+                                  }
+                                  disabled={isActionLoading}
+                                >
+                                  <span
+                                    className="booking-action-icon-symbol"
+                                    aria-hidden="true"
+                                  >
+                                    <IconClose />
+                                  </span>
+                                  Удалить
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {actionVariant === 'reviewed' && (
+                            <span className="booking-action-note">Отзыв отправлен</span>
+                          )}
+                        </div>
                       </div>
                       <div className="booking-item-meta">
                         {categoryLabel}
@@ -1254,78 +1338,6 @@ export const ClientRequestsScreen = ({
                               <img src={url} alt="" loading="lazy" />
                             </span>
                           ))}
-                        </div>
-                      )}
-                      {actionVariant && actionVariant !== 'reviewed' && (
-                        <div className="booking-action-row">
-                          {actionVariant === 'reschedule' && (
-                            <button
-                              className="booking-action-icon is-reschedule"
-                              type="button"
-                              onClick={() => onRescheduleBooking(booking)}
-                              disabled={isActionLoading}
-                            >
-                              <span className="booking-action-icon-symbol" aria-hidden="true">
-                                <IconSwap />
-                              </span>
-                              Перенести
-                            </button>
-                          )}
-                          {actionVariant === 'cancel' && (
-                            <button
-                              className="booking-action-icon is-cancel"
-                              type="button"
-                              onClick={() =>
-                                handleBookingAction(booking.id, 'client-cancel')
-                              }
-                              disabled={isActionLoading}
-                            >
-                              <span className="booking-action-icon-symbol" aria-hidden="true">
-                                <IconClose />
-                              </span>
-                              Отменить
-                            </button>
-                          )}
-                          {actionVariant === 'review' && (
-                            <button
-                              className="booking-action-icon is-review"
-                              type="button"
-                              onClick={() => {
-                                setReviewOpenId((current) =>
-                                  current === booking.id ? null : booking.id
-                                )
-                                setReviewErrors((current) => ({
-                                  ...current,
-                                  [booking.id]: '',
-                                }))
-                              }}
-                            >
-                              <span className="booking-action-icon-symbol" aria-hidden="true">
-                                <IconStar />
-                              </span>
-                              Отзыв
-                            </button>
-                          )}
-                          {actionVariant === 'delete' && (
-                            <button
-                              className="booking-action-icon is-delete"
-                              type="button"
-                              onClick={() =>
-                                handleBookingAction(booking.id, 'client-delete')
-                              }
-                              disabled={isActionLoading}
-                            >
-                              <span className="booking-action-icon-symbol" aria-hidden="true">
-                                <IconClose />
-                              </span>
-                              Удалить
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      {actionVariant === 'reviewed' && (
-                        <div className="booking-action-row">
-                          <span className="booking-action-note">Отзыв отправлен</span>
                         </div>
                       )}
                       {reviewOpenId === booking.id && (
