@@ -1250,9 +1250,9 @@
 }
 
 .requests-tab.is-active {
-  background: var(--ink);
-  color: #ffffff;
-  box-shadow: none;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.3);
 }
 
 .requests-tab:focus-visible {
@@ -2405,9 +2405,9 @@
 }
 
 .pro-cabinet-calendar-filter.is-active {
-  color: #ffffff;
-  border-color: transparent;
-  background: var(--ink);
+  color: var(--accent-strong);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.12);
   box-shadow: none;
 }
 
@@ -3318,9 +3318,9 @@
 }
 
 .pro-editor-tab.is-active {
-  background: var(--ink);
-  color: #ffffff;
-  border-color: transparent;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-strong);
+  border-color: rgba(var(--accent-rgb), 0.35);
   box-shadow: none;
 }
 
@@ -3636,10 +3636,9 @@
 }
 
 .pro-service-suggestion-action.is-active {
-  color: #ffffff;
-  background: var(--ink);
-  border-color: transparent;
-  box-shadow: none;
+  color: var(--accent-strong);
+  background: rgba(var(--accent-rgb), 0.12);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.35);
 }
 
 .pro-service-suggestion-action:focus-visible {
@@ -5491,15 +5490,15 @@
 }
 
 .pro-profile-ig-button {
-  border: none;
-  background: var(--ink);
+  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  background: rgba(var(--paper-rgb), 0.92);
   border-radius: 14px;
   padding: 9px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--ink);
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.18);
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
   appearance: none;
   font-family: inherit;
   display: inline-flex;
@@ -5534,8 +5533,8 @@
 .pro-profile-ig-button--primary {
   color: #ffffff;
   border: none;
-  background: linear-gradient(135deg, var(--ink) 0%, var(--ink) 45%, var(--surface-muted) 100%);
-  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.3);
+  background: var(--accent-strong);
+  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.22);
 }
 
 .pro-profile-ig-button:focus-visible {
@@ -5729,8 +5728,8 @@
 .pro-shell--hybrid .pro-profile-hero-actions .pro-profile-action:first-child {
   color: #ffffff;
   border: none;
-  background: linear-gradient(135deg, var(--ink) 0%, var(--ink) 45%, var(--surface-muted) 100%);
-  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.3);
+  background: var(--accent-strong);
+  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.22);
 }
 
 .pro-shell--hybrid .pro-profile-portfolio-panel,
@@ -6145,9 +6144,9 @@
 }
 
 .pro-profile-portfolio-panel-tab.is-active {
-  border-color: transparent;
-  background: var(--ink);
-  color: #ffffff;
+  border-color: rgba(var(--accent-rgb), 0.35);
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-strong);
   box-shadow: none;
 }
 
@@ -7429,9 +7428,9 @@
 }
 
 .pro-profile-editor-tab.is-active {
-  border: none;
-  color: #ffffff;
-  background: var(--ink);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  color: var(--accent-strong);
+  background: rgba(var(--accent-rgb), 0.14);
   box-shadow: none;
 }
 
@@ -7639,8 +7638,8 @@
   justify-content: center;
   color: #ffffff;
   border: none;
-  background: linear-gradient(135deg, var(--ink) 0%, var(--ink) 45%, var(--surface-muted) 100%);
-  box-shadow: 0 16px 26px rgba(var(--accent-rgb), 0.35);
+  background: var(--accent-strong);
+  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.22);
   text-shadow: 0 4px 10px rgba(var(--shadow-rgb), 0.18);
 }
 
@@ -8518,9 +8517,9 @@
 }
 
 .screen--pro-requests .requests-tab.is-active {
-  background: var(--ink);
-  border: 1.5px solid transparent;
-  color: #ffffff;
+  background: rgba(var(--accent-rgb), 0.14);
+  border: 1.5px solid rgba(var(--accent-rgb), 0.35);
+  color: var(--accent-strong);
   box-shadow: none;
 }
 

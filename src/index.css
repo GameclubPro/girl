@@ -15,10 +15,10 @@
   --surface-rgb: 255, 255, 255;
   --surface-muted: #f3f5f9;
   --surface-muted-rgb: 243, 245, 249;
-  --accent: #2d6be6;
-  --accent-rgb: 45, 107, 230;
-  --accent-strong: #1a4ea1;
-  --accent-soft: rgba(45, 107, 230, 0.16);
+  --accent: #3b6db0;
+  --accent-rgb: 59, 109, 176;
+  --accent-strong: #2b4b86;
+  --accent-soft: rgba(59, 109, 176, 0.12);
   --lavender: var(--ink);
   --sun: var(--ink);
   --sapphire: var(--accent);
