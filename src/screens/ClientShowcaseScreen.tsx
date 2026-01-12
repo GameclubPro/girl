@@ -65,16 +65,22 @@ type CategoryPalette = {
   ink: string
 }
 
+const basePalette: CategoryPalette = {
+  accent: 'var(--accent-strong)',
+  soft: 'var(--accent-soft)',
+  ink: 'var(--ink)',
+}
+
 const categoryPalettes: Record<string, CategoryPalette> = {
-  'beauty-nails': { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  'brows-lashes': { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  hair: { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  'makeup-look': { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  'cosmetology-care': { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  'massage-body': { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  'fitness-health': { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  'home-family': { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
-  default: { accent: '#0b2f6f', soft: '#f8f8f8', ink: '#0b2f6f' },
+  'beauty-nails': basePalette,
+  'brows-lashes': basePalette,
+  hair: basePalette,
+  'makeup-look': basePalette,
+  'cosmetology-care': basePalette,
+  'massage-body': basePalette,
+  'fitness-health': basePalette,
+  'home-family': basePalette,
+  default: basePalette,
 }
 
 const pickPalette = (categories: string[]) =>
