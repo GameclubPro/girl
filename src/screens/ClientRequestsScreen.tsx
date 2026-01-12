@@ -386,8 +386,7 @@ export const ClientRequestsScreen = ({
 
   return (
     <div className="screen screen--requests">
-      <div className="requests-shell">
-        <section className="requests-card animate delay-2">
+      <div className="requests-shell animate delay-2">
           <div className="requests-tabs" role="tablist" aria-label="Разделы">
             <button
               className={`requests-tab${activeTab === 'requests' ? ' is-active' : ''}`}
@@ -880,7 +879,6 @@ export const ClientRequestsScreen = ({
               </div>
             </>
           )}
-        </section>
       </div>
 
       <nav className="bottom-nav" aria-label="Навигация">
