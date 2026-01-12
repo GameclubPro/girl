@@ -29,6 +29,51 @@ export const IconHome = () => (
   </svg>
 )
 
+export const IconDashboard = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="4"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="13"
+      y="4"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="4"
+      y="13"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="13"
+      y="13"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+  </svg>
+)
+
 export const IconUsers = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <circle
@@ -63,6 +108,25 @@ export const IconList = () => (
     />
     <path
       d="M8 9h8M8 13h8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconInbox = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5 6.5h14l-1.6 9.6a2 2 0 0 1-2 1.7H8.6a2 2 0 0 1-2-1.7L5 6.5Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.2 12h5.6"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.6"

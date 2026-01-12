@@ -1,4 +1,4 @@
-import { IconHome, IconList, IconUser } from './icons'
+import { IconDashboard, IconInbox, IconUser } from './icons'
 
 type ProNavKey = 'cabinet' | 'requests' | 'profile'
 
@@ -29,9 +29,9 @@ export const ProBottomNav = ({
         aria-current={active === 'cabinet' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">
-          <IconHome />
+          <IconDashboard />
         </span>
-        Кабинет
+        <span className="pro-nav-label">Кабинет</span>
       </button>
       <button
         className={`pro-nav-item${active === 'requests' ? ' is-active' : ''}`}
@@ -40,9 +40,9 @@ export const ProBottomNav = ({
         aria-current={active === 'requests' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">
-          <IconList />
+          <IconInbox />
         </span>
-        Заявки
+        <span className="pro-nav-label">Заявки</span>
       </button>
       <button
         className={`pro-nav-item${active === 'profile' ? ' is-active' : ''}`}
@@ -53,7 +53,7 @@ export const ProBottomNav = ({
         <span className="pro-nav-icon" aria-hidden="true">
           <IconUser />
         </span>
-        Профиль
+        <span className="pro-nav-label">Профиль</span>
       </button>
     </nav>
   )
