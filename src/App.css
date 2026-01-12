@@ -1811,14 +1811,14 @@
 }
 
 .pro-cabinet-showcase-add {
-  border: 1.5px solid var(--pro-accent);
+  border: none;
   border-radius: 18px;
   padding: 14px 16px;
   font-size: 14px;
   font-weight: 700;
-  color: var(--pro-accent);
-  background: transparent;
-  box-shadow: 0 12px 18px rgba(11, 11, 11, 0.12);
+  color: #ffffff;
+  background: var(--accent-strong);
+  box-shadow: 0 12px 18px rgba(27, 185, 173, 0.24);
   cursor: pointer;
   width: 100%;
   text-align: center;
@@ -5009,10 +5009,10 @@
 }
 
 .pro-profile-portfolio-panel-action.is-primary {
-  border: 1.5px solid var(--accent-strong);
-  color: var(--accent-strong);
-  background: transparent;
-  box-shadow: none;
+  border: none;
+  color: #ffffff;
+  background: var(--accent-strong);
+  box-shadow: 0 10px 16px rgba(27, 185, 173, 0.22);
 }
 
 .pro-profile-portfolio-panel-action:active {
@@ -6485,10 +6485,10 @@
 }
 
 .pro-cabinet-pill.is-primary {
-  border: 1.5px solid var(--pro-accent);
-  color: var(--pro-accent);
-  background: transparent;
-  box-shadow: none;
+  border: none;
+  color: #ffffff;
+  background: var(--accent-strong);
+  box-shadow: 0 10px 16px rgba(27, 185, 173, 0.2);
 }
 
 .pro-cabinet-pill:focus-visible {
@@ -7242,22 +7242,22 @@
 }
 
 .pro-primary {
-  border: 1.5px solid var(--pro-accent);
+  border: none;
   border-radius: 18px;
   padding: 12px 16px;
   font-size: 15px;
   font-weight: 700;
-  color: var(--pro-accent);
-  background: transparent;
-  box-shadow: none;
+  color: #ffffff;
+  background: var(--accent-strong);
+  box-shadow: 0 12px 18px rgba(27, 185, 173, 0.24);
   cursor: pointer;
 }
 
 .pro-primary:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-  border-color: rgba(11, 11, 11, 0.3);
-  color: rgba(11, 11, 11, 0.35);
+  background: rgba(11, 11, 11, 0.12);
+  color: rgba(11, 11, 11, 0.4);
   box-shadow: none;
 }
 
@@ -11620,10 +11620,10 @@ h2 {
 .pro-profile-ig-button--primary,
 .pro-shell--hybrid .pro-profile-hero-actions .pro-profile-action:first-child,
 .pro-profile-editor-save {
-  background: transparent;
-  color: var(--accent-strong);
-  border: 1.5px solid var(--accent-strong);
-  box-shadow: none;
+  background: var(--accent-strong);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 14px 22px rgba(27, 185, 173, 0.28);
   text-shadow: none;
 }
 
@@ -11643,14 +11643,14 @@ h2 {
 .client-master-profile-status.is-active,
 .response-toggle.has-responses .response-toggle-pill,
 .pro-profile-editor-tab.is-active {
-  background: rgba(11, 11, 11, 0.06);
-  color: var(--ink);
-  border-color: rgba(11, 11, 11, 0.45);
-  box-shadow: inset 0 0 0 1.5px rgba(11, 11, 11, 0.45);
+  background: var(--ink);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 10px 16px rgba(11, 11, 11, 0.18);
 }
 
 .request-service-card.is-active {
-  background: rgba(11, 11, 11, 0.04);
+  background: rgba(11, 11, 11, 0.08);
   border-color: rgba(11, 11, 11, 0.55);
   box-shadow: none;
 }
