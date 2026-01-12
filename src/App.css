@@ -9722,6 +9722,7 @@ h2 {
 
 .client-geo-banner--warning .client-geo-button {
   background: var(--sapphire-dark);
+  color: #ffffff;
   box-shadow: 0 10px 16px rgba(var(--warning-rgb), 0.25);
 }
 
@@ -9817,6 +9818,7 @@ h2 {
 
 .client-master-card.is-featured .client-master-score {
   background: var(--sapphire-dark);
+  color: #ffffff;
   box-shadow: 0 10px 18px rgba(var(--accent-rgb), 0.3);
 }
 
