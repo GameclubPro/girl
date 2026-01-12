@@ -1423,14 +1423,57 @@
 }
 
 .booking-status {
+  --status-rgb: var(--accent-rgb);
+  --status-text: var(--ink);
+  --status-fill-strong: 0.26;
+  --status-fill-soft: 0.08;
+  --status-border: 0.32;
+  --status-shadow: 0.16;
+  --status-dot: rgba(var(--status-rgb), 0.95);
+  --status-dot-ring: rgba(255, 255, 255, 0.65);
   font-size: 10px;
   font-weight: 700;
-  padding: 4px 8px;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(var(--accent-rgb), 0.08);
-  border: 1px solid rgba(var(--accent-rgb), 0.18);
-  color: var(--ink);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--status-rgb), var(--status-fill-strong)),
+    rgba(var(--status-rgb), var(--status-fill-soft))
+  );
+  border: 1px solid rgba(var(--status-rgb), var(--status-border));
+  color: var(--status-text);
+  box-shadow: 0 6px 12px rgba(var(--status-rgb), var(--status-shadow));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.1;
+  position: relative;
+  overflow: hidden;
   white-space: nowrap;
+}
+
+.booking-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--status-dot);
+  box-shadow: 0 0 0 2px var(--status-dot-ring);
+  flex-shrink: 0;
+}
+
+.booking-status::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  right: -18px;
+  width: 50px;
+  height: 22px;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.5), transparent 70%);
+  opacity: 0.6;
+  transform: rotate(12deg);
+  pointer-events: none;
 }
 
 .screen--requests .booking-status {
@@ -1458,62 +1501,37 @@
 }
 
 .booking-status.is-waiting {
-  background: rgba(var(--accent-rgb), 0.12);
-  color: var(--muted);
+  --status-rgb: var(--accent-rgb);
+  --status-text: var(--muted);
 }
 
 .booking-status.is-offer {
-  background: rgba(var(--warning-rgb), 0.5);
-  color: var(--warning);
+  --status-rgb: var(--warning-rgb);
+  --status-text: var(--warning);
+  --status-fill-strong: 0.36;
+  --status-fill-soft: 0.12;
 }
 
 .booking-status.is-confirmed {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb), 0.95),
-    rgba(var(--success-rgb), 0.95)
-  );
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 8px 14px rgba(var(--accent-rgb), 0.22);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.booking-status.is-confirmed::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-}
-
-.booking-status.is-confirmed::after {
-  content: '';
-  position: absolute;
-  top: -10px;
-  right: -24px;
-  width: 52px;
-  height: 24px;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.65), transparent 70%);
-  opacity: 0.7;
-  transform: rotate(12deg);
-  pointer-events: none;
+  --status-rgb: var(--success-rgb);
+  --status-text: #ffffff;
+  --status-fill-strong: 0.9;
+  --status-fill-soft: 0.7;
+  --status-border: 0.24;
+  --status-shadow: 0.24;
+  --status-dot: rgba(255, 255, 255, 0.95);
+  --status-dot-ring: rgba(255, 255, 255, 0.35);
 }
 
 .booking-status.is-cancelled {
-  background: rgba(var(--danger-rgb), 0.6);
-  color: var(--danger);
+  --status-rgb: var(--danger-rgb);
+  --status-text: #ffffff;
+  --status-fill-strong: 0.88;
+  --status-fill-soft: 0.62;
+  --status-border: 0.24;
+  --status-shadow: 0.22;
+  --status-dot: rgba(255, 255, 255, 0.95);
+  --status-dot-ring: rgba(255, 255, 255, 0.35);
 }
 
 .booking-item-meta {
@@ -8531,17 +8549,26 @@
 }
 
 .screen--pro-requests .booking-status.is-waiting {
-  background: rgba(var(--accent-rgb), 0.8);
-  color: var(--muted);
+  --status-rgb: var(--accent-rgb);
+  --status-text: var(--muted);
 }
 
 .screen--pro-requests .booking-status.is-offer {
-  background: rgba(var(--warning-rgb), 0.5);
-  color: var(--warning);
+  --status-rgb: var(--warning-rgb);
+  --status-text: var(--warning);
+  --status-fill-strong: 0.36;
+  --status-fill-soft: 0.12;
 }
 
 .screen--pro-requests .booking-status.is-confirmed {
-  filter: saturate(1.05);
+  --status-rgb: var(--success-rgb);
+  --status-text: #ffffff;
+  --status-fill-strong: 0.9;
+  --status-fill-soft: 0.7;
+  --status-border: 0.24;
+  --status-shadow: 0.24;
+  --status-dot: rgba(255, 255, 255, 0.95);
+  --status-dot-ring: rgba(255, 255, 255, 0.35);
 }
 
 .screen--pro-requests .booking-action {
