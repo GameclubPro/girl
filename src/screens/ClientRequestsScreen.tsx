@@ -40,6 +40,8 @@ const bookingStatusToneMap = {
   cancelled: 'is-cancelled',
 } as const
 
+const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
   const parsed = new Date(value)
@@ -102,6 +104,54 @@ const formatTimeLeft = (value?: string | null) => {
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
 }
 
+const startOfWeek = (value: Date) => {
+  const next = new Date(value)
+  const day = next.getDay()
+  const diff = (day + 6) % 7
+  next.setDate(next.getDate() - diff)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+const addDays = (value: Date, amount: number) => {
+  const next = new Date(value)
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+const toDateKey = (value: Date) => {
+  const year = value.getFullYear()
+  const month = `${value.getMonth() + 1}`.padStart(2, '0')
+  const day = `${value.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const parseDateOnly = (value?: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  parsed.setHours(0, 0, 0, 0)
+  return parsed
+}
+
+const formatDayMonth = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  }).format(value)
+
+const formatLongDate = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  }).format(value)
+
+const formatMonthTitle = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    month: 'long',
+    year: 'numeric',
+  }).format(value)
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'М'
@@ -119,6 +169,13 @@ type ClientRequestsScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewProfile: (masterId: string) => void
+}
+
+type BookingCalendarItem = {
+  booking: Booking
+  date: Date
+  dateKey: string
+  timeMs: number
 }
 
 export const ClientRequestsScreen = ({
@@ -153,6 +210,15 @@ export const ClientRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
+  const [weekStartDate, setWeekStartDate] = useState(() =>
+    startOfWeek(new Date())
+  )
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
+  })
+  const [calendarInitialized, setCalendarInitialized] = useState(false)
 
   useEffect(() => {
     if (!userId) return
@@ -230,6 +296,94 @@ export const ClientRequestsScreen = ({
 
   const items = useMemo(() => requests, [requests])
   const bookingItems = useMemo(() => bookings, [bookings])
+  const bookingCalendarItems = useMemo(() => {
+    return bookingItems
+      .map((booking): BookingCalendarItem | null => {
+        const date = parseDateOnly(booking.scheduledAt)
+        if (!date) return null
+        const timeMs = new Date(booking.scheduledAt).getTime()
+        return {
+          booking,
+          date,
+          dateKey: toDateKey(date),
+          timeMs,
+        }
+      })
+      .filter((item): item is BookingCalendarItem => item !== null)
+      .sort((a, b) => a.timeMs - b.timeMs)
+  }, [bookingItems])
+  const bookingCountsByDate = useMemo(() => {
+    const map = new Map<string, number>()
+    bookingCalendarItems.forEach((item) => {
+      map.set(item.dateKey, (map.get(item.dateKey) ?? 0) + 1)
+    })
+    return map
+  }, [bookingCalendarItems])
+  const bookingsByDate = useMemo(() => {
+    const map = new Map<string, Booking[]>()
+    bookingCalendarItems.forEach((item) => {
+      const list = map.get(item.dateKey)
+      if (list) {
+        list.push(item.booking)
+      } else {
+        map.set(item.dateKey, [item.booking])
+      }
+    })
+    return map
+  }, [bookingCalendarItems])
+  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate])
+  const selectedBookings = useMemo(
+    () => bookingsByDate.get(selectedDateKey) ?? [],
+    [bookingsByDate, selectedDateKey]
+  )
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDays(weekStartDate, index)),
+    [weekStartDate]
+  )
+  const weekRangeLabel = useMemo(() => {
+    const weekEnd = addDays(weekStartDate, 6)
+    return `${formatDayMonth(weekStartDate)} — ${formatDayMonth(weekEnd)}`
+  }, [weekStartDate])
+  const monthLabel = useMemo(() => formatMonthTitle(weekStartDate), [weekStartDate])
+  const selectedDateLabel = useMemo(
+    () => formatLongDate(selectedDate),
+    [selectedDate]
+  )
+  const todayKey = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return toDateKey(today)
+  }, [])
+
+  useEffect(() => {
+    if (calendarInitialized || bookingCalendarItems.length === 0) return
+    const upcoming =
+      bookingCalendarItems.find((item) => item.timeMs >= Date.now()) ??
+      bookingCalendarItems[0]
+    if (!upcoming) return
+    setSelectedDate(upcoming.date)
+    setWeekStartDate(startOfWeek(upcoming.date))
+    setCalendarInitialized(true)
+  }, [bookingCalendarItems, calendarInitialized])
+
+  const handleSelectDate = (date: Date) => {
+    setSelectedDate(date)
+    setCalendarInitialized(true)
+  }
+
+  const handleShiftWeek = (direction: number) => {
+    setWeekStartDate((current) => addDays(current, direction * 7))
+    setSelectedDate((current) => addDays(current, direction * 7))
+    setCalendarInitialized(true)
+  }
+
+  const handleJumpToday = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    setSelectedDate(today)
+    setWeekStartDate(startOfWeek(today))
+    setCalendarInitialized(true)
+  }
 
   const toggleResponses = async (requestId: number) => {
     if (expandedRequestId === requestId) {
@@ -407,11 +561,9 @@ export const ClientRequestsScreen = ({
               Записи
             </button>
           </div>
-          <div className="requests-top">
-            <h2 className="requests-title">
-              {activeTab === 'requests' ? 'Активные' : 'Записи'}
-            </h2>
-            {activeTab === 'requests' && (
+          {activeTab === 'requests' && (
+            <div className="requests-top">
+              <h2 className="requests-title">Активные</h2>
               <button
                 className="cta cta--secondary"
                 type="button"
@@ -419,8 +571,95 @@ export const ClientRequestsScreen = ({
               >
                 + Новая заявка
               </button>
-            )}
-          </div>
+            </div>
+          )}
+
+          {activeTab === 'bookings' && (
+            <section className="booking-calendar" aria-label="Календарь записей">
+              <header className="booking-calendar-head">
+                <div className="booking-calendar-head-main">
+                  <h2 className="booking-calendar-title">Записи</h2>
+                  <p className="booking-calendar-subtitle">
+                    Выберите день для просмотра записей
+                  </p>
+                </div>
+                <button
+                  className="booking-calendar-today"
+                  type="button"
+                  onClick={handleJumpToday}
+                >
+                  Сегодня
+                </button>
+              </header>
+
+              <div className="booking-calendar-card">
+                <div className="booking-calendar-top">
+                  <button
+                    className="booking-calendar-nav"
+                    type="button"
+                    aria-label="Предыдущая неделя"
+                    onClick={() => handleShiftWeek(-1)}
+                  >
+                    ‹
+                  </button>
+                  <div className="booking-calendar-month">
+                    <span className="booking-calendar-month-label">
+                      {monthLabel}
+                    </span>
+                    <span className="booking-calendar-range">{weekRangeLabel}</span>
+                  </div>
+                  <button
+                    className="booking-calendar-nav"
+                    type="button"
+                    aria-label="Следующая неделя"
+                    onClick={() => handleShiftWeek(1)}
+                  >
+                    ›
+                  </button>
+                </div>
+
+                <div className="booking-calendar-week" role="tablist">
+                  {weekDays.map((day, index) => {
+                    const dayKey = toDateKey(day)
+                    const count = bookingCountsByDate.get(dayKey) ?? 0
+                    const isSelected = dayKey === selectedDateKey
+                    const isToday = dayKey === todayKey
+                    return (
+                      <button
+                        key={dayKey}
+                        className={`booking-calendar-day${
+                          isSelected ? ' is-selected' : ''
+                        }${isToday ? ' is-today' : ''}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={isSelected}
+                        onClick={() => handleSelectDate(day)}
+                      >
+                        <span className="booking-calendar-day-name">
+                          {weekDayLabels[index]}
+                        </span>
+                        <span className="booking-calendar-day-number">
+                          {day.getDate()}
+                        </span>
+                        {count > 0 && (
+                          <span className="booking-calendar-day-count">{count}</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="booking-calendar-summary">
+                  <span className="booking-calendar-summary-pill">
+                    Записей: {selectedBookings.length}
+                  </span>
+                  <span className="booking-calendar-summary-date">
+                    {selectedDateLabel}
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
 
           {activeTab === 'requests' && (
             <>
@@ -744,8 +983,30 @@ export const ClientRequestsScreen = ({
                 <p className="requests-empty">Пока нет записей.</p>
               )}
 
-              <div className="requests-list booking-list">
-                {bookingItems.map((booking) => {
+              {!isBookingsLoading && bookingItems.length > 0 && !bookingsError && (
+                <div className="booking-calendar-label">
+                  <span>Записи на</span>
+                  <span className="booking-calendar-label-date">
+                    {selectedDateLabel}
+                  </span>
+                  <span className="booking-calendar-label-count">
+                    {selectedBookings.length}
+                  </span>
+                </div>
+              )}
+
+              {!isBookingsLoading &&
+                bookingItems.length > 0 &&
+                selectedBookings.length === 0 &&
+                !bookingsError && (
+                  <p className="requests-empty">
+                    На выбранный день записей нет. Выберите дату с отметкой.
+                  </p>
+                )}
+
+              {selectedBookings.length > 0 && (
+                <div className="requests-list booking-list">
+                  {selectedBookings.map((booking) => {
                   const statusLabel =
                     bookingStatusLabelMap[booking.status] ?? booking.status
                   const statusTone =
@@ -876,7 +1137,8 @@ export const ClientRequestsScreen = ({
                     </div>
                   )
                 })}
-              </div>
+                </div>
+              )}
             </>
           )}
       </div>
