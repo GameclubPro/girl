@@ -1111,39 +1111,39 @@
   align-items: center;
   justify-content: center;
   padding: 0 5px;
-  background: rgba(var(--accent-rgb), 0.16);
-  color: var(--ink);
-  border: 1px solid rgba(var(--accent-rgb), 0.32);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
 }
 
 .booking-calendar-day-count.is-waiting {
-  background: rgba(var(--accent-rgb), 0.16);
-  color: var(--ink);
-  border-color: rgba(var(--accent-rgb), 0.28);
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-strong);
+  border-color: rgba(var(--accent-rgb), 0.32);
 }
 
 .booking-calendar-day-count.is-confirmed {
-  background: rgba(var(--success-rgb), 0.9);
-  color: #ffffff;
-  border-color: rgba(var(--success-rgb), 0.9);
+  background: rgba(var(--success-rgb), 0.18);
+  color: var(--success);
+  border-color: rgba(var(--success-rgb), 0.3);
 }
 
 .booking-calendar-day-count.is-cancelled {
-  background: rgba(var(--danger-rgb), 0.9);
-  color: #ffffff;
-  border-color: rgba(var(--danger-rgb), 0.9);
+  background: rgba(var(--danger-rgb), 0.18);
+  color: var(--danger);
+  border-color: rgba(var(--danger-rgb), 0.3);
 }
 
 .booking-calendar-day-count.is-mixed {
   background: linear-gradient(
     90deg,
-    rgba(var(--danger-rgb), 0.95) 0%,
-    rgba(var(--danger-rgb), 0.95) 50%,
-    rgba(var(--success-rgb), 0.95) 50%,
-    rgba(var(--success-rgb), 0.95) 100%
+    rgba(var(--danger-rgb), 0.18) 0%,
+    rgba(var(--danger-rgb), 0.18) 50%,
+    rgba(var(--success-rgb), 0.18) 50%,
+    rgba(var(--success-rgb), 0.18) 100%
   );
-  color: #ffffff;
-  border-color: rgba(var(--shadow-rgb), 0.2);
+  color: var(--ink);
+  border-color: rgba(var(--shadow-rgb), 0.16);
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-name,
@@ -1152,30 +1152,30 @@
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-count {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-count.is-confirmed {
-  background: rgba(var(--success-rgb), 0.95);
-  border-color: rgba(var(--success-rgb), 0.9);
+  background: rgba(var(--success-rgb), 0.65);
+  border-color: rgba(var(--success-rgb), 0.6);
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-count.is-cancelled {
-  background: rgba(var(--danger-rgb), 0.95);
-  border-color: rgba(var(--danger-rgb), 0.9);
+  background: rgba(var(--danger-rgb), 0.65);
+  border-color: rgba(var(--danger-rgb), 0.6);
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-count.is-mixed {
   background: linear-gradient(
     90deg,
-    rgba(var(--danger-rgb), 0.95) 0%,
-    rgba(var(--danger-rgb), 0.95) 50%,
-    rgba(var(--success-rgb), 0.95) 50%,
-    rgba(var(--success-rgb), 0.95) 100%
+    rgba(var(--danger-rgb), 0.65) 0%,
+    rgba(var(--danger-rgb), 0.65) 50%,
+    rgba(var(--success-rgb), 0.65) 50%,
+    rgba(var(--success-rgb), 0.65) 100%
   );
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .booking-calendar-summary {
@@ -1223,8 +1223,8 @@
   padding: 2px 8px;
   font-size: 10px;
   font-weight: 700;
-  background: rgba(var(--accent-rgb), 0.18);
-  color: var(--ink);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
 }
 
 .requests-tabs {
@@ -1483,6 +1483,45 @@
   max-width: 100%;
   flex-basis: 100%;
   align-self: flex-start;
+  --status-text: var(--accent-strong);
+  --status-fill-strong: 0.2;
+  --status-fill-soft: 0.06;
+  --status-border: 0.26;
+  --status-shadow: 0.12;
+  --status-dot: rgba(var(--status-rgb), 0.85);
+  --status-dot-ring: rgba(var(--status-rgb), 0.22);
+}
+
+.screen--requests .booking-status.is-waiting {
+  --status-text: var(--accent-strong);
+}
+
+.screen--requests .booking-status.is-offer {
+  --status-text: var(--warning);
+  --status-fill-strong: 0.22;
+  --status-fill-soft: 0.08;
+  --status-border: 0.26;
+  --status-shadow: 0.12;
+}
+
+.screen--requests .booking-status.is-confirmed {
+  --status-text: var(--success);
+  --status-fill-strong: 0.22;
+  --status-fill-soft: 0.08;
+  --status-border: 0.26;
+  --status-shadow: 0.14;
+  --status-dot: rgba(var(--success-rgb), 0.9);
+  --status-dot-ring: rgba(var(--success-rgb), 0.22);
+}
+
+.screen--requests .booking-status.is-cancelled {
+  --status-text: var(--danger);
+  --status-fill-strong: 0.22;
+  --status-fill-soft: 0.08;
+  --status-border: 0.26;
+  --status-shadow: 0.14;
+  --status-dot: rgba(var(--danger-rgb), 0.9);
+  --status-dot-ring: rgba(var(--danger-rgb), 0.22);
 }
 
 .screen--requests .booking-item-actions .booking-status {
