@@ -39,6 +39,7 @@ type BookingReturnView =
   | 'client-gallery'
   | 'client-gallery-detail'
   | 'client-master-profile'
+  | 'requests'
 
 const formatGeoError = (error: unknown) => {
   if (!isGeoFailure(error)) {

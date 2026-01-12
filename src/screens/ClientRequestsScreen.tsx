@@ -526,15 +526,16 @@ export const ClientRequestsScreen = ({
     bookingId: number,
     next: Partial<{ rating: number; comment: string }>
   ) => {
-    setReviewDrafts((current) => ({
-      ...current,
-      [bookingId]: {
-        rating: 0,
-        comment: '',
-        ...current[bookingId],
-        ...next,
-      },
-    }))
+    setReviewDrafts((current) => {
+      const base = current[bookingId] ?? { rating: 0, comment: '' }
+      return {
+        ...current,
+        [bookingId]: {
+          ...base,
+          ...next,
+        },
+      }
+    })
     setReviewErrors((current) => ({ ...current, [bookingId]: '' }))
   }
 
