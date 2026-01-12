@@ -1182,6 +1182,7 @@ export const ClientRequestsScreen = ({
                     booking.status === 'confirmed' && isPast && Boolean(booking.reviewId)
                   const canDelete =
                     booking.status === 'cancelled' || booking.status === 'declined'
+                  const isConfirmed = booking.status === 'confirmed'
                   const actionVariant = canDelete
                     ? 'delete'
                     : canLeaveReview
@@ -1216,15 +1217,24 @@ export const ClientRequestsScreen = ({
                           )}
                         </span>
                         <div className="booking-item-main">
-                          <div className="booking-item-master">{masterName}</div>
+                          <div className="booking-item-main-row">
+                            <div className="booking-item-master">{masterName}</div>
+                            {isConfirmed && (
+                              <span className={`booking-status ${statusTone}`}>
+                                {statusLabel}
+                              </span>
+                            )}
+                          </div>
                           <div className="booking-item-service">
                             {booking.serviceName}
                           </div>
                         </div>
                         <div className="booking-item-actions">
-                          <span className={`booking-status ${statusTone}`}>
-                            {statusLabel}
-                          </span>
+                          {!isConfirmed && (
+                            <span className={`booking-status ${statusTone}`}>
+                              {statusLabel}
+                            </span>
+                          )}
                           {actionVariant && actionVariant !== 'reviewed' && (
                             <div className="booking-action-row booking-action-row--top">
                               {actionVariant === 'reschedule' && (
