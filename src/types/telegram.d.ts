@@ -8,6 +8,8 @@ declare global {
         expand: () => void
         close?: () => void
         requestFullscreen?: () => void
+        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
+        openTelegramLink?: (url: string) => void
         setHeaderColor?: (color: string) => void
         setBackgroundColor?: (color: string) => void
         disableVerticalSwipes?: () => void
@@ -25,6 +27,7 @@ declare global {
             username?: string
             language_code?: string
           }
+          start_param?: string
         }
         safeAreaInset?: { top: number; bottom: number; left: number; right: number }
         contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number }

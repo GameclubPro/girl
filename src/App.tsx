@@ -25,6 +25,7 @@ import type {
   UserLocation,
 } from './types/app'
 import { isGeoFailure, requestPreciseLocation } from './utils/geo'
+import { parseBookingStartParam } from './utils/deeplink'
 import './App.css'
 
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(
@@ -116,11 +117,44 @@ function App() {
   const [bookingReturnView, setBookingReturnView] =
     useState<BookingReturnView | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
+  const deepLinkHandledRef = useRef(false)
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
       .filter(Boolean)
       .join(' ')
       .trim() || telegramUser?.username?.trim() || ''
+
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return
+    const webAppStart = window.Telegram?.WebApp?.initDataUnsafe?.start_param
+    const searchParams = new URLSearchParams(window.location.search)
+    const queryStart =
+      searchParams.get('startapp') ?? searchParams.get('start') ?? null
+    const queryMaster =
+      searchParams.get('masterId') ?? searchParams.get('master') ?? null
+    const rawParam = webAppStart ?? queryStart
+    const decodedParam = rawParam
+      ? (() => {
+          try {
+            return decodeURIComponent(rawParam)
+          } catch (error) {
+            return rawParam
+          }
+        })()
+      : null
+    const parsedMasterId = parseBookingStartParam(decodedParam)
+    const masterId = parsedMasterId ?? queryMaster?.trim() ?? null
+
+    if (!masterId) return
+    deepLinkHandledRef.current = true
+    setRole('client')
+    setSelectedMasterId(masterId)
+    setBookingMasterId(masterId)
+    setBookingPhotoUrls([])
+    setBookingPreferredCategoryId(null)
+    setBookingReturnView('client-master-profile')
+    setView('booking')
+  }, [])
 
   const handleDistrictChange = (value: number | null) => {
     setDistrictId(value)
