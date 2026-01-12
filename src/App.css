@@ -2886,9 +2886,9 @@
 }
 
 .pro-service-suggestion.is-active {
-  border-color: rgba(var(--accent-rgb), 0.35);
-  box-shadow: 0 14px 20px rgba(var(--accent-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.98);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 14px 20px rgba(var(--accent-rgb), 0.2);
+  background: var(--accent-soft);
 }
 
 .pro-service-suggestion-body {
@@ -3147,10 +3147,10 @@
 }
 
 .pro-service-settings.is-active {
-  background: transparent;
-  color: var(--pro-accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   border-color: rgba(var(--accent-rgb), 0.55);
-  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.12);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.18);
 }
 
 .pro-service-settings:focus-visible {
@@ -3533,10 +3533,10 @@
 }
 
 .screen--pro .request-chip.is-active {
-  background: transparent;
-  color: var(--pro-accent);
-  border-color: rgba(var(--accent-rgb), 0.5);
-  box-shadow: none;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
 }
 
 .screen--pro .request-chip:focus-visible {
@@ -8247,9 +8247,9 @@
 }
 
 .suggest-item.is-active {
-  border-color: rgba(var(--accent-rgb), 0.4);
-  color: var(--ink);
-  background: rgba(var(--surface-rgb), 0.7);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
 }
 
 .suggest-item.is-disabled {
@@ -11112,7 +11112,7 @@ h2 {
 }
 
 .nav-item.is-active {
-  color: var(--ink);
+  color: var(--accent-strong);
 }
 
 .nav-icon {
@@ -11168,9 +11168,9 @@ h2 {
 
 .pro-nav-item.is-active {
   color: var(--accent-strong);
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
+  background: var(--accent-soft);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
 }
 
 .pro-nav-item:focus-visible {
@@ -11827,7 +11827,7 @@ h2 {
   text-shadow: none;
 }
 
-/* Secondary buttons and selection states: ink-forward */
+/* Secondary buttons and selection states: accent-forward */
 .request-upload-button,
 .request-chip.is-active,
 .request-segment-button.is-active,
@@ -11841,26 +11841,26 @@ h2 {
 .client-master-toggle.is-active,
 .client-master-profile-status.is-active,
 .response-toggle.has-responses .response-toggle-pill {
-  background: var(--ink);
+  background: var(--accent-strong);
   color: #ffffff;
   border-color: transparent;
   box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.18);
 }
 
 .request-service-card.is-active {
-  background: rgba(var(--accent-rgb), 0.08);
-  border-color: rgba(var(--accent-rgb), 0.55);
+  background: var(--accent-soft);
+  border-color: rgba(var(--accent-rgb), 0.5);
   box-shadow: none;
 }
 
 .request-service-card.is-active .request-service-indicator {
-  background: var(--ink);
+  background: var(--accent-strong);
   color: #ffffff;
-  border-color: var(--ink);
+  border-color: var(--accent-strong);
 }
 
 .client-master-weekday.is-active {
-  background: var(--ink);
+  background: var(--accent-strong);
   color: #ffffff;
   border-color: transparent;
   box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.2);
