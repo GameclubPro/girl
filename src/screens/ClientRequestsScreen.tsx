@@ -377,14 +377,6 @@ export const ClientRequestsScreen = ({
     setCalendarInitialized(true)
   }
 
-  const handleJumpToday = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    setSelectedDate(today)
-    setWeekStartDate(startOfWeek(today))
-    setCalendarInitialized(true)
-  }
-
   const toggleResponses = async (requestId: number) => {
     if (expandedRequestId === requestId) {
       setExpandedRequestId(null)
@@ -575,88 +567,73 @@ export const ClientRequestsScreen = ({
           )}
 
           {activeTab === 'bookings' && (
-            <section className="booking-calendar" aria-label="Календарь записей">
-              <header className="booking-calendar-head">
-                <div className="booking-calendar-head-main">
-                  <h2 className="booking-calendar-title">Записи</h2>
-                  <p className="booking-calendar-subtitle">
-                    Выберите день для просмотра записей
-                  </p>
+            <section
+              className="booking-calendar-card"
+              aria-label="Календарь записей"
+            >
+              <div className="booking-calendar-top">
+                <button
+                  className="booking-calendar-nav"
+                  type="button"
+                  aria-label="Предыдущая неделя"
+                  onClick={() => handleShiftWeek(-1)}
+                >
+                  ‹
+                </button>
+                <div className="booking-calendar-month">
+                  <span className="booking-calendar-month-label">
+                    {monthLabel}
+                  </span>
+                  <span className="booking-calendar-range">{weekRangeLabel}</span>
                 </div>
                 <button
-                  className="booking-calendar-today"
+                  className="booking-calendar-nav"
                   type="button"
-                  onClick={handleJumpToday}
+                  aria-label="Следующая неделя"
+                  onClick={() => handleShiftWeek(1)}
                 >
-                  Сегодня
+                  ›
                 </button>
-              </header>
+              </div>
 
-              <div className="booking-calendar-card">
-                <div className="booking-calendar-top">
-                  <button
-                    className="booking-calendar-nav"
-                    type="button"
-                    aria-label="Предыдущая неделя"
-                    onClick={() => handleShiftWeek(-1)}
-                  >
-                    ‹
-                  </button>
-                  <div className="booking-calendar-month">
-                    <span className="booking-calendar-month-label">
-                      {monthLabel}
-                    </span>
-                    <span className="booking-calendar-range">{weekRangeLabel}</span>
-                  </div>
-                  <button
-                    className="booking-calendar-nav"
-                    type="button"
-                    aria-label="Следующая неделя"
-                    onClick={() => handleShiftWeek(1)}
-                  >
-                    ›
-                  </button>
-                </div>
+              <div className="booking-calendar-week" role="tablist">
+                {weekDays.map((day, index) => {
+                  const dayKey = toDateKey(day)
+                  const count = bookingCountsByDate.get(dayKey) ?? 0
+                  const isSelected = dayKey === selectedDateKey
+                  const isToday = dayKey === todayKey
+                  return (
+                    <button
+                      key={dayKey}
+                      className={`booking-calendar-day${
+                        isSelected ? ' is-selected' : ''
+                      }${isToday ? ' is-today' : ''}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={isSelected}
+                      onClick={() => handleSelectDate(day)}
+                    >
+                      <span className="booking-calendar-day-name">
+                        {weekDayLabels[index]}
+                      </span>
+                      <span className="booking-calendar-day-number">
+                        {day.getDate()}
+                      </span>
+                      {count > 0 && (
+                        <span className="booking-calendar-day-count">{count}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
 
-                <div className="booking-calendar-week" role="tablist">
-                  {weekDays.map((day, index) => {
-                    const dayKey = toDateKey(day)
-                    const count = bookingCountsByDate.get(dayKey) ?? 0
-                    const isSelected = dayKey === selectedDateKey
-                    const isToday = dayKey === todayKey
-                    return (
-                      <button
-                        key={dayKey}
-                        className={`booking-calendar-day${
-                          isSelected ? ' is-selected' : ''
-                        }${isToday ? ' is-today' : ''}`}
-                        type="button"
-                        role="tab"
-                        aria-selected={isSelected}
-                        onClick={() => handleSelectDate(day)}
-                      >
-                        <span className="booking-calendar-day-name">
-                          {weekDayLabels[index]}
-                        </span>
-                        <span className="booking-calendar-day-number">
-                          {day.getDate()}
-                        </span>
-                        {count > 0 && (
-                          <span className="booking-calendar-day-count">{count}</span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="booking-calendar-summary">
-                  <span className="booking-calendar-summary-pill">
-                    Записей: {selectedBookings.length}
-                  </span>
-                  <span className="booking-calendar-summary-date">
-                    {selectedDateLabel}
-                  </span>
-                </div>
+              <div className="booking-calendar-summary">
+                <span className="booking-calendar-summary-pill">
+                  Записей: {selectedBookings.length}
+                </span>
+                <span className="booking-calendar-summary-date">
+                  {selectedDateLabel}
+                </span>
               </div>
             </section>
           )}
