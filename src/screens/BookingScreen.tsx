@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { IconClock, IconPin, IconPhoto } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
-import type { MasterProfile } from '../types/app'
+import type { MasterProfile, MasterReview, MasterReviewSummary } from '../types/app'
 import { parseServiceItems } from '../utils/profileContent'
 
 type BookingScreenProps = {
@@ -23,6 +23,11 @@ type MasterBookingSlot = {
   scheduledAt: string
   serviceDuration: number | null
   status: string
+}
+
+type BookingPhoto = {
+  url: string
+  path?: string | null
 }
 
 type CategoryId = (typeof categoryItems)[number]['id']
@@ -79,6 +84,42 @@ const resolveServiceCategory = (serviceName: string) => {
 
 const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const getInitials = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return 'М'
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  const letters = parts.slice(0, 2).map((part) => part[0] ?? '')
+  const joined = letters.join('').toUpperCase()
+  if (joined) return joined
+  return normalized.slice(0, 2).toUpperCase()
+}
+
+const formatReviewName = (review: MasterReview) => {
+  const name = [review.reviewerFirstName, review.reviewerLastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+  if (name) return name
+  if (review.reviewerUsername) return `@${review.reviewerUsername}`
+  return 'Клиент'
+}
+
+const formatReviewDate = (value: string) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+}
+
+const formatReviewCount = (count: number) => {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return `${count} отзыв`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} отзыва`
+  }
+  return `${count} отзывов`
+}
+
 export const BookingScreen = ({
   apiBase,
   userId,
@@ -107,6 +148,20 @@ export const BookingScreen = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
+  const [photos, setPhotos] = useState<BookingPhoto[]>(
+    () => photoUrls.map((url) => ({ url, path: null }))
+  )
+  const [uploadError, setUploadError] = useState('')
+  const [uploadingCount, setUploadingCount] = useState(0)
+  const [reviews, setReviews] = useState<MasterReview[]>([])
+  const [reviewSummary, setReviewSummary] = useState<MasterReviewSummary | null>(
+    null
+  )
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false)
+  const [reviewsError, setReviewsError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const maxPhotos = 5
+  const maxUploadBytes = 6 * 1024 * 1024
 
   useEffect(() => {
     if (!masterId) return
@@ -176,6 +231,48 @@ export const BookingScreen = ({
     }
 
     void loadBookings()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, masterId])
+
+  useEffect(() => {
+    if (!masterId) return
+    let cancelled = false
+
+    const loadReviews = async () => {
+      setIsReviewsLoading(true)
+      setReviewsError('')
+      setReviews([])
+      setReviewSummary(null)
+      try {
+        const response = await fetch(
+          `${apiBase}/api/masters/${masterId}/reviews?limit=2`
+        )
+        if (!response.ok) {
+          throw new Error('Load reviews failed')
+        }
+        const data = (await response.json()) as {
+          summary?: MasterReviewSummary
+          reviews?: MasterReview[]
+        }
+        if (!cancelled) {
+          setReviewSummary(data?.summary ?? null)
+          setReviews(Array.isArray(data?.reviews) ? data.reviews : [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setReviewsError('Не удалось загрузить отзывы.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsReviewsLoading(false)
+        }
+      }
+    }
+
+    void loadReviews()
 
     return () => {
       cancelled = true
@@ -381,6 +478,17 @@ export const BookingScreen = ({
   const masterCityName = profile?.cityName?.trim() || cityName || 'Город не указан'
   const masterDistrictName =
     profile?.districtName?.trim() || districtName || 'Район не указан'
+  const hasDistrictName = Boolean(profile?.districtName?.trim() || districtName)
+  const masterDisplayName = profile?.displayName?.trim() || 'Мастер'
+  const masterInitials = getInitials(masterDisplayName)
+  const reviewsCountRaw = reviewSummary?.count ?? profile?.reviewsCount ?? 0
+  const reviewsAverageRaw = reviewSummary?.average ?? profile?.reviewsAverage ?? 0
+  const reviewsCount = Number.isFinite(reviewsCountRaw) ? reviewsCountRaw : 0
+  const reviewsAverage = Number.isFinite(reviewsAverageRaw) ? reviewsAverageRaw : 0
+  const hasReviews = reviewsCount > 0
+  const reviewsCountLabel = hasReviews
+    ? formatReviewCount(reviewsCount)
+    : 'Нет отзывов'
 
   const priceLabel =
     selectedService?.price !== null && selectedService?.price !== undefined
@@ -391,12 +499,117 @@ export const BookingScreen = ({
   const hasServiceChoice = serviceOptions.length > 1
   const hasLocation = Boolean(masterCityId && masterDistrictId)
   const hasSlots = Boolean(selectedDay && selectedTime)
+  const isUploading = uploadingCount > 0
   const canSubmit =
     Boolean(categoryId) &&
     Boolean(serviceName) &&
     hasLocation &&
     hasSlots &&
-    !isSubmitting
+    !isSubmitting &&
+    !isUploading
+
+  const canAddPhotos =
+    photos.length < maxPhotos && !isSubmitting && !isUploading
+
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result === 'string') {
+          resolve(result)
+        } else {
+          reject(new Error('invalid_data'))
+        }
+      }
+      reader.onerror = () => reject(new Error('read_failed'))
+      reader.readAsDataURL(file)
+    })
+
+  const handleAddPhotos = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    setUploadError('')
+
+    if (files.length === 0) return
+
+    const remaining = maxPhotos - photos.length
+    if (remaining <= 0) {
+      setUploadError('Можно добавить максимум 5 фото.')
+      return
+    }
+
+    const queue = files.slice(0, remaining)
+    setUploadingCount((current) => current + queue.length)
+
+    for (const file of queue) {
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Поддерживаются только изображения.')
+        setUploadingCount((current) => Math.max(0, current - 1))
+        continue
+      }
+      if (file.size > maxUploadBytes) {
+        setUploadError('Фото слишком большое. Максимум 6 МБ.')
+        setUploadingCount((current) => Math.max(0, current - 1))
+        continue
+      }
+
+      try {
+        const dataUrl = await readFileAsDataUrl(file)
+        const response = await fetch(`${apiBase}/api/requests/media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, dataUrl }),
+        })
+
+        if (response.status === 413) {
+          setUploadError('Фото слишком большое. Максимум 6 МБ.')
+          continue
+        }
+        if (!response.ok) {
+          throw new Error('upload_failed')
+        }
+
+        const payload = (await response.json()) as {
+          url?: string | null
+          path?: string | null
+        }
+
+        if (typeof payload.url !== 'string' || typeof payload.path !== 'string') {
+          throw new Error('upload_failed')
+        }
+
+        setPhotos((current) => [
+          ...current,
+          { url: payload.url, path: payload.path },
+        ])
+      } catch (error) {
+        setUploadError('Не удалось загрузить фото. Попробуйте еще раз.')
+      } finally {
+        setUploadingCount((current) => Math.max(0, current - 1))
+      }
+    }
+  }
+
+  const handleRemovePhoto = async (photo: BookingPhoto) => {
+    setPhotos((current) => current.filter((item) => item.url !== photo.url))
+    if (!photo.path || photo.path.startsWith('http')) {
+      return
+    }
+    try {
+      await fetch(`${apiBase}/api/requests/media`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, path: photo.path }),
+      })
+    } catch (error) {
+      setUploadError('Не удалось удалить фото. Попробуйте снова.')
+    }
+  }
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -415,6 +628,11 @@ export const BookingScreen = ({
 
     if (!masterCityId || !masterDistrictId) {
       setSubmitError('Мастер не указал город и район.')
+      return
+    }
+
+    if (isUploading) {
+      setSubmitError('Дождитесь загрузки фото.')
       return
     }
 
@@ -450,7 +668,7 @@ export const BookingScreen = ({
           serviceName: serviceName.trim(),
           locationType,
           scheduledAt: scheduledAt.toISOString(),
-          photoUrls,
+          photoUrls: photos.map((photo) => photo.url),
           comment: details.trim() || null,
         }),
       })
@@ -527,23 +745,99 @@ export const BookingScreen = ({
           </section>
         ) : profile ? (
           <>
-            <section className="request-card booking-card animate delay-2">
-              <div className="booking-master-row">
-                <span className="booking-master-name">
-                  {profile.displayName || 'Мастер'}
+            <section className="request-card booking-card booking-master-card animate delay-2">
+              <div className="booking-master-preview">
+                <span className="booking-master-avatar" aria-hidden="true">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt="" loading="lazy" />
+                  ) : (
+                    <span className="booking-master-avatar-fallback">
+                      {masterInitials}
+                    </span>
+                  )}
                 </span>
-                {profile.reviewsAverage ? (
-                  <span className="booking-master-rating">
-                    ★ {profile.reviewsAverage.toFixed(1)}
-                  </span>
-                ) : (
-                  <span className="booking-master-rating is-muted">Новый</span>
+                <div className="booking-master-body">
+                  <div className="booking-master-row">
+                    <span className="booking-master-name">{masterDisplayName}</span>
+                    <div className="booking-master-stats">
+                      {hasReviews ? (
+                        <span className="booking-master-rating">
+                          ★ {reviewsAverage.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="booking-master-rating is-muted">
+                          Новый
+                        </span>
+                      )}
+                      <span
+                        className={`booking-master-reviews-count${
+                          hasReviews ? '' : ' is-muted'
+                        }`}
+                      >
+                        {reviewsCountLabel}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="booking-master-meta">
+                    {masterCityName}
+                    {hasDistrictName ? ` • ${masterDistrictName}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="booking-master-reviews">
+                <div className="booking-master-reviews-header">
+                  <span className="booking-master-reviews-title">Отзывы</span>
+                  {hasReviews && (
+                    <span className="booking-master-reviews-average">
+                      ★ {reviewsAverage.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                {isReviewsLoading && (
+                  <p className="booking-master-reviews-state">
+                    Загружаем отзывы...
+                  </p>
+                )}
+                {reviewsError && (
+                  <p className="booking-master-reviews-state is-error">
+                    {reviewsError}
+                  </p>
+                )}
+                {!isReviewsLoading && !reviewsError && reviews.length === 0 && (
+                  <p className="booking-master-reviews-empty">
+                    Пока нет отзывов.
+                  </p>
+                )}
+                {!isReviewsLoading && !reviewsError && reviews.length > 0 && (
+                  <div className="booking-master-reviews-list">
+                    {reviews.slice(0, 2).map((review) => {
+                      const metaParts = [
+                        review.serviceName,
+                        formatReviewDate(review.createdAt),
+                      ].filter(Boolean)
+                      const metaLabel = metaParts.join(' • ')
+                      return (
+                        <article className="booking-review-card" key={review.id}>
+                          <div className="booking-review-head">
+                            <span className="booking-review-author">
+                              {formatReviewName(review)}
+                            </span>
+                            <span className="booking-review-rating">
+                              ★ {review.rating}
+                            </span>
+                          </div>
+                          <p className="booking-review-text">
+                            {review.comment?.trim() || 'Без текста'}
+                          </p>
+                          {metaLabel && (
+                            <span className="booking-review-meta">{metaLabel}</span>
+                          )}
+                        </article>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
-              <p className="booking-master-meta">
-                {profile.cityName ? profile.cityName : 'Город не указан'}
-                {profile.districtName ? ` • ${profile.districtName}` : ''}
-              </p>
             </section>
 
             <section className="request-card booking-card animate delay-2">
@@ -762,38 +1056,69 @@ export const BookingScreen = ({
                   rows={3}
                 />
               </div>
-              {photoUrls.length > 0 && (
-                <div className="request-field">
-                  <span className="request-label">Фото примера</span>
-                  <div className="booking-photo-grid" role="list">
-                    {photoUrls.map((url, index) => (
-                      <span
-                        className="booking-photo"
-                        key={`${url}-${index}`}
+              <div className="request-field">
+                <span className="request-label">Фото примера</span>
+                <input
+                  ref={fileInputRef}
+                  className="request-upload-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePhotoChange}
+                />
+                <div className="request-upload">
+                  <div className="request-upload-media" aria-hidden="true">
+                    <IconPhoto />
+                  </div>
+                  <div className="request-upload-body">
+                    <div className="request-upload-title">
+                      {photos.length > 0 ? 'Фото добавлены' : 'Добавить фото'}
+                    </div>
+                    <div className="request-upload-meta">
+                      {photos.length > 0
+                        ? `Добавлено ${photos.length}/${maxPhotos}`
+                        : '1-5 фото • до 6 МБ'}
+                    </div>
+                  </div>
+                  <button
+                    className="request-upload-button"
+                    type="button"
+                    onClick={handleAddPhotos}
+                    disabled={!canAddPhotos}
+                  >
+                    {photos.length > 0 ? 'Добавить еще' : 'Добавить'}
+                  </button>
+                </div>
+                {uploadingCount > 0 && (
+                  <p className="request-upload-status">
+                    Загружаем фото: {uploadingCount}
+                  </p>
+                )}
+                {uploadError && (
+                  <p className="request-upload-error">{uploadError}</p>
+                )}
+                {photos.length > 0 && (
+                  <div className="request-upload-grid" role="list">
+                    {photos.map((photo) => (
+                      <div
+                        className="request-upload-thumb"
                         role="listitem"
+                        key={photo.url}
                       >
-                        <img src={url} alt="" loading="lazy" />
-                      </span>
+                        <img src={photo.url} alt="" loading="lazy" />
+                        <button
+                          className="request-upload-remove"
+                          type="button"
+                          onClick={() => handleRemovePhoto(photo)}
+                          aria-label="Удалить фото"
+                        >
+                          x
+                        </button>
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
-              {photoUrls.length === 0 && (
-                <div className="request-field">
-                  <span className="request-label">Фото примера</span>
-                  <div className="request-upload">
-                    <div className="request-upload-media" aria-hidden="true">
-                      <IconPhoto />
-                    </div>
-                    <div className="request-upload-body">
-                      <div className="request-upload-title">Фото не выбрано</div>
-                      <div className="request-upload-meta">
-                        Можно добавить после записи
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </section>
 
             {submitError && <p className="request-error">{submitError}</p>}
