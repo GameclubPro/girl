@@ -578,14 +578,16 @@ export const BookingScreen = ({
           url?: string | null
           path?: string | null
         }
+        const nextUrl = payload.url
+        const nextPath = payload.path
 
-        if (typeof payload.url !== 'string' || typeof payload.path !== 'string') {
+        if (typeof nextUrl !== 'string' || typeof nextPath !== 'string') {
           throw new Error('upload_failed')
         }
 
         setPhotos((current) => [
           ...current,
-          { url: payload.url, path: payload.path },
+          { url: nextUrl, path: nextPath },
         ])
       } catch (error) {
         setUploadError('Не удалось загрузить фото. Попробуйте еще раз.')
