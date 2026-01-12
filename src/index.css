@@ -4,18 +4,18 @@
   font-family: 'Manrope', 'Segoe UI', sans-serif;
   --font-title: 'Sora', 'Segoe UI', sans-serif;
   --font-popular: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
-  --ink: #0b1020;
-  --muted: #4b5565;
+  --ink: #0b0b0b;
+  --muted: #4a4a4a;
   --cream: #ffffff;
-  --paper: #f5f7fb;
-  --lavender: #5b36d6;
-  --sun: #4a2bb8;
-  --sapphire: #5b36d6;
-  --sapphire-dark: #4a2bb8;
-  --sapphire-soft: rgba(91, 54, 214, 0.12);
-  --border: rgba(15, 23, 42, 0.12);
+  --paper: #ffffff;
+  --lavender: #1bb9ad;
+  --sun: #0d8f86;
+  --sapphire: #1bb9ad;
+  --sapphire-dark: #0d8f86;
+  --sapphire-soft: rgba(27, 185, 173, 0.12);
+  --border: rgba(11, 11, 11, 0.12);
   --surface: #ffffff;
-  --surface-muted: #f5f7fb;
+  --surface-muted: #f8f8f8;
   --safe-top: max(
     env(safe-area-inset-top, 0px),
     var(--tg-safe-area-inset-top, 0px),
