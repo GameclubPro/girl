@@ -80,9 +80,6 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
 
-const formatServiceCount = (value: number) =>
-  formatCount(value, 'услуга', 'услуги', 'услуг')
-
 const buildLocationLabel = (profile: MasterProfile | null) => {
   if (!profile) return 'Локация не указана'
   const parts = [profile.cityName, profile.districtName].filter(Boolean)
@@ -383,7 +380,24 @@ export const ClientMasterProfileScreen = ({
       })),
     [scheduleDaySet]
   )
+  const hasScheduleDays = scheduleDayKeys.length > 0
   const scheduleLabel = buildScheduleLabel(scheduleDayKeys)
+  const workingDays = scheduleWeek
+    .filter((day) => day.isActive)
+    .map((day) => day.label)
+  const offDays = scheduleWeek
+    .filter((day) => !day.isActive)
+    .map((day) => day.label)
+  const workingDaysLabel = hasScheduleDays
+    ? workingDays.length > 0
+      ? workingDays.join(', ')
+      : scheduleLabel
+    : 'График не указан'
+  const offDaysLabel = hasScheduleDays
+    ? offDays.length > 0
+      ? offDays.join(', ')
+      : 'Нет'
+    : '—'
   const scheduleRange = buildScheduleRange(
     profile?.scheduleStart,
     profile?.scheduleEnd
@@ -401,22 +415,6 @@ export const ClientMasterProfileScreen = ({
       } as CSSProperties)
     : undefined
   const hasScheduleRange = scheduleRange !== 'Время не указано'
-  const scheduleMeta =
-    scheduleDays.length > 0 && scheduleRange !== 'Время не указано'
-      ? `${scheduleLabel} · ${scheduleRange}`
-      : scheduleDays.length > 0
-        ? scheduleLabel
-        : scheduleRange
-  const servicesSummary =
-    serviceItems.length > 0
-      ? formatServiceCount(serviceItems.length)
-      : 'Нет услуг'
-  const showcaseCount = showcaseItems.filter((item) => item.url.trim()).length
-  const showcaseCountLabel = showcaseCount > 0 ? `${showcaseCount} фото` : 'Нет витрины'
-  const showcasePreview = useMemo(
-    () => showcaseItems.filter((item) => item.url.trim()).slice(0, 3),
-    [showcaseItems]
-  )
   const serviceNames = useMemo(
     () => serviceItems.map((item) => item.name.trim()).filter(Boolean),
     [serviceItems]
@@ -697,19 +695,56 @@ export const ClientMasterProfileScreen = ({
                       id="pro-profile-schedule-popover"
                       role="tooltip"
                     >
-                      <p className="pro-profile-schedule-popover-title">
-                        Расписание
-                      </p>
-                      <p className="pro-profile-schedule-popover-meta">
-                        {scheduleLabel}
-                      </p>
-                      <p
-                        className={`pro-profile-schedule-popover-time${
-                          hasScheduleRange ? '' : ' is-muted'
-                        }`}
-                      >
-                        {scheduleRange}
-                      </p>
+                      <p className="pro-profile-schedule-popover-title">График</p>
+                      <div className="pro-profile-schedule-popover-row">
+                        <span className="pro-profile-schedule-popover-label">
+                          Рабочие дни
+                        </span>
+                        <span
+                          className={`pro-profile-schedule-popover-value${
+                            hasScheduleDays ? '' : ' is-muted'
+                          }`}
+                        >
+                          {workingDaysLabel}
+                        </span>
+                      </div>
+                      <div className="pro-profile-schedule-popover-row">
+                        <span className="pro-profile-schedule-popover-label">
+                          Выходные
+                        </span>
+                        <span
+                          className={`pro-profile-schedule-popover-value${
+                            hasScheduleDays ? '' : ' is-muted'
+                          }`}
+                        >
+                          {offDaysLabel}
+                        </span>
+                      </div>
+                      <div className="pro-profile-schedule-popover-row">
+                        <span className="pro-profile-schedule-popover-label">
+                          Время
+                        </span>
+                        <span
+                          className={`pro-profile-schedule-popover-value${
+                            hasScheduleRange ? '' : ' is-muted'
+                          }`}
+                        >
+                          {scheduleRange}
+                        </span>
+                      </div>
+                      <div className="pro-profile-schedule-popover-week" role="list">
+                        {scheduleWeek.map((day) => (
+                          <span
+                            className={`pro-profile-schedule-popover-day${
+                              day.isActive ? ' is-active' : ''
+                            }`}
+                            key={`popover-${day.id}`}
+                            role="listitem"
+                          >
+                            {day.label}
+                          </span>
+                        ))}
+                      </div>
                       <div
                         className={`pro-profile-schedule-timebar${
                           hasScheduleTimebar ? '' : ' is-muted'
@@ -745,90 +780,6 @@ export const ClientMasterProfileScreen = ({
                   }`}
                 >
                   {scheduleRange}
-                </span>
-              </div>
-            </section>
-
-            <section className="pro-profile-cards animate delay-2">
-              <div className="pro-profile-card is-static">
-                <span className="pro-profile-card-icon" aria-hidden="true">
-                  👤
-                </span>
-                <span className="pro-profile-card-content">
-                  <span className="pro-profile-card-title">Статус</span>
-                  <span
-                    className={`pro-profile-card-value${
-                      aboutValue ? '' : ' is-muted'
-                    }`}
-                  >
-                    {aboutText}
-                  </span>
-                  <span className="pro-profile-card-meta">{experienceLabel}</span>
-                </span>
-              </div>
-              <div className="pro-profile-card is-static">
-                <span className="pro-profile-card-icon" aria-hidden="true">
-                  📍
-                </span>
-                <span className="pro-profile-card-content">
-                  <span className="pro-profile-card-title">Работа</span>
-                  <span className="pro-profile-card-value">{locationLabel}</span>
-                  <span className="pro-profile-card-meta">{workFormatLabel}</span>
-                  <span className="pro-profile-card-meta">{scheduleMeta}</span>
-                </span>
-              </div>
-              <div className="pro-profile-card is-static">
-                <span className="pro-profile-card-icon" aria-hidden="true">
-                  💸
-                </span>
-                <span className="pro-profile-card-content">
-                  <span className="pro-profile-card-title">Услуги и цены</span>
-                  <span className="pro-profile-card-value">{servicesSummary}</span>
-                  <span className="pro-profile-card-meta">{priceLabel}</span>
-                </span>
-              </div>
-              <div className="pro-profile-card is-static">
-                <span className="pro-profile-card-icon" aria-hidden="true">
-                  🖼️
-                </span>
-                <span className="pro-profile-card-content">
-                  <span className="pro-profile-card-title">Витрина</span>
-                  <span
-                    className={`pro-profile-card-value${
-                      showcaseCount > 0 ? '' : ' is-muted'
-                    }`}
-                  >
-                    {showcaseCountLabel}
-                  </span>
-                  {showcasePreview.length > 0 ? (
-                    <span className="pro-profile-portfolio">
-                      {showcasePreview.map((item, index) => {
-                        const showImage = isImageUrl(item.url)
-                        const focus = resolvePortfolioFocus(item)
-                        return (
-                          <span
-                            key={`${item.url}-${index}`}
-                            className={`pro-profile-portfolio-thumb${
-                              showImage ? ' has-image' : ''
-                            }`}
-                            style={
-                              showImage
-                                ? {
-                                    backgroundImage: `url(${item.url})`,
-                                    backgroundPosition: focus.position,
-                                  }
-                                : undefined
-                            }
-                            aria-hidden="true"
-                          />
-                        )
-                      })}
-                    </span>
-                  ) : (
-                    <span className="pro-profile-card-meta is-muted">
-                      Нет выбранных работ
-                    </span>
-                  )}
                 </span>
               </div>
             </section>

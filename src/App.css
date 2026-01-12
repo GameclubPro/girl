@@ -5301,6 +5301,7 @@
 
 .pro-profile-schedule-info-wrap {
   position: relative;
+  z-index: 3;
 }
 
 .pro-profile-schedule-info {
@@ -5338,7 +5339,7 @@
   border: 1px solid rgba(var(--shadow-rgb), 0.16);
   box-shadow: 0 16px 26px rgba(var(--shadow-rgb), 0.2);
   padding: 10px;
-  z-index: 2;
+  z-index: 20;
   animation: rise 0.22s ease forwards;
   transform-origin: top right;
 }
@@ -5365,22 +5366,56 @@
   color: var(--muted);
 }
 
-.pro-profile-schedule-popover-meta {
-  margin: 4px 0 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink);
+.pro-profile-schedule-popover-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
 }
 
-.pro-profile-schedule-popover-time {
-  margin: 4px 0 0;
-  font-size: 12px;
+.pro-profile-schedule-popover-label {
+  font-size: 10px;
   font-weight: 700;
-  color: var(--ink);
-}
-
-.pro-profile-schedule-popover-time.is-muted {
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
   color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.pro-profile-schedule-popover-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
+}
+
+.pro-profile-schedule-popover-value.is-muted {
+  color: var(--muted);
+}
+
+.pro-profile-schedule-popover-week {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pro-profile-schedule-popover-day {
+  border-radius: 8px;
+  padding: 4px 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--muted);
+  background: rgba(var(--surface-muted-rgb), 0.9);
+  border: 1px solid rgba(var(--surface-muted-rgb), 0.95);
+}
+
+.pro-profile-schedule-popover-day.is-active {
+  color: #ffffff;
+  background: var(--sapphire-dark);
+  border-color: transparent;
 }
 
 .pro-profile-schedule-timebar {
