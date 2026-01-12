@@ -360,7 +360,7 @@ function App() {
     webApp.expand()
     webApp.requestFullscreen?.()
     webApp.disableVerticalSwipes?.()
-    const themeColor = '#f8f2e9'
+    const themeColor = '#ffffff'
     webApp.setHeaderColor?.(themeColor)
     webApp.setBackgroundColor?.(themeColor)
   }, [view])
