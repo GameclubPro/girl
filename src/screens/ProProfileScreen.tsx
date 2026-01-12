@@ -3,6 +3,7 @@ import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
   IconClock,
+  IconEdit,
   IconHome,
   IconList,
   IconPin,
@@ -2218,7 +2219,10 @@ export const ProProfileScreen = ({
               type="button"
               onClick={() => openEditor('basic')}
             >
-              Редактировать
+              <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                <IconEdit />
+              </span>
+              <span className="pro-profile-ig-button-label">Редактировать</span>
             </button>
           </div>
         </section>

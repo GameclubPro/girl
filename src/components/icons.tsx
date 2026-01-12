@@ -135,6 +135,25 @@ export const IconInbox = () => (
   </svg>
 )
 
+export const IconEdit = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5 16.6V19h2.4l9.2-9.2-2.4-2.4L5 16.6Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M13.8 7.2 16.2 4.8a1.7 1.7 0 0 1 2.4 2.4l-2.4 2.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
 export const IconFilter = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
