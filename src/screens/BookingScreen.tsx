@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { IconClock, IconPin, IconPhoto } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
-import type { MasterProfile, MasterReview, MasterReviewSummary } from '../types/app'
+import type {
+  BookingStatus,
+  MasterProfile,
+  MasterReview,
+  MasterReviewSummary,
+} from '../types/app'
 import { parseServiceItems } from '../utils/profileContent'
 
 type BookingScreenProps = {
@@ -17,6 +22,7 @@ type BookingScreenProps = {
   photoUrls?: string[]
   preferredCategoryId?: string | null
   onBack: () => void
+  onBookingCreated?: (payload: { id: number | null; status?: BookingStatus }) => void
 }
 
 type MasterBookingSlot = {
@@ -132,6 +138,7 @@ export const BookingScreen = ({
   photoUrls = [],
   preferredCategoryId,
   onBack,
+  onBookingCreated,
 }: BookingScreenProps) => {
   const [profile, setProfile] = useState<MasterProfile | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -675,10 +682,11 @@ export const BookingScreen = ({
         }),
       })
 
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; id?: number; status?: BookingStatus }
+        | null
+
       if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null
         if (data?.error === 'time_unavailable') {
           setSubmitError('Это время уже занято. Выберите другое.')
           return
@@ -718,6 +726,7 @@ export const BookingScreen = ({
         throw new Error('Create booking failed')
       }
 
+      onBookingCreated?.({ id: data?.id ?? null, status: data?.status })
       setSubmitSuccess('Запись отправлена мастеру.')
     } catch (error) {
       setSubmitError('Не удалось создать запись. Попробуйте еще раз.')

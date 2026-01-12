@@ -116,6 +116,9 @@ function App() {
   >(null)
   const [bookingReturnView, setBookingReturnView] =
     useState<BookingReturnView | null>(null)
+  const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(
+    null
+  )
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
   const clientName =
@@ -153,6 +156,7 @@ function App() {
     setBookingPhotoUrls([])
     setBookingPreferredCategoryId(null)
     setBookingReturnView('client-master-profile')
+    setRescheduleBookingId(null)
     setView('booking')
   }, [])
 
@@ -658,15 +662,38 @@ function App() {
         photoUrls?: string[]
         preferredCategoryId?: string | null
         returnView?: BookingReturnView
+        rescheduleBookingId?: number | null
       }
     ) => {
       setBookingMasterId(masterId)
       setBookingPhotoUrls(options?.photoUrls ?? [])
       setBookingPreferredCategoryId(options?.preferredCategoryId ?? null)
       setBookingReturnView(options?.returnView ?? 'client-showcase')
+      setRescheduleBookingId(options?.rescheduleBookingId ?? null)
       setView('booking')
     },
     []
+  )
+
+  const handleBookingCreated = useCallback(
+    async (_payload: { id: number | null; status?: string }) => {
+      if (!rescheduleBookingId) return
+      try {
+        const response = await fetch(`${apiBase}/api/bookings/${rescheduleBookingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action: 'client-cancel' }),
+        })
+        if (!response.ok) {
+          throw new Error('Cancel rescheduled booking failed')
+        }
+      } catch (error) {
+        console.error('Failed to cancel booking after reschedule:', error)
+      } finally {
+        setRescheduleBookingId(null)
+      }
+    },
+    [apiBase, rescheduleBookingId, userId]
   )
 
   if (view === 'client') {
@@ -842,7 +869,9 @@ function App() {
           setBookingPreferredCategoryId(null)
           setView(bookingReturnView ?? 'client-showcase')
           setBookingReturnView(null)
+          setRescheduleBookingId(null)
         }}
+        onBookingCreated={handleBookingCreated}
       />
     )
   }
@@ -861,6 +890,13 @@ function App() {
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)
           setView('client-master-profile')
+        }}
+        onRescheduleBooking={(booking) => {
+          openBooking(booking.masterId, {
+            preferredCategoryId: booking.categoryId,
+            returnView: 'requests',
+            rescheduleBookingId: booking.id,
+          })
         }}
       />
     )

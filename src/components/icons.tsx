@@ -346,3 +346,40 @@ export const IconAddress = () => (
     />
   </svg>
 )
+
+export const IconStar = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="m12 4.4 2.4 4.8 5.3.8-3.9 3.8.9 5.3-4.7-2.5-4.7 2.5.9-5.3-3.9-3.8 5.3-.8L12 4.4Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconSwap = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M7 7h10l-2.6-2.6M17 17H7l2.6 2.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconClose = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6 6l12 12M18 6l-12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)

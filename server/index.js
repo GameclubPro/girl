@@ -920,6 +920,18 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    ALTER TABLE master_reviews
+    ADD COLUMN IF NOT EXISTS booking_id INTEGER REFERENCES service_bookings(id)
+    ON DELETE SET NULL;
+  `)
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS master_reviews_booking_idx
+    ON master_reviews (booking_id)
+    WHERE booking_id IS NOT NULL;
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS request_responses (
       id SERIAL PRIMARY KEY,
       request_id INTEGER NOT NULL REFERENCES service_requests(id) ON DELETE CASCADE,
@@ -2338,9 +2350,11 @@ app.get('/api/bookings', async (req, res) => {
           b.status,
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
-          b.created_at AS "createdAt"
+          b.created_at AS "createdAt",
+          mr.id AS "reviewId"
         FROM service_bookings b
         LEFT JOIN master_profiles mp ON mp.user_id = b.master_id
+        LEFT JOIN master_reviews mr ON mr.booking_id = b.id
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
         WHERE b.client_id = $1
@@ -2874,9 +2888,138 @@ app.patch('/api/bookings/:id', async (req, res) => {
       return
     }
 
+    if (normalizedAction === 'client-delete') {
+      if (!isClient) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!['cancelled', 'declined'].includes(booking.status)) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      await pool.query(
+        `
+          DELETE FROM service_bookings
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+
+      res.json({ ok: true, deleted: true })
+      return
+    }
+
     res.status(400).json({ error: 'action_invalid' })
   } catch (error) {
     console.error('PATCH /api/bookings/:id failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/bookings/:id/review', async (req, res) => {
+  const bookingId = Number(req.params.id)
+  if (!Number.isInteger(bookingId)) {
+    res.status(400).json({ error: 'bookingId_invalid' })
+    return
+  }
+
+  const { userId, rating, comment } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const parsedRating = parseOptionalInt(rating)
+  const normalizedComment = normalizeText(comment)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!parsedRating || parsedRating < 1 || parsedRating > 5) {
+    res.status(400).json({ error: 'rating_invalid' })
+    return
+  }
+
+  try {
+    const bookingResult = await pool.query(
+      `
+        SELECT
+          id,
+          client_id AS "clientId",
+          master_id AS "masterId",
+          status,
+          service_name AS "serviceName",
+          scheduled_at AS "scheduledAt"
+        FROM service_bookings
+        WHERE id = $1
+      `,
+      [bookingId]
+    )
+
+    if (bookingResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const booking = bookingResult.rows[0]
+    if (booking.clientId !== normalizedUserId) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    if (booking.status !== 'confirmed') {
+      res.status(409).json({ error: 'status_invalid' })
+      return
+    }
+
+    const scheduledAt = new Date(booking.scheduledAt)
+    if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() > Date.now()) {
+      res.status(409).json({ error: 'time_not_passed' })
+      return
+    }
+
+    const existing = await pool.query(
+      `
+        SELECT id
+        FROM master_reviews
+        WHERE booking_id = $1
+      `,
+      [bookingId]
+    )
+
+    if (existing.rows.length > 0) {
+      res.status(409).json({ error: 'review_exists' })
+      return
+    }
+
+    await ensureUser(normalizedUserId)
+    await ensureUser(booking.masterId)
+
+    const insertResult = await pool.query(
+      `
+        INSERT INTO master_reviews (
+          master_id,
+          reviewer_id,
+          rating,
+          comment,
+          service_name,
+          booking_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+      `,
+      [
+        booking.masterId,
+        normalizedUserId,
+        parsedRating,
+        normalizedComment || null,
+        booking.serviceName ?? null,
+        bookingId,
+      ]
+    )
+
+    res.json({ ok: true, reviewId: insertResult.rows[0]?.id })
+  } catch (error) {
+    console.error('POST /api/bookings/:id/review failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

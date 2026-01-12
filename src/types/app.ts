@@ -141,6 +141,7 @@ export type Booking = {
   comment?: string | null
   createdAt: string
   distanceKm?: number | null
+  reviewId?: number | null
 }
 
 export type RequestResponse = {

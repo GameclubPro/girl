@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { IconHome, IconList, IconUser, IconUsers } from '../components/icons'
+import {
+  IconClose,
+  IconHome,
+  IconList,
+  IconStar,
+  IconSwap,
+  IconUser,
+  IconUsers,
+} from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { Booking, RequestResponse, ServiceRequest } from '../types/app'
 
@@ -41,6 +49,7 @@ const bookingStatusToneMap = {
 } as const
 
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const
+const twelveHoursMs = 12 * 60 * 60 * 1000
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -102,6 +111,13 @@ const formatTimeLeft = (value?: string | null) => {
   const minutes = minutesTotal % 60
   if (hours <= 0) return `${minutesTotal} мин`
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
+}
+
+const getTimeUntilMs = (value?: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.getTime() - Date.now()
 }
 
 const startOfWeek = (value: Date) => {
@@ -169,6 +185,7 @@ type ClientRequestsScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewProfile: (masterId: string) => void
+  onRescheduleBooking: (booking: Booking) => void
 }
 
 type BookingCalendarItem = {
@@ -185,6 +202,7 @@ export const ClientRequestsScreen = ({
   onViewHome,
   onViewMasters,
   onViewProfile,
+  onRescheduleBooking,
 }: ClientRequestsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
   const [requests, setRequests] = useState<ServiceRequest[]>([])
@@ -209,6 +227,12 @@ export const ClientRequestsScreen = ({
   const [bookingActionId, setBookingActionId] = useState<number | null>(null)
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
+  >({})
+  const [reviewOpenId, setReviewOpenId] = useState<number | null>(null)
+  const [reviewSubmittingId, setReviewSubmittingId] = useState<number | null>(null)
+  const [reviewErrors, setReviewErrors] = useState<Record<number, string>>({})
+  const [reviewDrafts, setReviewDrafts] = useState<
+    Record<number, { rating: number; comment: string }>
   >({})
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
@@ -312,10 +336,30 @@ export const ClientRequestsScreen = ({
       .filter((item): item is BookingCalendarItem => item !== null)
       .sort((a, b) => a.timeMs - b.timeMs)
   }, [bookingItems])
-  const bookingCountsByDate = useMemo(() => {
-    const map = new Map<string, number>()
+  const bookingSummaryByDate = useMemo(() => {
+    const map = new Map<
+      string,
+      { count: number; hasConfirmed: boolean; hasCancelled: boolean; hasOther: boolean }
+    >()
     bookingCalendarItems.forEach((item) => {
-      map.set(item.dateKey, (map.get(item.dateKey) ?? 0) + 1)
+      const current = map.get(item.dateKey) ?? {
+        count: 0,
+        hasConfirmed: false,
+        hasCancelled: false,
+        hasOther: false,
+      }
+      current.count += 1
+      if (item.booking.status === 'confirmed') {
+        current.hasConfirmed = true
+      } else if (
+        item.booking.status === 'cancelled' ||
+        item.booking.status === 'declined'
+      ) {
+        current.hasCancelled = true
+      } else {
+        current.hasOther = true
+      }
+      map.set(item.dateKey, current)
     })
     return map
   }, [bookingCalendarItems])
@@ -414,7 +458,11 @@ export const ClientRequestsScreen = ({
 
   const handleBookingAction = async (
     bookingId: number,
-    action: 'client-accept-price' | 'client-decline-price' | 'client-cancel'
+    action:
+      | 'client-accept-price'
+      | 'client-decline-price'
+      | 'client-cancel'
+      | 'client-delete'
   ) => {
     if (bookingActionId !== null) return
 
@@ -436,8 +484,11 @@ export const ClientRequestsScreen = ({
         | { status?: Booking['status']; servicePrice?: number | null }
         | null
 
-      setBookings((current) =>
-        current.map((booking) => {
+      setBookings((current) => {
+        if (action === 'client-delete') {
+          return current.filter((booking) => booking.id !== bookingId)
+        }
+        return current.map((booking) => {
           if (booking.id !== bookingId) return booking
           const next = { ...booking }
           if (data?.status) {
@@ -457,14 +508,103 @@ export const ClientRequestsScreen = ({
           }
           return next
         })
-      )
+      })
     } catch (error) {
       setBookingActionError((current) => ({
         ...current,
-        [bookingId]: 'Не удалось обновить запись.',
+        [bookingId]:
+          action === 'client-delete'
+            ? 'Не удалось удалить запись.'
+            : 'Не удалось обновить запись.',
       }))
     } finally {
       setBookingActionId((current) => (current === bookingId ? null : current))
+    }
+  }
+
+  const updateReviewDraft = (
+    bookingId: number,
+    next: Partial<{ rating: number; comment: string }>
+  ) => {
+    setReviewDrafts((current) => ({
+      ...current,
+      [bookingId]: {
+        rating: 0,
+        comment: '',
+        ...current[bookingId],
+        ...next,
+      },
+    }))
+    setReviewErrors((current) => ({ ...current, [bookingId]: '' }))
+  }
+
+  const handleReviewSubmit = async (booking: Booking) => {
+    if (reviewSubmittingId !== null) return
+    const draft = reviewDrafts[booking.id] ?? { rating: 0, comment: '' }
+    if (!draft.rating) {
+      setReviewErrors((current) => ({
+        ...current,
+        [booking.id]: 'Поставьте оценку.',
+      }))
+      return
+    }
+
+    setReviewSubmittingId(booking.id)
+    setReviewErrors((current) => ({ ...current, [booking.id]: '' }))
+
+    try {
+      const response = await fetch(
+        `${apiBase}/api/bookings/${booking.id}/review`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            rating: draft.rating,
+            comment: draft.comment.trim() || null,
+          }),
+        }
+      )
+
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; reviewId?: number }
+        | null
+
+      if (!response.ok) {
+        const errorLabel =
+          data?.error === 'review_exists'
+            ? 'Отзыв уже оставлен.'
+            : data?.error === 'time_not_passed'
+              ? 'Отзыв можно оставить после записи.'
+              : data?.error === 'status_invalid'
+                ? 'Отзыв доступен после подтвержденной записи.'
+                : data?.error === 'not_found'
+                  ? 'Запись не найдена.'
+                  : 'Не удалось оставить отзыв.'
+        setReviewErrors((current) => ({ ...current, [booking.id]: errorLabel }))
+        return
+      }
+
+      setBookings((current) =>
+        current.map((item) =>
+          item.id === booking.id
+            ? { ...item, reviewId: data?.reviewId ?? item.reviewId ?? null }
+            : item
+        )
+      )
+      setReviewOpenId(null)
+      setReviewDrafts((current) => {
+        const next = { ...current }
+        delete next[booking.id]
+        return next
+      })
+    } catch (error) {
+      setReviewErrors((current) => ({
+        ...current,
+        [booking.id]: 'Не удалось оставить отзыв.',
+      }))
+    } finally {
+      setReviewSubmittingId((current) => (current === booking.id ? null : current))
     }
   }
 
@@ -596,14 +736,26 @@ export const ClientRequestsScreen = ({
                 </button>
               </div>
 
-              <div className="booking-calendar-week" role="tablist">
-                {weekDays.map((day, index) => {
-                  const dayKey = toDateKey(day)
-                  const count = bookingCountsByDate.get(dayKey) ?? 0
-                  const isSelected = dayKey === selectedDateKey
-                  const isToday = dayKey === todayKey
-                  return (
-                    <button
+                <div className="booking-calendar-week" role="tablist">
+                  {weekDays.map((day, index) => {
+                    const dayKey = toDateKey(day)
+                    const summary = bookingSummaryByDate.get(dayKey)
+                    const count = summary?.count ?? 0
+                    const countTone = summary
+                      ? summary.hasConfirmed && summary.hasCancelled
+                        ? 'is-mixed'
+                        : summary.hasCancelled
+                          ? 'is-cancelled'
+                          : summary.hasConfirmed
+                            ? 'is-confirmed'
+                            : summary.hasOther
+                              ? 'is-waiting'
+                              : ''
+                      : ''
+                    const isSelected = dayKey === selectedDateKey
+                    const isToday = dayKey === todayKey
+                    return (
+                      <button
                       key={dayKey}
                       className={`booking-calendar-day${
                         isSelected ? ' is-selected' : ''
@@ -616,16 +768,22 @@ export const ClientRequestsScreen = ({
                       <span className="booking-calendar-day-name">
                         {weekDayLabels[index]}
                       </span>
-                      <span className="booking-calendar-day-number">
-                        {day.getDate()}
-                      </span>
-                      {count > 0 && (
-                        <span className="booking-calendar-day-count">{count}</span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
+                        <span className="booking-calendar-day-number">
+                          {day.getDate()}
+                        </span>
+                        {count > 0 && (
+                          <span
+                            className={`booking-calendar-day-count${
+                              countTone ? ` ${countTone}` : ''
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
 
               <div className="booking-calendar-summary">
                 <span className="booking-calendar-summary-pill">
@@ -1003,17 +1161,48 @@ export const ClientRequestsScreen = ({
                         : 'Цена согласуется с мастером'
                   const canAcceptPrice = booking.status === 'price_proposed'
                   const canDeclinePrice = booking.status === 'price_proposed'
-                  const canCancel = [
-                    'pending',
-                    'price_pending',
-                    'confirmed',
-                  ].includes(booking.status)
+                  const canCancel = ['pending', 'price_pending', 'price_proposed'].includes(
+                    booking.status
+                  )
+                  const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
+                  const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
+                  const canReschedule =
+                    booking.status === 'confirmed' &&
+                    typeof timeUntilMs === 'number' &&
+                    timeUntilMs >= twelveHoursMs
+                  const canCancelConfirmed =
+                    booking.status === 'confirmed' &&
+                    typeof timeUntilMs === 'number' &&
+                    timeUntilMs > 0 &&
+                    timeUntilMs < twelveHoursMs
+                  const canLeaveReview =
+                    booking.status === 'confirmed' && isPast && !booking.reviewId
+                  const hasReview =
+                    booking.status === 'confirmed' && isPast && Boolean(booking.reviewId)
+                  const canDelete =
+                    booking.status === 'cancelled' || booking.status === 'declined'
+                  const actionVariant = canDelete
+                    ? 'delete'
+                    : canLeaveReview
+                      ? 'review'
+                      : hasReview
+                        ? 'reviewed'
+                        : canReschedule
+                          ? 'reschedule'
+                          : canCancelConfirmed
+                            ? 'cancel'
+                            : null
                   const isActionLoading = bookingActionId !== null
+                  const isReviewSubmitting = reviewSubmittingId === booking.id
                   const masterName = booking.masterName ?? 'Мастер'
                   const masterInitials = getInitials(masterName)
                   const photoItems = Array.isArray(booking.photoUrls)
                     ? booking.photoUrls
                     : []
+                  const reviewDraft = reviewDrafts[booking.id] ?? {
+                    rating: 0,
+                    comment: '',
+                  }
 
                   return (
                     <div className="booking-item" key={booking.id}>
@@ -1064,6 +1253,130 @@ export const ClientRequestsScreen = ({
                               <img src={url} alt="" loading="lazy" />
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {actionVariant && actionVariant !== 'reviewed' && (
+                        <div className="booking-action-row">
+                          {actionVariant === 'reschedule' && (
+                            <button
+                              className="booking-action-icon is-reschedule"
+                              type="button"
+                              onClick={() => onRescheduleBooking(booking)}
+                              disabled={isActionLoading}
+                            >
+                              <span className="booking-action-icon-symbol" aria-hidden="true">
+                                <IconSwap />
+                              </span>
+                              Перенести
+                            </button>
+                          )}
+                          {actionVariant === 'cancel' && (
+                            <button
+                              className="booking-action-icon is-cancel"
+                              type="button"
+                              onClick={() =>
+                                handleBookingAction(booking.id, 'client-cancel')
+                              }
+                              disabled={isActionLoading}
+                            >
+                              <span className="booking-action-icon-symbol" aria-hidden="true">
+                                <IconClose />
+                              </span>
+                              Отменить
+                            </button>
+                          )}
+                          {actionVariant === 'review' && (
+                            <button
+                              className="booking-action-icon is-review"
+                              type="button"
+                              onClick={() => {
+                                setReviewOpenId((current) =>
+                                  current === booking.id ? null : booking.id
+                                )
+                                setReviewErrors((current) => ({
+                                  ...current,
+                                  [booking.id]: '',
+                                }))
+                              }}
+                            >
+                              <span className="booking-action-icon-symbol" aria-hidden="true">
+                                <IconStar />
+                              </span>
+                              Отзыв
+                            </button>
+                          )}
+                          {actionVariant === 'delete' && (
+                            <button
+                              className="booking-action-icon is-delete"
+                              type="button"
+                              onClick={() =>
+                                handleBookingAction(booking.id, 'client-delete')
+                              }
+                              disabled={isActionLoading}
+                            >
+                              <span className="booking-action-icon-symbol" aria-hidden="true">
+                                <IconClose />
+                              </span>
+                              Удалить
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {actionVariant === 'reviewed' && (
+                        <div className="booking-action-row">
+                          <span className="booking-action-note">Отзыв отправлен</span>
+                        </div>
+                      )}
+                      {reviewOpenId === booking.id && (
+                        <div className="booking-review-form">
+                          <div className="booking-review-stars">
+                            {[1, 2, 3, 4, 5].map((value) => (
+                              <button
+                                key={`rating-${booking.id}-${value}`}
+                                className={`booking-review-star${
+                                  reviewDraft.rating >= value ? ' is-active' : ''
+                                }`}
+                                type="button"
+                                onClick={() => updateReviewDraft(booking.id, { rating: value })}
+                              >
+                                ★
+                              </button>
+                            ))}
+                          </div>
+                          <textarea
+                            className="booking-review-textarea"
+                            rows={3}
+                            placeholder="Напишите пару слов о мастере"
+                            value={reviewDraft.comment}
+                            onChange={(event) =>
+                              updateReviewDraft(booking.id, {
+                                comment: event.target.value,
+                              })
+                            }
+                          />
+                          <div className="booking-review-actions">
+                            <button
+                              className="booking-review-submit"
+                              type="button"
+                              onClick={() => handleReviewSubmit(booking)}
+                              disabled={isReviewSubmitting}
+                            >
+                              Отправить
+                            </button>
+                            <button
+                              className="booking-review-cancel"
+                              type="button"
+                              onClick={() => setReviewOpenId(null)}
+                              disabled={isReviewSubmitting}
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                          {reviewErrors[booking.id] && (
+                            <p className="booking-review-error">
+                              {reviewErrors[booking.id]}
+                            </p>
+                          )}
                         </div>
                       )}
                       {(canAcceptPrice || canDeclinePrice || canCancel) && (
