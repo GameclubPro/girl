@@ -387,13 +387,6 @@ export const ClientRequestsScreen = ({
   return (
     <div className="screen screen--requests">
       <div className="requests-shell">
-        <header className="requests-header animate delay-1">
-          <div className="request-heading-block">
-            <h1 className="request-title">Мои заявки и записи</h1>
-            <p className="request-subtitle">История заявок и записей</p>
-          </div>
-        </header>
-
         <section className="requests-card animate delay-2">
           <div className="requests-tabs" role="tablist" aria-label="Разделы">
             <button

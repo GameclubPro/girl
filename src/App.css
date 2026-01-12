@@ -73,11 +73,6 @@
   outline-offset: 2px;
 }
 
-.request-heading-block {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
 .request-title {
   margin: 0;
@@ -944,11 +939,6 @@
   gap: 14px;
 }
 
-.requests-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 
 .requests-card {
   background: rgba(var(--paper-rgb), 0.96);
