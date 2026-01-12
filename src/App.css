@@ -8468,11 +8468,11 @@ h2 {
 }
 
 .pin-stars--lavender {
-  --star-color: var(--accent);
+  --star-color: var(--ink);
 }
 
 .pin-stars--sun {
-  --star-color: var(--warning);
+  --star-color: var(--ink);
 }
 
 .pin-star {
@@ -10769,43 +10769,23 @@ h2 {
 }
 
 .collection-card--lavender {
-  background: linear-gradient(
-    150deg,
-    rgba(var(--accent-rgb), 0.12) 0%,
-    rgba(var(--surface-rgb), 0.98) 100%
-  );
+  background: linear-gradient(150deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
 }
 
 .collection-card--sun {
-  background: linear-gradient(
-    150deg,
-    rgba(var(--warning-rgb), 0.14) 0%,
-    rgba(var(--surface-rgb), 0.98) 100%
-  );
+  background: linear-gradient(150deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
 }
 
 .collection-card--mint {
-  background: linear-gradient(
-    150deg,
-    rgba(var(--success-rgb), 0.12) 0%,
-    rgba(var(--surface-rgb), 0.98) 100%
-  );
+  background: linear-gradient(150deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
 }
 
 .collection-card--rose {
-  background: linear-gradient(
-    150deg,
-    rgba(var(--danger-rgb), 0.12) 0%,
-    rgba(var(--surface-rgb), 0.98) 100%
-  );
+  background: linear-gradient(150deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
 }
 
 .collection-card--sky {
-  background: linear-gradient(
-    150deg,
-    rgba(var(--accent-rgb), 0.1) 0%,
-    rgba(var(--surface-rgb), 0.98) 100%
-  );
+  background: linear-gradient(150deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
 }
 
 .collection-tag {
@@ -10886,13 +10866,9 @@ h2 {
 }
 
 .category-card.is-selected {
-  border-color: var(--accent-strong);
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb), 0.14) 0%,
-    rgba(var(--paper-rgb), 0.94) 100%
-  );
-  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.22);
+  border-color: var(--ink);
+  background: linear-gradient(135deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
+  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.2);
 }
 
 .category-helper {
