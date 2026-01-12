@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   IconClock,
   IconHome,
@@ -194,6 +194,7 @@ export const ClientMasterProfileScreen = ({
     number | null
   >(null)
   const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false)
+  const scheduleInfoRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!masterId) return
@@ -280,6 +281,27 @@ export const ClientMasterProfileScreen = ({
     setPortfolioLightboxIndex(null)
     setIsScheduleInfoOpen(false)
   }, [masterId])
+
+  useEffect(() => {
+    if (!isScheduleInfoOpen) return
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (!target) {
+        setIsScheduleInfoOpen(false)
+        return
+      }
+      const container = scheduleInfoRef.current
+      if (container && container.contains(target)) {
+        return
+      }
+      setIsScheduleInfoOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [isScheduleInfoOpen])
 
   const serviceItems = useMemo(
     () => parseServiceItems(profile?.services ?? []),
@@ -678,7 +700,7 @@ export const ClientMasterProfileScreen = ({
                     {scheduleDays.length > 0 ? 'Дни приема' : 'График не указан'}
                   </p>
                 </div>
-                <div className="pro-profile-schedule-info-wrap">
+                <div className="pro-profile-schedule-info-wrap" ref={scheduleInfoRef}>
                   <button
                     className="pro-profile-schedule-info"
                     type="button"
