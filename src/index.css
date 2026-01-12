@@ -5,10 +5,18 @@
   --font-title: 'Sora', 'Segoe UI', sans-serif;
   --font-popular: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
   --ink: #0b2f6f;
+  --ink-rgb: 11 47 111;
   --muted: #4a4a4a;
+  --muted-rgb: 74 74 74;
   --cream: #ffffff;
   --paper: #ffffff;
+  --paper-rgb: 255 255 255;
+  --surface: #ffffff;
+  --surface-rgb: 255 255 255;
+  --surface-muted: #f8f8f8;
+  --surface-muted-rgb: 248 248 248;
   --accent: #1a4ea1;
+  --accent-rgb: 26 78 161;
   --accent-strong: #0b2f6f;
   --accent-soft: rgba(26, 78, 161, 0.12);
   --lavender: var(--ink);
@@ -17,8 +25,13 @@
   --sapphire-dark: #0b2f6f;
   --sapphire-soft: rgba(26, 78, 161, 0.12);
   --border: rgba(11, 47, 111, 0.12);
-  --surface: #ffffff;
-  --surface-muted: #f8f8f8;
+  --shadow-rgb: 15 23 42;
+  --success: #1f7a4d;
+  --success-rgb: 31 122 77;
+  --warning: #b86a00;
+  --warning-rgb: 184 106 0;
+  --danger: #b44b4b;
+  --danger-rgb: 180 75 75;
   --safe-top: max(
     env(safe-area-inset-top, 0px),
     var(--tg-safe-area-inset-top, 0px),
