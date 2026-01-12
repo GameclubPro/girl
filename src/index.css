@@ -4,34 +4,50 @@
   font-family: 'Manrope', 'Segoe UI', sans-serif;
   --font-title: 'Sora', 'Segoe UI', sans-serif;
   --font-popular: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
-  --ink: #111827;
-  --ink-rgb: 17, 24, 39;
-  --muted: #5b6472;
-  --muted-rgb: 91, 100, 114;
-  --cream: #ffffff;
-  --paper: #ffffff;
-  --paper-rgb: 255, 255, 255;
-  --surface: #ffffff;
-  --surface-rgb: 255, 255, 255;
-  --surface-muted: #f3f5f9;
-  --surface-muted-rgb: 243, 245, 249;
-  --accent: #2d6be6;
-  --accent-rgb: 45, 107, 230;
-  --accent-strong: #1a4ea1;
-  --accent-soft: rgba(45, 107, 230, 0.16);
+  --ink: #2c2622;
+  --ink-rgb: 44, 38, 34;
+  --muted: #6e6259;
+  --muted-rgb: 110, 98, 89;
+  --cream: #f8f2e9;
+  --paper: #fbf5ee;
+  --paper-rgb: 251, 245, 238;
+  --surface: #f6eee3;
+  --surface-rgb: 246, 238, 227;
+  --surface-muted: #efe3d6;
+  --surface-muted-rgb: 239, 227, 214;
+  --accent: #cc6a4a;
+  --accent-rgb: 204, 106, 74;
+  --accent-strong: #b1583d;
+  --accent-soft: rgba(204, 106, 74, 0.12);
   --lavender: var(--ink);
   --sun: var(--ink);
   --sapphire: var(--accent);
   --sapphire-dark: var(--accent-strong);
   --sapphire-soft: var(--accent-soft);
-  --border: rgba(17, 24, 39, 0.16);
-  --shadow-rgb: 17, 24, 39;
-  --success: #1f7a4d;
-  --success-rgb: 31, 122, 77;
-  --warning: #b86a00;
-  --warning-rgb: 184, 106, 0;
-  --danger: #b44b4b;
-  --danger-rgb: 180, 75, 75;
+  --border: rgba(118, 102, 90, 0.06);
+  --shadow-rgb: 118, 102, 90;
+  --success: #2d7a5d;
+  --success-rgb: 45, 122, 93;
+  --warning: #b9782f;
+  --warning-rgb: 185, 120, 47;
+  --danger: #b8665e;
+  --danger-rgb: 184, 102, 94;
+  --app-gradient: radial-gradient(
+      120% 120% at 8% 0%,
+      rgba(var(--accent-rgb), 0.08) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      140% 120% at 100% 0%,
+      rgba(var(--shadow-rgb), 0.08) 0%,
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(var(--paper-rgb), 0.82) 0%,
+      rgba(var(--surface-rgb), 0.98) 60%,
+      rgba(var(--surface-rgb), 0.98) 100%
+    );
   --safe-top: max(
     env(safe-area-inset-top, 0px),
     var(--tg-safe-area-inset-top, 0px),
@@ -59,6 +75,9 @@ body {
   margin: 0;
   min-height: 100dvh;
   background-color: var(--cream);
+  background-image: var(--app-gradient);
+  background-repeat: no-repeat;
+  background-size: cover;
   color: var(--ink);
 }
 
