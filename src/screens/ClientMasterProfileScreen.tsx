@@ -1025,7 +1025,7 @@ export const ClientMasterProfileScreen = ({
           </span>
           Мастера
         </button>
-        <button className="nav-item" type="button" onClick={onViewRequests}>
+        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
           </span>

@@ -528,7 +528,7 @@ export const ClientShowcaseGalleryScreen = ({
           </span>
           Мастера
         </button>
-        <button className="nav-item" type="button" onClick={onViewRequests}>
+        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
           </span>
@@ -563,7 +563,7 @@ export const ClientShowcaseDetailScreen = ({
   const favoritePayload = useMemo(
     () => ({
       masterId: item.masterId,
-      displayName: item.masterName,
+      displayName: item.masterName.trim() || 'Мастер',
       avatarUrl: item.masterAvatarUrl,
       categories: item.categories,
       cityName: item.cityName,
@@ -726,7 +726,7 @@ export const ClientShowcaseDetailScreen = ({
           </span>
           Мастера
         </button>
-        <button className="nav-item" type="button" onClick={onViewRequests}>
+        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
           </span>
@@ -1361,7 +1361,7 @@ export const ClientShowcaseScreen = ({
           </span>
           Мастера
         </button>
-        <button className="nav-item" type="button" onClick={onViewRequests}>
+        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
           </span>
