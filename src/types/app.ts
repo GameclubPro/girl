@@ -57,6 +57,7 @@ export type MasterProfile = {
   reviewsCount?: number | null
   reviewsAverage?: number | null
   distanceKm?: number | null
+  followersCount?: number | null
 }
 
 export type MasterReview = {

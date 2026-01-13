@@ -85,6 +85,13 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
 
+const formatDistanceLabel = (value: number) => {
+  if (value < 1) {
+    return `${Math.round(value * 1000)} м`
+  }
+  return `${value.toFixed(1).replace('.', ',')} км`
+}
+
 const buildLocationLabel = (profile: MasterProfile | null) => {
   if (!profile) return 'Локация не указана'
   const parts = [profile.cityName, profile.districtName].filter(Boolean)
@@ -177,6 +184,8 @@ const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
 
 const PORTFOLIO_PREVIEW_LIMIT = 4
 
+type MasterProfileTabId = 'overview' | 'portfolio' | 'schedule' | 'reviews'
+
 export const ClientMasterProfileScreen = ({
   apiBase,
   masterId,
@@ -203,6 +212,7 @@ export const ClientMasterProfileScreen = ({
     number | null
   >(null)
   const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<MasterProfileTabId>('overview')
   const scheduleInfoRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -289,6 +299,7 @@ export const ClientMasterProfileScreen = ({
     setIsPortfolioExpanded(false)
     setPortfolioLightboxIndex(null)
     setIsScheduleInfoOpen(false)
+    setActiveTab('overview')
   }, [masterId])
 
   useEffect(() => {
@@ -311,6 +322,25 @@ export const ClientMasterProfileScreen = ({
       document.removeEventListener('pointerdown', handlePointerDown)
     }
   }, [isScheduleInfoOpen])
+
+  useEffect(() => {
+    if (activeTab !== 'schedule') {
+      setIsScheduleInfoOpen(false)
+    }
+  }, [activeTab])
+
+  const handleTabChange = (nextTab: MasterProfileTabId) => {
+    setActiveTab(nextTab)
+    const panel = document.getElementById('master-profile-panel')
+    if (!panel) return
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches
+    panel.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    })
+  }
 
   const serviceItems = useMemo(
     () => parseServiceItems(profile?.services ?? []),
@@ -342,21 +372,41 @@ export const ClientMasterProfileScreen = ({
   const reviewAverage = reviewSummary?.average ?? 0
   const reviewDistribution = reviewSummary?.distribution ?? []
   const reviewCountLabel = reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
+  const followersCount =
+    typeof profile?.followersCount === 'number' &&
+    Number.isFinite(profile.followersCount)
+      ? Math.max(0, Math.round(profile.followersCount))
+      : 0
+  const followersValue = followersCount.toLocaleString('ru-RU')
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
   const profileStats = [
     { label: 'Работы', value: String(portfolioCount) },
     { label: 'Рейтинг', value: reviewAverageLabel },
     { label: 'Отзывы', value: String(reviewCount) },
+    { label: 'Подписчики', value: followersValue },
   ]
   const priceLabel = formatPriceRange(
     profile?.priceFrom ?? null,
     profile?.priceTo ?? null
   )
   const experienceLabel = formatExperience(profile?.experienceYears ?? null)
-  const locationLabel = buildLocationLabel(profile)
+  const distanceKm =
+    typeof profile?.distanceKm === 'number' && Number.isFinite(profile.distanceKm)
+      ? Math.max(0, profile.distanceKm)
+      : null
+  const distanceLabel = distanceKm !== null ? formatDistanceLabel(distanceKm) : null
+  const locationLabelBase = buildLocationLabel(profile)
+  const locationLabel =
+    distanceLabel && locationLabelBase !== 'Локация не указана'
+      ? `${locationLabelBase} · ${distanceLabel}`
+      : distanceLabel
+        ? `Рядом · ${distanceLabel}`
+        : locationLabelBase
   const workFormatLabel = buildWorkFormatLabel(profile)
-  const hasLocation = Boolean(profile?.cityName || profile?.districtName)
+  const hasLocation = Boolean(
+    profile?.cityName || profile?.districtName || distanceLabel
+  )
   const hasWorkFormat = Boolean(profile?.worksAtClient || profile?.worksAtMaster)
   const hasPrice =
     typeof profile?.priceFrom === 'number' || typeof profile?.priceTo === 'number'
@@ -466,6 +516,10 @@ export const ClientMasterProfileScreen = ({
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_PREVIEW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded
   const isFavorite = favorites.some((favorite) => favorite.masterId === masterId)
+  const followActionLabel = isFavorite ? 'Вы подписаны' : 'Подписаться'
+  const followAriaLabel = isFavorite
+    ? 'Отписаться от мастера'
+    : 'Подписаться на мастера'
   const favoritePayload = useMemo(
     () => ({
       masterId,
@@ -485,6 +539,12 @@ export const ClientMasterProfileScreen = ({
   const visiblePortfolioItems = portfolioGridItems
   const portfolioCountLabel =
     portfolioGridItems.length > 0 ? `${portfolioGridItems.length} фото` : 'Нет фото'
+  const masterTabs: { id: MasterProfileTabId; label: string; badge?: number }[] = [
+    { id: 'overview', label: 'Обзор' },
+    { id: 'portfolio', label: 'Портфолио', badge: portfolioGridItems.length },
+    { id: 'schedule', label: 'График' },
+    { id: 'reviews', label: 'Отзывы', badge: reviewCount },
+  ]
 
   const portfolioLightboxItem =
     portfolioLightboxIndex !== null ? portfolioItems[portfolioLightboxIndex] ?? null : null
@@ -522,7 +582,7 @@ export const ClientMasterProfileScreen = ({
             className={`master-profile-like${isFavorite ? ' is-active' : ''}`}
             type="button"
             onClick={() => onToggleFavorite(favoritePayload)}
-            aria-label={isFavorite ? 'Убрать из избранного' : 'В избранное'}
+            aria-label={followAriaLabel}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -588,69 +648,6 @@ export const ClientMasterProfileScreen = ({
                   </span>
                 </div>
               </div>
-              <div className="pro-profile-ig-body">
-                <div className="pro-profile-status-card">
-                  <div className="pro-profile-status-head">
-                    <span className="pro-profile-status-title">Статус</span>
-                    <span className="pro-profile-status-tag">статус мастера</span>
-                  </div>
-                  <p
-                    className={`pro-profile-status-text${
-                      aboutValue ? '' : ' is-muted'
-                    }`}
-                  >
-                    {aboutText}
-                  </p>
-                </div>
-                <div className="pro-profile-facts-grid">
-                  {profileFacts.map((fact) => (
-                    <div
-                      className={`pro-profile-fact-card${
-                        fact.isMuted ? ' is-muted' : ''
-                      }`}
-                      key={fact.label}
-                    >
-                      <span
-                        className={`pro-profile-fact-icon is-${fact.id}`}
-                        aria-hidden="true"
-                      >
-                        {fact.icon}
-                      </span>
-                      <div className="pro-profile-fact-info">
-                        <span className="pro-profile-fact-value">{fact.value}</span>
-                        <span className="pro-profile-fact-label">{fact.label}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="pro-profile-ig-tags">
-                  {previewTags.length > 0 ? (
-                    <>
-                      {previewTags.map((label, index) => (
-                        <span className="pro-profile-tag" key={`${label}-${index}`}>
-                          {label}
-                        </span>
-                      ))}
-                      {previewTagRemainder > 0 && (
-                        <span className="pro-profile-tag is-muted">
-                          +{previewTagRemainder}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="pro-profile-tag is-muted">
-                      Теги появятся здесь
-                    </span>
-                  )}
-                  {reviewCount > 0 ? (
-                    <span className="pro-profile-tag is-review">
-                      ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
-                    </span>
-                  ) : (
-                    <span className="pro-profile-tag is-muted">Нет отзывов</span>
-                  )}
-                </div>
-              </div>
               <div className="pro-profile-ig-actions">
                 <button
                   className="pro-profile-ig-button pro-profile-ig-button--primary"
@@ -658,6 +655,21 @@ export const ClientMasterProfileScreen = ({
                   onClick={onCreateBooking}
                 >
                   Записаться
+                </button>
+                <button
+                  className={`pro-profile-ig-button master-profile-follow-button${
+                    isFavorite ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => onToggleFavorite(favoritePayload)}
+                  aria-label={followAriaLabel}
+                >
+                  <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                    <IconUsers />
+                  </span>
+                  <span className="pro-profile-ig-button-label">
+                    {followActionLabel}
+                  </span>
                 </button>
                 <button
                   className="pro-profile-ig-button"
@@ -669,296 +681,424 @@ export const ClientMasterProfileScreen = ({
               </div>
             </section>
 
-            <section className="pro-profile-portfolio-panel animate delay-2">
-              <div className="pro-profile-portfolio-panel-head">
-                <div className="pro-profile-portfolio-panel-controls">
-                  <span className="pro-profile-portfolio-panel-count">
-                    {portfolioCountLabel}
-                  </span>
-                  {hasPortfolioOverflow && (
-                    <button
-                      className="pro-profile-portfolio-panel-action"
-                      type="button"
-                      onClick={() => setIsPortfolioExpanded((current) => !current)}
-                      aria-expanded={isPortfolioExpanded}
-                    >
-                      {isPortfolioExpanded ? 'Свернуть' : 'Все фото'}
-                    </button>
+            <div
+              className="master-profile-tabs"
+              role="tablist"
+              aria-label="Разделы профиля мастера"
+            >
+              {masterTabs.map((tab) => (
+                <button
+                  className={`master-profile-tab${
+                    activeTab === tab.id ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  key={tab.id}
+                  id={`master-profile-tab-${tab.id}`}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls="master-profile-panel"
+                  onClick={() => handleTabChange(tab.id)}
+                >
+                  <span>{tab.label}</span>
+                  {typeof tab.badge === 'number' && tab.badge > 0 && (
+                    <span className="master-profile-tab-badge" aria-hidden="true">
+                      {tab.badge}
+                    </span>
                   )}
-                </div>
-              </div>
-              <div
-                className={`pro-profile-portfolio-grid${
-                  isPortfolioCollapsed ? ' is-collapsed' : ''
-                }`}
-                role="list"
-                aria-label="Портфолио"
-              >
-                {visiblePortfolioItems.length > 0 ? (
-                  visiblePortfolioItems.map(({ item, index }) => {
-                    const focus = resolvePortfolioFocus(item)
-                    const showImage = isImageUrl(item.url)
-                    const isInShowcase = showcaseItems.some(
-                      (showcaseItem) => showcaseItem.url === item.url
-                    )
-                    return (
-                      <button
-                        className="pro-profile-portfolio-item"
-                        key={`${item.url}-${index}`}
-                        type="button"
-                        onClick={() => setPortfolioLightboxIndex(index)}
-                        role="listitem"
-                        aria-label={`Открыть работу ${index + 1}`}
-                      >
-                        {showImage ? (
-                          <img
-                            src={item.url}
-                            alt=""
-                            loading="lazy"
-                            style={{ objectPosition: focus.position }}
-                          />
-                        ) : (
-                          <span className="pro-profile-portfolio-fallback">LINK</span>
-                        )}
-                        {isInShowcase && (
-                          <span
-                            className="pro-profile-portfolio-badge"
-                            aria-hidden="true"
-                            title="В витрине"
-                          >
-                            ✦
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })
-                ) : (
-                  <div className="pro-profile-portfolio-empty" role="listitem">
-                    У мастера пока нет работ.
-                  </div>
-                )}
-              </div>
-            </section>
+                </button>
+              ))}
+            </div>
 
-            <section className="pro-profile-schedule-panel animate delay-2">
-              <div className="pro-profile-schedule-head">
-                <div>
-                  <h3 className="pro-profile-schedule-title">График работы</h3>
-                  <p className="pro-profile-schedule-subtitle">
-                    {scheduleDays.length > 0 ? 'Дни приема' : 'График не указан'}
-                  </p>
-                </div>
-                <div className="pro-profile-schedule-info-wrap" ref={scheduleInfoRef}>
-                  <button
-                    className="pro-profile-schedule-info"
-                    type="button"
-                    aria-label="Показать график"
-                    aria-expanded={isScheduleInfoOpen}
-                    aria-controls="pro-profile-schedule-popover"
-                    onClick={() => setIsScheduleInfoOpen((current) => !current)}
-                  >
-                    i
-                  </button>
-                  {isScheduleInfoOpen && (
-                    <div
-                      className="pro-profile-schedule-popover"
-                      id="pro-profile-schedule-popover"
-                      role="tooltip"
+            <div
+              id="master-profile-panel"
+              className="master-profile-panel"
+              role="tabpanel"
+              aria-labelledby={`master-profile-tab-${activeTab}`}
+              key={activeTab}
+            >
+              {activeTab === 'overview' && (
+                <div className="pro-profile-ig-body master-profile-overview animate delay-2">
+                  <div className="pro-profile-status-card">
+                    <div className="pro-profile-status-head">
+                      <span className="pro-profile-status-title">Статус</span>
+                      <span className="pro-profile-status-tag">статус мастера</span>
+                    </div>
+                    <p
+                      className={`pro-profile-status-text${
+                        aboutValue ? '' : ' is-muted'
+                      }`}
                     >
-                      <p className="pro-profile-schedule-popover-title">График</p>
-                      <div className="pro-profile-schedule-popover-row">
-                        <span className="pro-profile-schedule-popover-label">
-                          Рабочие дни
-                        </span>
+                      {aboutText}
+                    </p>
+                  </div>
+                  <div className="pro-profile-facts-grid">
+                    {profileFacts.map((fact) => (
+                      <div
+                        className={`pro-profile-fact-card${
+                          fact.isMuted ? ' is-muted' : ''
+                        }`}
+                        key={fact.label}
+                      >
                         <span
-                          className={`pro-profile-schedule-popover-value${
-                            hasScheduleDays ? '' : ' is-muted'
-                          }`}
+                          className={`pro-profile-fact-icon is-${fact.id}`}
+                          aria-hidden="true"
                         >
-                          {workingDaysLabel}
+                          {fact.icon}
                         </span>
+                        <div className="pro-profile-fact-info">
+                          <span className="pro-profile-fact-value">
+                            {fact.value}
+                          </span>
+                          <span className="pro-profile-fact-label">
+                            {fact.label}
+                          </span>
+                        </div>
                       </div>
-                      <div className="pro-profile-schedule-popover-row">
-                        <span className="pro-profile-schedule-popover-label">
-                          Выходные
-                        </span>
-                        <span
-                          className={`pro-profile-schedule-popover-value${
-                            hasScheduleDays ? '' : ' is-muted'
-                          }`}
-                        >
-                          {offDaysLabel}
-                        </span>
-                      </div>
-                      <div className="pro-profile-schedule-popover-row">
-                        <span className="pro-profile-schedule-popover-label">
-                          Время
-                        </span>
-                        <span
-                          className={`pro-profile-schedule-popover-value${
-                            hasScheduleRange ? '' : ' is-muted'
-                          }`}
-                        >
-                          {scheduleRange}
-                        </span>
-                      </div>
-                      <div className="pro-profile-schedule-popover-week" role="list">
-                        {scheduleWeek.map((day) => (
-                          <span
-                            className={`pro-profile-schedule-popover-day${
-                              day.isActive ? ' is-active' : ''
-                            }`}
-                            key={`popover-${day.id}`}
-                            role="listitem"
-                          >
-                            {day.label}
+                    ))}
+                  </div>
+                  <div className="pro-profile-ig-tags">
+                    {previewTags.length > 0 ? (
+                      <>
+                        {previewTags.map((label, index) => (
+                          <span className="pro-profile-tag" key={`${label}-${index}`}>
+                            {label}
                           </span>
                         ))}
-                      </div>
-                      <div
-                        className={`pro-profile-schedule-timebar${
-                          hasScheduleTimebar ? '' : ' is-muted'
-                        }`}
-                        style={scheduleTimeStyle}
-                      />
-                      <div className="pro-profile-schedule-timebar-scale">
-                        <span>0:00</span>
-                        <span>24:00</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="pro-profile-schedule-week" role="list">
-                {scheduleWeek.map((day) => (
-                  <span
-                    className={`pro-profile-schedule-day${
-                      day.isActive ? ' is-active' : ''
-                    }`}
-                    key={day.id}
-                    role="listitem"
-                  >
-                    {day.label}
-                  </span>
-                ))}
-              </div>
-              <div className="pro-profile-schedule-range">
-                <span className="pro-profile-schedule-range-label">Время</span>
-                <span
-                  className={`pro-profile-schedule-range-value${
-                    hasScheduleRange ? '' : ' is-muted'
-                  }`}
-                >
-                  {scheduleRange}
-                </span>
-              </div>
-            </section>
-
-            <section className="pro-profile-reviews animate delay-3">
-              <div className="pro-profile-reviews-head">
-                <div>
-                  <p className="pro-profile-reviews-kicker">Отзывы</p>
-                  <h2 className="pro-profile-reviews-title">Отзывы клиентов</h2>
-                </div>
-                <span className="pro-profile-reviews-count-pill">
-                  {reviewCountLabel}
-                </span>
-              </div>
-
-              {isReviewsLoading ? (
-                <div className="pro-profile-reviews-skeleton" aria-hidden="true">
-                  <div className="pro-profile-reviews-skeleton-line is-wide" />
-                  <div className="pro-profile-reviews-skeleton-line" />
-                  <div className="pro-profile-reviews-skeleton-line is-short" />
-                </div>
-              ) : reviewsError ? (
-                <p className="pro-error">{reviewsError}</p>
-              ) : reviewCount > 0 ? (
-                <>
-                  <div className="pro-profile-reviews-summary">
-                    <div className="pro-profile-reviews-score">
-                      <span className="pro-profile-reviews-average">
-                        {reviewAverage.toFixed(1)}
-                      </span>
-                      <span className="pro-profile-reviews-stars">
-                        {buildStars(reviewAverage)}
-                      </span>
-                      <span className="pro-profile-reviews-count">
-                        {reviewCountLabel}
-                      </span>
-                    </div>
-                    <div className="pro-profile-reviews-bars">
-                      {reviewDistribution.map((entry) => {
-                        const percent =
-                          reviewCount > 0 ? (entry.count / reviewCount) * 100 : 0
-                        return (
-                          <div
-                            className="pro-profile-reviews-bar"
-                            key={`rating-${entry.rating}`}
-                          >
-                            <span className="pro-profile-reviews-bar-label">
-                              {entry.rating}
-                            </span>
-                            <span className="pro-profile-reviews-bar-track">
-                              <span
-                                className="pro-profile-reviews-bar-fill"
-                                style={{ width: `${percent}%` }}
-                              />
-                            </span>
-                            <span className="pro-profile-reviews-bar-count">
-                              {entry.count}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div className="pro-profile-reviews-list">
-                    {reviews.map((review) => {
-                      const reviewerName = buildReviewerName(review)
-                      const reviewerInitials = getInitials(reviewerName)
-                      const dateLabel = formatReviewDate(review.createdAt)
-                      const comment = review.comment?.trim() || 'Без комментария.'
-
-                      return (
-                        <article className="pro-profile-review-card" key={review.id}>
-                          <span className="pro-profile-review-avatar" aria-hidden="true">
-                            {reviewerInitials}
+                        {previewTagRemainder > 0 && (
+                          <span className="pro-profile-tag is-muted">
+                            +{previewTagRemainder}
                           </span>
-                          <div className="pro-profile-review-body">
-                            <div className="pro-profile-review-head">
-                              <span className="pro-profile-review-name">
-                                {reviewerName}
-                              </span>
-                              <span className="pro-profile-review-rating">
-                                {buildStars(review.rating)}
-                              </span>
-                            </div>
-                            {(review.serviceName || dateLabel) && (
-                              <div className="pro-profile-review-meta">
-                                {review.serviceName && (
-                                  <span className="pro-profile-review-service">
-                                    {review.serviceName}
-                                  </span>
-                                )}
-                                {dateLabel && (
-                                  <span className="pro-profile-review-date">
-                                    {dateLabel}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            <p className="pro-profile-review-text">{comment}</p>
-                          </div>
-                        </article>
-                      )
-                    })}
+                        )}
+                      </>
+                    ) : (
+                      <span className="pro-profile-tag is-muted">
+                        Теги появятся здесь
+                      </span>
+                    )}
+                    {reviewCount > 0 ? (
+                      <span className="pro-profile-tag is-review">
+                        ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                      </span>
+                    ) : (
+                      <span className="pro-profile-tag is-muted">Нет отзывов</span>
+                    )}
                   </div>
-                </>
-              ) : (
-                <p className="pro-profile-reviews-empty">Пока нет отзывов.</p>
+                </div>
               )}
-            </section>
+
+              {activeTab === 'portfolio' && (
+                <section className="pro-profile-portfolio-panel animate delay-2">
+                  <div className="pro-profile-portfolio-panel-head">
+                    <div className="pro-profile-portfolio-panel-controls">
+                      <span className="pro-profile-portfolio-panel-count">
+                        {portfolioCountLabel}
+                      </span>
+                      {hasPortfolioOverflow && (
+                        <button
+                          className="pro-profile-portfolio-panel-action"
+                          type="button"
+                          onClick={() => setIsPortfolioExpanded((current) => !current)}
+                          aria-expanded={isPortfolioExpanded}
+                        >
+                          {isPortfolioExpanded ? 'Свернуть' : 'Все фото'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    className={`pro-profile-portfolio-grid${
+                      isPortfolioCollapsed ? ' is-collapsed' : ''
+                    }`}
+                    role="list"
+                    aria-label="Портфолио"
+                  >
+                    {visiblePortfolioItems.length > 0 ? (
+                      visiblePortfolioItems.map(({ item, index }) => {
+                        const focus = resolvePortfolioFocus(item)
+                        const showImage = isImageUrl(item.url)
+                        const isInShowcase = showcaseItems.some(
+                          (showcaseItem) => showcaseItem.url === item.url
+                        )
+                        return (
+                          <button
+                            className="pro-profile-portfolio-item"
+                            key={`${item.url}-${index}`}
+                            type="button"
+                            onClick={() => setPortfolioLightboxIndex(index)}
+                            role="listitem"
+                            aria-label={`Открыть работу ${index + 1}`}
+                          >
+                            {showImage ? (
+                              <img
+                                src={item.url}
+                                alt=""
+                                loading="lazy"
+                                style={{ objectPosition: focus.position }}
+                              />
+                            ) : (
+                              <span className="pro-profile-portfolio-fallback">
+                                LINK
+                              </span>
+                            )}
+                            {isInShowcase && (
+                              <span
+                                className="pro-profile-portfolio-badge"
+                                aria-hidden="true"
+                                title="В витрине"
+                              >
+                                ✦
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })
+                    ) : (
+                      <div className="pro-profile-portfolio-empty" role="listitem">
+                        У мастера пока нет работ.
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {activeTab === 'schedule' && (
+                <section className="pro-profile-schedule-panel animate delay-2">
+                  <div className="pro-profile-schedule-head">
+                    <div>
+                      <h3 className="pro-profile-schedule-title">График работы</h3>
+                      <p className="pro-profile-schedule-subtitle">
+                        {scheduleDays.length > 0 ? 'Дни приема' : 'График не указан'}
+                      </p>
+                    </div>
+                    <div
+                      className="pro-profile-schedule-info-wrap"
+                      ref={scheduleInfoRef}
+                    >
+                      <button
+                        className="pro-profile-schedule-info"
+                        type="button"
+                        aria-label="Показать график"
+                        aria-expanded={isScheduleInfoOpen}
+                        aria-controls="pro-profile-schedule-popover"
+                        onClick={() => setIsScheduleInfoOpen((current) => !current)}
+                      >
+                        i
+                      </button>
+                      {isScheduleInfoOpen && (
+                        <div
+                          className="pro-profile-schedule-popover"
+                          id="pro-profile-schedule-popover"
+                          role="tooltip"
+                        >
+                          <p className="pro-profile-schedule-popover-title">
+                            График
+                          </p>
+                          <div className="pro-profile-schedule-popover-row">
+                            <span className="pro-profile-schedule-popover-label">
+                              Рабочие дни
+                            </span>
+                            <span
+                              className={`pro-profile-schedule-popover-value${
+                                hasScheduleDays ? '' : ' is-muted'
+                              }`}
+                            >
+                              {workingDaysLabel}
+                            </span>
+                          </div>
+                          <div className="pro-profile-schedule-popover-row">
+                            <span className="pro-profile-schedule-popover-label">
+                              Выходные
+                            </span>
+                            <span
+                              className={`pro-profile-schedule-popover-value${
+                                hasScheduleDays ? '' : ' is-muted'
+                              }`}
+                            >
+                              {offDaysLabel}
+                            </span>
+                          </div>
+                          <div className="pro-profile-schedule-popover-row">
+                            <span className="pro-profile-schedule-popover-label">
+                              Время
+                            </span>
+                            <span
+                              className={`pro-profile-schedule-popover-value${
+                                hasScheduleRange ? '' : ' is-muted'
+                              }`}
+                            >
+                              {scheduleRange}
+                            </span>
+                          </div>
+                          <div
+                            className="pro-profile-schedule-popover-week"
+                            role="list"
+                          >
+                            {scheduleWeek.map((day) => (
+                              <span
+                                className={`pro-profile-schedule-popover-day${
+                                  day.isActive ? ' is-active' : ''
+                                }`}
+                                key={`popover-${day.id}`}
+                                role="listitem"
+                              >
+                                {day.label}
+                              </span>
+                            ))}
+                          </div>
+                          <div
+                            className={`pro-profile-schedule-timebar${
+                              hasScheduleTimebar ? '' : ' is-muted'
+                            }`}
+                            style={scheduleTimeStyle}
+                          />
+                          <div className="pro-profile-schedule-timebar-scale">
+                            <span>0:00</span>
+                            <span>24:00</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="pro-profile-schedule-week" role="list">
+                    {scheduleWeek.map((day) => (
+                      <span
+                        className={`pro-profile-schedule-day${
+                          day.isActive ? ' is-active' : ''
+                        }`}
+                        key={day.id}
+                        role="listitem"
+                      >
+                        {day.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="pro-profile-schedule-range">
+                    <span className="pro-profile-schedule-range-label">Время</span>
+                    <span
+                      className={`pro-profile-schedule-range-value${
+                        hasScheduleRange ? '' : ' is-muted'
+                      }`}
+                    >
+                      {scheduleRange}
+                    </span>
+                  </div>
+                </section>
+              )}
+
+              {activeTab === 'reviews' && (
+                <section className="pro-profile-reviews animate delay-3">
+                  <div className="pro-profile-reviews-head">
+                    <div>
+                      <p className="pro-profile-reviews-kicker">Отзывы</p>
+                      <h2 className="pro-profile-reviews-title">Отзывы клиентов</h2>
+                    </div>
+                    <span className="pro-profile-reviews-count-pill">
+                      {reviewCountLabel}
+                    </span>
+                  </div>
+
+                  {isReviewsLoading ? (
+                    <div className="pro-profile-reviews-skeleton" aria-hidden="true">
+                      <div className="pro-profile-reviews-skeleton-line is-wide" />
+                      <div className="pro-profile-reviews-skeleton-line" />
+                      <div className="pro-profile-reviews-skeleton-line is-short" />
+                    </div>
+                  ) : reviewsError ? (
+                    <p className="pro-error">{reviewsError}</p>
+                  ) : reviewCount > 0 ? (
+                    <>
+                      <div className="pro-profile-reviews-summary">
+                        <div className="pro-profile-reviews-score">
+                          <span className="pro-profile-reviews-average">
+                            {reviewAverage.toFixed(1)}
+                          </span>
+                          <span className="pro-profile-reviews-stars">
+                            {buildStars(reviewAverage)}
+                          </span>
+                          <span className="pro-profile-reviews-count">
+                            {reviewCountLabel}
+                          </span>
+                        </div>
+                        <div className="pro-profile-reviews-bars">
+                          {reviewDistribution.map((entry) => {
+                            const percent =
+                              reviewCount > 0
+                                ? (entry.count / reviewCount) * 100
+                                : 0
+                            return (
+                              <div
+                                className="pro-profile-reviews-bar"
+                                key={`rating-${entry.rating}`}
+                              >
+                                <span className="pro-profile-reviews-bar-label">
+                                  {entry.rating}
+                                </span>
+                                <span className="pro-profile-reviews-bar-track">
+                                  <span
+                                    className="pro-profile-reviews-bar-fill"
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </span>
+                                <span className="pro-profile-reviews-bar-count">
+                                  {entry.count}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <div className="pro-profile-reviews-list">
+                        {reviews.map((review) => {
+                          const reviewerName = buildReviewerName(review)
+                          const reviewerInitials = getInitials(reviewerName)
+                          const dateLabel = formatReviewDate(review.createdAt)
+                          const comment =
+                            review.comment?.trim() || 'Без комментария.'
+
+                          return (
+                            <article className="pro-profile-review-card" key={review.id}>
+                              <span
+                                className="pro-profile-review-avatar"
+                                aria-hidden="true"
+                              >
+                                {reviewerInitials}
+                              </span>
+                              <div className="pro-profile-review-body">
+                                <div className="pro-profile-review-head">
+                                  <span className="pro-profile-review-name">
+                                    {reviewerName}
+                                  </span>
+                                  <span className="pro-profile-review-rating">
+                                    {buildStars(review.rating)}
+                                  </span>
+                                </div>
+                                {(review.serviceName || dateLabel) && (
+                                  <div className="pro-profile-review-meta">
+                                    {review.serviceName && (
+                                      <span className="pro-profile-review-service">
+                                        {review.serviceName}
+                                      </span>
+                                    )}
+                                    {dateLabel && (
+                                      <span className="pro-profile-review-date">
+                                        {dateLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                <p className="pro-profile-review-text">{comment}</p>
+                              </div>
+                            </article>
+                          )
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="pro-profile-reviews-empty">Пока нет отзывов.</p>
+                  )}
+                </section>
+              )}
+            </div>
           </>
         ) : null}
       </div>
