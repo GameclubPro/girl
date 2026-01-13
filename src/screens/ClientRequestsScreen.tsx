@@ -187,6 +187,7 @@ type ClientRequestsScreenProps = {
   onViewMasters: () => void
   onViewProfile: (masterId: string) => void
   onRescheduleBooking: (booking: Booking) => void
+  onOpenChat: (chatId: number) => void
 }
 
 type BookingCalendarItem = {
@@ -205,6 +206,7 @@ export const ClientRequestsScreen = ({
   onViewMasters,
   onViewProfile,
   onRescheduleBooking,
+  onOpenChat,
 }: ClientRequestsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>(
     initialTab ?? 'requests'
@@ -638,6 +640,9 @@ export const ClientRequestsScreen = ({
           body: JSON.stringify({ userId, action }),
         }
       )
+      const data = (await response.json().catch(() => null)) as
+        | { status?: string; requestStatus?: string; chatId?: number | null }
+        | null
 
       if (!response.ok) {
         throw new Error('Response update failed')
@@ -649,11 +654,16 @@ export const ClientRequestsScreen = ({
         const rejectedStatus: RequestResponse['status'] = 'rejected'
         const nextStatus: RequestResponse['status'] =
           action === 'accept' ? acceptedStatus : rejectedStatus
+        const nextChatId =
+          action === 'accept' && typeof data?.chatId === 'number'
+            ? data.chatId
+            : null
         const next = items.map((item): RequestResponse => {
           if (item.id === responseId) {
             return {
               ...item,
               status: nextStatus,
+              chatId: nextChatId ?? item.chatId ?? null,
             }
           }
           if (action === 'accept' && item.status === 'sent') {
@@ -1100,6 +1110,22 @@ export const ClientRequestsScreen = ({
                                       Отклонить
                                     </button>
                                   </div>
+                                )}
+                                {isAccepted && responseItem.chatId && (
+                                  <div className="response-actions">
+                                    <button
+                                      className="response-action is-primary"
+                                      type="button"
+                                      onClick={() => onOpenChat(responseItem.chatId!)}
+                                    >
+                                      Перейти в чат
+                                    </button>
+                                  </div>
+                                )}
+                                {isAccepted && !responseItem.chatId && (
+                                  <p className="response-status">
+                                    Чат создается...
+                                  </p>
                                 )}
                                 {responseActionError[responseItem.id] && (
                                   <p className="response-error">

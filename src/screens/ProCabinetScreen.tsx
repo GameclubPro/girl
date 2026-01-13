@@ -9,6 +9,7 @@ type ProCabinetScreenProps = {
   displayNameFallback: string
   onEditProfile: (section?: ProProfileSection) => void
   onViewRequests: () => void
+  onViewChats: () => void
 }
 
 type CalendarFilter = 'all' | 'bookings' | 'requests'
@@ -152,6 +153,7 @@ export const ProCabinetScreen = ({
   displayNameFallback,
   onEditProfile,
   onViewRequests,
+  onViewChats,
 }: ProCabinetScreenProps) => {
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -672,6 +674,7 @@ export const ProCabinetScreen = ({
         active="cabinet"
         onCabinet={() => {}}
         onRequests={onViewRequests}
+        onChats={onViewChats}
         onProfile={() => onEditProfile()}
       />
     </div>

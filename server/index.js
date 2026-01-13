@@ -1,6 +1,7 @@
 import dotenv from 'dotenv'
 import cors from 'cors'
 import express from 'express'
+import { WebSocketServer } from 'ws'
 import { Pool } from 'pg'
 import { randomUUID } from 'crypto'
 import fs from 'fs/promises'
@@ -19,6 +20,17 @@ const REQUEST_EXPANDED_BATCH_SIZE = 20
 const REQUEST_RESPONSE_WINDOW_MINUTES = 30
 const REQUEST_DISPATCH_SCAN_INTERVAL_MS = 60_000
 const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
+const CHAT_MESSAGE_DEFAULT_LIMIT = 30
+const CHAT_MESSAGE_MAX_LIMIT = 80
+const CHAT_STREAM_PATH = '/api/chats/stream'
+const chatMessageTypes = new Set([
+  'text',
+  'image',
+  'system',
+  'offer_price',
+  'offer_time',
+  'offer_location',
+])
 
 app.use(cors({ origin: corsOrigin }))
 app.use(express.json({ limit: '12mb' }))
@@ -43,6 +55,7 @@ const createPool = () => {
 }
 
 const pool = createPool()
+const chatClientsByUserId = new Map()
 
 const normalizeText = (value) => {
   if (typeof value !== 'string') return ''
@@ -233,6 +246,14 @@ const buildRequestUploadPath = (safeUserId, mime) => {
   return { relativePath, absolutePath }
 }
 
+const buildChatUploadPath = (safeUserId, mime) => {
+  const ext = getImageExtension(mime)
+  const filename = `chat-${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`
+  const relativePath = path.posix.join('chats', safeUserId, filename)
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  return { relativePath, absolutePath }
+}
+
 const normalizeUploadPath = (value) => {
   const normalized = normalizeText(value)
   if (!normalized) return ''
@@ -274,6 +295,15 @@ const isSafeRequestUploadPath = (safeUserId, relativePath) => {
   return path.normalize(absolutePath).startsWith(safeBase)
 }
 
+const isSafeChatUploadPath = (safeUserId, relativePath) => {
+  if (!relativePath || relativePath.includes('..')) return false
+  const prefix = `chats/${safeUserId}/`
+  if (!relativePath.startsWith(prefix)) return false
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  const safeBase = path.join(uploadsRoot, 'chats', safeUserId)
+  return path.normalize(absolutePath).startsWith(safeBase)
+}
+
 const buildPublicUrl = (req, relativePath) => {
   const normalized = normalizeText(relativePath)
   if (!normalized) return null
@@ -282,6 +312,114 @@ const buildPublicUrl = (req, relativePath) => {
     process.env.PUBLIC_BASE_URL ?? `${req.protocol}://${req.get('host')}`
   const safePath = normalized.replace(/^\/+/, '')
   return `${baseUrl}/uploads/${safePath}`
+}
+
+const formatUserDisplayName = (firstName, lastName, username, fallback) => {
+  const parts = [normalizeText(firstName), normalizeText(lastName)].filter(Boolean)
+  const name = parts.join(' ').trim()
+  if (name) return name
+  const handle = normalizeText(username)
+  if (handle) return `@${handle}`
+  return fallback
+}
+
+const safeJson = (value) => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'object') return value
+  if (typeof value !== 'string') return null
+  try {
+    return JSON.parse(value)
+  } catch (error) {
+    return null
+  }
+}
+
+const telegramBotToken = normalizeText(process.env.BOT_TOKEN)
+const telegramWebAppUrl = normalizeText(process.env.WEB_APP_URL)
+const telegramApiBase = 'https://api.telegram.org'
+
+const buildStartAppUrl = (baseUrl, startParam) => {
+  if (!baseUrl || !startParam) return ''
+  const encodedParam = encodeURIComponent(startParam)
+  if (/startapp=/i.test(baseUrl)) {
+    return baseUrl.replace(/startapp=[^&]*/i, `startapp=${encodedParam}`)
+  }
+  const joiner = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${joiner}startapp=${encodedParam}`
+}
+
+const resolveUserDisplayName = async (userId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        u.first_name AS "firstName",
+        u.last_name AS "lastName",
+        u.username AS "username",
+        mp.display_name AS "displayName"
+      FROM users u
+      LEFT JOIN master_profiles mp ON mp.user_id = u.user_id
+      WHERE u.user_id = $1
+    `,
+    [userId]
+  )
+  const row = result.rows[0]
+  if (!row) return ''
+  if (row.displayName) return row.displayName
+  return formatUserDisplayName(row.firstName, row.lastName, row.username, '')
+}
+
+const sendTelegramMessage = async ({ recipientId, text, url }) => {
+  if (!telegramBotToken) return
+  if (typeof fetch !== 'function') return
+  const payload = {
+    chat_id: recipientId,
+    text,
+    disable_web_page_preview: true,
+    ...(url
+      ? {
+          reply_markup: {
+            inline_keyboard: [[{ text: 'Открыть чат', url }]],
+          },
+        }
+      : {}),
+  }
+
+  try {
+    await fetch(`${telegramApiBase}/bot${telegramBotToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    console.error('Telegram notification failed:', error)
+  }
+}
+
+const sendChatNotification = async ({ chatId, senderId, preview }) => {
+  if (!telegramBotToken || !telegramWebAppUrl) return
+  const result = await pool.query(
+    `
+      SELECT user_id AS "userId"
+      FROM chat_members
+      WHERE chat_id = $1
+    `,
+    [chatId]
+  )
+  const recipients = result.rows
+    .map((row) => row.userId)
+    .filter((id) => id && id !== senderId)
+  if (recipients.length === 0) return
+
+  const senderName = senderId ? await resolveUserDisplayName(senderId) : ''
+  const title = senderName ? `Новое сообщение от ${senderName}` : 'Новое сообщение'
+  const text = preview ? `${title}\n${preview}` : title
+  const link = buildStartAppUrl(telegramWebAppUrl, `chat_${chatId}`)
+
+  await Promise.all(
+    recipients.map((recipientId) =>
+      sendTelegramMessage({ recipientId, text, url: link })
+    )
+  )
 }
 
 const getProfileStatusSummary = (profile) => {
@@ -355,6 +493,194 @@ const ensureUser = async (userId) => {
     `,
     [userId]
   )
+}
+
+const registerChatClient = (userId, ws) => {
+  const normalized = normalizeText(userId)
+  if (!normalized) return
+  const bucket = chatClientsByUserId.get(normalized) ?? new Set()
+  bucket.add(ws)
+  chatClientsByUserId.set(normalized, bucket)
+
+  ws.on('close', () => {
+    const current = chatClientsByUserId.get(normalized)
+    if (!current) return
+    current.delete(ws)
+    if (current.size === 0) {
+      chatClientsByUserId.delete(normalized)
+    }
+  })
+}
+
+const broadcastToUser = (userId, payload) => {
+  const normalized = normalizeText(userId)
+  if (!normalized) return
+  const bucket = chatClientsByUserId.get(normalized)
+  if (!bucket || bucket.size === 0) return
+  const message = JSON.stringify(payload)
+  bucket.forEach((client) => {
+    if (client.readyState === 1) {
+      client.send(message)
+    }
+  })
+}
+
+const notifyChatMembers = async (chatId, payload, excludeUserId) => {
+  const result = await pool.query(
+    `
+      SELECT user_id AS "userId"
+      FROM chat_members
+      WHERE chat_id = $1
+    `,
+    [chatId]
+  )
+  result.rows.forEach((row) => {
+    if (excludeUserId && row.userId === excludeUserId) return
+    broadcastToUser(row.userId, payload)
+  })
+}
+
+const loadChatAccess = async (chatId, userId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        c.id,
+        c.context_type AS "contextType",
+        c.context_id AS "contextId",
+        c.request_id AS "requestId",
+        c.booking_id AS "bookingId",
+        c.client_id AS "clientId",
+        c.master_id AS "masterId",
+        c.status,
+        c.last_message_id AS "lastMessageId",
+        c.last_message_at AS "lastMessageAt",
+        cm.role AS "memberRole",
+        cm.last_read_message_id AS "lastReadMessageId",
+        cm.unread_count AS "unreadCount"
+      FROM chat_members cm
+      JOIN chats c ON c.id = cm.chat_id
+      WHERE cm.chat_id = $1
+        AND cm.user_id = $2
+    `,
+    [chatId, userId]
+  )
+  return result.rows[0] ?? null
+}
+
+const createChatForRequest = async ({
+  requestId,
+  responseId,
+  clientId,
+  masterId,
+  serviceName,
+  actorId,
+}) => {
+  await pool.query('BEGIN')
+  try {
+    const insertResult = await pool.query(
+      `
+        INSERT INTO chats (
+          context_type,
+          context_id,
+          request_id,
+          response_id,
+          client_id,
+          master_id,
+          status
+        )
+        VALUES ('request', $1, $1, $2, $3, $4, 'active')
+        ON CONFLICT (context_type, context_id, client_id, master_id)
+        DO UPDATE SET response_id = EXCLUDED.response_id,
+                      updated_at = NOW()
+        RETURNING id, (xmax = 0) AS "isNew"
+      `,
+      [requestId, responseId, clientId, masterId]
+    )
+
+    const chatId = insertResult.rows[0]?.id ?? null
+    const isNew = Boolean(insertResult.rows[0]?.isNew)
+    if (!chatId) {
+      await pool.query('ROLLBACK')
+      return null
+    }
+
+    await pool.query(
+      `
+        INSERT INTO chat_members (chat_id, user_id, role)
+        VALUES ($1, $2, 'client')
+        ON CONFLICT (chat_id, user_id) DO NOTHING
+      `,
+      [chatId, clientId]
+    )
+    await pool.query(
+      `
+        INSERT INTO chat_members (chat_id, user_id, role)
+        VALUES ($1, $2, 'master')
+        ON CONFLICT (chat_id, user_id) DO NOTHING
+      `,
+      [chatId, masterId]
+    )
+
+    let systemMessageId = null
+    let systemMessageCreatedAt = null
+
+    if (isNew) {
+      const body = serviceName
+        ? `Заявка согласована по услуге «${serviceName}». Обсудите детали.`
+        : 'Заявка согласована. Обсудите детали.'
+      const meta = { event: 'request_accepted', serviceName: serviceName ?? null }
+      const messageResult = await pool.query(
+        `
+          INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
+          VALUES ($1, NULL, 'system', $2, $3)
+          RETURNING id, created_at AS "createdAt"
+        `,
+        [chatId, body, meta]
+      )
+      const messageId = messageResult.rows[0]?.id ?? null
+      systemMessageId = messageId
+      systemMessageCreatedAt = messageResult.rows[0]?.createdAt ?? null
+      if (messageId) {
+        await pool.query(
+          `
+            UPDATE chats
+            SET last_message_id = $2,
+                last_message_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [chatId, messageId]
+        )
+        await pool.query(
+          `
+            UPDATE chat_members
+            SET unread_count = CASE
+                  WHEN user_id = $2 THEN 0
+                  ELSE unread_count + 1
+                END,
+                last_read_message_id = CASE
+                  WHEN user_id = $2 THEN $3
+                  ELSE last_read_message_id
+                END,
+                updated_at = NOW()
+            WHERE chat_id = $1
+          `,
+          [chatId, actorId ?? clientId, messageId]
+        )
+      }
+    }
+
+    await pool.query('COMMIT')
+    return {
+      chatId,
+      isNew,
+      systemMessageId,
+      systemMessageCreatedAt,
+    }
+  } catch (error) {
+    await pool.query('ROLLBACK')
+    throw error
+  }
 }
 
 const loadMasterProfile = async (userId) => {
@@ -1023,6 +1349,78 @@ const ensureSchema = async () => {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS service_requests_status_created_idx
     ON service_requests (status, created_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chats (
+      id SERIAL PRIMARY KEY,
+      context_type TEXT NOT NULL,
+      context_id INTEGER NOT NULL,
+      request_id INTEGER REFERENCES service_requests(id) ON DELETE SET NULL,
+      response_id INTEGER REFERENCES request_responses(id) ON DELETE SET NULL,
+      booking_id INTEGER REFERENCES service_bookings(id) ON DELETE SET NULL,
+      client_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'active',
+      last_message_id INTEGER,
+      last_message_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (context_type, context_id, client_id, master_id)
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_members (
+      id SERIAL PRIMARY KEY,
+      chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'client',
+      last_read_message_id INTEGER,
+      unread_count INTEGER NOT NULL DEFAULT 0,
+      muted_until TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (chat_id, user_id)
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id SERIAL PRIMARY KEY,
+      chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+      sender_id TEXT REFERENCES users(user_id) ON DELETE SET NULL,
+      type TEXT NOT NULL DEFAULT 'text',
+      body TEXT,
+      meta JSONB,
+      attachment_path TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chats_client_idx
+    ON chats (client_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chats_master_idx
+    ON chats (master_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chats_context_idx
+    ON chats (context_type, context_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chat_members_user_idx
+    ON chat_members (user_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chat_messages_chat_idx
+    ON chat_messages (chat_id, id DESC);
   `)
 }
 
@@ -2415,6 +2813,7 @@ app.get('/api/pro/requests', async (req, res) => {
           rr.comment AS "responseComment",
           rr.proposed_time AS "responseProposedTime",
           rr.created_at AS "responseCreatedAt",
+          ch.id AS "chatId",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
           ul.share_to_masters AS "clientShareToMasters"
@@ -2425,6 +2824,10 @@ app.get('/api/pro/requests', async (req, res) => {
         LEFT JOIN user_locations ul ON ul.user_id = r.user_id
         LEFT JOIN request_responses rr
           ON rr.request_id = r.id AND rr.master_id = rd.master_id
+        LEFT JOIN chats ch
+          ON ch.request_id = r.id
+          AND ch.master_id = rd.master_id
+          AND ch.context_type = 'request'
         WHERE rd.master_id = $1
           AND (
             (rd.status = 'sent' AND rd.expires_at > NOW())
@@ -3384,11 +3787,16 @@ app.get('/api/requests/:id/responses', async (req, res) => {
           rr.proposed_time AS "proposedTime",
           rr.status,
           rr.created_at AS "createdAt",
+          ch.id AS "chatId",
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage"
         FROM request_responses rr
         LEFT JOIN master_profiles mp ON mp.user_id = rr.master_id
         LEFT JOIN master_showcases ms ON ms.user_id = rr.master_id
+        LEFT JOIN chats ch
+          ON ch.request_id = rr.request_id
+          AND ch.master_id = rr.master_id
+          AND ch.context_type = 'request'
         LEFT JOIN (
           SELECT
             master_id,
@@ -3431,6 +3839,7 @@ app.get('/api/requests/:id/responses', async (req, res) => {
         proposedTime: row.proposedTime,
         status: row.status,
         createdAt: row.createdAt,
+        chatId: row.chatId ?? null,
         avatarUrl: resolvePublicUrl(req, row.avatarPath),
         reviewsAverage,
         reviewsCount,
@@ -3668,6 +4077,7 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
       `
         SELECT
           user_id AS "userId",
+          service_name AS "serviceName",
           status
         FROM service_requests
         WHERE id = $1
@@ -3695,6 +4105,7 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
       `
         SELECT
           id,
+          master_id AS "masterId",
           status
         FROM request_responses
         WHERE id = $1
@@ -3761,7 +4172,42 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
         )
       }
 
-      res.json({ ok: true, status: 'accepted', requestStatus: 'closed' })
+      let chatId = null
+      try {
+        const chatPayload = await createChatForRequest({
+          requestId,
+          responseId,
+          clientId: request.userId,
+          masterId: response.masterId,
+          serviceName: request.serviceName,
+          actorId: normalizedUserId,
+        })
+        chatId = chatPayload?.chatId ?? null
+        if (chatId) {
+          void notifyChatMembers(chatId, {
+            type: 'chat:created',
+            chatId,
+            requestId,
+            responseId,
+          })
+          if (chatPayload?.systemMessageId) {
+            void notifyChatMembers(chatId, {
+              type: 'message:new',
+              chatId,
+              messageId: chatPayload.systemMessageId,
+            })
+          }
+        }
+      } catch (chatError) {
+        console.error('Failed to create chat for request:', chatError)
+      }
+
+      res.json({
+        ok: true,
+        status: 'accepted',
+        requestStatus: 'closed',
+        chatId,
+      })
       return
     }
 
@@ -3785,6 +4231,596 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
     res.json({ ok: true, status: 'rejected' })
   } catch (error) {
     console.error('PATCH /api/requests/:id/responses/:responseId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/chats', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          c.id,
+          c.context_type AS "contextType",
+          c.context_id AS "contextId",
+          c.request_id AS "requestId",
+          c.booking_id AS "bookingId",
+          c.client_id AS "clientId",
+          c.master_id AS "masterId",
+          c.status,
+          c.last_message_at AS "lastMessageAt",
+          cm.unread_count AS "unreadCount",
+          cm.last_read_message_id AS "lastReadMessageId",
+          lm.id AS "lastMessageId",
+          lm.sender_id AS "lastMessageSenderId",
+          lm.type AS "lastMessageType",
+          lm.body AS "lastMessageBody",
+          lm.attachment_path AS "lastMessageAttachmentPath",
+          lm.created_at AS "lastMessageCreatedAt",
+          sr.service_name AS "serviceName",
+          sr.category_id AS "categoryId",
+          sr.location_type AS "locationType",
+          sr.status AS "requestStatus",
+          sb.service_name AS "bookingServiceName",
+          sb.category_id AS "bookingCategoryId",
+          sb.status AS "bookingStatus",
+          mp.display_name AS "masterName",
+          mp.avatar_path AS "masterAvatarPath",
+          u.first_name AS "clientFirstName",
+          u.last_name AS "clientLastName",
+          u.username AS "clientUsername"
+        FROM chat_members cm
+        JOIN chats c ON c.id = cm.chat_id
+        LEFT JOIN chat_messages lm ON lm.id = c.last_message_id
+        LEFT JOIN service_requests sr ON sr.id = c.request_id
+        LEFT JOIN service_bookings sb ON sb.id = c.booking_id
+        LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
+        LEFT JOIN users u ON u.user_id = c.client_id
+        WHERE cm.user_id = $1
+        ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+      `,
+      [normalizedUserId]
+    )
+
+    const payload = result.rows.map((row) => {
+      const isClient = row.clientId === normalizedUserId
+      const counterpartName = isClient
+        ? row.masterName || 'Мастер'
+        : formatUserDisplayName(
+            row.clientFirstName,
+            row.clientLastName,
+            row.clientUsername,
+            'Клиент'
+          )
+      const counterpartAvatarUrl = isClient
+        ? buildPublicUrl(req, row.masterAvatarPath)
+        : null
+      const lastMessageText =
+        row.lastMessageBody ||
+        (row.lastMessageType === 'image'
+          ? 'Фото'
+          : row.lastMessageType === 'system'
+            ? 'Системное сообщение'
+            : '')
+      const serviceName = row.serviceName || row.bookingServiceName || ''
+      const categoryId = row.categoryId || row.bookingCategoryId || null
+
+      return {
+        id: row.id,
+        contextType: row.contextType,
+        contextId: row.contextId,
+        requestId: row.requestId,
+        bookingId: row.bookingId,
+        status: row.status,
+        unreadCount: Number(row.unreadCount) || 0,
+        lastReadMessageId: row.lastReadMessageId ?? null,
+        lastMessage: row.lastMessageId
+          ? {
+              id: row.lastMessageId,
+              senderId: row.lastMessageSenderId,
+              type: row.lastMessageType,
+              body: lastMessageText,
+              createdAt: row.lastMessageCreatedAt,
+              attachmentUrl: buildPublicUrl(req, row.lastMessageAttachmentPath),
+            }
+          : null,
+        counterpart: {
+          id: isClient ? row.masterId : row.clientId,
+          role: isClient ? 'master' : 'client',
+          name: counterpartName,
+          avatarUrl: counterpartAvatarUrl,
+        },
+        request: row.requestId
+          ? {
+              id: row.requestId,
+              serviceName,
+              categoryId,
+              locationType: row.locationType,
+              status: row.requestStatus,
+            }
+          : null,
+        booking: row.bookingId
+          ? {
+              id: row.bookingId,
+              serviceName,
+              categoryId,
+              status: row.bookingStatus,
+            }
+          : null,
+      }
+    })
+
+    res.json(payload)
+  } catch (error) {
+    console.error('GET /api/chats failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/chats/:id', async (req, res) => {
+  const chatId = Number(req.params.id)
+  if (!Number.isInteger(chatId)) {
+    res.status(400).json({ error: 'chatId_invalid' })
+    return
+  }
+
+  const normalizedUserId = normalizeText(req.query.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const access = await loadChatAccess(chatId, normalizedUserId)
+    if (!access) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    const detailResult = await pool.query(
+      `
+        SELECT
+          c.id,
+          c.context_type AS "contextType",
+          c.context_id AS "contextId",
+          c.request_id AS "requestId",
+          c.booking_id AS "bookingId",
+          c.client_id AS "clientId",
+          c.master_id AS "masterId",
+          c.status,
+          c.last_message_id AS "lastMessageId",
+          c.last_message_at AS "lastMessageAt",
+          sr.service_name AS "serviceName",
+          sr.category_id AS "categoryId",
+          sr.location_type AS "locationType",
+          sr.date_option AS "dateOption",
+          sr.date_time AS "dateTime",
+          sr.budget,
+          sr.details,
+          sr.photo_urls AS "photoUrls",
+          sr.status AS "requestStatus",
+          mp.display_name AS "masterName",
+          mp.avatar_path AS "masterAvatarPath",
+          u.first_name AS "clientFirstName",
+          u.last_name AS "clientLastName",
+          u.username AS "clientUsername"
+        FROM chats c
+        LEFT JOIN service_requests sr ON sr.id = c.request_id
+        LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
+        LEFT JOIN users u ON u.user_id = c.client_id
+        WHERE c.id = $1
+      `,
+      [chatId]
+    )
+
+    const row = detailResult.rows[0]
+    if (!row) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const isClient = row.clientId === normalizedUserId
+    const counterpartName = isClient
+      ? row.masterName || 'Мастер'
+      : formatUserDisplayName(
+          row.clientFirstName,
+          row.clientLastName,
+          row.clientUsername,
+          'Клиент'
+        )
+
+    res.json({
+      chat: {
+        id: row.id,
+        contextType: row.contextType,
+        contextId: row.contextId,
+        requestId: row.requestId,
+        bookingId: row.bookingId,
+        status: row.status,
+        lastMessageId: row.lastMessageId ?? null,
+        lastMessageAt: row.lastMessageAt ?? null,
+        memberRole: access.memberRole,
+        unreadCount: Number(access.unreadCount) || 0,
+        lastReadMessageId: access.lastReadMessageId ?? null,
+      },
+      counterpart: {
+        id: isClient ? row.masterId : row.clientId,
+        role: isClient ? 'master' : 'client',
+        name: counterpartName,
+        avatarUrl: isClient ? buildPublicUrl(req, row.masterAvatarPath) : null,
+      },
+      request: row.requestId
+        ? {
+            id: row.requestId,
+            serviceName: row.serviceName,
+            categoryId: row.categoryId,
+            locationType: row.locationType,
+            dateOption: row.dateOption,
+            dateTime: row.dateTime,
+            budget: row.budget,
+            details: row.details,
+            photoUrls: Array.isArray(row.photoUrls) ? row.photoUrls : [],
+            status: row.requestStatus,
+          }
+        : null,
+    })
+  } catch (error) {
+    console.error('GET /api/chats/:id failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/chats/:id/messages', async (req, res) => {
+  const chatId = Number(req.params.id)
+  if (!Number.isInteger(chatId)) {
+    res.status(400).json({ error: 'chatId_invalid' })
+    return
+  }
+
+  const normalizedUserId = normalizeText(req.query.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const beforeId = parseOptionalInt(req.query.beforeId)
+  const rawLimit = parseOptionalInt(req.query.limit)
+  const limit =
+    rawLimit && rawLimit > 0
+      ? Math.min(rawLimit, CHAT_MESSAGE_MAX_LIMIT)
+      : CHAT_MESSAGE_DEFAULT_LIMIT
+
+  try {
+    const access = await loadChatAccess(chatId, normalizedUserId)
+    if (!access) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          chat_id AS "chatId",
+          sender_id AS "senderId",
+          type,
+          body,
+          meta,
+          attachment_path AS "attachmentPath",
+          created_at AS "createdAt"
+        FROM chat_messages
+        WHERE chat_id = $1
+          AND ($2::int IS NULL OR id < $2)
+        ORDER BY id DESC
+        LIMIT $3
+      `,
+      [chatId, beforeId, limit]
+    )
+
+    const items = result.rows
+      .map((row) => ({
+        id: row.id,
+        chatId: row.chatId,
+        senderId: row.senderId,
+        type: row.type,
+        body: row.body,
+        meta: safeJson(row.meta),
+        attachmentUrl: buildPublicUrl(req, row.attachmentPath),
+        createdAt: row.createdAt,
+      }))
+      .reverse()
+
+    res.json({ items })
+  } catch (error) {
+    console.error('GET /api/chats/:id/messages failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/chats/:id/messages', async (req, res) => {
+  const chatId = Number(req.params.id)
+  if (!Number.isInteger(chatId)) {
+    res.status(400).json({ error: 'chatId_invalid' })
+    return
+  }
+
+  const { userId, type, body, meta, attachmentPath, attachmentUrl } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const normalizedType = normalizeText(type) || 'text'
+  if (!chatMessageTypes.has(normalizedType)) {
+    res.status(400).json({ error: 'type_invalid' })
+    return
+  }
+  if (normalizedType === 'system') {
+    res.status(403).json({ error: 'type_forbidden' })
+    return
+  }
+
+  const normalizedBody = normalizeText(body)
+  const metaPayload = safeJson(meta) ?? (typeof meta === 'object' ? meta : null)
+
+  const rawAttachmentPath = normalizeText(attachmentPath || attachmentUrl)
+  const normalizedAttachmentPath = rawAttachmentPath
+    ? normalizeUploadPath(rawAttachmentPath)
+    : ''
+
+  if (normalizedType === 'text' && !normalizedBody) {
+    res.status(400).json({ error: 'message_required' })
+    return
+  }
+  if (normalizedType === 'image' && !normalizedAttachmentPath) {
+    res.status(400).json({ error: 'attachment_required' })
+    return
+  }
+  if (
+    ['offer_price', 'offer_time', 'offer_location'].includes(normalizedType) &&
+    !normalizedBody &&
+    !metaPayload
+  ) {
+    res.status(400).json({ error: 'message_required' })
+    return
+  }
+
+  if (normalizedAttachmentPath) {
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    if (!isSafeChatUploadPath(safeUserId, normalizedAttachmentPath)) {
+      res.status(403).json({ error: 'attachment_forbidden' })
+      return
+    }
+  }
+
+  let transactionStarted = false
+  try {
+    const access = await loadChatAccess(chatId, normalizedUserId)
+    if (!access) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    await ensureUser(normalizedUserId)
+
+    await pool.query('BEGIN')
+    transactionStarted = true
+    const insertResult = await pool.query(
+      `
+        INSERT INTO chat_messages (chat_id, sender_id, type, body, meta, attachment_path)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, created_at AS "createdAt"
+      `,
+      [
+        chatId,
+        normalizedUserId,
+        normalizedType,
+        normalizedBody || null,
+        metaPayload ?? null,
+        normalizedAttachmentPath || null,
+      ]
+    )
+    const messageId = insertResult.rows[0]?.id
+    const createdAt = insertResult.rows[0]?.createdAt ?? null
+
+    if (!messageId) {
+      throw new Error('message_insert_failed')
+    }
+
+    await pool.query(
+      `
+        UPDATE chats
+        SET last_message_id = $2,
+            last_message_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [chatId, messageId]
+    )
+
+    await pool.query(
+      `
+        UPDATE chat_members
+        SET unread_count = CASE
+              WHEN user_id = $2 THEN 0
+              ELSE unread_count + 1
+            END,
+            last_read_message_id = CASE
+              WHEN user_id = $2 THEN $3
+              ELSE last_read_message_id
+            END,
+            updated_at = NOW()
+        WHERE chat_id = $1
+      `,
+      [chatId, normalizedUserId, messageId]
+    )
+
+    await pool.query('COMMIT')
+
+    const messagePayload = {
+      id: messageId,
+      chatId,
+      senderId: normalizedUserId,
+      type: normalizedType,
+      body: normalizedBody || null,
+      meta: metaPayload ?? null,
+      attachmentUrl: buildPublicUrl(req, normalizedAttachmentPath),
+      createdAt,
+    }
+
+    void notifyChatMembers(chatId, {
+      type: 'message:new',
+      chatId,
+      message: messagePayload,
+    })
+    const previewText =
+      normalizedType === 'image'
+        ? 'Фото'
+        : normalizedBody || (normalizedType.startsWith('offer_') ? 'Новое предложение' : '')
+    if (previewText) {
+      void sendChatNotification({
+        chatId,
+        senderId: normalizedUserId,
+        preview: previewText,
+      })
+    }
+
+    res.json(messagePayload)
+  } catch (error) {
+    if (transactionStarted) {
+      await pool.query('ROLLBACK')
+    }
+    console.error('POST /api/chats/:id/messages failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/chats/:id/read', async (req, res) => {
+  const chatId = Number(req.params.id)
+  if (!Number.isInteger(chatId)) {
+    res.status(400).json({ error: 'chatId_invalid' })
+    return
+  }
+
+  const { userId, messageId } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const parsedMessageId = parseOptionalInt(messageId)
+
+  try {
+    const access = await loadChatAccess(chatId, normalizedUserId)
+    if (!access) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    let targetMessageId = parsedMessageId ?? access.lastMessageId
+    if (targetMessageId) {
+      const messageCheck = await pool.query(
+        `
+          SELECT id
+          FROM chat_messages
+          WHERE id = $1
+            AND chat_id = $2
+        `,
+        [targetMessageId, chatId]
+      )
+      if (messageCheck.rows.length === 0) {
+        res.status(404).json({ error: 'message_not_found' })
+        return
+      }
+    }
+
+    if (!targetMessageId) {
+      res.json({ ok: true })
+      return
+    }
+
+    await pool.query(
+      `
+        UPDATE chat_members
+        SET last_read_message_id = GREATEST(COALESCE(last_read_message_id, 0), $3),
+            unread_count = 0,
+            updated_at = NOW()
+        WHERE chat_id = $1
+          AND user_id = $2
+      `,
+      [chatId, normalizedUserId, targetMessageId]
+    )
+
+    void notifyChatMembers(chatId, {
+      type: 'chat:read',
+      chatId,
+      userId: normalizedUserId,
+      messageId: targetMessageId,
+    })
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/chats/:id/read failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/chats/:id/attachments', async (req, res) => {
+  const chatId = Number(req.params.id)
+  if (!Number.isInteger(chatId)) {
+    res.status(400).json({ error: 'chatId_invalid' })
+    return
+  }
+
+  const { userId, dataUrl } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const access = await loadChatAccess(chatId, normalizedUserId)
+    if (!access) {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    const parsedImage = parseImageDataUrl(dataUrl)
+    if (!parsedImage) {
+      res.status(400).json({ error: 'image_invalid' })
+      return
+    }
+
+    if (parsedImage.buffer.length > MAX_UPLOAD_BYTES) {
+      res.status(413).json({ error: 'image_too_large' })
+      return
+    }
+
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    const { relativePath, absolutePath } = buildChatUploadPath(
+      safeUserId,
+      parsedImage.mime
+    )
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true })
+    await fs.writeFile(absolutePath, parsedImage.buffer)
+
+    res.json({
+      ok: true,
+      url: buildPublicUrl(req, relativePath),
+      path: relativePath,
+    })
+  } catch (error) {
+    console.error('POST /api/chats/:id/attachments failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -3957,8 +4993,24 @@ const start = async () => {
   await ensureSchema()
   await seedLocations()
   await fs.mkdir(uploadsRoot, { recursive: true })
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`API listening on :${port}`)
+  })
+  const wss = new WebSocketServer({ server, path: CHAT_STREAM_PATH })
+  wss.on('connection', (ws, req) => {
+    try {
+      const baseUrl = `http://${req.headers.host ?? 'localhost'}`
+      const url = new URL(req.url ?? '', baseUrl)
+      const userId = normalizeText(url.searchParams.get('userId'))
+      if (!userId) {
+        ws.close(1008, 'userId_required')
+        return
+      }
+      registerChatClient(userId, ws)
+      ws.send(JSON.stringify({ type: 'connected', userId }))
+    } catch (error) {
+      ws.close(1011, 'server_error')
+    }
   })
   void runRequestDispatchCycle()
   setInterval(() => {

@@ -135,6 +135,25 @@ export const IconInbox = () => (
   </svg>
 )
 
+export const IconChat = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5.4 6.4h13.2a1.6 1.6 0 0 1 1.6 1.6v7.2a1.6 1.6 0 0 1-1.6 1.6H9.2l-3.8 2.8v-2.8H5.4a1.6 1.6 0 0 1-1.6-1.6V8a1.6 1.6 0 0 1 1.6-1.6Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8 10h8M8 13h5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
 export const IconEdit = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path

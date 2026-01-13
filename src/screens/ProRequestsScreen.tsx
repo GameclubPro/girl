@@ -111,6 +111,8 @@ type ProRequestsScreenProps = {
   userId: string
   onBack: () => void
   onEditProfile: (section?: ProProfileSection) => void
+  onViewChats: () => void
+  onOpenChat: (chatId: number) => void
 }
 
 export const ProRequestsScreen = ({
@@ -118,6 +120,8 @@ export const ProRequestsScreen = ({
   userId,
   onBack,
   onEditProfile,
+  onViewChats,
+  onOpenChat,
 }: ProRequestsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
   const [requests, setRequests] = useState<ProRequest[]>([])
@@ -699,6 +703,15 @@ export const ProRequestsScreen = ({
                           Ваш отклик: {responseStatusLabel}
                         </div>
                       )}
+                      {item.responseStatus === 'accepted' && item.chatId && (
+                        <button
+                          className="request-chat-cta"
+                          type="button"
+                          onClick={() => onOpenChat(item.chatId!)}
+                        >
+                          Перейти в чат
+                        </button>
+                      )}
                       {item.details && (
                         <div className="request-item-details">{item.details}</div>
                       )}
@@ -959,6 +972,7 @@ export const ProRequestsScreen = ({
         active="requests"
         onCabinet={onBack}
         onRequests={() => {}}
+        onChats={onViewChats}
         onProfile={() => onEditProfile()}
       />
     </div>

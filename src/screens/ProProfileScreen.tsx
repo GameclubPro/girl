@@ -38,6 +38,7 @@ type ProProfileScreenProps = {
   displayNameFallback: string
   onBack: () => void
   onViewRequests: () => void
+  onViewChats: () => void
   focusSection?: ProProfileSection | null
   onBackHandlerChange?: ((handler: (() => boolean) | null) => void) | undefined
 }
@@ -208,6 +209,7 @@ export const ProProfileScreen = ({
   displayNameFallback,
   onBack,
   onViewRequests,
+  onViewChats,
   focusSection,
   onBackHandlerChange,
 }: ProProfileScreenProps) => {
@@ -3779,6 +3781,7 @@ export const ProProfileScreen = ({
           active="profile"
           onCabinet={onBack}
           onRequests={onViewRequests}
+          onChats={onViewChats}
           onProfile={() => {}}
         />
       )}

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AddressScreen } from './screens/AddressScreen'
+import { ChatListScreen } from './screens/ChatListScreen'
+import { ChatThreadScreen } from './screens/ChatThreadScreen'
 import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
 import { ClientProfileScreen } from './screens/ClientProfileScreen'
 import { ClientScreen } from './screens/ClientScreen'
@@ -26,7 +28,7 @@ import type {
   UserLocation,
 } from './types/app'
 import { isGeoFailure, requestPreciseLocation } from './utils/geo'
-import { parseBookingStartParam } from './utils/deeplink'
+import { parseBookingStartParam, parseChatStartParam } from './utils/deeplink'
 import {
   loadFavorites,
   saveFavorites,
@@ -48,6 +50,14 @@ type BookingReturnView =
   | 'client-gallery-detail'
   | 'client-master-profile'
   | 'requests'
+
+type ChatReturnView =
+  | 'chats'
+  | 'requests'
+  | 'client'
+  | 'client-profile'
+  | 'pro-requests'
+  | 'pro-cabinet'
 
 const formatGeoError = (error: unknown) => {
   if (!isGeoFailure(error)) {
@@ -85,6 +95,8 @@ function App() {
     | 'client-gallery'
     | 'client-gallery-detail'
     | 'client-master-profile'
+    | 'chats'
+    | 'chat-thread'
     | 'booking'
     | 'request'
     | 'requests'
@@ -119,6 +131,7 @@ function App() {
   const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null)
   const [selectedShowcaseItem, setSelectedShowcaseItem] =
     useState<ShowcaseMedia | null>(null)
+  const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
   const [bookingMasterId, setBookingMasterId] = useState<string | null>(null)
   const [bookingPhotoUrls, setBookingPhotoUrls] = useState<string[]>([])
   const [bookingPreferredCategoryId, setBookingPreferredCategoryId] = useState<
@@ -135,6 +148,9 @@ function App() {
   )
   const [bookingReturnView, setBookingReturnView] =
     useState<BookingReturnView | null>(null)
+  const [chatReturnView, setChatReturnView] = useState<ChatReturnView | null>(
+    null
+  )
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(
     null
   )
@@ -160,6 +176,8 @@ function App() {
       searchParams.get('startapp') ?? searchParams.get('start') ?? null
     const queryMaster =
       searchParams.get('masterId') ?? searchParams.get('master') ?? null
+    const queryChat =
+      searchParams.get('chatId') ?? searchParams.get('chat') ?? null
     const rawParam = webAppStart ?? queryStart
     const decodedParam = rawParam
       ? (() => {
@@ -170,8 +188,19 @@ function App() {
           }
         })()
       : null
+    const parsedChatId = parseChatStartParam(decodedParam)
     const parsedMasterId = parseBookingStartParam(decodedParam)
+    const rawChatId = parsedChatId ?? queryChat?.trim() ?? null
+    const parsedChatNumber = rawChatId ? Number(rawChatId) : null
     const masterId = parsedMasterId ?? queryMaster?.trim() ?? null
+
+    if (parsedChatNumber && Number.isInteger(parsedChatNumber)) {
+      deepLinkHandledRef.current = true
+      setSelectedChatId(parsedChatNumber)
+      setChatReturnView('chats')
+      setView('chat-thread')
+      return
+    }
 
     if (!masterId) return
     deepLinkHandledRef.current = true
@@ -587,6 +616,8 @@ function App() {
       view === 'client-gallery' ||
       view === 'client-gallery-detail' ||
       view === 'client-master-profile' ||
+      view === 'chats' ||
+      view === 'chat-thread' ||
       view === 'booking' ||
       view === 'request' ||
       view === 'requests' ||
@@ -621,6 +652,14 @@ function App() {
           setBookingPreferredCategoryId(null)
           setView(bookingReturnView ?? 'client-showcase')
           setBookingReturnView(null)
+          break
+        case 'chat-thread':
+          setSelectedChatId(null)
+          setView(chatReturnView ?? 'chats')
+          setChatReturnView(null)
+          break
+        case 'chats':
+          setView(role === 'pro' ? 'pro-cabinet' : 'client')
           break
         case 'pro-profile':
           if (proProfileBackHandlerRef.current?.()) {
@@ -677,6 +716,12 @@ function App() {
   }, [bookingMasterId, bookingReturnView, view])
 
   useEffect(() => {
+    if (view === 'chat-thread' && !selectedChatId) {
+      setView('chats')
+    }
+  }, [selectedChatId, view])
+
+  useEffect(() => {
     saveFavorites(favorites)
   }, [favorites])
 
@@ -717,6 +762,21 @@ function App() {
     setRequestsInitialTab(tab ?? 'requests')
     setView('requests')
   }, [])
+
+  const openChatList = useCallback(() => {
+    setSelectedChatId(null)
+    setChatReturnView(null)
+    setView('chats')
+  }, [])
+
+  const openChatThread = useCallback(
+    (chatId: number, returnView?: ChatReturnView) => {
+      setSelectedChatId(chatId)
+      setChatReturnView(returnView ?? 'chats')
+      setView('chat-thread')
+    },
+    []
+  )
 
   const syncFollowWithFavorite = useCallback(
     async (favorite: Omit<FavoriteMaster, 'savedAt'>, shouldFollow: boolean) => {
@@ -813,6 +873,7 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onViewShowcase={() => setView('client-gallery')}
         onViewMasters={() => setView('client-showcase')}
+        onViewChats={openChatList}
         onCreateRequest={(categoryId) => {
           setRequestCategoryId(
             categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
@@ -988,6 +1049,41 @@ function App() {
     )
   }
 
+  if (view === 'chats') {
+    return (
+      <ChatListScreen
+        apiBase={apiBase}
+        userId={userId}
+        role={role}
+        onOpenChat={(chatId) => openChatThread(chatId, 'chats')}
+        onViewHome={() => setView('client')}
+        onViewMasters={() => setView('client-showcase')}
+        onViewRequests={() =>
+          role === 'pro' ? setView('pro-requests') : openRequests()
+        }
+        onViewProfile={() =>
+          setView(role === 'pro' ? 'pro-profile' : 'client-profile')
+        }
+        onViewCabinet={() => setView('pro-cabinet')}
+      />
+    )
+  }
+
+  if (view === 'chat-thread' && selectedChatId) {
+    return (
+      <ChatThreadScreen
+        apiBase={apiBase}
+        userId={userId}
+        chatId={selectedChatId}
+        onBack={() => {
+          setSelectedChatId(null)
+          setView(chatReturnView ?? 'chats')
+          setChatReturnView(null)
+        }}
+      />
+    )
+  }
+
   if (view === 'request') {
     const cityName = cities.find((item) => item.id === cityId)?.name ?? ''
     const districtName =
@@ -1056,6 +1152,7 @@ function App() {
           setSelectedMasterId(masterId)
           setView('client-master-profile')
         }}
+        onOpenChat={(chatId) => openChatThread(chatId, 'requests')}
         onRescheduleBooking={(booking) => {
           openBooking(booking.masterId, {
             photoUrls: booking.photoUrls,
@@ -1082,6 +1179,7 @@ function App() {
           setView('pro-cabinet')
         }}
         onViewRequests={() => setView('pro-requests')}
+        onViewChats={openChatList}
         focusSection={proProfileSection}
         onBackHandlerChange={registerProProfileBackHandler}
       />
@@ -1098,6 +1196,8 @@ function App() {
           setProProfileSection(section ?? null)
           setView('pro-profile')
         }}
+        onViewChats={openChatList}
+        onOpenChat={(chatId) => openChatThread(chatId, 'pro-requests')}
       />
     )
   }
@@ -1113,6 +1213,7 @@ function App() {
           setView('pro-profile')
         }}
         onViewRequests={() => setView('pro-requests')}
+        onViewChats={openChatList}
       />
     )
   }

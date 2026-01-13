@@ -108,6 +108,7 @@ export type ServiceRequest = {
     displayName?: string | null
     avatarUrl?: string | null
   }[]
+  chatId?: number | null
 }
 
 export type BookingStatus =
@@ -162,4 +163,96 @@ export type RequestResponse = {
   reviewsAverage?: number | null
   reviewsCount?: number | null
   previewUrls?: string[]
+  chatId?: number | null
+}
+
+export type ChatContextType = 'request' | 'booking'
+
+export type ChatMessage = {
+  id: number
+  chatId: number
+  senderId?: string | null
+  type:
+    | 'text'
+    | 'image'
+    | 'system'
+    | 'offer_price'
+    | 'offer_time'
+    | 'offer_location'
+  body?: string | null
+  meta?: Record<string, unknown> | null
+  attachmentUrl?: string | null
+  createdAt: string
+}
+
+export type ChatSummary = {
+  id: number
+  contextType: ChatContextType
+  contextId: number
+  requestId?: number | null
+  bookingId?: number | null
+  status: string
+  unreadCount: number
+  lastReadMessageId?: number | null
+  lastMessage?: {
+    id: number
+    senderId?: string | null
+    type: ChatMessage['type']
+    body?: string | null
+    createdAt?: string | null
+    attachmentUrl?: string | null
+  } | null
+  counterpart: {
+    id: string
+    role: 'client' | 'master'
+    name: string
+    avatarUrl?: string | null
+  }
+  request?: {
+    id: number
+    serviceName?: string | null
+    categoryId?: string | null
+    locationType?: ServiceRequest['locationType']
+    status?: string | null
+  } | null
+  booking?: {
+    id: number
+    serviceName?: string | null
+    categoryId?: string | null
+    status?: string | null
+  } | null
+}
+
+export type ChatDetail = {
+  chat: {
+    id: number
+    contextType: ChatContextType
+    contextId: number
+    requestId?: number | null
+    bookingId?: number | null
+    status: string
+    lastMessageId?: number | null
+    lastMessageAt?: string | null
+    memberRole?: 'client' | 'master'
+    unreadCount?: number | null
+    lastReadMessageId?: number | null
+  }
+  counterpart: {
+    id: string
+    role: 'client' | 'master'
+    name: string
+    avatarUrl?: string | null
+  }
+  request?: {
+    id: number
+    serviceName?: string | null
+    categoryId?: string | null
+    locationType?: ServiceRequest['locationType']
+    dateOption?: ServiceRequest['dateOption']
+    dateTime?: string | null
+    budget?: string | null
+    details?: string | null
+    photoUrls?: string[]
+    status?: string | null
+  } | null
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  IconChat,
   IconHome,
   IconList,
   IconUser,
@@ -45,6 +46,7 @@ export const ClientScreen = ({
   onCategoryChange,
   onViewShowcase,
   onViewMasters,
+  onViewChats,
   onCreateRequest,
   onViewRequests,
   onViewProfile,
@@ -54,6 +56,7 @@ export const ClientScreen = ({
   onCategoryChange: (categoryId: string | null) => void
   onViewShowcase: () => void
   onViewMasters: () => void
+  onViewChats: () => void
   onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewProfile: () => void
@@ -324,6 +327,12 @@ export const ClientScreen = ({
             <IconUsers />
           </span>
           Мастера
+        </button>
+        <button className="nav-item" type="button" onClick={onViewChats}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconChat />
+          </span>
+          Чаты
         </button>
         <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">

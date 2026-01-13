@@ -1,11 +1,12 @@
-import { IconDashboard, IconInbox, IconUser } from './icons'
+import { IconChat, IconDashboard, IconInbox, IconUser } from './icons'
 
-type ProNavKey = 'cabinet' | 'requests' | 'profile'
+type ProNavKey = 'cabinet' | 'requests' | 'chats' | 'profile'
 
 type ProBottomNavProps = {
   active: ProNavKey
   onCabinet: () => void
   onRequests: () => void
+  onChats: () => void
   onProfile: () => void
 }
 
@@ -13,6 +14,7 @@ export const ProBottomNav = ({
   active,
   onCabinet,
   onRequests,
+  onChats,
   onProfile,
 }: ProBottomNavProps) => {
   const handleClick = (key: ProNavKey, action: () => void) => () => {
@@ -43,6 +45,17 @@ export const ProBottomNav = ({
           <IconInbox />
         </span>
         <span className="pro-nav-label">Заявки</span>
+      </button>
+      <button
+        className={`pro-nav-item${active === 'chats' ? ' is-active' : ''}`}
+        type="button"
+        onClick={handleClick('chats', onChats)}
+        aria-current={active === 'chats' ? 'page' : undefined}
+      >
+        <span className="pro-nav-icon" aria-hidden="true">
+          <IconChat />
+        </span>
+        <span className="pro-nav-label">Чаты</span>
       </button>
       <button
         className={`pro-nav-item${active === 'profile' ? ' is-active' : ''}`}
