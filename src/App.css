@@ -5326,7 +5326,7 @@
 
 .pro-profile-audience-card {
   position: relative;
-  padding: 12px 14px;
+  padding: 8px 12px;
   border-radius: 16px;
   background: linear-gradient(
     135deg,
@@ -5336,6 +5336,10 @@
   border: 1px solid rgba(var(--accent-rgb), 0.2);
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.1);
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .pro-profile-audience-card::after {
@@ -5351,12 +5355,11 @@
   pointer-events: none;
 }
 
-.pro-profile-audience-head {
+.pro-profile-audience-main {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   z-index: 1;
 }
 
@@ -5383,19 +5386,10 @@
 
 .pro-profile-audience-value {
   position: relative;
-  margin-top: 6px;
-  font-size: 22px;
+  margin: 0;
+  font-size: 18px;
   font-weight: 700;
   color: var(--pro-ink);
-  z-index: 1;
-}
-
-.pro-profile-audience-caption {
-  position: relative;
-  margin: 4px 0 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--pro-muted);
   z-index: 1;
 }
 
