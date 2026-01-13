@@ -5292,19 +5292,6 @@
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.pro-profile-status-tag {
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--accent-strong);
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(var(--paper-rgb), 0.85);
-  border: 1px solid var(--accent-strong);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .pro-profile-status-text {
   position: relative;
   margin: 8px 0 0;

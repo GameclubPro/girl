@@ -2140,14 +2140,6 @@ export const ProProfileScreen = ({
             </div>
             <div className="pro-profile-ig-name-row">
               <h1 className="pro-profile-ig-name">{displayNameValue}</h1>
-              <button
-                className={`pro-profile-ig-status${isActive ? '' : ' is-paused'}`}
-                type="button"
-                onClick={() => setIsActive((current) => !current)}
-              >
-                <span className="pro-profile-social-dot" aria-hidden="true" />
-                {isActive ? 'Принимаю заявки' : 'Пауза'}
-              </button>
             </div>
             <div className="pro-profile-ig-stats">
               {profileStats.map((stat) => (
@@ -2162,7 +2154,14 @@ export const ProProfileScreen = ({
             <div className="pro-profile-status-card">
               <div className="pro-profile-status-head">
                 <span className="pro-profile-status-title">Статус</span>
-                <span className="pro-profile-status-tag">виден клиентам</span>
+                <button
+                  className={`pro-profile-ig-status${isActive ? '' : ' is-paused'}`}
+                  type="button"
+                  onClick={() => setIsActive((current) => !current)}
+                >
+                  <span className="pro-profile-social-dot" aria-hidden="true" />
+                  {isActive ? 'Принимаю заявки' : 'Пауза'}
+                </button>
               </div>
               <p
                 className={`pro-profile-status-text${
