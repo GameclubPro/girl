@@ -3909,9 +3909,6 @@
   height: 16px;
 }
 
-.pro-service-settings .icon-emoji {
-  font-size: 16px;
-}
 
 .pro-service-settings.is-active {
   background: var(--accent-soft);
@@ -5642,13 +5639,6 @@
   height: 16px;
 }
 
-.icon-emoji {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
 .pro-profile-ig-button-label {
   line-height: 1;
 }
@@ -5673,10 +5663,12 @@
   height: 46px;
   padding: 0;
   border-radius: 16px;
-  background: rgba(var(--accent-rgb), 0.18);
+  background: #ffffff;
   color: var(--ink);
   border: 1px solid rgba(var(--accent-rgb), 0.35);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.16);
+  box-shadow:
+    0 12px 18px rgba(var(--shadow-rgb), 0.16),
+    0 0 0 1px rgba(var(--accent-rgb), 0.08);
   z-index: 2;
   justify-content: center;
   align-items: center;
@@ -5693,9 +5685,6 @@
   height: 24px;
 }
 
-.screen--pro .pro-profile-ig-button--fab .icon-emoji {
-  font-size: 24px;
-}
 
 .pro-shell--ig .pro-profile-portfolio-panel {
   border-radius: 0;
