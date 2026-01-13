@@ -80,37 +80,50 @@ export const ChatListScreen = ({
     return items
   }, [filter, items])
 
-  const loadChats = useCallback(async () => {
-    if (!userId) return
-    setIsLoading(true)
-    isLoadingRef.current = true
-    setLoadError('')
-    try {
-      const response = await fetch(
-        `${apiBase}/api/chats?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load chats failed')
+  const loadChats = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!userId) return
+      if (isLoadingRef.current) return
+      const silent = options?.silent ?? false
+
+      isLoadingRef.current = true
+      if (!silent) {
+        setIsLoading(true)
+        setLoadError('')
       }
-      const data = (await response.json()) as ChatSummary[]
-      setItems(Array.isArray(data) ? data : [])
-      isReadyRef.current = true
-    } catch (error) {
-      console.error('Failed to load chats:', error)
-      setLoadError('Не удалось загрузить чаты.')
-      setItems([])
-    } finally {
-      setIsLoading(false)
-      isLoadingRef.current = false
-    }
-  }, [apiBase, userId])
+
+      try {
+        const response = await fetch(
+          `${apiBase}/api/chats?userId=${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load chats failed')
+        }
+        const data = (await response.json()) as ChatSummary[]
+        setItems(Array.isArray(data) ? data : [])
+        setLoadError('')
+        isReadyRef.current = true
+      } catch (error) {
+        console.error('Failed to load chats:', error)
+        if (!silent) {
+          setLoadError('Не удалось загрузить чаты.')
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false)
+        }
+        isLoadingRef.current = false
+      }
+    },
+    [apiBase, userId]
+  )
 
   const scheduleReload = useCallback(() => {
     if (!isReadyRef.current || isLoadingRef.current) return
     if (reloadTimerRef.current !== null) return
     reloadTimerRef.current = window.setTimeout(() => {
       reloadTimerRef.current = null
-      void loadChats()
+      void loadChats({ silent: true })
     }, 240)
   }, [loadChats])
 
@@ -187,12 +200,13 @@ export const ChatListScreen = ({
             Непрочитанные
           </button>
           <button
-            className="chat-refresh"
+            className={`chat-refresh${isLoading ? ' is-loading' : ''}`}
             type="button"
             onClick={() => void loadChats()}
             disabled={isLoading}
           >
-            {isLoading ? 'Обновляем...' : 'Обновить'}
+            <span className="chat-refresh-label">Обновить</span>
+            <span className="chat-refresh-spinner" aria-hidden="true" />
           </button>
         </div>
 
