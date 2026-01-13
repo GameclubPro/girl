@@ -27,6 +27,13 @@ import type {
 } from './types/app'
 import { isGeoFailure, requestPreciseLocation } from './utils/geo'
 import { parseBookingStartParam } from './utils/deeplink'
+import {
+  loadFavorites,
+  saveFavorites,
+  toggleFavorite,
+  upsertFavorite,
+  type FavoriteMaster,
+} from './utils/favorites'
 import './App.css'
 
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(
@@ -117,10 +124,25 @@ function App() {
   const [bookingPreferredCategoryId, setBookingPreferredCategoryId] = useState<
     string | null
   >(null)
+  const [bookingInitialServiceName, setBookingInitialServiceName] = useState<
+    string | null
+  >(null)
+  const [bookingInitialLocationType, setBookingInitialLocationType] = useState<
+    'master' | 'client' | null
+  >(null)
+  const [bookingInitialDetails, setBookingInitialDetails] = useState<string | null>(
+    null
+  )
   const [bookingReturnView, setBookingReturnView] =
     useState<BookingReturnView | null>(null)
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(
     null
+  )
+  const [requestsInitialTab, setRequestsInitialTab] = useState<
+    'requests' | 'bookings'
+  >('requests')
+  const [favorites, setFavorites] = useState<FavoriteMaster[]>(() =>
+    loadFavorites()
   )
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
@@ -307,7 +329,7 @@ function App() {
           userId,
           cityId,
           districtId,
-          address: null,
+          address: address.trim() || null,
         }),
       })
 
@@ -315,14 +337,14 @@ function App() {
         throw new Error('Save failed')
       }
 
-      setAddress('')
+      setAddress(address.trim())
       setView(role === 'pro' ? 'pro-profile' : 'client')
     } catch (error) {
       setSaveError('Не удалось сохранить город и район. Попробуйте еще раз.')
     } finally {
       setIsSaving(false)
     }
-  }, [cityId, districtId, role, userId])
+  }, [address, cityId, districtId, role, userId])
 
   useEffect(() => {
     if (!telegramUser?.id) return
@@ -425,7 +447,7 @@ function App() {
 
         if (cancelled) return
 
-        setAddress('')
+        setAddress(typeof data.address === 'string' ? data.address : '')
         if (typeof data.cityId === 'number') {
           setCityId(data.cityId)
         }
@@ -646,10 +668,17 @@ function App() {
     if (view === 'booking' && !bookingMasterId) {
       setBookingPreferredCategoryId(null)
       setBookingPhotoUrls([])
+      setBookingInitialServiceName(null)
+      setBookingInitialLocationType(null)
+      setBookingInitialDetails(null)
       setBookingReturnView(null)
       setView(bookingReturnView ?? 'client-showcase')
     }
   }, [bookingMasterId, bookingReturnView, view])
+
+  useEffect(() => {
+    saveFavorites(favorites)
+  }, [favorites])
 
   const registerProProfileBackHandler = useCallback(
     (handler: (() => boolean) | null) => {
@@ -664,6 +693,9 @@ function App() {
       options?: {
         photoUrls?: string[]
         preferredCategoryId?: string | null
+        initialServiceName?: string | null
+        initialLocationType?: 'master' | 'client' | null
+        initialDetails?: string | null
         returnView?: BookingReturnView
         rescheduleBookingId?: number | null
       }
@@ -671,9 +703,35 @@ function App() {
       setBookingMasterId(masterId)
       setBookingPhotoUrls(options?.photoUrls ?? [])
       setBookingPreferredCategoryId(options?.preferredCategoryId ?? null)
+      setBookingInitialServiceName(options?.initialServiceName ?? null)
+      setBookingInitialLocationType(options?.initialLocationType ?? null)
+      setBookingInitialDetails(options?.initialDetails ?? null)
       setBookingReturnView(options?.returnView ?? 'client-showcase')
       setRescheduleBookingId(options?.rescheduleBookingId ?? null)
       setView('booking')
+    },
+    []
+  )
+
+  const openRequests = useCallback((tab?: 'requests' | 'bookings') => {
+    setRequestsInitialTab(tab ?? 'requests')
+    setView('requests')
+  }, [])
+
+  const handleToggleFavorite = useCallback(
+    (favorite: Omit<FavoriteMaster, 'savedAt'>) => {
+      setFavorites((prev) => toggleFavorite(prev, favorite))
+    },
+    []
+  )
+
+  const handleUpsertFavorite = useCallback(
+    (favorite: Omit<FavoriteMaster, 'savedAt'>) => {
+      setFavorites((prev) => {
+        const existing = prev.find((item) => item.masterId === favorite.masterId)
+        const savedAt = existing?.savedAt ?? new Date().toISOString()
+        return upsertFavorite(prev, { ...favorite, savedAt })
+      })
     },
     []
   )
@@ -713,7 +771,7 @@ function App() {
           )
           setView('request')
         }}
-        onViewRequests={() => setView('requests')}
+        onViewRequests={(tab) => openRequests(tab)}
         onViewProfile={() => setView('client-profile')}
       />
     )
@@ -727,12 +785,19 @@ function App() {
         displayNameFallback={clientName}
         onViewHome={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
-        onViewRequests={() => setView('requests')}
+        onViewRequests={(tab) => openRequests(tab)}
         onCreateRequest={() => {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           setView('request')
         }}
         onEditAddress={() => setView('address')}
+        onViewMasterProfile={(masterId) => {
+          setSelectedMasterId(masterId)
+          setView('client-master-profile')
+        }}
+        onRequestLocation={handleRequestLocation}
+        onClearLocation={handleClearLocation}
+        favorites={favorites}
       />
     )
   }
@@ -744,7 +809,7 @@ function App() {
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
-        onViewRequests={() => setView('requests')}
+        onViewRequests={(tab) => openRequests(tab)}
         onViewClientProfile={() => setView('client-profile')}
         clientLocation={clientLocation}
         isLocating={isLocating}
@@ -783,12 +848,15 @@ function App() {
         }}
         onViewRequests={() => {
           setSelectedMasterId(null)
-          setView('requests')
+          openRequests()
         }}
         onViewProfile={() => {
           setSelectedMasterId(null)
           setView('client-profile')
         }}
+        favorites={favorites}
+        onToggleFavorite={handleToggleFavorite}
+        onUpdateFavorite={handleUpsertFavorite}
         onCreateBooking={() =>
           openBooking(selectedMasterId, {
             returnView: 'client-master-profile',
@@ -818,7 +886,7 @@ function App() {
         }}
         onViewRequests={() => {
           setSelectedShowcaseItem(null)
-          setView('requests')
+          openRequests()
         }}
         onViewClientProfile={() => {
           setSelectedShowcaseItem(null)
@@ -829,6 +897,9 @@ function App() {
           setSelectedMasterId(masterId)
           setView('client-master-profile')
         }}
+        favorites={favorites}
+        onToggleFavorite={handleToggleFavorite}
+        onUpdateFavorite={handleUpsertFavorite}
         onCreateBooking={() =>
           openBooking(selectedShowcaseItem.masterId, {
             photoUrls: [selectedShowcaseItem.url],
@@ -849,7 +920,7 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
-        onViewRequests={() => setView('requests')}
+        onViewRequests={(tab) => openRequests(tab)}
         onViewClientProfile={() => setView('client-profile')}
         onViewDetail={(item) => {
           setSelectedShowcaseItem(item)
@@ -895,6 +966,9 @@ function App() {
         address={address}
         photoUrls={bookingPhotoUrls}
         preferredCategoryId={bookingPreferredCategoryId}
+        initialServiceName={bookingInitialServiceName ?? undefined}
+        initialLocationType={bookingInitialLocationType ?? undefined}
+        initialDetails={bookingInitialDetails ?? undefined}
         onBack={() => {
           setBookingMasterId(null)
           setBookingPhotoUrls([])
@@ -913,6 +987,7 @@ function App() {
       <ClientRequestsScreen
         apiBase={apiBase}
         userId={userId}
+        initialTab={requestsInitialTab}
         onCreateRequest={() => {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           setView('request')
@@ -925,7 +1000,11 @@ function App() {
         }}
         onRescheduleBooking={(booking) => {
           openBooking(booking.masterId, {
+            photoUrls: booking.photoUrls,
             preferredCategoryId: booking.categoryId,
+            initialServiceName: booking.serviceName,
+            initialLocationType: booking.locationType,
+            initialDetails: booking.comment ?? null,
             returnView: 'requests',
             rescheduleBookingId: booking.id,
           })
@@ -989,6 +1068,7 @@ function App() {
         cityId={cityId}
         districtId={districtId}
         cityQuery={cityQuery}
+        address={address}
         isSaving={isSaving}
         isLoading={
           isLoadingAddress ||
@@ -1003,6 +1083,7 @@ function App() {
         onCityQueryChange={handleCityQueryChange}
         onCitySelect={handleCitySelect}
         onDistrictChange={handleDistrictChange}
+        onAddressChange={setAddress}
         onContinue={handleSaveAddress}
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}

@@ -230,6 +230,27 @@ export const IconClock = () => (
   </svg>
 )
 
+export const IconRefresh = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M19.6 12a7.6 7.6 0 1 1-2.6-5.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M19.6 6.2v4.4h-4.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 export const IconPhoto = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <rect

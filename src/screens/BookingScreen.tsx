@@ -8,6 +8,10 @@ import type {
   MasterReview,
   MasterReviewSummary,
 } from '../types/app'
+import {
+  loadClientPreferences,
+  updateClientPreferences,
+} from '../utils/clientPreferences'
 import { parseServiceItems } from '../utils/profileContent'
 
 type BookingScreenProps = {
@@ -21,6 +25,9 @@ type BookingScreenProps = {
   address: string
   photoUrls?: string[]
   preferredCategoryId?: string | null
+  initialServiceName?: string
+  initialLocationType?: 'master' | 'client'
+  initialDetails?: string
   onBack: () => void
   onBookingCreated?: (payload: { id: number | null; status?: BookingStatus }) => void
 }
@@ -137,9 +144,13 @@ export const BookingScreen = ({
   address,
   photoUrls = [],
   preferredCategoryId,
+  initialServiceName,
+  initialLocationType,
+  initialDetails,
   onBack,
   onBookingCreated,
 }: BookingScreenProps) => {
+  const preferencesRef = useRef(loadClientPreferences())
   const [profile, setProfile] = useState<MasterProfile | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -151,7 +162,9 @@ export const BookingScreen = ({
   const [locationType, setLocationType] = useState<'master' | 'client'>('master')
   const [selectedDayKey, setSelectedDayKey] = useState<string>('')
   const [selectedTime, setSelectedTime] = useState<string>('')
-  const [details, setDetails] = useState('')
+  const [details, setDetails] = useState(
+    initialDetails ?? preferencesRef.current.lastBookingNote ?? ''
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
@@ -342,9 +355,33 @@ export const BookingScreen = ({
     setServiceName((current) =>
       serviceOptions.some((item) => item.name === current)
         ? current
-        : serviceOptions[0].name
+        : (() => {
+            const masterPreferred =
+              preferencesRef.current.lastBookingServiceByMaster?.[masterId]
+            const categoryPreferred =
+              preferencesRef.current.lastBookingServiceByCategory?.[categoryId]
+            if (
+              initialServiceName &&
+              serviceOptions.some((item) => item.name === initialServiceName)
+            ) {
+              return initialServiceName
+            }
+            if (
+              masterPreferred &&
+              serviceOptions.some((item) => item.name === masterPreferred)
+            ) {
+              return masterPreferred
+            }
+            if (
+              categoryPreferred &&
+              serviceOptions.some((item) => item.name === categoryPreferred)
+            ) {
+              return categoryPreferred
+            }
+            return serviceOptions[0].name
+          })()
     )
-  }, [serviceOptions])
+  }, [categoryId, initialServiceName, masterId, serviceOptions])
 
   const selectedService = useMemo(
     () => serviceOptions.find((item) => item.name === serviceName) ?? null,
@@ -367,9 +404,21 @@ export const BookingScreen = ({
     setLocationType((current) =>
       locationOptions.some((option) => option.value === current)
         ? current
-        : locationOptions[0].value
+        : (() => {
+            if (
+              initialLocationType &&
+              locationOptions.some((option) => option.value === initialLocationType)
+            ) {
+              return initialLocationType
+            }
+            const preferred = preferencesRef.current.lastBookingLocationType
+            if (preferred && locationOptions.some((option) => option.value === preferred)) {
+              return preferred
+            }
+            return locationOptions[0].value
+          })()
     )
-  }, [locationOptions])
+  }, [initialLocationType, locationOptions])
 
   const availableDays = useMemo(() => {
     if (!profile) return []
@@ -727,6 +776,19 @@ export const BookingScreen = ({
       }
 
       onBookingCreated?.({ id: data?.id ?? null, status: data?.status })
+      updateClientPreferences((current) => ({
+        ...current,
+        lastBookingLocationType: locationType,
+        lastBookingNote: details.trim(),
+        lastBookingServiceByMaster: {
+          ...(current.lastBookingServiceByMaster ?? {}),
+          [masterId]: serviceName.trim(),
+        },
+        lastBookingServiceByCategory: {
+          ...(current.lastBookingServiceByCategory ?? {}),
+          [categoryId]: serviceName.trim(),
+        },
+      }))
       setSubmitSuccess('Запись отправлена мастеру.')
     } catch (error) {
       setSubmitError('Не удалось создать запись. Попробуйте еще раз.')

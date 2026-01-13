@@ -1336,6 +1336,61 @@ app.post('/api/location', async (req, res) => {
   }
 })
 
+app.patch('/api/location/share', async (req, res) => {
+  const { userId, shareToClients, shareToMasters } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const hasShareToClients = typeof shareToClients === 'boolean'
+  const hasShareToMasters = typeof shareToMasters === 'boolean'
+
+  if (!hasShareToClients && !hasShareToMasters) {
+    res.status(400).json({ error: 'share_required' })
+    return
+  }
+
+  try {
+    const location = await loadUserLocation(normalizedUserId)
+    if (!location) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const updates = []
+    const values = []
+    if (hasShareToClients) {
+      values.push(shareToClients)
+      updates.push(`share_to_clients = $${values.length}`)
+    }
+    if (hasShareToMasters) {
+      values.push(shareToMasters)
+      updates.push(`share_to_masters = $${values.length}`)
+    }
+
+    values.push(normalizedUserId)
+
+    await pool.query(
+      `
+        UPDATE user_locations
+        SET ${updates.join(', ')},
+            updated_at = NOW()
+        WHERE user_id = $${values.length}
+      `,
+      values
+    )
+
+    const nextLocation = await loadUserLocation(normalizedUserId)
+    res.json({ ok: true, location: nextLocation })
+  } catch (error) {
+    console.error('PATCH /api/location/share failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.delete('/api/location', async (req, res) => {
   const normalizedUserId = normalizeText(req.query.userId)
 

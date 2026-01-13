@@ -10,6 +10,7 @@ export const AddressScreen = ({
   cityId,
   districtId,
   cityQuery,
+  address,
   isSaving,
   isLoading,
   saveError,
@@ -19,6 +20,7 @@ export const AddressScreen = ({
   onCityQueryChange,
   onCitySelect,
   onDistrictChange,
+  onAddressChange,
   onContinue,
   onRequestLocation,
   onClearLocation,
@@ -29,6 +31,7 @@ export const AddressScreen = ({
   cityId: number | null
   districtId: number | null
   cityQuery: string
+  address: string
   isSaving: boolean
   isLoading: boolean
   saveError: string
@@ -38,6 +41,7 @@ export const AddressScreen = ({
   onCityQueryChange: (value: string) => void
   onCitySelect: (city: City) => void
   onDistrictChange: (value: number | null) => void
+  onAddressChange: (value: string) => void
   onContinue: () => void
   onRequestLocation: () => void
   onClearLocation: () => void
@@ -183,6 +187,25 @@ export const AddressScreen = ({
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+          <div className="address-field">
+            <label className="address-label" htmlFor="address-input">
+              Адрес (по желанию)
+            </label>
+            <div className="address-input-wrap">
+              <span className="address-input-icon" aria-hidden="true">
+                <IconPin />
+              </span>
+              <input
+                id="address-input"
+                className="address-input address-input--icon"
+                type="text"
+                value={address}
+                onChange={(event) => onAddressChange(event.target.value)}
+                placeholder="Улица, дом, подъезд"
+                autoComplete="street-address"
+              />
             </div>
           </div>
         </div>

@@ -181,6 +181,7 @@ const getInitials = (value: string) => {
 type ClientRequestsScreenProps = {
   apiBase: string
   userId: string
+  initialTab?: 'requests' | 'bookings'
   onCreateRequest: () => void
   onViewHome: () => void
   onViewMasters: () => void
@@ -198,13 +199,16 @@ type BookingCalendarItem = {
 export const ClientRequestsScreen = ({
   apiBase,
   userId,
+  initialTab,
   onCreateRequest,
   onViewHome,
   onViewMasters,
   onViewProfile,
   onRescheduleBooking,
 }: ClientRequestsScreenProps) => {
-  const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
+  const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>(
+    initialTab ?? 'requests'
+  )
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -243,6 +247,12 @@ export const ClientRequestsScreen = ({
     return today
   })
   const [calendarInitialized, setCalendarInitialized] = useState(false)
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab])
 
   useEffect(() => {
     if (!userId) return

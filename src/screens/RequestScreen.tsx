@@ -12,6 +12,10 @@ import {
   requestBudgetOptions,
   requestServiceCatalog,
 } from '../data/requestData'
+import {
+  loadClientPreferences,
+  updateClientPreferences,
+} from '../utils/clientPreferences'
 
 const locationOptions = [
   { value: 'master', label: 'У мастера' },
@@ -56,23 +60,49 @@ export const RequestScreen = ({
   districtName,
   address,
 }: RequestScreenProps) => {
-  const initialCategoryId = defaultCategoryId ?? categoryItems[0]?.id ?? ''
+  const preferencesRef = useRef(loadClientPreferences())
+  const initialCategoryId =
+    defaultCategoryId ??
+    preferencesRef.current.defaultCategoryId ??
+    categoryItems[0]?.id ??
+    ''
   const initialServiceOptions = getServiceOptions(initialCategoryId)
+  const preferredService =
+    preferencesRef.current.lastRequestServiceByCategory?.[initialCategoryId] ?? ''
   const [categoryId, setCategoryId] = useState<string>(initialCategoryId)
   const [serviceName, setServiceName] = useState<string>(
-    initialServiceOptions[0]?.title ?? ''
+    initialServiceOptions.some((option) => option.title === preferredService)
+      ? preferredService
+      : initialServiceOptions[0]?.title ?? ''
   )
+  const initialLocationType =
+    preferencesRef.current.defaultLocationType &&
+    locationOptions.some(
+      (option) => option.value === preferencesRef.current.defaultLocationType
+    )
+      ? preferencesRef.current.defaultLocationType
+      : 'master'
+  const initialDateOption =
+    preferencesRef.current.defaultDateOption &&
+    dateOptions.some(
+      (option) => option.value === preferencesRef.current.defaultDateOption
+    )
+      ? preferencesRef.current.defaultDateOption
+      : 'today'
+  const initialBudget =
+    preferencesRef.current.defaultBudget &&
+    requestBudgetOptions.includes(preferencesRef.current.defaultBudget)
+      ? preferencesRef.current.defaultBudget
+      : requestBudgetOptions[0] ?? 'не важно'
   const [locationType, setLocationType] = useState<
     (typeof locationOptions)[number]['value']
-  >('master')
+  >(initialLocationType)
   const [dateOption, setDateOption] = useState<
     (typeof dateOptions)[number]['value']
-  >('today')
+  >(initialDateOption)
   const [dateValue, setDateValue] = useState('')
   const [timeValue, setTimeValue] = useState('')
-  const [budget, setBudget] = useState<string>(
-    requestBudgetOptions[0] ?? 'не важно'
-  )
+  const [budget, setBudget] = useState<string>(initialBudget)
   const [details, setDetails] = useState('')
   const [photos, setPhotos] = useState<RequestPhoto[]>([])
   const [uploadError, setUploadError] = useState('')
@@ -101,8 +131,18 @@ export const RequestScreen = ({
       setServiceName('')
       return
     }
-    setServiceName(serviceOptions[0].title)
-  }, [serviceOptions])
+    setServiceName((current) => {
+      if (serviceOptions.some((option) => option.title === current)) {
+        return current
+      }
+      const preferred =
+        preferencesRef.current.lastRequestServiceByCategory?.[categoryId]
+      if (preferred && serviceOptions.some((option) => option.title === preferred)) {
+        return preferred
+      }
+      return serviceOptions[0].title
+    })
+  }, [categoryId, serviceOptions])
 
   const dateLabel = useMemo(() => {
     const match = dateOptions.find((option) => option.value === dateOption)
@@ -284,6 +324,17 @@ export const RequestScreen = ({
       }
 
       setSubmitSuccess('Заявка опубликована. Ожидайте отклики.')
+      updateClientPreferences((current) => ({
+        ...current,
+        defaultCategoryId: categoryId,
+        defaultLocationType: locationType,
+        defaultDateOption: dateOption,
+        defaultBudget: budget,
+        lastRequestServiceByCategory: {
+          ...(current.lastRequestServiceByCategory ?? {}),
+          [categoryId]: serviceName.trim(),
+        },
+      }))
     } catch (error) {
       setSubmitError('Не удалось опубликовать заявку. Попробуйте еще раз.')
     } finally {

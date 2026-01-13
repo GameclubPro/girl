@@ -15,6 +15,7 @@ import {
   parseServiceItems,
 } from '../utils/profileContent'
 import type { PortfolioItem } from '../utils/profileContent'
+import type { FavoriteMaster } from '../utils/favorites'
 
 type ClientMasterProfileScreenProps = {
   apiBase: string
@@ -22,9 +23,12 @@ type ClientMasterProfileScreenProps = {
   onBack: () => void
   onViewHome: () => void
   onViewMasters: () => void
-  onViewRequests: () => void
+  onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewProfile: () => void
   onCreateBooking: () => void
+  favorites: FavoriteMaster[]
+  onToggleFavorite: (favorite: Omit<FavoriteMaster, 'savedAt'>) => void
+  onUpdateFavorite: (favorite: Omit<FavoriteMaster, 'savedAt'>) => void
 }
 
 const scheduleLabels: Record<string, string> = {
@@ -182,6 +186,9 @@ export const ClientMasterProfileScreen = ({
   onViewRequests,
   onViewProfile,
   onCreateBooking,
+  favorites,
+  onToggleFavorite,
+  onUpdateFavorite,
 }: ClientMasterProfileScreenProps) => {
   const [profile, setProfile] = useState<MasterProfile | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -458,6 +465,23 @@ export const ClientMasterProfileScreen = ({
   )
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_PREVIEW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded
+  const isFavorite = favorites.some((favorite) => favorite.masterId === masterId)
+  const favoritePayload = useMemo(
+    () => ({
+      masterId,
+      displayName: profile?.displayName?.trim() || 'Мастер',
+      avatarUrl: profile?.avatarUrl ?? null,
+      categories: profile?.categories ?? [],
+      cityName: profile?.cityName ?? null,
+      districtName: profile?.districtName ?? null,
+      reviewsAverage: profile?.reviewsAverage ?? null,
+      reviewsCount: profile?.reviewsCount ?? null,
+      priceFrom: profile?.priceFrom ?? null,
+      priceTo: profile?.priceTo ?? null,
+      updatedAt: profile?.updatedAt ?? null,
+    }),
+    [masterId, profile]
+  )
   const visiblePortfolioItems = portfolioGridItems
   const portfolioCountLabel =
     portfolioGridItems.length > 0 ? `${portfolioGridItems.length} фото` : 'Нет фото'
@@ -471,6 +495,12 @@ export const ClientMasterProfileScreen = ({
 
   const coverUrl = profile?.coverUrl ?? null
   const coverFocus = '50% 50%'
+
+  useEffect(() => {
+    if (profile && isFavorite) {
+      onUpdateFavorite(favoritePayload)
+    }
+  }, [favoritePayload, isFavorite, onUpdateFavorite, profile])
 
   return (
     <div className="screen screen--client screen--client-master-profile">
@@ -488,6 +518,22 @@ export const ClientMasterProfileScreen = ({
             <span className="master-profile-context-kicker">Профиль мастера</span>
             <span className="master-profile-context-title">{primaryCategory}</span>
           </div>
+          <button
+            className={`master-profile-like${isFavorite ? ' is-active' : ''}`}
+            type="button"
+            onClick={() => onToggleFavorite(favoritePayload)}
+            aria-label={isFavorite ? 'Убрать из избранного' : 'В избранное'}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 20.2s-6.4-3.7-8.6-7.4c-1.6-2.7-0.8-6.1 2-7.2 2.1-0.9 4.6-0.1 6.6 1.8 2-1.9 4.5-2.7 6.6-1.8 2.8 1.1 3.6 4.5 2 7.2-2.2 3.7-8.6 7.4-8.6 7.4Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </header>
 
         {loadError && <p className="pro-error">{loadError}</p>}

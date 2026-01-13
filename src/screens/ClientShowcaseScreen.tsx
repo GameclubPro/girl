@@ -8,13 +8,14 @@ import {
   parseServiceItems,
 } from '../utils/profileContent'
 import type { ServiceItem } from '../utils/profileContent'
+import type { FavoriteMaster } from '../utils/favorites'
 
 type ClientShowcaseScreenProps = {
   apiBase: string
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onBack: () => void
-  onViewRequests: () => void
+  onViewRequests: (tab?: 'requests' | 'bookings') => void
   onCreateBooking: (masterId: string) => void
   onViewProfile: (masterId: string) => void
   onViewClientProfile: () => void
@@ -30,7 +31,7 @@ type ClientShowcaseGalleryScreenProps = {
   onCategoryChange: (categoryId: string | null) => void
   onBack: () => void
   onViewMasters: () => void
-  onViewRequests: () => void
+  onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewDetail: (item: ShowcaseMedia) => void
   onViewClientProfile: () => void
 }
@@ -41,10 +42,13 @@ type ClientShowcaseDetailScreenProps = {
   onBack: () => void
   onViewHome: () => void
   onViewMasters: () => void
-  onViewRequests: () => void
+  onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewClientProfile: () => void
   onViewProfile: (masterId: string) => void
   onCreateBooking: () => void
+  favorites: FavoriteMaster[]
+  onToggleFavorite: (favorite: Omit<FavoriteMaster, 'savedAt'>) => void
+  onUpdateFavorite: (favorite: Omit<FavoriteMaster, 'savedAt'>) => void
 }
 
 const categoryLabelOverrides: Record<string, string> = {
@@ -551,8 +555,27 @@ export const ClientShowcaseDetailScreen = ({
   onViewClientProfile,
   onViewProfile,
   onCreateBooking,
+  favorites,
+  onToggleFavorite,
+  onUpdateFavorite,
 }: ClientShowcaseDetailScreenProps) => {
-  const [isLiked, setIsLiked] = useState(false)
+  const isLiked = favorites.some((favorite) => favorite.masterId === item.masterId)
+  const favoritePayload = useMemo(
+    () => ({
+      masterId: item.masterId,
+      displayName: item.masterName,
+      avatarUrl: item.masterAvatarUrl,
+      categories: item.categories,
+      cityName: item.cityName,
+      districtName: item.districtName,
+      reviewsAverage: item.reviewsAverage,
+      reviewsCount: item.reviewsCount,
+      priceFrom: item.priceFrom,
+      priceTo: item.priceTo,
+      updatedAt: null,
+    }),
+    [item]
+  )
   const masterInitials = getInitials(item.masterName)
   const primaryCategoryId = activeCategoryId ?? item.categories[0] ?? null
   const primaryCategoryLabel = primaryCategoryId
@@ -570,6 +593,12 @@ export const ClientShowcaseDetailScreen = ({
   const ratingLabel =
     item.reviewsAverage !== null ? item.reviewsAverage.toFixed(1) : 'Новый'
   const hasReviews = item.reviewsCount > 0 && item.reviewsAverage !== null
+
+  useEffect(() => {
+    if (isLiked) {
+      onUpdateFavorite(favoritePayload)
+    }
+  }, [favoritePayload, isLiked, onUpdateFavorite])
 
   return (
     <div className="screen screen--client screen--client-showcase screen--client-gallery-detail">
@@ -590,7 +619,7 @@ export const ClientShowcaseDetailScreen = ({
             className={`client-gallery-detail-like${isLiked ? ' is-active' : ''}`}
             type="button"
             aria-label={isLiked ? 'Убрать из избранного' : 'В избранное'}
-            onClick={() => setIsLiked((prev) => !prev)}
+            onClick={() => onToggleFavorite(favoritePayload)}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
