@@ -189,26 +189,6 @@ export const ChatThreadScreen = ({
     []
   )
 
-  const handleScroll = useCallback(() => {
-    const container = getScrollElement()
-    const distance =
-      container.scrollHeight - container.scrollTop - container.clientHeight
-    isNearBottomRef.current = distance < 120
-    if (isNearBottomRef.current) {
-      setHasNewMessage(false)
-      const last = messagesRef.current[messagesRef.current.length - 1]
-      if (
-        last &&
-        last.senderId !== userId &&
-        last.id > 0 &&
-        last.id !== lastReadSentRef.current
-      ) {
-        lastReadSentRef.current = last.id
-        void markRead(last.id)
-      }
-    }
-  }, [getScrollElement, markRead, userId])
-
   const mergeMessages = useCallback((incoming: ChatMessage[]) => {
     setMessages((current) => {
       const map = new Map<number, LocalChatMessage>()
@@ -303,6 +283,26 @@ export const ChatThreadScreen = ({
     },
     [apiBase, chatId, userId]
   )
+
+  const handleScroll = useCallback(() => {
+    const container = getScrollElement()
+    const distance =
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    isNearBottomRef.current = distance < 120
+    if (isNearBottomRef.current) {
+      setHasNewMessage(false)
+      const last = messagesRef.current[messagesRef.current.length - 1]
+      if (
+        last &&
+        last.senderId !== userId &&
+        last.id > 0 &&
+        last.id !== lastReadSentRef.current
+      ) {
+        lastReadSentRef.current = last.id
+        void markRead(last.id)
+      }
+    }
+  }, [getScrollElement, markRead, userId])
 
   const loadMessages = useCallback(
     async (beforeId?: number, options?: { silent?: boolean }) => {
@@ -425,7 +425,10 @@ export const ChatThreadScreen = ({
 
     const cachedMessages = getCachedChatMessages(apiBase, userId, chatId)
     if (cachedMessages && cachedMessages.length > 0) {
-      const seeded = cachedMessages.map((item) => ({ ...item, status: 'sent' }))
+      const seeded: LocalChatMessage[] = cachedMessages.map((item) => ({
+        ...item,
+        status: 'sent',
+      }))
       setMessages(seeded)
       setIsLoading(false)
       hasInitialScrollRef.current = false
