@@ -3,7 +3,6 @@ import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
   IconClock,
-  IconEdit,
   IconHome,
   IconList,
   IconPin,
