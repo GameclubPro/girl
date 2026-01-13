@@ -5673,10 +5673,10 @@
   height: 46px;
   padding: 0;
   border-radius: 16px;
-  background: rgba(var(--paper-rgb), 0.92);
+  background: rgba(var(--accent-rgb), 0.18);
   color: var(--ink);
-  border: 1px solid rgba(var(--shadow-rgb), 0.16);
-  box-shadow: 0 14px 22px rgba(var(--shadow-rgb), 0.2);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.16);
   z-index: 2;
   justify-content: center;
   align-items: center;
