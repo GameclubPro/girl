@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
+  IconChat,
   IconClock,
   IconHome,
   IconList,
@@ -24,6 +25,7 @@ type ClientMasterProfileScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
+  onViewChats: () => void
   onViewProfile: () => void
   onCreateBooking: () => void
   favorites: FavoriteMaster[]
@@ -193,6 +195,7 @@ export const ClientMasterProfileScreen = ({
   onViewHome,
   onViewMasters,
   onViewRequests,
+  onViewChats,
   onViewProfile,
   onCreateBooking,
   favorites,
@@ -1166,6 +1169,12 @@ export const ClientMasterProfileScreen = ({
             <IconUsers />
           </span>
           Мастера
+        </button>
+        <button className="nav-item" type="button" onClick={onViewChats}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconChat />
+          </span>
+          Чаты
         </button>
         <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  IconChat,
   IconClock,
   IconHome,
   IconList,
@@ -20,6 +21,7 @@ type ClientProfileScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
+  onViewChats: () => void
   onCreateRequest: () => void
   onCreateBooking: (payload: {
     masterId: string
@@ -165,6 +167,7 @@ export const ClientProfileScreen = ({
   onViewHome,
   onViewMasters,
   onViewRequests,
+  onViewChats,
   onCreateRequest,
   onCreateBooking,
   onEditAddress,
@@ -1411,6 +1414,12 @@ export const ClientProfileScreen = ({
             <IconUsers />
           </span>
           Мастера
+        </button>
+        <button className="nav-item" type="button" onClick={onViewChats}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconChat />
+          </span>
+          Чаты
         </button>
         <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  IconChat,
   IconClose,
   IconHome,
   IconList,
@@ -185,6 +186,7 @@ type ClientRequestsScreenProps = {
   onCreateRequest: () => void
   onViewHome: () => void
   onViewMasters: () => void
+  onViewChats: () => void
   onViewProfile: (masterId: string) => void
   onRescheduleBooking: (booking: Booking) => void
   onOpenChat: (chatId: number) => void
@@ -204,6 +206,7 @@ export const ClientRequestsScreen = ({
   onCreateRequest,
   onViewHome,
   onViewMasters,
+  onViewChats,
   onViewProfile,
   onRescheduleBooking,
   onOpenChat,
@@ -1504,6 +1507,12 @@ export const ClientRequestsScreen = ({
             <IconUsers />
           </span>
           Мастера
+        </button>
+        <button className="nav-item" type="button" onClick={onViewChats}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconChat />
+          </span>
+          Чаты
         </button>
         <button className="nav-item is-active" type="button">
           <span className="nav-icon" aria-hidden="true">

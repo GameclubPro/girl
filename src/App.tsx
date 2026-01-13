@@ -895,6 +895,7 @@ function App() {
         onViewHome={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
         onViewRequests={(tab) => openRequests(tab)}
+        onViewChats={openChatList}
         onCreateRequest={() => {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           setView('request')
@@ -929,6 +930,7 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
         onViewRequests={(tab) => openRequests(tab)}
+        onViewChats={openChatList}
         onViewClientProfile={() => setView('client-profile')}
         clientLocation={clientLocation}
         isLocating={isLocating}
@@ -969,6 +971,10 @@ function App() {
           setSelectedMasterId(null)
           openRequests()
         }}
+        onViewChats={() => {
+          setSelectedMasterId(null)
+          setView('chats')
+        }}
         onViewProfile={() => {
           setSelectedMasterId(null)
           setView('client-profile')
@@ -1007,6 +1013,10 @@ function App() {
           setSelectedShowcaseItem(null)
           openRequests()
         }}
+        onViewChats={() => {
+          setSelectedShowcaseItem(null)
+          setView('chats')
+        }}
         onViewClientProfile={() => {
           setSelectedShowcaseItem(null)
           setView('client-profile')
@@ -1040,6 +1050,7 @@ function App() {
         onBack={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
         onViewRequests={(tab) => openRequests(tab)}
+        onViewChats={openChatList}
         onViewClientProfile={() => setView('client-profile')}
         onViewDetail={(item) => {
           setSelectedShowcaseItem(item)
@@ -1072,6 +1083,7 @@ function App() {
   if (view === 'chat-thread' && selectedChatId) {
     return (
       <ChatThreadScreen
+        key={selectedChatId}
         apiBase={apiBase}
         userId={userId}
         chatId={selectedChatId}
@@ -1148,6 +1160,7 @@ function App() {
         }}
         onViewHome={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
+        onViewChats={openChatList}
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)
           setView('client-master-profile')

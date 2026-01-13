@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { IconFilter, IconHome, IconList, IconUser, IconUsers } from '../components/icons'
+import {
+  IconChat,
+  IconFilter,
+  IconHome,
+  IconList,
+  IconUser,
+  IconUsers,
+} from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, UserLocation } from '../types/app'
 import {
@@ -16,6 +23,7 @@ type ClientShowcaseScreenProps = {
   onCategoryChange: (categoryId: string | null) => void
   onBack: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
+  onViewChats: () => void
   onCreateBooking: (masterId: string) => void
   onViewProfile: (masterId: string) => void
   onViewClientProfile: () => void
@@ -32,6 +40,7 @@ type ClientShowcaseGalleryScreenProps = {
   onBack: () => void
   onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
+  onViewChats: () => void
   onViewDetail: (item: ShowcaseMedia) => void
   onViewClientProfile: () => void
 }
@@ -43,6 +52,7 @@ type ClientShowcaseDetailScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
+  onViewChats: () => void
   onViewClientProfile: () => void
   onViewProfile: (masterId: string) => void
   onCreateBooking: () => void
@@ -357,6 +367,7 @@ export const ClientShowcaseGalleryScreen = ({
   onBack,
   onViewMasters,
   onViewRequests,
+  onViewChats,
   onViewDetail,
   onViewClientProfile,
 }: ClientShowcaseGalleryScreenProps) => {
@@ -528,6 +539,12 @@ export const ClientShowcaseGalleryScreen = ({
           </span>
           Мастера
         </button>
+        <button className="nav-item" type="button" onClick={onViewChats}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconChat />
+          </span>
+          Чаты
+        </button>
         <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
@@ -552,6 +569,7 @@ export const ClientShowcaseDetailScreen = ({
   onViewHome,
   onViewMasters,
   onViewRequests,
+  onViewChats,
   onViewClientProfile,
   onViewProfile,
   onCreateBooking,
@@ -726,6 +744,12 @@ export const ClientShowcaseDetailScreen = ({
           </span>
           Мастера
         </button>
+        <button className="nav-item" type="button" onClick={onViewChats}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconChat />
+          </span>
+          Чаты
+        </button>
         <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
@@ -749,6 +773,7 @@ export const ClientShowcaseScreen = ({
   onCategoryChange,
   onBack,
   onViewRequests,
+  onViewChats,
   onCreateBooking,
   onViewProfile,
   onViewClientProfile,
@@ -1360,6 +1385,12 @@ export const ClientShowcaseScreen = ({
             <IconUsers />
           </span>
           Мастера
+        </button>
+        <button className="nav-item" type="button" onClick={onViewChats}>
+          <span className="nav-icon" aria-hidden="true">
+            <IconChat />
+          </span>
+          Чаты
         </button>
         <button className="nav-item" type="button" onClick={() => onViewRequests()}>
           <span className="nav-icon" aria-hidden="true">

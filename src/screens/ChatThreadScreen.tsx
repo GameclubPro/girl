@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -82,6 +83,8 @@ export const ChatThreadScreen = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const hasMoreRef = useRef(true)
   const isLoadingMoreRef = useRef(false)
+  const hasInitialScrollRef = useRef(false)
+  const messagesRef = useRef<ChatMessage[]>([])
 
   const limit = 30
 
@@ -153,7 +156,6 @@ export const ChatThreadScreen = ({
           setHasMore(false)
         }
         if (!beforeId) {
-          setTimeout(() => scrollToBottom('auto'), 0)
           const last = items[items.length - 1]
           if (last && last.senderId !== userId) {
             void markRead(last.id)
@@ -193,13 +195,16 @@ export const ChatThreadScreen = ({
     void loadMessages()
   }, [loadDetail, loadMessages])
 
+  useLayoutEffect(() => {
+    if (hasInitialScrollRef.current) return
+    if (messages.length === 0) return
+    scrollToBottom('auto')
+    hasInitialScrollRef.current = true
+  }, [messages.length, scrollToBottom])
+
   useEffect(() => {
-    setMessages([])
-    setHasMore(true)
-    setLoadError('')
-    hasMoreRef.current = true
-    isLoadingMoreRef.current = false
-  }, [chatId])
+    messagesRef.current = messages
+  }, [messages])
 
   useEffect(() => {
     const streamUrl = buildChatStreamUrl(apiBase, userId)
@@ -212,6 +217,8 @@ export const ChatThreadScreen = ({
         if (payload?.type === 'message:new') {
           const incoming = payload.message as ChatMessage | undefined
           if (incoming?.chatId === chatId) {
+            const exists = messagesRef.current.some((item) => item.id === incoming.id)
+            if (exists) return
             mergeMessages([incoming])
             scrollToBottom()
             if (incoming.senderId !== userId) {
