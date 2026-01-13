@@ -29,6 +29,11 @@ const dateOptions = [
   { value: 'choose', label: 'Выбрать' },
 ] as const
 
+type RequestBudgetOption = (typeof requestBudgetOptions)[number]
+
+const isRequestBudgetOption = (value: string): value is RequestBudgetOption =>
+  requestBudgetOptions.some((option) => option === value)
+
 type RequestScreenProps = {
   apiBase: string
   userId: string
@@ -91,7 +96,7 @@ export const RequestScreen = ({
       : 'today'
   const initialBudget =
     preferencesRef.current.defaultBudget &&
-    requestBudgetOptions.includes(preferencesRef.current.defaultBudget)
+    isRequestBudgetOption(preferencesRef.current.defaultBudget)
       ? preferencesRef.current.defaultBudget
       : requestBudgetOptions[0] ?? 'не важно'
   const [locationType, setLocationType] = useState<
@@ -102,7 +107,7 @@ export const RequestScreen = ({
   >(initialDateOption)
   const [dateValue, setDateValue] = useState('')
   const [timeValue, setTimeValue] = useState('')
-  const [budget, setBudget] = useState<string>(initialBudget)
+  const [budget, setBudget] = useState<RequestBudgetOption>(initialBudget)
   const [details, setDetails] = useState('')
   const [photos, setPhotos] = useState<RequestPhoto[]>([])
   const [uploadError, setUploadError] = useState('')

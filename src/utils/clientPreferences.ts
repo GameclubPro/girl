@@ -15,6 +15,14 @@ const PREFS_KEY = 'kiven-client-preferences'
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
+const toStringRecord = (value: Record<string, unknown>) =>
+  Object.entries(value).reduce<Record<string, string>>((acc, [key, val]) => {
+    if (typeof val === 'string' && val.trim()) {
+      acc[key] = val
+    }
+    return acc
+  }, {})
+
 const normalizePreferences = (value: unknown): ClientPreferences => {
   if (!isRecord(value)) return {}
   const prefs: ClientPreferences = {}
@@ -40,24 +48,18 @@ const normalizePreferences = (value: unknown): ClientPreferences => {
     prefs.defaultBudget = value.defaultBudget
   }
   if (isRecord(value.lastRequestServiceByCategory)) {
-    prefs.lastRequestServiceByCategory = Object.fromEntries(
-      Object.entries(value.lastRequestServiceByCategory).filter(
-        ([, val]) => typeof val === 'string' && val.trim()
-      )
+    prefs.lastRequestServiceByCategory = toStringRecord(
+      value.lastRequestServiceByCategory
     )
   }
   if (isRecord(value.lastBookingServiceByCategory)) {
-    prefs.lastBookingServiceByCategory = Object.fromEntries(
-      Object.entries(value.lastBookingServiceByCategory).filter(
-        ([, val]) => typeof val === 'string' && val.trim()
-      )
+    prefs.lastBookingServiceByCategory = toStringRecord(
+      value.lastBookingServiceByCategory
     )
   }
   if (isRecord(value.lastBookingServiceByMaster)) {
-    prefs.lastBookingServiceByMaster = Object.fromEntries(
-      Object.entries(value.lastBookingServiceByMaster).filter(
-        ([, val]) => typeof val === 'string' && val.trim()
-      )
+    prefs.lastBookingServiceByMaster = toStringRecord(
+      value.lastBookingServiceByMaster
     )
   }
   if (value.lastBookingLocationType === 'master' || value.lastBookingLocationType === 'client') {

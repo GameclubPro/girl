@@ -87,12 +87,13 @@ const formatDateLabel = (date: Date) => {
 
 const normalizeServiceKey = (value: string) => value.trim().toLowerCase()
 
-const resolveServiceCategory = (serviceName: string) => {
+const resolveServiceCategory = (serviceName: string): CategoryId | null => {
   const normalized = normalizeServiceKey(serviceName)
   const match = Object.entries(requestServiceCatalog).find(([, options]) =>
     options.some((option) => normalizeServiceKey(option.title) === normalized)
   )
-  return match?.[0] ?? null
+  const categoryId = match?.[0] ?? null
+  return categoryId && isCategoryId(categoryId) ? categoryId : null
 }
 
 const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
