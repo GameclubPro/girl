@@ -2106,15 +2106,15 @@ export const ProProfileScreen = ({
             <button
               className="pro-profile-ig-button pro-profile-ig-button--fab"
               type="button"
+              aria-label="Настройки профиля"
               onClick={(event) => {
                 event.stopPropagation()
                 openEditor('basic')
               }}
             >
               <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                <IconEdit />
+                <IconSettings />
               </span>
-              <span className="pro-profile-ig-button-label">Редактировать</span>
             </button>
           </div>
           <div className="pro-profile-ig-header">

@@ -5656,25 +5656,27 @@
 
 .screen--pro .pro-profile-ig-button--fab {
   position: absolute;
-  top: calc(12px + var(--safe-top) + var(--tg-top-offset));
+  top: calc(16px + var(--safe-top) + var(--tg-top-offset));
   right: var(--pro-pad-x);
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: var(--accent-strong);
-  color: #ffffff;
-  border: none;
-  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.28);
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 16px;
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  box-shadow: 0 14px 22px rgba(var(--shadow-rgb), 0.2);
   z-index: 2;
 }
 
 .screen--pro .pro-profile-ig-button--fab .pro-profile-ig-button-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .screen--pro .pro-profile-ig-button--fab .pro-profile-ig-button-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .pro-shell--ig .pro-profile-portfolio-panel {
