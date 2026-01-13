@@ -187,11 +187,16 @@ export const ClientProfileScreen = ({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState('')
+  const [activeAnchorId, setActiveAnchorId] = useState<string>(
+    profileAnchorItems[0]?.id ?? ''
+  )
   const displayName = displayNameFallback.trim() || 'Клиент'
   const initials = getInitials(displayName)
+  const showSkeleton = isLoading && requests.length === 0 && bookings.length === 0
   const handleAnchorJump = useCallback((targetId: string) => {
     const element = document.getElementById(targetId)
     if (!element) return
+    setActiveAnchorId(targetId)
     const prefersReducedMotion =
       typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -200,6 +205,27 @@ export const ClientProfileScreen = ({
       block: 'start',
     })
   }, [])
+
+  useEffect(() => {
+    if (showSkeleton) return
+    const elements = profileAnchorItems
+      .map((item) => document.getElementById(item.id))
+      .filter((element): element is HTMLElement => Boolean(element))
+    if (elements.length === 0) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        if (visible[0]?.target) {
+          setActiveAnchorId(visible[0].target.id)
+        }
+      },
+      { rootMargin: '-20% 0px -55% 0px', threshold: [0, 0.25, 0.5] }
+    )
+    elements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [showSkeleton])
 
   useEffect(() => {
     if (!userId) return
@@ -324,102 +350,116 @@ export const ClientProfileScreen = ({
     }
   }, [apiBase, userId])
 
-  const refreshMeta = useCallback(async () => {
-    if (!userId) return
-
-    const loadAddress = async () => {
-      const response = await fetch(
-        `${apiBase}/api/address?userId=${encodeURIComponent(userId)}`
-      )
-      if (response.status === 404) {
-        setCityName('')
-        setDistrictName('')
-        setAddressLine('')
-        setAddressUpdatedAt(null)
-        return
+  const fetchAddress = useCallback(async () => {
+    const response = await fetch(
+      `${apiBase}/api/address?userId=${encodeURIComponent(userId)}`
+    )
+    if (response.status === 404) {
+      return {
+        cityName: '',
+        districtName: '',
+        addressLine: '',
+        addressUpdatedAt: null,
       }
-      if (!response.ok) {
-        throw new Error('Load address failed')
-      }
-      const data = (await response.json()) as {
-        cityId?: number | null
-        districtId?: number | null
-        address?: string | null
-        updatedAt?: string | null
-      }
-
-      if (!data.cityId) {
-        setCityName('')
-        setDistrictName('')
-        setAddressLine(typeof data.address === 'string' ? data.address : '')
-        setAddressUpdatedAt(
-          typeof data.updatedAt === 'string' ? data.updatedAt : null
-        )
-        return
-      }
-
-      const [citiesResponse, districtsResponse] = await Promise.all([
-        fetch(`${apiBase}/api/cities`),
-        data.districtId
-          ? fetch(`${apiBase}/api/cities/${data.cityId}/districts`)
-          : Promise.resolve(null),
-      ])
-
-      if (citiesResponse?.ok) {
-        const cities = (await citiesResponse.json()) as { id: number; name: string }[]
-        const matchedCity = cities.find((city) => city.id === data.cityId)
-        setCityName(matchedCity?.name ?? '')
-      } else {
-        setCityName('')
-      }
-
-      if (districtsResponse?.ok && data.districtId) {
-        const districts = (await districtsResponse.json()) as {
-          id: number
-          name: string
-        }[]
-        const matchedDistrict = districts.find(
-          (district) => district.id === data.districtId
-        )
-        setDistrictName(matchedDistrict?.name ?? '')
-      } else {
-        setDistrictName('')
-      }
-
-      setAddressLine(typeof data.address === 'string' ? data.address : '')
-      setAddressUpdatedAt(typeof data.updatedAt === 'string' ? data.updatedAt : null)
+    }
+    if (!response.ok) {
+      throw new Error('Load address failed')
+    }
+    const data = (await response.json()) as {
+      cityId?: number | null
+      districtId?: number | null
+      address?: string | null
+      updatedAt?: string | null
     }
 
-    const loadLocation = async () => {
-      const response = await fetch(
-        `${apiBase}/api/location?userId=${encodeURIComponent(userId)}`
-      )
-      if (response.status === 404) {
-        setLocation(null)
-        return
+    if (!data.cityId) {
+      return {
+        cityName: '',
+        districtName: '',
+        addressLine: typeof data.address === 'string' ? data.address : '',
+        addressUpdatedAt:
+          typeof data.updatedAt === 'string' ? data.updatedAt : null,
       }
-      if (!response.ok) {
-        throw new Error('Load location failed')
-      }
-      const data = (await response.json()) as UserLocation
-      setLocation(data)
     }
 
-    setMetaError('')
-    const [addressResult, locationResult] = await Promise.allSettled([
-      loadAddress(),
-      loadLocation(),
+    const [citiesResponse, districtsResponse] = await Promise.all([
+      fetch(`${apiBase}/api/cities`),
+      data.districtId
+        ? fetch(`${apiBase}/api/cities/${data.cityId}/districts`)
+        : Promise.resolve(null),
     ])
-    const nextError = [
-      addressResult.status === 'rejected' ? 'Не удалось загрузить адрес.' : '',
-      locationResult.status === 'rejected'
-        ? 'Не удалось загрузить геолокацию.'
-        : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-    setMetaError(nextError)
+
+    let resolvedCityName = ''
+    let resolvedDistrictName = ''
+
+    if (citiesResponse?.ok) {
+      const cities = (await citiesResponse.json()) as { id: number; name: string }[]
+      const matchedCity = cities.find((city) => city.id === data.cityId)
+      resolvedCityName = matchedCity?.name ?? ''
+    }
+
+    if (districtsResponse?.ok && data.districtId) {
+      const districts = (await districtsResponse.json()) as { id: number; name: string }[]
+      const matchedDistrict = districts.find(
+        (district) => district.id === data.districtId
+      )
+      resolvedDistrictName = matchedDistrict?.name ?? ''
+    }
+
+    return {
+      cityName: resolvedCityName,
+      districtName: resolvedDistrictName,
+      addressLine: typeof data.address === 'string' ? data.address : '',
+      addressUpdatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : null,
+    }
   }, [apiBase, userId])
+
+  const fetchLocation = useCallback(async () => {
+    const response = await fetch(
+      `${apiBase}/api/location?userId=${encodeURIComponent(userId)}`
+    )
+    if (response.status === 404) {
+      return null
+    }
+    if (!response.ok) {
+      throw new Error('Load location failed')
+    }
+    const data = (await response.json()) as UserLocation
+    return data
+  }, [apiBase, userId])
+
+  const refreshMeta = useCallback(
+    async (isCancelled?: () => boolean) => {
+      if (!userId) return
+      if (isCancelled?.()) return
+      setMetaError('')
+      const [addressResult, locationResult] = await Promise.allSettled([
+        fetchAddress(),
+        fetchLocation(),
+      ])
+      if (isCancelled?.()) return
+      if (addressResult.status === 'fulfilled') {
+        setCityName(addressResult.value.cityName)
+        setDistrictName(addressResult.value.districtName)
+        setAddressLine(addressResult.value.addressLine)
+        setAddressUpdatedAt(addressResult.value.addressUpdatedAt)
+      }
+      if (locationResult.status === 'fulfilled') {
+        setLocation(locationResult.value)
+      }
+      const nextError = [
+        addressResult.status === 'rejected' ? 'Не удалось загрузить адрес.' : '',
+        locationResult.status === 'rejected'
+          ? 'Не удалось загрузить геолокацию.'
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+      if (isCancelled?.()) return
+      setMetaError(nextError)
+    },
+    [fetchAddress, fetchLocation, userId]
+  )
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return
@@ -495,121 +535,12 @@ export const ClientProfileScreen = ({
   useEffect(() => {
     if (!userId) return
     let cancelled = false
-
-    const loadAddress = async () => {
-      const response = await fetch(
-        `${apiBase}/api/address?userId=${encodeURIComponent(userId)}`
-      )
-      if (response.status === 404) {
-        if (!cancelled) {
-          setCityName('')
-          setDistrictName('')
-          setAddressLine('')
-          setAddressUpdatedAt(null)
-        }
-        return
-      }
-      if (!response.ok) {
-        throw new Error('Load address failed')
-      }
-      const data = (await response.json()) as {
-        cityId?: number | null
-        districtId?: number | null
-        address?: string | null
-        updatedAt?: string | null
-      }
-
-      if (!data.cityId) {
-        if (!cancelled) {
-          setCityName('')
-          setDistrictName('')
-          setAddressLine(typeof data.address === 'string' ? data.address : '')
-          setAddressUpdatedAt(
-            typeof data.updatedAt === 'string' ? data.updatedAt : null
-          )
-        }
-        return
-      }
-
-      const [citiesResponse, districtsResponse] = await Promise.all([
-        fetch(`${apiBase}/api/cities`),
-        data.districtId
-          ? fetch(`${apiBase}/api/cities/${data.cityId}/districts`)
-          : Promise.resolve(null),
-      ])
-
-      if (cancelled) return
-
-      if (citiesResponse?.ok) {
-        const cities = (await citiesResponse.json()) as { id: number; name: string }[]
-        const matchedCity = cities.find((city) => city.id === data.cityId)
-        setCityName(matchedCity?.name ?? '')
-      } else {
-        setCityName('')
-      }
-
-      if (districtsResponse?.ok && data.districtId) {
-        const districts = (await districtsResponse.json()) as {
-          id: number
-          name: string
-        }[]
-        const matchedDistrict = districts.find(
-          (district) => district.id === data.districtId
-        )
-        setDistrictName(matchedDistrict?.name ?? '')
-      } else {
-        setDistrictName('')
-      }
-
-      setAddressLine(typeof data.address === 'string' ? data.address : '')
-      setAddressUpdatedAt(typeof data.updatedAt === 'string' ? data.updatedAt : null)
-    }
-
-    const loadLocation = async () => {
-      const response = await fetch(
-        `${apiBase}/api/location?userId=${encodeURIComponent(userId)}`
-      )
-      if (response.status === 404) {
-        if (!cancelled) {
-          setLocation(null)
-        }
-        return
-      }
-      if (!response.ok) {
-        throw new Error('Load location failed')
-      }
-      const data = (await response.json()) as UserLocation
-      if (!cancelled) {
-        setLocation(data)
-      }
-    }
-
-    const loadProfileMeta = async () => {
-      setMetaError('')
-      const [addressResult, locationResult] = await Promise.allSettled([
-        loadAddress(),
-        loadLocation(),
-      ])
-      if (cancelled) return
-      const nextError = [
-        addressResult.status === 'rejected'
-          ? 'Не удалось загрузить адрес.'
-          : '',
-        locationResult.status === 'rejected'
-          ? 'Не удалось загрузить геолокацию.'
-          : '',
-      ]
-        .filter(Boolean)
-        .join(' ')
-      setMetaError(nextError)
-    }
-
-    void loadProfileMeta()
-
+    const isCancelled = () => cancelled
+    void refreshMeta(isCancelled)
     return () => {
       cancelled = true
     }
-  }, [apiBase, userId])
+  }, [refreshMeta, userId])
 
   const openRequests = useMemo(
     () => requests.filter((request) => request.status === 'open'),
@@ -767,13 +698,14 @@ export const ClientProfileScreen = ({
   )
   const locationLabel = buildLocationLabel(cityName, districtName)
   const locationMeta = formatLocationMeta(location)
+  const locationMetaItems = locationMeta ? locationMeta.split(' • ') : []
   const locationStatusLabel = location ? 'Геолокация включена' : 'Геолокация выключена'
   const addressLabel = addressLine.trim() || 'Адрес не указан'
   const addressMeta = addressUpdatedAt ? `Обновлено ${formatShortDate(addressUpdatedAt)}` : ''
   const locationShareLabel = location
     ? location.shareToMasters === false
-      ? 'Расстояние скрыто от мастеров'
-      : 'Мастера видят расстояние'
+      ? 'Мастера не видят расстояние'
+      : 'Мастера видят только расстояние, адрес скрыт'
     : 'Геолокация не задана'
   const lastUpdatedLabel = lastUpdated
     ? lastUpdated.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
@@ -815,202 +747,175 @@ export const ClientProfileScreen = ({
           </div>
         </header>
 
-        {isLoading && (
-          <p className="client-profile-loading">Обновляем данные...</p>
-        )}
         {loadError && <p className="client-profile-error">{loadError}</p>}
         {metaError && <p className="client-profile-error">{metaError}</p>}
         {shareError && <p className="client-profile-error">{shareError}</p>}
 
-        <div
-          className="client-profile-anchors"
-          role="list"
-          aria-label="Быстрая навигация по профилю"
-        >
-          {profileAnchorItems.map((item) => (
-            <button
-              className="client-profile-anchor"
-              type="button"
-              key={item.id}
-              onClick={() => handleAnchorJump(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        <section
-          id="profile-actions"
-          className="client-section client-profile-section client-profile-anchor-target animate delay-1"
-        >
-          <div className="section-header">
-            <h3>Требуют внимания</h3>
-            {attentionTotal > 0 && (
-              <span className="client-profile-attention-badge">
-                {formatCount(attentionTotal, 'событие', 'события', 'событий')}
-              </span>
-            )}
+        {showSkeleton ? (
+          <div className="client-profile-skeleton" aria-hidden="true">
+            <div className="client-profile-skeleton-card">
+              <span className="client-profile-skeleton-line is-xl" />
+              <span className="client-profile-skeleton-line is-lg" />
+              <span className="client-profile-skeleton-line is-sm" />
+            </div>
+            <div className="client-profile-skeleton-card">
+              <span className="client-profile-skeleton-line is-lg" />
+              <span className="client-profile-skeleton-line is-md" />
+              <span className="client-profile-skeleton-line is-xs" />
+            </div>
+            <div className="client-profile-skeleton-row">
+              <span className="client-profile-skeleton-pill" />
+              <span className="client-profile-skeleton-pill" />
+              <span className="client-profile-skeleton-pill" />
+            </div>
           </div>
-          <div className="client-profile-card client-profile-attention-card">
-            {attentionItems.length > 0 ? (
-              <div className="client-profile-attention-list" role="list">
-                {attentionItems.map((item) => (
-                  <button
-                    className={`client-profile-attention-item is-${item.tone} is-pulse`}
-                    type="button"
-                    key={item.id}
-                    onClick={item.onClick}
-                    role="listitem"
-                  >
-                    <span className="client-profile-attention-count">{item.count}</span>
-                    <span className="client-profile-attention-body">
-                      <span className="client-profile-attention-label">
-                        {item.label}
-                      </span>
-                      <span className="client-profile-attention-meta">
-                        {item.meta}
-                      </span>
-                    </span>
-                    <span
-                      className="client-profile-attention-chevron"
-                      aria-hidden="true"
-                    >
-                      →
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="client-profile-empty-block">
-                <p className="client-profile-empty">
-                  Все спокойно — нет задач, которые требуют срочного ответа.
-                </p>
+        ) : (
+          <>
+            <div
+              className="client-profile-anchors"
+              role="list"
+              aria-label="Быстрая навигация по профилю"
+            >
+              {profileAnchorItems.map((item) => (
                 <button
-                  className="client-profile-action is-primary"
+                  className={`client-profile-anchor${
+                    activeAnchorId === item.id ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  key={item.id}
+                  onClick={() => handleAnchorJump(item.id)}
+                  aria-current={activeAnchorId === item.id ? 'true' : undefined}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <section
+              id="profile-actions"
+              className="client-section client-profile-section client-profile-anchor-target animate delay-1"
+            >
+              <div className="section-header">
+                <h3>Требуют внимания</h3>
+                {attentionTotal > 0 && (
+                  <span className="client-profile-attention-badge">
+                    {formatCount(attentionTotal, 'событие', 'события', 'событий')}
+                  </span>
+                )}
+              </div>
+              <div className="client-profile-card client-profile-attention-card">
+                {attentionItems.length > 0 ? (
+                  <div className="client-profile-attention-list" role="list">
+                    {attentionItems.map((item) => (
+                      <button
+                        className={`client-profile-attention-item is-${item.tone} is-pulse`}
+                        type="button"
+                        key={item.id}
+                        onClick={item.onClick}
+                        role="listitem"
+                      >
+                        <span className="client-profile-attention-count">
+                          {item.count}
+                        </span>
+                        <span className="client-profile-attention-body">
+                          <span className="client-profile-attention-label">
+                            {item.label}
+                          </span>
+                          <span className="client-profile-attention-meta">
+                            {item.meta}
+                          </span>
+                        </span>
+                        <span
+                          className="client-profile-attention-chevron"
+                          aria-hidden="true"
+                        >
+                          →
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="client-profile-empty-block">
+                    <p className="client-profile-empty">
+                      Все спокойно — нет задач, которые требуют срочного ответа.
+                    </p>
+                    <button
+                      className="client-profile-action is-primary"
+                      type="button"
+                      onClick={onCreateRequest}
+                    >
+                      Создать заявку
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section
+              id="profile-summary"
+              className="client-profile-hero client-profile-anchor-target animate delay-2"
+            >
+              <div className="client-profile-identity">
+                <div className="client-profile-avatar" aria-hidden="true">
+                  {initials}
+                </div>
+                <div className="client-profile-title-group">
+                  <h2 className="client-profile-name">{displayName}</h2>
+                  <div className="client-profile-hero-meta">
+                    <span className="client-profile-badge">
+                      Профиль {completionPercent}%
+                    </span>
+                    <span className="client-profile-subtitle">Клиент KIVEN</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="client-profile-primary-action">
+                <button
+                  className="cta cta--primary cta--wide"
                   type="button"
                   onClick={onCreateRequest}
                 >
-                  Создать заявку
+                  Новая заявка
+                </button>
+                <button
+                  className="client-profile-link"
+                  type="button"
+                  onClick={onViewMasters}
+                >
+                  Найти мастера <span aria-hidden="true">→</span>
                 </button>
               </div>
-            )}
-          </div>
-        </section>
 
-        <section
-          id="profile-summary"
-          className="client-profile-hero client-profile-anchor-target animate delay-2"
-        >
-          <div className="client-profile-identity">
-            <div className="client-profile-avatar" aria-hidden="true">
-              {initials}
-            </div>
-            <div className="client-profile-title-group">
-              <h2 className="client-profile-name">{displayName}</h2>
-              <div className="client-profile-hero-meta">
-                <span className="client-profile-badge">
-                  Профиль {completionPercent}%
-                </span>
-                <span className="client-profile-subtitle">Клиент KIVEN</span>
+              <div className="client-profile-stats">
+                <button
+                  className="client-profile-stat-button"
+                  type="button"
+                  onClick={() => handleAnchorJump('profile-requests')}
+                >
+                  <span className="client-profile-stat-value">{openRequestsCount}</span>
+                  <span className="client-profile-stat-label">Открытых заявок</span>
+                </button>
+                <button
+                  className="client-profile-stat-button"
+                  type="button"
+                  onClick={() => handleAnchorJump('profile-upcoming')}
+                >
+                  <span className="client-profile-stat-value">
+                    {upcomingBookings.length}
+                  </span>
+                  <span className="client-profile-stat-label">Активных записей</span>
+                </button>
+                <button
+                  className="client-profile-stat-button"
+                  type="button"
+                  onClick={() => handleAnchorJump('profile-favorites')}
+                >
+                  <span className="client-profile-stat-value">{favoriteCount}</span>
+                  <span className="client-profile-stat-label">Избранное</span>
+                </button>
               </div>
-            </div>
-          </div>
-
-          <div className="cta-row">
-            <button className="cta cta--primary" type="button" onClick={onCreateRequest}>
-              Новая заявка
-            </button>
-            <button className="cta cta--secondary" type="button" onClick={onViewMasters}>
-              Найти мастера
-            </button>
-          </div>
-
-          {(responseCount > 0 || priceOfferCount > 0 || pendingBookingCount > 0) && (
-            <div className="client-profile-alerts" role="list">
-              {responseCount > 0 && (
-                <button
-                  className="client-profile-alert is-accent is-pulse"
-                  type="button"
-                  onClick={() => onViewRequests('requests')}
-                  role="listitem"
-                >
-                  <span className="client-profile-alert-count">
-                    {formatCount(responseCount, 'отклик', 'отклика', 'откликов')}
-                  </span>
-                  <span className="client-profile-alert-label">Новые отклики</span>
-                </button>
-              )}
-              {priceOfferCount > 0 && (
-                <button
-                  className="client-profile-alert is-warning is-pulse"
-                  type="button"
-                  onClick={() => onViewRequests('bookings')}
-                  role="listitem"
-                >
-                  <span className="client-profile-alert-count">
-                    {formatCount(
-                      priceOfferCount,
-                      'предложение',
-                      'предложения',
-                      'предложений'
-                    )}
-                  </span>
-                  <span className="client-profile-alert-label">Цена от мастера</span>
-                </button>
-              )}
-              {pendingBookingCount > 0 && (
-                <button
-                  className="client-profile-alert is-neutral is-pulse"
-                  type="button"
-                  onClick={() => onViewRequests('bookings')}
-                  role="listitem"
-                >
-                  <span className="client-profile-alert-count">
-                    {formatCount(
-                      pendingBookingCount,
-                      'запись',
-                      'записи',
-                      'записей'
-                    )}
-                  </span>
-                  <span className="client-profile-alert-label">Ждут подтверждения</span>
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="client-profile-stats">
-            <div className="client-profile-stat">
-              <span className="client-profile-stat-value">{openRequestsCount}</span>
-              <span className="client-profile-stat-label">Открытых заявок</span>
-            </div>
-            <div className="client-profile-stat">
-              <span className="client-profile-stat-value">{upcomingBookings.length}</span>
-              <span className="client-profile-stat-label">Активных записей</span>
-            </div>
-            <div className="client-profile-stat">
-              <span className="client-profile-stat-value">{favoriteCount}</span>
-              <span className="client-profile-stat-label">Избранное</span>
-            </div>
-          </div>
-
-          <div className="client-profile-shortcuts">
-            <button
-              className="client-profile-shortcut"
-              type="button"
-              onClick={() => onViewRequests('requests')}
-            >
-              Мои заявки
-            </button>
-            <button
-              className="client-profile-shortcut"
-              type="button"
-              onClick={() => onViewRequests('bookings')}
-            >
-              Мои записи
-            </button>
-          </div>
-        </section>
+            </section>
 
         <section
           className="client-section client-profile-section client-profile-anchor-target animate delay-3"
@@ -1115,11 +1020,11 @@ export const ClientProfileScreen = ({
                     Найти мастера
                   </button>
                   <button
-                    className="client-profile-action"
+                    className="client-profile-link"
                     type="button"
                     onClick={onCreateRequest}
                   >
-                    Создать заявку
+                    Создать заявку <span aria-hidden="true">→</span>
                   </button>
                 </div>
               </div>
@@ -1319,7 +1224,7 @@ export const ClientProfileScreen = ({
                 </span>
                 <span className="client-profile-location-address">{addressLabel}</span>
                 {addressMeta && (
-                  <span className="client-profile-location-meta">{addressMeta}</span>
+                  <span className="client-profile-location-chip">{addressMeta}</span>
                 )}
               </div>
             </div>
@@ -1331,8 +1236,17 @@ export const ClientProfileScreen = ({
               >
                 {locationStatusLabel}
               </span>
-              {locationMeta && (
-                <span className="client-profile-location-meta">{locationMeta}</span>
+              {locationMetaItems.length > 0 && (
+                <div className="client-profile-location-chips">
+                  {locationMetaItems.map((item, index) => (
+                    <span
+                      className="client-profile-location-chip"
+                      key={`${item}-${index}`}
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
             <div className="client-profile-location-privacy">
@@ -1346,10 +1260,10 @@ export const ClientProfileScreen = ({
                 aria-pressed={location?.shareToMasters !== false}
               >
                 {location?.shareToMasters === false
-                  ? 'Скрыто от мастеров'
-                  : 'Видно мастерам'}
+                  ? 'Расстояние скрыто'
+                  : 'Расстояние видно'}
               </button>
-              <span className="client-profile-location-meta">{locationShareLabel}</span>
+              <span className="client-profile-location-help">{locationShareLabel}</span>
             </div>
             <div className="client-profile-location-actions">
               <button
@@ -1464,6 +1378,8 @@ export const ClientProfileScreen = ({
             )}
           </div>
         </section>
+          </>
+        )}
       </div>
 
       <nav className="bottom-nav" aria-label="Навигация">
