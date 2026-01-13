@@ -2183,15 +2183,6 @@ export const ProProfileScreen = ({
                 {aboutPreview}
               </p>
             </div>
-            <div className="pro-profile-audience-card">
-              <div className="pro-profile-audience-main">
-                <span className="pro-profile-audience-title">Подписчики</span>
-                <span className="pro-profile-audience-pill">
-                  {followersCountLabel}
-                </span>
-              </div>
-              <div className="pro-profile-audience-value">{followersValue}</div>
-            </div>
             <div className="pro-profile-facts">
               <div
                 className="pro-profile-facts-grid"
