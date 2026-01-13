@@ -328,6 +328,13 @@ export const BookingScreen = ({
       setCategoryId('')
       return
     }
+    const preferredServiceName =
+      initialServiceName ??
+      preferencesRef.current.lastBookingServiceByMaster?.[masterId] ??
+      ''
+    const preferredCategoryFromService = preferredServiceName
+      ? resolveServiceCategory(preferredServiceName)
+      : null
     setCategoryId((current) => {
       if (
         preferredCategoryId &&
@@ -336,11 +343,17 @@ export const BookingScreen = ({
       ) {
         return preferredCategoryId
       }
+      if (
+        preferredCategoryFromService &&
+        availableCategoryIds.includes(preferredCategoryFromService)
+      ) {
+        return preferredCategoryFromService
+      }
       return isCategoryId(current) && availableCategoryIds.includes(current)
         ? current
         : availableCategoryIds[0]
     })
-  }, [availableCategoryIds, preferredCategoryId])
+  }, [availableCategoryIds, initialServiceName, masterId, preferredCategoryId])
 
   const serviceOptions = useMemo(() => {
     if (!categoryId) return []

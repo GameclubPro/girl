@@ -31,7 +31,6 @@ import {
   loadFavorites,
   saveFavorites,
   toggleFavorite,
-  upsertFavorite,
   type FavoriteMaster,
 } from './utils/favorites'
 import './App.css'
@@ -43,6 +42,7 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
 type BookingReturnView =
   | 'client'
+  | 'client-profile'
   | 'client-showcase'
   | 'client-gallery'
   | 'client-gallery-detail'
@@ -730,7 +730,12 @@ function App() {
       setFavorites((prev) => {
         const existing = prev.find((item) => item.masterId === favorite.masterId)
         const savedAt = existing?.savedAt ?? new Date().toISOString()
-        return upsertFavorite(prev, { ...favorite, savedAt })
+        if (!existing) {
+          return [{ ...favorite, savedAt }, ...prev]
+        }
+        return prev.map((item) =>
+          item.masterId === favorite.masterId ? { ...favorite, savedAt } : item
+        )
       })
     },
     []
@@ -790,6 +795,16 @@ function App() {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           setView('request')
         }}
+        onCreateBooking={(payload) =>
+          openBooking(payload.masterId, {
+            photoUrls: payload.photoUrls ?? [],
+            preferredCategoryId: payload.categoryId ?? null,
+            initialServiceName: payload.serviceName ?? null,
+            initialLocationType: payload.locationType ?? null,
+            initialDetails: payload.details ?? null,
+            returnView: 'client-profile',
+          })
+        }
         onEditAddress={() => setView('address')}
         onViewMasterProfile={(masterId) => {
           setSelectedMasterId(masterId)

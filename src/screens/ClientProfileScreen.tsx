@@ -21,6 +21,14 @@ type ClientProfileScreenProps = {
   onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onCreateRequest: () => void
+  onCreateBooking: (payload: {
+    masterId: string
+    categoryId?: string | null
+    serviceName?: string | null
+    locationType?: 'master' | 'client' | null
+    details?: string | null
+    photoUrls?: string[]
+  }) => void
   onEditAddress: () => void
   onViewMasterProfile: (masterId: string) => void
   onRequestLocation: () => Promise<void>
@@ -89,7 +97,8 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 
 const formatRating = (average?: number | null, count?: number | null) => {
   const safeCount = typeof count === 'number' ? count : 0
-  const safeAverage = typeof average === 'number' ? average : 0
+  const safeAverage =
+    typeof average === 'number' && Number.isFinite(average) ? average : 0
   if (safeCount <= 0) return 'Новый'
   return `★ ${safeAverage.toFixed(1)} (${safeCount})`
 }
@@ -148,6 +157,7 @@ export const ClientProfileScreen = ({
   onViewMasters,
   onViewRequests,
   onCreateRequest,
+  onCreateBooking,
   onEditAddress,
   onViewMasterProfile,
   onRequestLocation,
@@ -394,6 +404,8 @@ export const ClientProfileScreen = ({
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return
     setIsRefreshing(true)
+    setLoadError('')
+    setMetaError('')
     await Promise.allSettled([refreshSummary(), refreshMeta()])
     setIsRefreshing(false)
   }, [isRefreshing, refreshMeta, refreshSummary])
@@ -829,7 +841,7 @@ export const ClientProfileScreen = ({
           <div className="client-profile-card client-profile-progress">
             <div className="client-profile-progress-head">
               <span className="client-profile-progress-title">
-                Заполнено {completionPercent}%
+                Профиль заполнен
               </span>
               <span className="client-profile-progress-value">{completionPercent}%</span>
             </div>
@@ -932,7 +944,16 @@ export const ClientProfileScreen = ({
                       className="client-profile-booking-row"
                       type="button"
                       key={booking.id}
-                      onClick={() => onViewMasterProfile(booking.masterId)}
+                      onClick={() =>
+                        onCreateBooking({
+                          masterId: booking.masterId,
+                          categoryId: booking.categoryId,
+                          serviceName: booking.serviceName,
+                          locationType: booking.locationType,
+                          details: booking.comment ?? null,
+                          photoUrls: booking.photoUrls,
+                        })
+                      }
                     >
                       <div className="client-profile-booking-info">
                         <span className="client-profile-booking-title">
