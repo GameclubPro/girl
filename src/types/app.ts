@@ -255,4 +255,13 @@ export type ChatDetail = {
     photoUrls?: string[]
     status?: string | null
   } | null
+  booking?: {
+    id: number
+    serviceName?: string | null
+    categoryId?: string | null
+    locationType?: ServiceRequest['locationType']
+    scheduledAt?: string | null
+    servicePrice?: number | null
+    status?: string | null
+  } | null
 }

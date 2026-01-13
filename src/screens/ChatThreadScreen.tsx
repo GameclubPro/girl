@@ -91,6 +91,20 @@ export const ChatThreadScreen = ({
 
   const counterpart = detail?.counterpart
   const request = detail?.request
+  const booking = detail?.booking
+  const isBookingChat = detail?.chat?.contextType === 'booking'
+  const headerSubtitle = isBookingChat
+    ? booking?.serviceName ?? 'Запись подтверждена'
+    : request?.serviceName ?? 'Переговоры по заявке'
+  const bookingStatusLabel =
+    booking?.status === 'confirmed' ? 'Подтверждено' : 'Запись'
+  const bookingTimeLabel = booking?.scheduledAt
+    ? formatDateTime(booking.scheduledAt)
+    : 'Время уточняется'
+  const bookingPriceLabel =
+    typeof booking?.servicePrice === 'number'
+      ? `Стоимость: ${formatPrice(booking.servicePrice)}`
+      : null
 
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
@@ -421,7 +435,7 @@ export const ChatThreadScreen = ({
               {counterpart?.name ?? 'Чат'}
             </span>
             <span className="chat-thread-subtitle">
-              {request?.serviceName ?? 'Переговоры по заявке'}
+              {headerSubtitle}
             </span>
           </div>
         </header>
@@ -449,6 +463,24 @@ export const ChatThreadScreen = ({
             {request.details && (
               <p className="chat-request-details">{request.details}</p>
             )}
+          </section>
+        ) : booking ? (
+          <section className="chat-request-card">
+            <div className="chat-request-top">
+              <span className="chat-request-title">
+                {booking.serviceName ?? 'Запись'}
+              </span>
+              <span className="chat-request-pill">{bookingStatusLabel}</span>
+            </div>
+            <div className="chat-request-meta">
+              <span>
+                <IconPin /> {locationLabelMap[booking.locationType ?? 'client']}
+              </span>
+              <span>
+                <IconClock /> {bookingTimeLabel}
+              </span>
+              {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
+            </div>
           </section>
         ) : (
           isDetailLoading && (

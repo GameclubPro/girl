@@ -231,7 +231,10 @@ export const ChatListScreen = ({
               <IconChat />
             </div>
             <h2>Чаты появятся после подтверждения</h2>
-            <p>После подтверждения заявки диалог станет доступен здесь.</p>
+            <p>
+              После подтверждения заявки или записи диалог станет доступен
+              здесь.
+            </p>
             {onViewRequests && (
               <div className="chat-empty-actions">
                 <button
@@ -239,7 +242,7 @@ export const ChatListScreen = ({
                   type="button"
                   onClick={onViewRequests}
                 >
-                  Перейти к заявкам
+                  К заявкам и записям
                 </button>
               </div>
             )}

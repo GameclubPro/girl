@@ -683,6 +683,120 @@ const createChatForRequest = async ({
   }
 }
 
+const createChatForBooking = async ({
+  bookingId,
+  clientId,
+  masterId,
+  serviceName,
+  actorId,
+}) => {
+  await pool.query('BEGIN')
+  try {
+    const insertResult = await pool.query(
+      `
+        INSERT INTO chats (
+          context_type,
+          context_id,
+          booking_id,
+          client_id,
+          master_id,
+          status
+        )
+        VALUES ('booking', $1, $1, $2, $3, 'active')
+        ON CONFLICT (context_type, context_id, client_id, master_id)
+        DO UPDATE SET booking_id = EXCLUDED.booking_id,
+                      updated_at = NOW()
+        RETURNING id, (xmax = 0) AS "isNew"
+      `,
+      [bookingId, clientId, masterId]
+    )
+
+    const chatId = insertResult.rows[0]?.id ?? null
+    const isNew = Boolean(insertResult.rows[0]?.isNew)
+    if (!chatId) {
+      await pool.query('ROLLBACK')
+      return null
+    }
+
+    await pool.query(
+      `
+        INSERT INTO chat_members (chat_id, user_id, role)
+        VALUES ($1, $2, 'client')
+        ON CONFLICT (chat_id, user_id) DO NOTHING
+      `,
+      [chatId, clientId]
+    )
+    await pool.query(
+      `
+        INSERT INTO chat_members (chat_id, user_id, role)
+        VALUES ($1, $2, 'master')
+        ON CONFLICT (chat_id, user_id) DO NOTHING
+      `,
+      [chatId, masterId]
+    )
+
+    let systemMessageId = null
+    let systemMessageCreatedAt = null
+
+    if (isNew) {
+      const body = serviceName
+        ? `Запись подтверждена по услуге «${serviceName}». Можно обсудить детали.`
+        : 'Запись подтверждена. Можно обсудить детали.'
+      const meta = { event: 'booking_confirmed', serviceName: serviceName ?? null }
+      const messageResult = await pool.query(
+        `
+          INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
+          VALUES ($1, NULL, 'system', $2, $3)
+          RETURNING id, created_at AS "createdAt"
+        `,
+        [chatId, body, meta]
+      )
+      const messageId = messageResult.rows[0]?.id ?? null
+      systemMessageId = messageId
+      systemMessageCreatedAt = messageResult.rows[0]?.createdAt ?? null
+      if (messageId) {
+        await pool.query(
+          `
+            UPDATE chats
+            SET last_message_id = $2,
+                last_message_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [chatId, messageId]
+        )
+        await pool.query(
+          `
+            UPDATE chat_members
+            SET unread_count = CASE
+                  WHEN user_id = $2 THEN 0
+                  ELSE unread_count + 1
+                END,
+                last_read_message_id = CASE
+                  WHEN user_id = $2 THEN $3
+                  ELSE last_read_message_id
+                END,
+                updated_at = NOW()
+            WHERE chat_id = $1
+          `,
+          [chatId, actorId ?? clientId, messageId]
+        )
+      }
+    }
+
+    await pool.query('COMMIT')
+    return {
+      chatId,
+      isNew,
+      systemMessageId,
+      systemMessageCreatedAt,
+    }
+  } catch (error) {
+    await pool.query('ROLLBACK')
+    throw error
+  }
+}
+
 const loadMasterProfile = async (userId) => {
   const result = await pool.query(
     `
@@ -3270,6 +3384,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
           client_id AS "clientId",
           master_id AS "masterId",
           status,
+          service_name AS "serviceName",
           service_price AS "servicePrice",
           proposed_price AS "proposedPrice"
         FROM service_bookings
@@ -3312,7 +3427,34 @@ app.patch('/api/bookings/:id', async (req, res) => {
         [bookingId]
       )
 
-      res.json({ ok: true, status: 'confirmed' })
+      let chatPayload = null
+      try {
+        chatPayload = await createChatForBooking({
+          bookingId,
+          clientId: booking.clientId,
+          masterId: booking.masterId,
+          serviceName: booking.serviceName,
+          actorId: normalizedUserId,
+        })
+        if (chatPayload?.chatId) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
+            bookingId,
+          })
+          if (chatPayload.systemMessageId) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              messageId: chatPayload.systemMessageId,
+            })
+          }
+        }
+      } catch (chatError) {
+        console.error('Failed to create chat for booking:', chatError)
+      }
+
+      res.json({ ok: true, status: 'confirmed', chatId: chatPayload?.chatId ?? null })
       return
     }
 
@@ -3387,10 +3529,38 @@ app.patch('/api/bookings/:id', async (req, res) => {
         [bookingId, booking.proposedPrice]
       )
 
+      let chatPayload = null
+      try {
+        chatPayload = await createChatForBooking({
+          bookingId,
+          clientId: booking.clientId,
+          masterId: booking.masterId,
+          serviceName: booking.serviceName,
+          actorId: normalizedUserId,
+        })
+        if (chatPayload?.chatId) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
+            bookingId,
+          })
+          if (chatPayload.systemMessageId) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              messageId: chatPayload.systemMessageId,
+            })
+          }
+        }
+      } catch (chatError) {
+        console.error('Failed to create chat for booking:', chatError)
+      }
+
       res.json({
         ok: true,
         status: 'confirmed',
         servicePrice: booking.proposedPrice,
+        chatId: chatPayload?.chatId ?? null,
       })
       return
     }
@@ -4411,6 +4581,12 @@ app.get('/api/chats/:id', async (req, res) => {
           sr.details,
           sr.photo_urls AS "photoUrls",
           sr.status AS "requestStatus",
+          sb.service_name AS "bookingServiceName",
+          sb.category_id AS "bookingCategoryId",
+          sb.location_type AS "bookingLocationType",
+          sb.scheduled_at AS "bookingScheduledAt",
+          sb.service_price AS "bookingServicePrice",
+          sb.status AS "bookingStatus",
           mp.display_name AS "masterName",
           mp.avatar_path AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
@@ -4418,6 +4594,7 @@ app.get('/api/chats/:id', async (req, res) => {
           u.username AS "clientUsername"
         FROM chats c
         LEFT JOIN service_requests sr ON sr.id = c.request_id
+        LEFT JOIN service_bookings sb ON sb.id = c.booking_id
         LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
         LEFT JOIN users u ON u.user_id = c.client_id
         WHERE c.id = $1
@@ -4473,6 +4650,17 @@ app.get('/api/chats/:id', async (req, res) => {
             details: row.details,
             photoUrls: Array.isArray(row.photoUrls) ? row.photoUrls : [],
             status: row.requestStatus,
+          }
+        : null,
+      booking: row.bookingId
+        ? {
+            id: row.bookingId,
+            serviceName: row.bookingServiceName,
+            categoryId: row.bookingCategoryId,
+            locationType: row.bookingLocationType,
+            scheduledAt: row.bookingScheduledAt,
+            servicePrice: row.bookingServicePrice,
+            status: row.bookingStatus,
           }
         : null,
     })
