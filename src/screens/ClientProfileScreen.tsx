@@ -149,6 +149,15 @@ const formatLocationMeta = (location: UserLocation | null) => {
     .join(' • ')
 }
 
+const profileAnchorItems = [
+  { id: 'profile-actions', label: 'Действия' },
+  { id: 'profile-summary', label: 'Профиль' },
+  { id: 'profile-upcoming', label: 'Ближайшее' },
+  { id: 'profile-requests', label: 'Заявки' },
+  { id: 'profile-location', label: 'Локация' },
+  { id: 'profile-favorites', label: 'Избранное' },
+] as const
+
 export const ClientProfileScreen = ({
   apiBase,
   userId,
@@ -180,6 +189,17 @@ export const ClientProfileScreen = ({
   const [shareError, setShareError] = useState('')
   const displayName = displayNameFallback.trim() || 'Клиент'
   const initials = getInitials(displayName)
+  const handleAnchorJump = useCallback((targetId: string) => {
+    const element = document.getElementById(targetId)
+    if (!element) return
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    element.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    })
+  }, [])
 
   useEffect(() => {
     if (!userId) return
@@ -616,6 +636,40 @@ export const ClientProfileScreen = ({
       ).length,
     [bookings]
   )
+  const attentionItems = useMemo(
+    () =>
+      [
+        {
+          id: 'responses',
+          count: responseCount,
+          label: 'Новые отклики',
+          meta: 'Нужен ответ мастеру',
+          tone: 'accent',
+          onClick: () => onViewRequests('requests'),
+        },
+        {
+          id: 'prices',
+          count: priceOfferCount,
+          label: 'Цена от мастера',
+          meta: 'Есть предложения по записи',
+          tone: 'warning',
+          onClick: () => onViewRequests('bookings'),
+        },
+        {
+          id: 'pending',
+          count: pendingBookingCount,
+          label: 'Подтвердите запись',
+          meta: 'Ожидают подтверждения',
+          tone: 'neutral',
+          onClick: () => onViewRequests('bookings'),
+        },
+      ].filter((item) => item.count > 0),
+    [pendingBookingCount, priceOfferCount, responseCount, onViewRequests]
+  )
+  const attentionTotal = useMemo(
+    () => attentionItems.reduce((total, item) => total + item.count, 0),
+    [attentionItems]
+  )
   const upcomingBookings = useMemo(() => {
     const now = Date.now()
     return bookings.filter((booking) => {
@@ -657,13 +711,54 @@ export const ClientProfileScreen = ({
     : 'is-muted'
   const profileChecklist = useMemo(
     () => [
-      { id: 'address', label: 'Город и район', done: Boolean(cityName && districtName) },
-      { id: 'location', label: 'Геолокация', done: Boolean(location) },
-      { id: 'request', label: 'Первая заявка', done: requests.length > 0 },
-      { id: 'booking', label: 'Первая запись', done: bookings.length > 0 },
-      { id: 'favorite', label: 'Избранное', done: favoriteCount > 0 },
+      {
+        id: 'address',
+        label: 'Город и район',
+        done: Boolean(cityName && districtName),
+        actionLabel: 'Указать',
+        onAction: onEditAddress,
+      },
+      {
+        id: 'location',
+        label: 'Геолокация',
+        done: Boolean(location),
+        actionLabel: 'Поделиться',
+        onAction: handleRequestLocation,
+      },
+      {
+        id: 'request',
+        label: 'Первая заявка',
+        done: requests.length > 0,
+        actionLabel: 'Создать',
+        onAction: onCreateRequest,
+      },
+      {
+        id: 'booking',
+        label: 'Первая запись',
+        done: bookings.length > 0,
+        actionLabel: 'Найти мастера',
+        onAction: onViewMasters,
+      },
+      {
+        id: 'favorite',
+        label: 'Избранное',
+        done: favoriteCount > 0,
+        actionLabel: 'Смотреть мастеров',
+        onAction: onViewMasters,
+      },
     ],
-    [bookings, cityName, districtName, favoriteCount, location, requests]
+    [
+      bookings.length,
+      cityName,
+      districtName,
+      favoriteCount,
+      handleRequestLocation,
+      location,
+      onCreateRequest,
+      onEditAddress,
+      onViewMasters,
+      requests.length,
+    ]
   )
   const completionPercent = Math.round(
     (profileChecklist.filter((item) => item.done).length /
@@ -727,14 +822,97 @@ export const ClientProfileScreen = ({
         {metaError && <p className="client-profile-error">{metaError}</p>}
         {shareError && <p className="client-profile-error">{shareError}</p>}
 
-        <section className="client-profile-hero animate delay-1">
+        <div
+          className="client-profile-anchors"
+          role="list"
+          aria-label="Быстрая навигация по профилю"
+        >
+          {profileAnchorItems.map((item) => (
+            <button
+              className="client-profile-anchor"
+              type="button"
+              key={item.id}
+              onClick={() => handleAnchorJump(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <section
+          id="profile-actions"
+          className="client-section client-profile-section client-profile-anchor-target animate delay-1"
+        >
+          <div className="section-header">
+            <h3>Требуют внимания</h3>
+            {attentionTotal > 0 && (
+              <span className="client-profile-attention-badge">
+                {formatCount(attentionTotal, 'событие', 'события', 'событий')}
+              </span>
+            )}
+          </div>
+          <div className="client-profile-card client-profile-attention-card">
+            {attentionItems.length > 0 ? (
+              <div className="client-profile-attention-list" role="list">
+                {attentionItems.map((item) => (
+                  <button
+                    className={`client-profile-attention-item is-${item.tone} is-pulse`}
+                    type="button"
+                    key={item.id}
+                    onClick={item.onClick}
+                    role="listitem"
+                  >
+                    <span className="client-profile-attention-count">{item.count}</span>
+                    <span className="client-profile-attention-body">
+                      <span className="client-profile-attention-label">
+                        {item.label}
+                      </span>
+                      <span className="client-profile-attention-meta">
+                        {item.meta}
+                      </span>
+                    </span>
+                    <span
+                      className="client-profile-attention-chevron"
+                      aria-hidden="true"
+                    >
+                      →
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="client-profile-empty-block">
+                <p className="client-profile-empty">
+                  Все спокойно — нет задач, которые требуют срочного ответа.
+                </p>
+                <button
+                  className="client-profile-action is-primary"
+                  type="button"
+                  onClick={onCreateRequest}
+                >
+                  Создать заявку
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section
+          id="profile-summary"
+          className="client-profile-hero client-profile-anchor-target animate delay-2"
+        >
           <div className="client-profile-identity">
             <div className="client-profile-avatar" aria-hidden="true">
               {initials}
             </div>
             <div className="client-profile-title-group">
               <h2 className="client-profile-name">{displayName}</h2>
-              <p className="client-profile-subtitle">Клиент KIVEN</p>
+              <div className="client-profile-hero-meta">
+                <span className="client-profile-badge">
+                  Профиль {completionPercent}%
+                </span>
+                <span className="client-profile-subtitle">Клиент KIVEN</span>
+              </div>
             </div>
           </div>
 
@@ -745,6 +923,75 @@ export const ClientProfileScreen = ({
             <button className="cta cta--secondary" type="button" onClick={onViewMasters}>
               Найти мастера
             </button>
+          </div>
+
+          {(responseCount > 0 || priceOfferCount > 0 || pendingBookingCount > 0) && (
+            <div className="client-profile-alerts" role="list">
+              {responseCount > 0 && (
+                <button
+                  className="client-profile-alert is-accent is-pulse"
+                  type="button"
+                  onClick={() => onViewRequests('requests')}
+                  role="listitem"
+                >
+                  <span className="client-profile-alert-count">
+                    {formatCount(responseCount, 'отклик', 'отклика', 'откликов')}
+                  </span>
+                  <span className="client-profile-alert-label">Новые отклики</span>
+                </button>
+              )}
+              {priceOfferCount > 0 && (
+                <button
+                  className="client-profile-alert is-warning is-pulse"
+                  type="button"
+                  onClick={() => onViewRequests('bookings')}
+                  role="listitem"
+                >
+                  <span className="client-profile-alert-count">
+                    {formatCount(
+                      priceOfferCount,
+                      'предложение',
+                      'предложения',
+                      'предложений'
+                    )}
+                  </span>
+                  <span className="client-profile-alert-label">Цена от мастера</span>
+                </button>
+              )}
+              {pendingBookingCount > 0 && (
+                <button
+                  className="client-profile-alert is-neutral is-pulse"
+                  type="button"
+                  onClick={() => onViewRequests('bookings')}
+                  role="listitem"
+                >
+                  <span className="client-profile-alert-count">
+                    {formatCount(
+                      pendingBookingCount,
+                      'запись',
+                      'записи',
+                      'записей'
+                    )}
+                  </span>
+                  <span className="client-profile-alert-label">Ждут подтверждения</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="client-profile-stats">
+            <div className="client-profile-stat">
+              <span className="client-profile-stat-value">{openRequestsCount}</span>
+              <span className="client-profile-stat-label">Открытых заявок</span>
+            </div>
+            <div className="client-profile-stat">
+              <span className="client-profile-stat-value">{upcomingBookings.length}</span>
+              <span className="client-profile-stat-label">Активных записей</span>
+            </div>
+            <div className="client-profile-stat">
+              <span className="client-profile-stat-value">{favoriteCount}</span>
+              <span className="client-profile-stat-label">Избранное</span>
+            </div>
           </div>
 
           <div className="client-profile-shortcuts">
@@ -763,78 +1010,12 @@ export const ClientProfileScreen = ({
               Мои записи
             </button>
           </div>
-
-          <div className="client-profile-stats">
-            <div className="client-profile-stat">
-              <span className="client-profile-stat-value">{openRequestsCount}</span>
-              <span className="client-profile-stat-label">Открытых заявок</span>
-            </div>
-            <div className="client-profile-stat">
-              <span className="client-profile-stat-value">{upcomingBookings.length}</span>
-              <span className="client-profile-stat-label">Активных записей</span>
-            </div>
-            <div className="client-profile-stat">
-              <span className="client-profile-stat-value">{favoriteCount}</span>
-              <span className="client-profile-stat-label">Избранное</span>
-            </div>
-          </div>
-
-          {(responseCount > 0 || priceOfferCount > 0 || pendingBookingCount > 0) && (
-            <div className="client-profile-alerts" role="list">
-              {responseCount > 0 && (
-                <button
-                  className="client-profile-alert is-accent"
-                  type="button"
-                  onClick={() => onViewRequests('requests')}
-                  role="listitem"
-                >
-                  <span className="client-profile-alert-count">
-                    {formatCount(responseCount, 'отклик', 'отклика', 'откликов')}
-                  </span>
-                  <span className="client-profile-alert-label">Новые отклики</span>
-                </button>
-              )}
-              {priceOfferCount > 0 && (
-                <button
-                  className="client-profile-alert is-warning"
-                  type="button"
-                  onClick={() => onViewRequests('bookings')}
-                  role="listitem"
-                >
-                  <span className="client-profile-alert-count">
-                    {formatCount(
-                      priceOfferCount,
-                      'предложение',
-                      'предложения',
-                      'предложений'
-                    )}
-                  </span>
-                  <span className="client-profile-alert-label">Цена от мастера</span>
-                </button>
-              )}
-              {pendingBookingCount > 0 && (
-                <button
-                  className="client-profile-alert is-neutral"
-                  type="button"
-                  onClick={() => onViewRequests('bookings')}
-                  role="listitem"
-                >
-                  <span className="client-profile-alert-count">
-                    {formatCount(
-                      pendingBookingCount,
-                      'запись',
-                      'записи',
-                      'записей'
-                    )}
-                  </span>
-                  <span className="client-profile-alert-label">Ждут подтверждения</span>
-                </button>
-              )}
-            </div>
-          )}
         </section>
 
-        <section className="client-section client-profile-section animate delay-2">
+        <section
+          className="client-section client-profile-section client-profile-anchor-target animate delay-3"
+          id="profile-progress"
+        >
           <div className="section-header">
             <h3>Готовность профиля</h3>
           </div>
@@ -848,26 +1029,41 @@ export const ClientProfileScreen = ({
             <div className="client-profile-progress-bar" aria-hidden="true">
               <span style={{ width: `${completionPercent}%` }} />
             </div>
-            <div className="client-profile-progress-list">
+            <div className="client-profile-checklist">
               {profileChecklist.map((item) => (
-                <span
-                  className={`client-profile-progress-item${
+                <div
+                  className={`client-profile-check-item${
                     item.done ? ' is-done' : ''
                   }`}
                   key={item.id}
                 >
-                  {item.label}
-                </span>
+                  <span className="client-profile-check-status" aria-hidden="true" />
+                  <span className="client-profile-check-label">{item.label}</span>
+                  {item.done ? (
+                    <span className="client-profile-check-done">Готово</span>
+                  ) : (
+                    <button
+                      className="client-profile-check-action"
+                      type="button"
+                      onClick={item.onAction}
+                    >
+                      {item.actionLabel}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="client-section client-profile-section animate delay-3">
+        <section
+          id="profile-upcoming"
+          className="client-section client-profile-section client-profile-anchor-target animate delay-4"
+        >
           <div className="section-header">
             <h3>Ближайшее</h3>
           </div>
-          <div className="client-profile-card">
+          <div className="client-profile-card is-highlight">
             <div className="client-profile-card-head">
               <div className="client-profile-card-title">
                 <span className="client-profile-card-icon" aria-hidden="true">
@@ -906,12 +1102,32 @@ export const ClientProfileScreen = ({
                 </span>
               </div>
             ) : (
-              <p className="client-profile-empty">Пока нет активных записей.</p>
+              <div className="client-profile-empty-block">
+                <p className="client-profile-empty">
+                  Пока нет активных записей. Найдите мастера или создайте заявку.
+                </p>
+                <div className="client-profile-empty-actions">
+                  <button
+                    className="client-profile-action is-primary"
+                    type="button"
+                    onClick={onViewMasters}
+                  >
+                    Найти мастера
+                  </button>
+                  <button
+                    className="client-profile-action"
+                    type="button"
+                    onClick={onCreateRequest}
+                  >
+                    Создать заявку
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </section>
 
-        <section className="client-section client-profile-section animate delay-4">
+        <section className="client-section client-profile-section animate delay-5">
           <div className="section-header">
             <h3>Последние записи</h3>
           </div>
@@ -972,12 +1188,26 @@ export const ClientProfileScreen = ({
                 })}
               </div>
             ) : (
-              <p className="client-profile-empty">Пока нет завершенных записей.</p>
+              <div className="client-profile-empty-block">
+                <p className="client-profile-empty">
+                  История появится после первой записи.
+                </p>
+                <button
+                  className="client-profile-action"
+                  type="button"
+                  onClick={onViewMasters}
+                >
+                  Найти мастера
+                </button>
+              </div>
             )}
           </div>
         </section>
 
-        <section className="client-section client-profile-section animate delay-5">
+        <section
+          id="profile-requests"
+          className="client-section client-profile-section client-profile-anchor-target animate delay-6"
+        >
           <div className="section-header">
             <h3>Активные заявки</h3>
           </div>
@@ -1040,7 +1270,7 @@ export const ClientProfileScreen = ({
                   Открытых заявок пока нет. Создайте первую и получите отклики.
                 </p>
                 <button
-                  className="client-profile-action"
+                  className="client-profile-action is-primary"
                   type="button"
                   onClick={onCreateRequest}
                 >
@@ -1051,7 +1281,10 @@ export const ClientProfileScreen = ({
           </div>
         </section>
 
-        <section className="client-section client-profile-section animate delay-6">
+        <section
+          id="profile-location"
+          className="client-section client-profile-section client-profile-anchor-target animate delay-7"
+        >
           <div className="section-header">
             <h3>Локация</h3>
           </div>
@@ -1072,6 +1305,13 @@ export const ClientProfileScreen = ({
               </button>
             </div>
             <div className="client-profile-location">
+              <div className="client-profile-location-map" aria-hidden="true">
+                <span className="client-profile-location-map-pin">
+                  <IconPin />
+                </span>
+                <span className="client-profile-location-map-dot" />
+                <span className="client-profile-location-map-dot is-secondary" />
+              </div>
               <div className="client-profile-location-info">
                 <span className="client-profile-location-title">{locationLabel}</span>
                 <span className="client-profile-location-subtitle">
@@ -1113,7 +1353,7 @@ export const ClientProfileScreen = ({
             </div>
             <div className="client-profile-location-actions">
               <button
-                className="client-profile-action"
+                className="client-profile-action is-primary"
                 type="button"
                 onClick={handleRequestLocation}
                 disabled={isSharing}
@@ -1134,7 +1374,10 @@ export const ClientProfileScreen = ({
           </div>
         </section>
 
-        <section className="client-section client-profile-section animate delay-7">
+        <section
+          id="profile-favorites"
+          className="client-section client-profile-section client-profile-anchor-target animate delay-7"
+        >
           <div className="section-header">
             <h3>Избранное</h3>
           </div>
@@ -1205,10 +1448,19 @@ export const ClientProfileScreen = ({
                 })}
               </div>
             ) : (
-              <p className="client-profile-empty">
-                Пока нет сохраненных мастеров. Откройте витрину и добавьте тех,
-                кто понравился.
-              </p>
+              <div className="client-profile-empty-block">
+                <p className="client-profile-empty">
+                  Пока нет сохраненных мастеров. Откройте витрину и добавьте тех,
+                  кто понравился.
+                </p>
+                <button
+                  className="client-profile-action"
+                  type="button"
+                  onClick={onViewMasters}
+                >
+                  Найти мастера
+                </button>
+              </div>
             )}
           </div>
         </section>
