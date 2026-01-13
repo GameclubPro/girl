@@ -421,8 +421,6 @@ export const ProProfileScreen = ({
   const reviewDistribution = reviewSummary?.distribution ?? []
   const reviewCountLabel =
     reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
-  const followersCountLabel =
-    followersCount > 0 ? formatFollowerCount(followersCount) : 'Нет подписчиков'
   const followersValue = followersCount.toLocaleString('ru-RU')
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const showcaseCount = showcaseItems.length
