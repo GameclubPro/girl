@@ -5654,6 +5654,29 @@
   outline-offset: 2px;
 }
 
+.screen--pro .pro-profile-ig-button--fab {
+  position: absolute;
+  top: calc(12px + var(--safe-top) + var(--tg-top-offset));
+  right: var(--pro-pad-x);
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.28);
+  z-index: 2;
+}
+
+.screen--pro .pro-profile-ig-button--fab .pro-profile-ig-button-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.screen--pro .pro-profile-ig-button--fab .pro-profile-ig-button-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
 .pro-shell--ig .pro-profile-portfolio-panel {
   border-radius: 0;
   background: rgba(var(--paper-rgb), 0.96);

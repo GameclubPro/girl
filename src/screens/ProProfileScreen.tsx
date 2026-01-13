@@ -2103,6 +2103,19 @@ export const ProProfileScreen = ({
               aria-hidden="true"
               tabIndex={-1}
             />
+            <button
+              className="pro-profile-ig-button pro-profile-ig-button--fab"
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                openEditor('basic')
+              }}
+            >
+              <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                <IconEdit />
+              </span>
+              <span className="pro-profile-ig-button-label">Редактировать</span>
+            </button>
           </div>
           <div className="pro-profile-ig-header">
             <div
@@ -2233,18 +2246,6 @@ export const ProProfileScreen = ({
                 <span className="pro-profile-tag is-muted">Нет отзывов</span>
               )}
             </div>
-          </div>
-          <div className="pro-profile-ig-actions">
-            <button
-              className="pro-profile-ig-button"
-              type="button"
-              onClick={() => openEditor('basic')}
-            >
-              <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                <IconEdit />
-              </span>
-              <span className="pro-profile-ig-button-label">Редактировать</span>
-            </button>
           </div>
         </section>
 
