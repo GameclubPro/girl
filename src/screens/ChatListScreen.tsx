@@ -68,17 +68,31 @@ export const ChatListScreen = ({
   const isReadyRef = useRef(false)
   const isLoadingRef = useRef(false)
 
-  const totalUnread = useMemo(
-    () => items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
+  const confirmedItems = useMemo(
+    () =>
+      items.filter((item) => {
+        if (item.contextType === 'request') {
+          return item.request?.status === 'closed'
+        }
+        if (item.contextType === 'booking') {
+          return item.booking?.status === 'confirmed'
+        }
+        return true
+      }),
     [items]
+  )
+
+  const totalUnread = useMemo(
+    () => confirmedItems.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
+    [confirmedItems]
   )
 
   const filteredItems = useMemo(() => {
     if (filter === 'unread') {
-      return items.filter((item) => (item.unreadCount ?? 0) > 0)
+      return confirmedItems.filter((item) => (item.unreadCount ?? 0) > 0)
     }
-    return items
-  }, [filter, items])
+    return confirmedItems
+  }, [confirmedItems, filter])
 
   const loadChats = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -216,8 +230,19 @@ export const ChatListScreen = ({
             <div className="chat-empty-icon">
               <IconChat />
             </div>
-            <h2>Пока нет чатов</h2>
-            <p>Чат появится после согласования заявки.</p>
+            <h2>Чаты появятся после подтверждения</h2>
+            <p>После подтверждения заявки диалог станет доступен здесь.</p>
+            {onViewRequests && (
+              <div className="chat-empty-actions">
+                <button
+                  className="cta cta--secondary chat-empty-cta"
+                  type="button"
+                  onClick={onViewRequests}
+                >
+                  Перейти к заявкам
+                </button>
+              </div>
+            )}
           </div>
         )}
 

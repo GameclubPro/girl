@@ -4284,6 +4284,11 @@ app.get('/api/chats', async (req, res) => {
         LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
         LEFT JOIN users u ON u.user_id = c.client_id
         WHERE cm.user_id = $1
+          AND (
+            (c.context_type = 'request' AND sr.status = 'closed')
+            OR (c.context_type = 'booking' AND sb.status = 'confirmed')
+            OR (c.context_type NOT IN ('request', 'booking'))
+          )
         ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
       `,
       [normalizedUserId]

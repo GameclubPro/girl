@@ -14758,6 +14758,16 @@ h2 {
   font-size: 13px;
 }
 
+.chat-empty-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.chat-empty-cta {
+  min-width: 180px;
+}
+
 .chat-list {
   display: flex;
   flex-direction: column;
