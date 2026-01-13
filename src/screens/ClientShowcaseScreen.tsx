@@ -17,6 +17,7 @@ type ClientShowcaseScreenProps = {
   onViewRequests: () => void
   onCreateBooking: (masterId: string) => void
   onViewProfile: (masterId: string) => void
+  onViewClientProfile: () => void
   clientLocation: UserLocation | null
   isLocating: boolean
   onRequestLocation: () => void
@@ -31,6 +32,7 @@ type ClientShowcaseGalleryScreenProps = {
   onViewMasters: () => void
   onViewRequests: () => void
   onViewDetail: (item: ShowcaseMedia) => void
+  onViewClientProfile: () => void
 }
 
 type ClientShowcaseDetailScreenProps = {
@@ -40,6 +42,7 @@ type ClientShowcaseDetailScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewRequests: () => void
+  onViewClientProfile: () => void
   onViewProfile: (masterId: string) => void
   onCreateBooking: () => void
 }
@@ -351,6 +354,7 @@ export const ClientShowcaseGalleryScreen = ({
   onViewMasters,
   onViewRequests,
   onViewDetail,
+  onViewClientProfile,
 }: ClientShowcaseGalleryScreenProps) => {
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -526,7 +530,7 @@ export const ClientShowcaseGalleryScreen = ({
           </span>
           Мои заявки
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewClientProfile}>
           <span className="nav-icon" aria-hidden="true">
             <IconUser />
           </span>
@@ -544,6 +548,7 @@ export const ClientShowcaseDetailScreen = ({
   onViewHome,
   onViewMasters,
   onViewRequests,
+  onViewClientProfile,
   onViewProfile,
   onCreateBooking,
 }: ClientShowcaseDetailScreenProps) => {
@@ -698,7 +703,7 @@ export const ClientShowcaseDetailScreen = ({
           </span>
           Мои заявки
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewClientProfile}>
           <span className="nav-icon" aria-hidden="true">
             <IconUser />
           </span>
@@ -717,6 +722,7 @@ export const ClientShowcaseScreen = ({
   onViewRequests,
   onCreateBooking,
   onViewProfile,
+  onViewClientProfile,
   clientLocation,
   isLocating,
   onRequestLocation,
@@ -1332,7 +1338,7 @@ export const ClientShowcaseScreen = ({
           </span>
           Мои заявки
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewClientProfile}>
           <span className="nav-icon" aria-hidden="true">
             <IconUser />
           </span>

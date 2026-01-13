@@ -23,6 +23,7 @@ type ClientMasterProfileScreenProps = {
   onViewHome: () => void
   onViewMasters: () => void
   onViewRequests: () => void
+  onViewProfile: () => void
   onCreateBooking: () => void
 }
 
@@ -179,6 +180,7 @@ export const ClientMasterProfileScreen = ({
   onViewHome,
   onViewMasters,
   onViewRequests,
+  onViewProfile,
   onCreateBooking,
 }: ClientMasterProfileScreenProps) => {
   const [profile, setProfile] = useState<MasterProfile | null>(null)
@@ -983,7 +985,7 @@ export const ClientMasterProfileScreen = ({
           </span>
           Мои заявки
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewProfile}>
           <span className="nav-icon" aria-hidden="true">
             <IconUser />
           </span>

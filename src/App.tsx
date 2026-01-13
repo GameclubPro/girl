@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AddressScreen } from './screens/AddressScreen'
 import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
+import { ClientProfileScreen } from './screens/ClientProfileScreen'
 import { ClientScreen } from './screens/ClientScreen'
 import {
   ClientShowcaseDetailScreen,
@@ -72,6 +73,7 @@ function App() {
     | 'start'
     | 'address'
     | 'client'
+    | 'client-profile'
     | 'client-showcase'
     | 'client-gallery'
     | 'client-gallery-detail'
@@ -712,6 +714,25 @@ function App() {
           setView('request')
         }}
         onViewRequests={() => setView('requests')}
+        onViewProfile={() => setView('client-profile')}
+      />
+    )
+  }
+
+  if (view === 'client-profile') {
+    return (
+      <ClientProfileScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        onViewHome={() => setView('client')}
+        onViewMasters={() => setView('client-showcase')}
+        onViewRequests={() => setView('requests')}
+        onCreateRequest={() => {
+          setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
+          setView('request')
+        }}
+        onEditAddress={() => setView('address')}
       />
     )
   }
@@ -724,6 +745,7 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
         onViewRequests={() => setView('requests')}
+        onViewClientProfile={() => setView('client-profile')}
         clientLocation={clientLocation}
         isLocating={isLocating}
         onRequestLocation={handleRequestLocation}
@@ -763,6 +785,10 @@ function App() {
           setSelectedMasterId(null)
           setView('requests')
         }}
+        onViewProfile={() => {
+          setSelectedMasterId(null)
+          setView('client-profile')
+        }}
         onCreateBooking={() =>
           openBooking(selectedMasterId, {
             returnView: 'client-master-profile',
@@ -794,6 +820,10 @@ function App() {
           setSelectedShowcaseItem(null)
           setView('requests')
         }}
+        onViewClientProfile={() => {
+          setSelectedShowcaseItem(null)
+          setView('client-profile')
+        }}
         onViewProfile={(masterId) => {
           setSelectedShowcaseItem(null)
           setSelectedMasterId(masterId)
@@ -820,6 +850,7 @@ function App() {
         onBack={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
         onViewRequests={() => setView('requests')}
+        onViewClientProfile={() => setView('client-profile')}
         onViewDetail={(item) => {
           setSelectedShowcaseItem(item)
           setView('client-gallery-detail')

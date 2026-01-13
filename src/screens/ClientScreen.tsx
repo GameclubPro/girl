@@ -47,6 +47,7 @@ export const ClientScreen = ({
   onViewMasters,
   onCreateRequest,
   onViewRequests,
+  onViewProfile,
 }: {
   apiBase: string
   activeCategoryId: string | null
@@ -55,6 +56,7 @@ export const ClientScreen = ({
   onViewMasters: () => void
   onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: () => void
+  onViewProfile: () => void
 }) => {
   const activeCategoryLabel =
     (activeCategoryId ? categoryLabelOverrides[activeCategoryId] : '') ??
@@ -329,7 +331,7 @@ export const ClientScreen = ({
           </span>
           Мои заявки
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewProfile}>
           <span className="nav-icon" aria-hidden="true">
             <IconUser />
           </span>
