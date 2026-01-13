@@ -75,6 +75,9 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
 
+const formatFollowerCount = (value: number) =>
+  formatCount(value, 'подписчик', 'подписчика', 'подписчиков')
+
 const buildReviewStars = (value: number) => {
   const clamped = Math.max(0, Math.min(5, Math.round(value)))
   return Array.from({ length: 5 }, (_, index) => (index < clamped ? '★' : '☆')).join(
@@ -253,6 +256,7 @@ export const ProProfileScreen = ({
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] =
     useState<MasterReviewSummary | null>(null)
+  const [followersCount, setFollowersCount] = useState(0)
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
@@ -419,6 +423,9 @@ export const ProProfileScreen = ({
   const reviewDistribution = reviewSummary?.distribution ?? []
   const reviewCountLabel =
     reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
+  const followersCountLabel =
+    followersCount > 0 ? formatFollowerCount(followersCount) : 'Нет подписчиков'
+  const followersValue = followersCount.toLocaleString('ru-RU')
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const showcaseCount = showcaseItems.length
   const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
@@ -430,6 +437,7 @@ export const ProProfileScreen = ({
     { label: 'Работы', value: String(portfolioCount) },
     { label: 'Рейтинг', value: reviewAverageLabel },
     { label: 'Отзывы', value: String(reviewCount) },
+    { label: 'Подписчики', value: followersValue },
   ]
   const locationLabel = useMemo(() => {
     const cityLabel = cityId
@@ -1020,6 +1028,12 @@ export const ProProfileScreen = ({
         setShowcaseItems(nextShowcaseItems)
         setAvatarUrl(data.avatarUrl ?? '')
         setCoverUrl(data.coverUrl ?? '')
+        const nextFollowersCount =
+          typeof data.followersCount === 'number' &&
+          Number.isFinite(data.followersCount)
+            ? Math.max(0, Math.round(data.followersCount))
+            : 0
+        setFollowersCount(nextFollowersCount)
 
         const nextPriceRange = getServicePriceRange(nextServiceItems)
 
@@ -2157,6 +2171,18 @@ export const ProProfileScreen = ({
                 }`}
               >
                 {aboutPreview}
+              </p>
+            </div>
+            <div className="pro-profile-audience-card">
+              <div className="pro-profile-audience-head">
+                <span className="pro-profile-audience-title">Подписчики</span>
+                <span className="pro-profile-audience-pill">
+                  {followersCountLabel}
+                </span>
+              </div>
+              <div className="pro-profile-audience-value">{followersValue}</div>
+              <p className="pro-profile-audience-caption">
+                Делитесь свежими работами — аудитория растет быстрее.
               </p>
             </div>
             <div className="pro-profile-facts">

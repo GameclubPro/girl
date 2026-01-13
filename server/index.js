@@ -845,6 +845,25 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_followers (
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      follower_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (master_id, follower_id)
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_followers_master_idx
+    ON master_followers (master_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_followers_follower_idx
+    ON master_followers (follower_id);
+  `)
+
+  await pool.query(`
     ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
   `)
@@ -1472,6 +1491,7 @@ app.get('/api/masters', async (req, res) => {
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
+          COALESCE(mf.followers_count, 0) AS "followersCount",
           mp.updated_at AS "updatedAt",
           ul.lat AS "locationLat",
           ul.lng AS "locationLng",
@@ -1489,6 +1509,13 @@ app.get('/api/masters', async (req, res) => {
           FROM master_reviews
           GROUP BY master_id
         ) mr ON mr.master_id = mp.user_id
+        LEFT JOIN (
+          SELECT
+            master_id,
+            COUNT(*)::int AS followers_count
+          FROM master_followers
+          GROUP BY master_id
+        ) mf ON mf.master_id = mp.user_id
         ${whereClause}
         ORDER BY mp.updated_at DESC
         ${limitClause}
@@ -1535,6 +1562,9 @@ app.get('/api/masters', async (req, res) => {
         reviewsAverage: Number.isFinite(average) ? average : 0,
         reviewsCount: Number.isFinite(Number(row.reviewsCount))
           ? Number(row.reviewsCount)
+          : 0,
+        followersCount: Number.isFinite(Number(row.followersCount))
+          ? Number(row.followersCount)
           : 0,
         avatarUrl: buildPublicUrl(req, row.avatarPath),
         coverUrl: buildPublicUrl(req, row.coverPath),
@@ -1594,6 +1624,7 @@ app.get('/api/masters/:userId', async (req, res) => {
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
+          COALESCE(mf.followers_count, 0) AS "followersCount",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN cities c ON c.id = mp.city_id
@@ -1607,6 +1638,13 @@ app.get('/api/masters/:userId', async (req, res) => {
           FROM master_reviews
           GROUP BY master_id
         ) mr ON mr.master_id = mp.user_id
+        LEFT JOIN (
+          SELECT
+            master_id,
+            COUNT(*)::int AS followers_count
+          FROM master_followers
+          GROUP BY master_id
+        ) mf ON mf.master_id = mp.user_id
         WHERE mp.user_id = $1
       `,
       [normalizedUserId]
@@ -1624,16 +1662,75 @@ app.get('/api/masters/:userId', async (req, res) => {
     const reviewsCount = Number.isFinite(Number(row.reviewsCount))
       ? Number(row.reviewsCount)
       : 0
+    const followersCount = Number.isFinite(Number(row.followersCount))
+      ? Number(row.followersCount)
+      : 0
     res.json({
       ...row,
       reviewsAverage,
       reviewsCount,
+      followersCount,
       avatarUrl: buildPublicUrl(req, row.avatarPath),
       coverUrl: buildPublicUrl(req, row.coverPath),
       ...summary,
     })
   } catch (error) {
     console.error('GET /api/masters/:userId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/:userId/follow', async (req, res) => {
+  const masterId = normalizeText(req.params.userId)
+  const followerId = normalizeText(req.body?.userId ?? req.body?.followerId)
+  if (!masterId || !followerId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (masterId === followerId) {
+    res.status(400).json({ error: 'self_follow_forbidden' })
+    return
+  }
+
+  try {
+    await pool.query(
+      `
+        INSERT INTO master_followers (master_id, follower_id)
+        VALUES ($1, $2)
+        ON CONFLICT DO NOTHING
+      `,
+      [masterId, followerId]
+    )
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/masters/:userId/follow failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/:userId/unfollow', async (req, res) => {
+  const masterId = normalizeText(req.params.userId)
+  const followerId = normalizeText(req.body?.userId ?? req.body?.followerId)
+  if (!masterId || !followerId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (masterId === followerId) {
+    res.status(400).json({ error: 'self_unfollow_forbidden' })
+    return
+  }
+
+  try {
+    await pool.query(
+      `
+        DELETE FROM master_followers
+        WHERE master_id = $1 AND follower_id = $2
+      `,
+      [masterId, followerId]
+    )
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/masters/:userId/unfollow failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

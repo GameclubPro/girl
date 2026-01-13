@@ -718,11 +718,54 @@ function App() {
     setView('requests')
   }, [])
 
+  const syncFollowWithFavorite = useCallback(
+    async (favorite: Omit<FavoriteMaster, 'savedAt'>, shouldFollow: boolean) => {
+      if (!userId || !favorite.masterId) return
+      const action = shouldFollow ? 'follow' : 'unfollow'
+
+      try {
+        const response = await fetch(
+          `${apiBase}/api/masters/${favorite.masterId}/${action}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          }
+        )
+        if (!response.ok) {
+          throw new Error('Follow sync failed')
+        }
+      } catch (error) {
+        console.error(`Failed to ${action} master:`, error)
+        setFavorites((current) => {
+          const isFavoriteNow = current.some(
+            (item) => item.masterId === favorite.masterId
+          )
+          if (shouldFollow) {
+            if (!isFavoriteNow) return current
+            return current.filter((item) => item.masterId !== favorite.masterId)
+          }
+          if (isFavoriteNow) return current
+          const savedAt = new Date().toISOString()
+          return [{ ...favorite, savedAt }, ...current]
+        })
+      }
+    },
+    [apiBase, userId]
+  )
+
   const handleToggleFavorite = useCallback(
     (favorite: Omit<FavoriteMaster, 'savedAt'>) => {
-      setFavorites((prev) => toggleFavorite(prev, favorite))
+      setFavorites((prev) => {
+        const isAlreadyFavorite = prev.some(
+          (item) => item.masterId === favorite.masterId
+        )
+        const next = toggleFavorite(prev, favorite)
+        void syncFollowWithFavorite(favorite, !isAlreadyFavorite)
+        return next
+      })
     },
-    []
+    [syncFollowWithFavorite]
   )
 
   const handleUpsertFavorite = useCallback(
