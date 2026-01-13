@@ -5667,13 +5667,13 @@
 
 .screen--pro .pro-profile-ig-button--fab {
   position: absolute;
-  top: calc(16px + var(--safe-top) + var(--tg-top-offset));
+  top: calc(20px + var(--safe-top) + var(--tg-top-offset));
   right: var(--pro-pad-x);
   width: 46px;
   height: 46px;
   padding: 0;
   border-radius: 16px;
-  background: #ffffff;
+  background: rgba(var(--paper-rgb), 0.92);
   color: var(--ink);
   border: 1px solid rgba(var(--shadow-rgb), 0.16);
   box-shadow: 0 14px 22px rgba(var(--shadow-rgb), 0.2);
