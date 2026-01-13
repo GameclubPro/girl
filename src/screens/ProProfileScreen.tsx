@@ -74,8 +74,6 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
 
-const formatFollowerCount = (value: number) =>
-  formatCount(value, 'подписчик', 'подписчика', 'подписчиков')
 
 const buildReviewStars = (value: number) => {
   const clamped = Math.max(0, Math.min(5, Math.round(value)))
