@@ -149,14 +149,14 @@ const formatLocationMeta = (location: UserLocation | null) => {
     .join(' • ')
 }
 
-const profileAnchorItems = [
-  { id: 'profile-actions', label: 'Действия' },
-  { id: 'profile-summary', label: 'Профиль' },
-  { id: 'profile-upcoming', label: 'Ближайшее' },
-  { id: 'profile-requests', label: 'Заявки' },
-  { id: 'profile-location', label: 'Локация' },
-  { id: 'profile-favorites', label: 'Избранное' },
+const profileTabs = [
+  { id: 'summary', label: 'Сводка' },
+  { id: 'activity', label: 'Активность' },
+  { id: 'location', label: 'Локация' },
+  { id: 'favorites', label: 'Избранное' },
 ] as const
+
+type ProfileTabId = (typeof profileTabs)[number]['id']
 
 export const ClientProfileScreen = ({
   apiBase,
@@ -187,45 +187,22 @@ export const ClientProfileScreen = ({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState('')
-  const [activeAnchorId, setActiveAnchorId] = useState<string>(
-    profileAnchorItems[0]?.id ?? ''
-  )
+  const [activeTab, setActiveTab] = useState<ProfileTabId>('summary')
   const displayName = displayNameFallback.trim() || 'Клиент'
   const initials = getInitials(displayName)
   const showSkeleton = isLoading && requests.length === 0 && bookings.length === 0
-  const handleAnchorJump = useCallback((targetId: string) => {
-    const element = document.getElementById(targetId)
-    if (!element) return
-    setActiveAnchorId(targetId)
+  const handleTabChange = useCallback((tabId: ProfileTabId) => {
+    setActiveTab(tabId)
+    if (typeof window === 'undefined') return
     const prefersReducedMotion =
-      typeof window !== 'undefined' &&
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    element.scrollIntoView({
+    const panel = document.getElementById('profile-panel')
+    if (!panel) return
+    panel.scrollIntoView({
       behavior: prefersReducedMotion ? 'auto' : 'smooth',
       block: 'start',
     })
   }, [])
-
-  useEffect(() => {
-    if (showSkeleton) return
-    const elements = profileAnchorItems
-      .map((item) => document.getElementById(item.id))
-      .filter((element): element is HTMLElement => Boolean(element))
-    if (elements.length === 0) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
-        if (visible[0]?.target) {
-          setActiveAnchorId(visible[0].target.id)
-        }
-      },
-      { rootMargin: '-20% 0px -55% 0px', threshold: [0, 0.25, 0.5] }
-    )
-    elements.forEach((element) => observer.observe(element))
-    return () => observer.disconnect()
-  }, [showSkeleton])
 
   useEffect(() => {
     if (!userId) return
@@ -751,6 +728,91 @@ export const ClientProfileScreen = ({
         {metaError && <p className="client-profile-error">{metaError}</p>}
         {shareError && <p className="client-profile-error">{shareError}</p>}
 
+        <section className="client-profile-hero animate delay-1">
+          <div className="client-profile-identity">
+            <div className="client-profile-avatar" aria-hidden="true">
+              {initials}
+            </div>
+            <div className="client-profile-title-group">
+              <h2 className="client-profile-name">{displayName}</h2>
+              <div className="client-profile-hero-meta">
+                <span className="client-profile-badge">
+                  Профиль {completionPercent}%
+                </span>
+                <span className="client-profile-subtitle">Клиент KIVEN</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="client-profile-primary-action">
+            <button
+              className="cta cta--primary cta--wide"
+              type="button"
+              onClick={onCreateRequest}
+            >
+              Новая заявка
+            </button>
+            <button
+              className="client-profile-link"
+              type="button"
+              onClick={onViewMasters}
+            >
+              Найти мастера <span aria-hidden="true">→</span>
+            </button>
+          </div>
+
+          <div className="client-profile-stats">
+            <button
+              className="client-profile-stat-button"
+              type="button"
+              onClick={() => handleTabChange('activity')}
+            >
+              <span className="client-profile-stat-value">{openRequestsCount}</span>
+              <span className="client-profile-stat-label">Открытых заявок</span>
+            </button>
+            <button
+              className="client-profile-stat-button"
+              type="button"
+              onClick={() => handleTabChange('activity')}
+            >
+              <span className="client-profile-stat-value">
+                {upcomingBookings.length}
+              </span>
+              <span className="client-profile-stat-label">Активных записей</span>
+            </button>
+            <button
+              className="client-profile-stat-button"
+              type="button"
+              onClick={() => handleTabChange('favorites')}
+            >
+              <span className="client-profile-stat-value">{favoriteCount}</span>
+              <span className="client-profile-stat-label">Избранное</span>
+            </button>
+          </div>
+        </section>
+
+        <div className="client-profile-tabs" role="tablist" aria-label="Разделы профиля">
+          {profileTabs.map((tab) => (
+            <button
+              className={`client-profile-tab${activeTab === tab.id ? ' is-active' : ''}`}
+              type="button"
+              key={tab.id}
+              id={`profile-tab-${tab.id}`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls="profile-panel"
+              onClick={() => handleTabChange(tab.id)}
+            >
+              <span>{tab.label}</span>
+              {tab.id === 'activity' && attentionTotal > 0 && (
+                <span className="client-profile-tab-badge" aria-hidden="true">
+                  {attentionTotal}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {showSkeleton ? (
           <div className="client-profile-skeleton" aria-hidden="true">
             <div className="client-profile-skeleton-card">
@@ -770,615 +832,570 @@ export const ClientProfileScreen = ({
             </div>
           </div>
         ) : (
-          <>
-            <div
-              className="client-profile-anchors"
-              role="list"
-              aria-label="Быстрая навигация по профилю"
-            >
-              {profileAnchorItems.map((item) => (
-                <button
-                  className={`client-profile-anchor${
-                    activeAnchorId === item.id ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  key={item.id}
-                  onClick={() => handleAnchorJump(item.id)}
-                  aria-current={activeAnchorId === item.id ? 'true' : undefined}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
-            <section
-              id="profile-actions"
-              className="client-section client-profile-section client-profile-anchor-target animate delay-1"
-            >
-              <div className="section-header">
-                <h3>Требуют внимания</h3>
-                {attentionTotal > 0 && (
-                  <span className="client-profile-attention-badge">
-                    {formatCount(attentionTotal, 'событие', 'события', 'событий')}
-                  </span>
-                )}
-              </div>
-              <div className="client-profile-card client-profile-attention-card">
-                {attentionItems.length > 0 ? (
-                  <div className="client-profile-attention-list" role="list">
-                    {attentionItems.map((item) => (
-                      <button
-                        className={`client-profile-attention-item is-${item.tone} is-pulse`}
-                        type="button"
-                        key={item.id}
-                        onClick={item.onClick}
-                        role="listitem"
-                      >
-                        <span className="client-profile-attention-count">
-                          {item.count}
-                        </span>
-                        <span className="client-profile-attention-body">
-                          <span className="client-profile-attention-label">
+          <div
+            id="profile-panel"
+            className="client-profile-panel animate"
+            role="tabpanel"
+            aria-labelledby={`profile-tab-${activeTab}`}
+            key={activeTab}
+          >
+            {activeTab === 'summary' && (
+              <>
+                <section className="client-section client-profile-section">
+                  <div className="section-header">
+                    <h3>Готовность профиля</h3>
+                  </div>
+                  <div className="client-profile-card client-profile-progress">
+                    <div className="client-profile-progress-head">
+                      <span className="client-profile-progress-title">
+                        Профиль заполнен
+                      </span>
+                      <span className="client-profile-progress-value">
+                        {completionPercent}%
+                      </span>
+                    </div>
+                    <div className="client-profile-progress-bar" aria-hidden="true">
+                      <span style={{ width: `${completionPercent}%` }} />
+                    </div>
+                    <div className="client-profile-checklist">
+                      {profileChecklist.map((item) => (
+                        <div
+                          className={`client-profile-check-item${
+                            item.done ? ' is-done' : ''
+                          }`}
+                          key={item.id}
+                        >
+                          <span
+                            className="client-profile-check-status"
+                            aria-hidden="true"
+                          />
+                          <span className="client-profile-check-label">
                             {item.label}
                           </span>
-                          <span className="client-profile-attention-meta">
-                            {item.meta}
-                          </span>
-                        </span>
-                        <span
-                          className="client-profile-attention-chevron"
-                          aria-hidden="true"
-                        >
-                          →
-                        </span>
-                      </button>
-                    ))}
+                          {item.done ? (
+                            <span className="client-profile-check-done">Готово</span>
+                          ) : (
+                            <button
+                              className="client-profile-check-action"
+                              type="button"
+                              onClick={item.onAction}
+                            >
+                              {item.actionLabel}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ) : (
-                  <div className="client-profile-empty-block">
-                    <p className="client-profile-empty">
-                      Все спокойно — нет задач, которые требуют срочного ответа.
-                    </p>
+                </section>
+
+                <section className="client-section client-profile-section">
+                  <div className="section-header">
+                    <h3>Быстрые действия</h3>
+                  </div>
+                  <div className="client-profile-card">
+                    <div className="client-profile-shortcuts">
+                      <button
+                        className="client-profile-shortcut"
+                        type="button"
+                        onClick={() => onViewRequests('requests')}
+                      >
+                        Мои заявки
+                      </button>
+                      <button
+                        className="client-profile-shortcut"
+                        type="button"
+                        onClick={() => onViewRequests('bookings')}
+                      >
+                        Мои записи
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              </>
+            )}
+
+            {activeTab === 'activity' && (
+              <>
+                <section className="client-section client-profile-section">
+                  <div className="section-header">
+                    <h3>Требуют внимания</h3>
+                    {attentionTotal > 0 && (
+                      <span className="client-profile-attention-badge">
+                        {formatCount(attentionTotal, 'событие', 'события', 'событий')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="client-profile-card client-profile-attention-card">
+                    {attentionItems.length > 0 ? (
+                      <div className="client-profile-attention-list" role="list">
+                        {attentionItems.map((item) => (
+                          <button
+                            className={`client-profile-attention-item is-${item.tone} is-pulse`}
+                            type="button"
+                            key={item.id}
+                            onClick={item.onClick}
+                            role="listitem"
+                          >
+                            <span className="client-profile-attention-count">
+                              {item.count}
+                            </span>
+                            <span className="client-profile-attention-body">
+                              <span className="client-profile-attention-label">
+                                {item.label}
+                              </span>
+                              <span className="client-profile-attention-meta">
+                                {item.meta}
+                              </span>
+                            </span>
+                            <span
+                              className="client-profile-attention-chevron"
+                              aria-hidden="true"
+                            >
+                              →
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="client-profile-empty-block">
+                        <p className="client-profile-empty">
+                          Все спокойно — нет задач, которые требуют срочного ответа.
+                        </p>
+                        <button
+                          className="client-profile-action is-primary"
+                          type="button"
+                          onClick={onCreateRequest}
+                        >
+                          Создать заявку
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="client-section client-profile-section">
+                  <div className="section-header">
+                    <h3>Ближайшее</h3>
+                  </div>
+                  <div className="client-profile-card is-highlight">
+                    <div className="client-profile-card-head">
+                      <div className="client-profile-card-title">
+                        <span className="client-profile-card-icon" aria-hidden="true">
+                          <IconClock />
+                        </span>
+                        <span>Ближайшая запись</span>
+                      </div>
+                      <button
+                        className="client-profile-card-action"
+                        type="button"
+                        onClick={() => onViewRequests('bookings')}
+                      >
+                        Все
+                      </button>
+                    </div>
+                    {nextBooking ? (
+                      <div className="client-profile-booking">
+                        <div className="client-profile-booking-info">
+                          <span className="client-profile-booking-title">
+                            {nextBooking.serviceName || 'Услуга'}
+                          </span>
+                          <span className="client-profile-booking-meta">
+                            {nextBooking.masterName || 'Мастер'}
+                            {nextBookingTime ? ` • ${nextBookingTime}` : ''}
+                          </span>
+                          {(nextBooking.cityName || nextBooking.districtName) && (
+                            <span className="client-profile-booking-meta">
+                              {[nextBooking.cityName, nextBooking.districtName]
+                                .filter(Boolean)
+                                .join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`client-profile-chip ${nextBookingTone}`}>
+                          {nextBookingStatus}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="client-profile-empty-block">
+                        <p className="client-profile-empty">
+                          Пока нет активных записей. Найдите мастера или создайте заявку.
+                        </p>
+                        <div className="client-profile-empty-actions">
+                          <button
+                            className="client-profile-action is-primary"
+                            type="button"
+                            onClick={onViewMasters}
+                          >
+                            Найти мастера
+                          </button>
+                          <button
+                            className="client-profile-link"
+                            type="button"
+                            onClick={onCreateRequest}
+                          >
+                            Создать заявку <span aria-hidden="true">→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="client-section client-profile-section">
+                  <div className="section-header">
+                    <h3>Последние записи</h3>
+                  </div>
+                  <div className="client-profile-card">
+                    <div className="client-profile-card-head">
+                      <div className="client-profile-card-title">
+                        <span className="client-profile-card-icon" aria-hidden="true">
+                          <IconClock />
+                        </span>
+                        <span>Недавние визиты</span>
+                      </div>
+                      <button
+                        className="client-profile-card-action"
+                        type="button"
+                        onClick={() => onViewRequests('bookings')}
+                      >
+                        Все
+                      </button>
+                    </div>
+                    {recentBookings.length > 0 ? (
+                      <div className="client-profile-bookings">
+                        {recentBookings.map((booking) => {
+                          const bookingDate = formatShortDate(booking.scheduledAt)
+                          const bookingStatus =
+                            bookingStatusLabelMap[booking.status] ?? booking.status
+                          const bookingTone =
+                            bookingStatusToneMap[booking.status] ?? 'is-muted'
+                          return (
+                            <button
+                              className="client-profile-booking-row"
+                              type="button"
+                              key={booking.id}
+                              onClick={() =>
+                                onCreateBooking({
+                                  masterId: booking.masterId,
+                                  categoryId: booking.categoryId,
+                                  serviceName: booking.serviceName,
+                                  locationType: booking.locationType,
+                                  details: booking.comment ?? null,
+                                  photoUrls: booking.photoUrls,
+                                })
+                              }
+                            >
+                              <div className="client-profile-booking-info">
+                                <span className="client-profile-booking-title">
+                                  {booking.serviceName || 'Услуга'}
+                                </span>
+                                <span className="client-profile-booking-meta">
+                                  {booking.masterName || 'Мастер'}
+                                  {bookingDate ? ` • ${bookingDate}` : ''}
+                                </span>
+                              </div>
+                              <span className={`client-profile-chip ${bookingTone}`}>
+                                {bookingStatus}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="client-profile-empty-block">
+                        <p className="client-profile-empty">
+                          История появится после первой записи.
+                        </p>
+                        <button
+                          className="client-profile-action"
+                          type="button"
+                          onClick={onViewMasters}
+                        >
+                          Найти мастера
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="client-section client-profile-section">
+                  <div className="section-header">
+                    <h3>Активные заявки</h3>
+                  </div>
+                  <div className="client-profile-card">
+                    <div className="client-profile-card-head">
+                      <div className="client-profile-card-title">
+                        <span className="client-profile-card-icon" aria-hidden="true">
+                          <IconList />
+                        </span>
+                        <span>Ваши заявки</span>
+                      </div>
+                      <button
+                        className="client-profile-card-action"
+                        type="button"
+                        onClick={() => onViewRequests('requests')}
+                      >
+                        Все
+                      </button>
+                    </div>
+                    {recentRequests.length > 0 ? (
+                      <div className="client-profile-requests">
+                        {recentRequests.map((request) => (
+                          <button
+                            className="client-profile-request"
+                            key={request.id}
+                            type="button"
+                            onClick={() => onViewRequests('requests')}
+                          >
+                            <div className="client-profile-request-info">
+                              <span className="client-profile-request-title">
+                                {request.serviceName || 'Услуга'}
+                              </span>
+                              <span className="client-profile-request-meta">
+                                {getCategoryLabel(request.categoryId)}
+                                {request.createdAt
+                                  ? ` • ${formatShortDate(request.createdAt)}`
+                                  : ''}
+                              </span>
+                            </div>
+                            <span
+                              className={`client-profile-chip${
+                                (request.responsesCount ?? 0) > 0
+                                  ? ' is-warning'
+                                  : ' is-muted'
+                              }`}
+                            >
+                              {(request.responsesCount ?? 0) > 0
+                                ? formatCount(
+                                    request.responsesCount ?? 0,
+                                    'отклик',
+                                    'отклика',
+                                    'откликов'
+                                  )
+                                : 'Без откликов'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="client-profile-empty-block">
+                        <p className="client-profile-empty">
+                          Открытых заявок пока нет. Создайте первую и получите отклики.
+                        </p>
+                        <button
+                          className="client-profile-action is-primary"
+                          type="button"
+                          onClick={onCreateRequest}
+                        >
+                          Создать заявку
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </>
+            )}
+
+            {activeTab === 'location' && (
+              <section className="client-section client-profile-section">
+                <div className="section-header">
+                  <h3>Локация</h3>
+                </div>
+                <div className="client-profile-card">
+                  <div className="client-profile-card-head">
+                    <div className="client-profile-card-title">
+                      <span className="client-profile-card-icon" aria-hidden="true">
+                        <IconPin />
+                      </span>
+                      <span>Город и район</span>
+                    </div>
+                    <button
+                      className="client-profile-card-action"
+                      type="button"
+                      onClick={onEditAddress}
+                    >
+                      Изменить
+                    </button>
+                  </div>
+                  <div className="client-profile-location">
+                    <div className="client-profile-location-map" aria-hidden="true">
+                      <span className="client-profile-location-map-pin">
+                        <IconPin />
+                      </span>
+                      <span className="client-profile-location-map-dot" />
+                      <span className="client-profile-location-map-dot is-secondary" />
+                    </div>
+                    <div className="client-profile-location-info">
+                      <span className="client-profile-location-title">{locationLabel}</span>
+                      <span className="client-profile-location-subtitle">
+                        Данные для подбора мастеров
+                      </span>
+                      <span className="client-profile-location-address">{addressLabel}</span>
+                      {addressMeta && (
+                        <span className="client-profile-location-chip">{addressMeta}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="client-profile-location-status">
+                    <span
+                      className={`client-profile-location-label${
+                        location ? ' is-active' : ''
+                      }`}
+                    >
+                      {locationStatusLabel}
+                    </span>
+                    {locationMetaItems.length > 0 && (
+                      <div className="client-profile-location-chips">
+                        {locationMetaItems.map((item, index) => (
+                          <span
+                            className="client-profile-location-chip"
+                            key={`${item}-${index}`}
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="client-profile-location-privacy">
+                    <button
+                      className={`client-profile-toggle${
+                        location?.shareToMasters === false ? '' : ' is-active'
+                      }`}
+                      type="button"
+                      onClick={() => handleShareToggle(location?.shareToMasters === false)}
+                      disabled={!location || isSharing}
+                      aria-pressed={location?.shareToMasters !== false}
+                    >
+                      {location?.shareToMasters === false
+                        ? 'Расстояние скрыто'
+                        : 'Расстояние видно'}
+                    </button>
+                    <span className="client-profile-location-help">
+                      {locationShareLabel}
+                    </span>
+                  </div>
+                  <div className="client-profile-location-actions">
                     <button
                       className="client-profile-action is-primary"
                       type="button"
-                      onClick={onCreateRequest}
+                      onClick={handleRequestLocation}
+                      disabled={isSharing}
                     >
-                      Создать заявку
+                      {location ? 'Обновить геолокацию' : 'Поделиться геолокацией'}
                     </button>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section
-              id="profile-summary"
-              className="client-profile-hero client-profile-anchor-target animate delay-2"
-            >
-              <div className="client-profile-identity">
-                <div className="client-profile-avatar" aria-hidden="true">
-                  {initials}
-                </div>
-                <div className="client-profile-title-group">
-                  <h2 className="client-profile-name">{displayName}</h2>
-                  <div className="client-profile-hero-meta">
-                    <span className="client-profile-badge">
-                      Профиль {completionPercent}%
-                    </span>
-                    <span className="client-profile-subtitle">Клиент KIVEN</span>
+                    {location && (
+                      <button
+                        className="client-profile-action is-ghost"
+                        type="button"
+                        onClick={handleClearLocation}
+                        disabled={isSharing}
+                      >
+                        Удалить
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
-
-              <div className="client-profile-primary-action">
-                <button
-                  className="cta cta--primary cta--wide"
-                  type="button"
-                  onClick={onCreateRequest}
-                >
-                  Новая заявка
-                </button>
-                <button
-                  className="client-profile-link"
-                  type="button"
-                  onClick={onViewMasters}
-                >
-                  Найти мастера <span aria-hidden="true">→</span>
-                </button>
-              </div>
-
-              <div className="client-profile-stats">
-                <button
-                  className="client-profile-stat-button"
-                  type="button"
-                  onClick={() => handleAnchorJump('profile-requests')}
-                >
-                  <span className="client-profile-stat-value">{openRequestsCount}</span>
-                  <span className="client-profile-stat-label">Открытых заявок</span>
-                </button>
-                <button
-                  className="client-profile-stat-button"
-                  type="button"
-                  onClick={() => handleAnchorJump('profile-upcoming')}
-                >
-                  <span className="client-profile-stat-value">
-                    {upcomingBookings.length}
-                  </span>
-                  <span className="client-profile-stat-label">Активных записей</span>
-                </button>
-                <button
-                  className="client-profile-stat-button"
-                  type="button"
-                  onClick={() => handleAnchorJump('profile-favorites')}
-                >
-                  <span className="client-profile-stat-value">{favoriteCount}</span>
-                  <span className="client-profile-stat-label">Избранное</span>
-                </button>
-              </div>
-            </section>
-
-        <section
-          className="client-section client-profile-section client-profile-anchor-target animate delay-3"
-          id="profile-progress"
-        >
-          <div className="section-header">
-            <h3>Готовность профиля</h3>
-          </div>
-          <div className="client-profile-card client-profile-progress">
-            <div className="client-profile-progress-head">
-              <span className="client-profile-progress-title">
-                Профиль заполнен
-              </span>
-              <span className="client-profile-progress-value">{completionPercent}%</span>
-            </div>
-            <div className="client-profile-progress-bar" aria-hidden="true">
-              <span style={{ width: `${completionPercent}%` }} />
-            </div>
-            <div className="client-profile-checklist">
-              {profileChecklist.map((item) => (
-                <div
-                  className={`client-profile-check-item${
-                    item.done ? ' is-done' : ''
-                  }`}
-                  key={item.id}
-                >
-                  <span className="client-profile-check-status" aria-hidden="true" />
-                  <span className="client-profile-check-label">{item.label}</span>
-                  {item.done ? (
-                    <span className="client-profile-check-done">Готово</span>
-                  ) : (
-                    <button
-                      className="client-profile-check-action"
-                      type="button"
-                      onClick={item.onAction}
-                    >
-                      {item.actionLabel}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="profile-upcoming"
-          className="client-section client-profile-section client-profile-anchor-target animate delay-4"
-        >
-          <div className="section-header">
-            <h3>Ближайшее</h3>
-          </div>
-          <div className="client-profile-card is-highlight">
-            <div className="client-profile-card-head">
-              <div className="client-profile-card-title">
-                <span className="client-profile-card-icon" aria-hidden="true">
-                  <IconClock />
-                </span>
-                <span>Ближайшая запись</span>
-              </div>
-              <button
-                className="client-profile-card-action"
-                type="button"
-                onClick={() => onViewRequests('bookings')}
-              >
-                Все
-              </button>
-            </div>
-            {nextBooking ? (
-              <div className="client-profile-booking">
-                <div className="client-profile-booking-info">
-                  <span className="client-profile-booking-title">
-                    {nextBooking.serviceName || 'Услуга'}
-                  </span>
-                  <span className="client-profile-booking-meta">
-                    {nextBooking.masterName || 'Мастер'}
-                    {nextBookingTime ? ` • ${nextBookingTime}` : ''}
-                  </span>
-                  {(nextBooking.cityName || nextBooking.districtName) && (
-                    <span className="client-profile-booking-meta">
-                      {[nextBooking.cityName, nextBooking.districtName]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </span>
-                  )}
-                </div>
-                <span className={`client-profile-chip ${nextBookingTone}`}>
-                  {nextBookingStatus}
-                </span>
-              </div>
-            ) : (
-              <div className="client-profile-empty-block">
-                <p className="client-profile-empty">
-                  Пока нет активных записей. Найдите мастера или создайте заявку.
-                </p>
-                <div className="client-profile-empty-actions">
-                  <button
-                    className="client-profile-action is-primary"
-                    type="button"
-                    onClick={onViewMasters}
-                  >
-                    Найти мастера
-                  </button>
-                  <button
-                    className="client-profile-link"
-                    type="button"
-                    onClick={onCreateRequest}
-                  >
-                    Создать заявку <span aria-hidden="true">→</span>
-                  </button>
-                </div>
-              </div>
+              </section>
             )}
-          </div>
-        </section>
 
-        <section className="client-section client-profile-section animate delay-5">
-          <div className="section-header">
-            <h3>Последние записи</h3>
-          </div>
-          <div className="client-profile-card">
-            <div className="client-profile-card-head">
-              <div className="client-profile-card-title">
-                <span className="client-profile-card-icon" aria-hidden="true">
-                  <IconClock />
-                </span>
-                <span>Недавние визиты</span>
-              </div>
-              <button
-                className="client-profile-card-action"
-                type="button"
-                onClick={() => onViewRequests('bookings')}
-              >
-                Все
-              </button>
-            </div>
-            {recentBookings.length > 0 ? (
-              <div className="client-profile-bookings">
-                {recentBookings.map((booking) => {
-                  const bookingDate = formatShortDate(booking.scheduledAt)
-                  const bookingStatus =
-                    bookingStatusLabelMap[booking.status] ?? booking.status
-                  const bookingTone =
-                    bookingStatusToneMap[booking.status] ?? 'is-muted'
-                  return (
-                    <button
-                      className="client-profile-booking-row"
-                      type="button"
-                      key={booking.id}
-                      onClick={() =>
-                        onCreateBooking({
-                          masterId: booking.masterId,
-                          categoryId: booking.categoryId,
-                          serviceName: booking.serviceName,
-                          locationType: booking.locationType,
-                          details: booking.comment ?? null,
-                          photoUrls: booking.photoUrls,
-                        })
-                      }
-                    >
-                      <div className="client-profile-booking-info">
-                        <span className="client-profile-booking-title">
-                          {booking.serviceName || 'Услуга'}
-                        </span>
-                        <span className="client-profile-booking-meta">
-                          {booking.masterName || 'Мастер'}
-                          {bookingDate ? ` • ${bookingDate}` : ''}
-                        </span>
-                      </div>
-                      <span className={`client-profile-chip ${bookingTone}`}>
-                        {bookingStatus}
+            {activeTab === 'favorites' && (
+              <section className="client-section client-profile-section">
+                <div className="section-header">
+                  <h3>Избранное</h3>
+                </div>
+                <div className="client-profile-card">
+                  <div className="client-profile-card-head">
+                    <div className="client-profile-card-title">
+                      <span className="client-profile-card-icon" aria-hidden="true">
+                        <IconStar />
                       </span>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="client-profile-empty-block">
-                <p className="client-profile-empty">
-                  История появится после первой записи.
-                </p>
-                <button
-                  className="client-profile-action"
-                  type="button"
-                  onClick={onViewMasters}
-                >
-                  Найти мастера
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section
-          id="profile-requests"
-          className="client-section client-profile-section client-profile-anchor-target animate delay-6"
-        >
-          <div className="section-header">
-            <h3>Активные заявки</h3>
-          </div>
-          <div className="client-profile-card">
-            <div className="client-profile-card-head">
-              <div className="client-profile-card-title">
-                <span className="client-profile-card-icon" aria-hidden="true">
-                  <IconList />
-                </span>
-                <span>Ваши заявки</span>
-              </div>
-              <button
-                className="client-profile-card-action"
-                type="button"
-                onClick={() => onViewRequests('requests')}
-              >
-                Все
-              </button>
-            </div>
-            {recentRequests.length > 0 ? (
-              <div className="client-profile-requests">
-                {recentRequests.map((request) => (
-                  <button
-                    className="client-profile-request"
-                    key={request.id}
-                    type="button"
-                    onClick={() => onViewRequests('requests')}
-                  >
-                    <div className="client-profile-request-info">
-                      <span className="client-profile-request-title">
-                        {request.serviceName || 'Услуга'}
-                      </span>
-                      <span className="client-profile-request-meta">
-                        {getCategoryLabel(request.categoryId)}
-                        {request.createdAt
-                          ? ` • ${formatShortDate(request.createdAt)}`
-                          : ''}
-                      </span>
+                      <span>Сохраненные мастера</span>
                     </div>
-                    <span
-                      className={`client-profile-chip${
-                        (request.responsesCount ?? 0) > 0 ? ' is-warning' : ' is-muted'
-                      }`}
-                    >
-                      {(request.responsesCount ?? 0) > 0
-                        ? formatCount(
-                            request.responsesCount ?? 0,
-                            'отклик',
-                            'отклика',
-                            'откликов'
-                          )
-                        : 'Без откликов'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="client-profile-empty-block">
-                <p className="client-profile-empty">
-                  Открытых заявок пока нет. Создайте первую и получите отклики.
-                </p>
-                <button
-                  className="client-profile-action is-primary"
-                  type="button"
-                  onClick={onCreateRequest}
-                >
-                  Создать заявку
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section
-          id="profile-location"
-          className="client-section client-profile-section client-profile-anchor-target animate delay-7"
-        >
-          <div className="section-header">
-            <h3>Локация</h3>
-          </div>
-          <div className="client-profile-card">
-            <div className="client-profile-card-head">
-              <div className="client-profile-card-title">
-                <span className="client-profile-card-icon" aria-hidden="true">
-                  <IconPin />
-                </span>
-                <span>Город и район</span>
-              </div>
-              <button
-                className="client-profile-card-action"
-                type="button"
-                onClick={onEditAddress}
-              >
-                Изменить
-              </button>
-            </div>
-            <div className="client-profile-location">
-              <div className="client-profile-location-map" aria-hidden="true">
-                <span className="client-profile-location-map-pin">
-                  <IconPin />
-                </span>
-                <span className="client-profile-location-map-dot" />
-                <span className="client-profile-location-map-dot is-secondary" />
-              </div>
-              <div className="client-profile-location-info">
-                <span className="client-profile-location-title">{locationLabel}</span>
-                <span className="client-profile-location-subtitle">
-                  Данные для подбора мастеров
-                </span>
-                <span className="client-profile-location-address">{addressLabel}</span>
-                {addressMeta && (
-                  <span className="client-profile-location-chip">{addressMeta}</span>
-                )}
-              </div>
-            </div>
-            <div className="client-profile-location-status">
-              <span
-                className={`client-profile-location-label${
-                  location ? ' is-active' : ''
-                }`}
-              >
-                {locationStatusLabel}
-              </span>
-              {locationMetaItems.length > 0 && (
-                <div className="client-profile-location-chips">
-                  {locationMetaItems.map((item, index) => (
-                    <span
-                      className="client-profile-location-chip"
-                      key={`${item}-${index}`}
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="client-profile-location-privacy">
-              <button
-                className={`client-profile-toggle${
-                  location?.shareToMasters === false ? '' : ' is-active'
-                }`}
-                type="button"
-                onClick={() => handleShareToggle(location?.shareToMasters === false)}
-                disabled={!location || isSharing}
-                aria-pressed={location?.shareToMasters !== false}
-              >
-                {location?.shareToMasters === false
-                  ? 'Расстояние скрыто'
-                  : 'Расстояние видно'}
-              </button>
-              <span className="client-profile-location-help">{locationShareLabel}</span>
-            </div>
-            <div className="client-profile-location-actions">
-              <button
-                className="client-profile-action is-primary"
-                type="button"
-                onClick={handleRequestLocation}
-                disabled={isSharing}
-              >
-                {location ? 'Обновить геолокацию' : 'Поделиться геолокацией'}
-              </button>
-              {location && (
-                <button
-                  className="client-profile-action is-ghost"
-                  type="button"
-                  onClick={handleClearLocation}
-                  disabled={isSharing}
-                >
-                  Удалить
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="profile-favorites"
-          className="client-section client-profile-section client-profile-anchor-target animate delay-7"
-        >
-          <div className="section-header">
-            <h3>Избранное</h3>
-          </div>
-          <div className="client-profile-card">
-            <div className="client-profile-card-head">
-              <div className="client-profile-card-title">
-                <span className="client-profile-card-icon" aria-hidden="true">
-                  <IconStar />
-                </span>
-                <span>Сохраненные мастера</span>
-              </div>
-              <button
-                className="client-profile-card-action"
-                type="button"
-                onClick={onViewMasters}
-              >
-                Найти
-              </button>
-            </div>
-            {favoritesPreview.length > 0 ? (
-              <div className="client-profile-favorites">
-                {favoritesPreview.map((favorite) => {
-                  const categoryLabels = Array.isArray(favorite.categories)
-                    ? favorite.categories.slice(0, 2).map(getCategoryLabel)
-                    : []
-                  const ratingLabel = formatRating(
-                    favorite.reviewsAverage,
-                    favorite.reviewsCount
-                  )
-                  const locationLine = [favorite.cityName, favorite.districtName]
-                    .filter(Boolean)
-                    .join(', ')
-                  return (
                     <button
-                      className="client-profile-favorite"
-                      key={favorite.masterId}
+                      className="client-profile-card-action"
                       type="button"
-                      onClick={() => onViewMasterProfile(favorite.masterId)}
+                      onClick={onViewMasters}
                     >
-                      <span className="client-profile-favorite-avatar" aria-hidden="true">
-                        {favorite.avatarUrl ? (
-                          <img src={favorite.avatarUrl} alt="" loading="lazy" />
-                        ) : (
-                          <span>{getInitials(favorite.displayName)}</span>
-                        )}
-                      </span>
-                      <span className="client-profile-favorite-body">
-                        <span className="client-profile-favorite-head">
-                          <span className="client-profile-favorite-name">
-                            {favorite.displayName}
-                          </span>
-                          <span className="client-profile-favorite-rating">
-                            {ratingLabel}
-                          </span>
-                        </span>
-                        <span className="client-profile-favorite-meta">
-                          {categoryLabels.join(' • ') || 'Категории не указаны'}
-                        </span>
-                        <span className="client-profile-favorite-meta">
-                          {locationLine || 'Локация не указана'}
-                        </span>
-                      </span>
-                      <span className="client-profile-favorite-chevron" aria-hidden="true">
-                        →
-                      </span>
+                      Найти
                     </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="client-profile-empty-block">
-                <p className="client-profile-empty">
-                  Пока нет сохраненных мастеров. Откройте витрину и добавьте тех,
-                  кто понравился.
-                </p>
-                <button
-                  className="client-profile-action"
-                  type="button"
-                  onClick={onViewMasters}
-                >
-                  Найти мастера
-                </button>
-              </div>
+                  </div>
+                  {favoritesPreview.length > 0 ? (
+                    <div className="client-profile-favorites">
+                      {favoritesPreview.map((favorite) => {
+                        const categoryLabels = Array.isArray(favorite.categories)
+                          ? favorite.categories.slice(0, 2).map(getCategoryLabel)
+                          : []
+                        const ratingLabel = formatRating(
+                          favorite.reviewsAverage,
+                          favorite.reviewsCount
+                        )
+                        const locationLine = [favorite.cityName, favorite.districtName]
+                          .filter(Boolean)
+                          .join(', ')
+                        return (
+                          <button
+                            className="client-profile-favorite"
+                            key={favorite.masterId}
+                            type="button"
+                            onClick={() => onViewMasterProfile(favorite.masterId)}
+                          >
+                            <span
+                              className="client-profile-favorite-avatar"
+                              aria-hidden="true"
+                            >
+                              {favorite.avatarUrl ? (
+                                <img src={favorite.avatarUrl} alt="" loading="lazy" />
+                              ) : (
+                                <span>{getInitials(favorite.displayName)}</span>
+                              )}
+                            </span>
+                            <span className="client-profile-favorite-body">
+                              <span className="client-profile-favorite-head">
+                                <span className="client-profile-favorite-name">
+                                  {favorite.displayName}
+                                </span>
+                                <span className="client-profile-favorite-rating">
+                                  {ratingLabel}
+                                </span>
+                              </span>
+                              <span className="client-profile-favorite-meta">
+                                {categoryLabels.join(' • ') || 'Категории не указаны'}
+                              </span>
+                              <span className="client-profile-favorite-meta">
+                                {locationLine || 'Локация не указана'}
+                              </span>
+                            </span>
+                            <span
+                              className="client-profile-favorite-chevron"
+                              aria-hidden="true"
+                            >
+                              →
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="client-profile-empty-block">
+                      <p className="client-profile-empty">
+                        Пока нет сохраненных мастеров. Откройте витрину и добавьте тех,
+                        кто понравился.
+                      </p>
+                      <button
+                        className="client-profile-action"
+                        type="button"
+                        onClick={onViewMasters}
+                      >
+                        Найти мастера
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </section>
             )}
           </div>
-        </section>
-          </>
         )}
       </div>
 
