@@ -9,7 +9,14 @@ import {
 } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import type { ChatDetail, ChatMessage } from '../types/app'
-import { buildChatStreamUrl } from '../utils/chat'
+import type { ChatStreamStatus } from '../utils/chatStream'
+import { getChatStream } from '../utils/chatStream'
+import {
+  getCachedChatDetail,
+  getCachedChatMessages,
+  setCachedChatDetail,
+  setCachedChatMessages,
+} from '../utils/chatCache'
 
 type ChatThreadScreenProps = {
   apiBase: string
@@ -59,6 +66,40 @@ const formatDayLabel = (value?: string | null) => {
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+type MessageStatus = 'sending' | 'sent' | 'failed'
+
+type LocalChatMessage = ChatMessage & {
+  status?: MessageStatus
+  clientMessageId?: string
+  localAttachmentUrl?: string | null
+}
+
+const createClientMessageId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `msg_${Math.random().toString(36).slice(2, 10)}`
+}
+
+const extractClientMessageId = (
+  meta: ChatMessage['meta']
+): string | null => {
+  if (!meta || typeof meta !== 'object') return null
+  const candidate = (meta as Record<string, unknown>).clientMessageId
+  return typeof candidate === 'string' ? candidate : null
+}
+
+const sortMessages = (items: LocalChatMessage[]) => {
+  return [...items].sort((a, b) => {
+    const timeA = new Date(a.createdAt).getTime()
+    const timeB = new Date(b.createdAt).getTime()
+    if (Number.isFinite(timeA) && Number.isFinite(timeB) && timeA !== timeB) {
+      return timeA - timeB
+    }
+    return a.id - b.id
+  })
+}
+
 export const ChatThreadScreen = ({
   apiBase,
   userId,
@@ -66,28 +107,41 @@ export const ChatThreadScreen = ({
   onBack,
 }: ChatThreadScreenProps) => {
   const [detail, setDetail] = useState<ChatDetail | null>(null)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<LocalChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDetailLoading, setIsDetailLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [composerText, setComposerText] = useState('')
-  const [isSending, setIsSending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [sendError, setSendError] = useState('')
+  const [streamStatus, setStreamStatus] = useState<ChatStreamStatus>('idle')
+  const [counterpartLastReadId, setCounterpartLastReadId] = useState<number | null>(
+    null
+  )
+  const [isCounterpartTyping, setIsCounterpartTyping] = useState(false)
+  const [hasNewMessage, setHasNewMessage] = useState(false)
   const [quickMode, setQuickMode] = useState<
     null | 'price' | 'time' | 'location'
   >(null)
   const [quickValue, setQuickValue] = useState('')
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const hasMoreRef = useRef(true)
   const isLoadingMoreRef = useRef(false)
   const hasInitialScrollRef = useRef(false)
-  const messagesRef = useRef<ChatMessage[]>([])
+  const messagesRef = useRef<LocalChatMessage[]>([])
+  const pendingByClientIdRef = useRef(new Map<string, number>())
+  const isNearBottomRef = useRef(true)
+  const typingTimeoutRef = useRef<number | null>(null)
+  const selfTypingTimeoutRef = useRef<number | null>(null)
+  const isSelfTypingRef = useRef(false)
+  const lastReadSentRef = useRef<number | null>(null)
 
   const limit = 30
+  const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
 
   const counterpart = detail?.counterpart
   const request = detail?.request
@@ -106,22 +160,133 @@ export const ChatThreadScreen = ({
       ? `Стоимость: ${formatPrice(booking.servicePrice)}`
       : null
 
+  const connectionLabel =
+    streamStatus === 'connected'
+      ? 'Онлайн'
+      : streamStatus === 'connecting' || streamStatus === 'reconnecting'
+        ? 'Соединяем...'
+        : 'Нет связи'
+  const connectionTone =
+    streamStatus === 'connected'
+      ? 'is-online'
+      : streamStatus === 'connecting' || streamStatus === 'reconnecting'
+        ? 'is-syncing'
+        : 'is-offline'
+
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
       bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
+      setHasNewMessage(false)
     },
     []
   )
 
+  const getScrollElement = useCallback(
+    () =>
+      messagesContainerRef.current ??
+      document.scrollingElement ??
+      document.documentElement,
+    []
+  )
+
+  const handleScroll = useCallback(() => {
+    const container = getScrollElement()
+    const distance =
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    isNearBottomRef.current = distance < 120
+    if (isNearBottomRef.current) {
+      setHasNewMessage(false)
+      const last = messagesRef.current[messagesRef.current.length - 1]
+      if (
+        last &&
+        last.senderId !== userId &&
+        last.id > 0 &&
+        last.id !== lastReadSentRef.current
+      ) {
+        lastReadSentRef.current = last.id
+        void markRead(last.id)
+      }
+    }
+  }, [getScrollElement, markRead, userId])
+
   const mergeMessages = useCallback((incoming: ChatMessage[]) => {
     setMessages((current) => {
-      const map = new Map<number, ChatMessage>()
+      const map = new Map<number, LocalChatMessage>()
       current.forEach((item) => map.set(item.id, item))
-      incoming.forEach((item) => map.set(item.id, item))
-      const next = Array.from(map.values()).sort((a, b) => a.id - b.id)
-      return next
+      incoming.forEach((item) => {
+        const clientMessageId = extractClientMessageId(item.meta)
+        if (clientMessageId) {
+          const tempId = pendingByClientIdRef.current.get(clientMessageId)
+          if (tempId) {
+            map.delete(tempId)
+            pendingByClientIdRef.current.delete(clientMessageId)
+          } else {
+            const matching = Array.from(map.values()).find(
+              (entry) =>
+                entry.clientMessageId === clientMessageId ||
+                extractClientMessageId(entry.meta) === clientMessageId
+            )
+            if (matching) {
+              map.delete(matching.id)
+            }
+          }
+        }
+        map.set(item.id, { ...item, status: 'sent' })
+      })
+      return sortMessages(Array.from(map.values()))
     })
   }, [])
+
+  const updateMessageStatus = useCallback((tempId: number, status: MessageStatus) => {
+    setMessages((current) =>
+      current.map((item) =>
+        item.id === tempId ? { ...item, status } : item
+      )
+    )
+  }, [])
+
+  const enqueueOptimisticMessage = useCallback(
+    (payload: {
+      type: ChatMessage['type']
+      body?: string | null
+      meta?: Record<string, unknown> | null
+      attachmentUrl?: string | null
+      localAttachmentUrl?: string | null
+      clientMessageId?: string
+      tempId?: number
+    }) => {
+      const clientMessageId = payload.clientMessageId ?? createClientMessageId()
+      const tempId = payload.tempId ?? -Date.now()
+      const meta = payload.meta ? { ...payload.meta, clientMessageId } : { clientMessageId }
+
+      const optimistic: LocalChatMessage = {
+        id: tempId,
+        chatId,
+        senderId: userId,
+        type: payload.type,
+        body: payload.body ?? null,
+        meta,
+        attachmentUrl: payload.attachmentUrl ?? null,
+        createdAt: new Date().toISOString(),
+        status: 'sending',
+        clientMessageId,
+        localAttachmentUrl: payload.localAttachmentUrl ?? null,
+      }
+
+      pendingByClientIdRef.current.set(clientMessageId, tempId)
+      setMessages((current) => {
+        const exists = current.some((item) => item.id === tempId)
+        if (exists) {
+          return current.map((item) =>
+            item.id === tempId ? { ...item, ...optimistic } : item
+          )
+        }
+        return sortMessages([...current, optimistic])
+      })
+      return { clientMessageId, tempId }
+    },
+    [chatId, userId]
+  )
 
   const markRead = useCallback(
     async (messageId?: number) => {
@@ -140,16 +305,26 @@ export const ChatThreadScreen = ({
   )
 
   const loadMessages = useCallback(
-    async (beforeId?: number) => {
+    async (beforeId?: number, options?: { silent?: boolean }) => {
       const target = beforeId ? 'more' : 'initial'
+      const silent = options?.silent ?? false
       if (target === 'more') {
         if (isLoadingMoreRef.current || !hasMoreRef.current) return
         isLoadingMoreRef.current = true
         setIsLoadingMore(true)
       } else {
-        setIsLoading(true)
+        if (!silent) {
+          setIsLoading(true)
+        }
+        hasMoreRef.current = true
+        setHasMore(true)
       }
-      setLoadError('')
+      if (!silent) {
+        setLoadError('')
+      }
+      const container = getScrollElement()
+      const prevScrollHeight = container?.scrollHeight ?? 0
+      const prevScrollTop = container?.scrollTop ?? 0
       try {
         const params = new URLSearchParams()
         params.set('userId', userId)
@@ -173,98 +348,234 @@ export const ChatThreadScreen = ({
         if (!beforeId) {
           const last = items[items.length - 1]
           if (last && last.senderId !== userId) {
+            lastReadSentRef.current = last.id
             void markRead(last.id)
           }
+          if (last && last.senderId !== userId && !isNearBottomRef.current) {
+            setHasNewMessage(true)
+          }
+        } else if (container) {
+          requestAnimationFrame(() => {
+            const nextHeight = container.scrollHeight
+            const delta = nextHeight - prevScrollHeight
+            container.scrollTop = prevScrollTop + delta
+          })
         }
       } catch (error) {
         console.error('Failed to load messages:', error)
-        setLoadError('Не удалось загрузить сообщения.')
+        if (!silent) {
+          setLoadError('Не удалось загрузить сообщения.')
+        }
       } finally {
-        setIsLoading(false)
+        if (!silent) {
+          setIsLoading(false)
+        }
         isLoadingMoreRef.current = false
         setIsLoadingMore(false)
       }
     },
-    [apiBase, chatId, limit, markRead, mergeMessages, scrollToBottom, userId]
+    [apiBase, chatId, getScrollElement, limit, markRead, mergeMessages, userId]
   )
 
-  const loadDetail = useCallback(async () => {
-    if (!userId) return
-    setIsDetailLoading(true)
-    try {
-      const response = await fetch(
-        `${apiBase}/api/chats/${chatId}?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load chat detail failed')
+  const loadDetail = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!userId) return
+      const silent = options?.silent ?? false
+      if (!silent) {
+        setIsDetailLoading(true)
       }
-      const data = (await response.json()) as ChatDetail
-      setDetail(data ?? null)
-    } catch (error) {
-      console.error('Failed to load chat detail:', error)
-      setLoadError('Не удалось загрузить чат.')
-    } finally {
-      setIsDetailLoading(false)
-    }
-  }, [apiBase, chatId, userId])
+      try {
+        const response = await fetch(
+          `${apiBase}/api/chats/${chatId}?userId=${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load chat detail failed')
+        }
+        const data = (await response.json()) as ChatDetail
+        if (data) {
+          setDetail(data)
+          setCachedChatDetail(apiBase, userId, chatId, data)
+          setCounterpartLastReadId(
+            data.chat.counterpartLastReadMessageId ?? null
+          )
+        }
+      } catch (error) {
+        console.error('Failed to load chat detail:', error)
+        if (!silent) {
+          setLoadError('Не удалось загрузить чат.')
+        }
+      } finally {
+        if (!silent) {
+          setIsDetailLoading(false)
+        }
+      }
+    },
+    [apiBase, chatId, userId]
+  )
 
   useEffect(() => {
-    void loadDetail()
-    void loadMessages()
-  }, [loadDetail, loadMessages])
+    const cachedDetail = getCachedChatDetail(apiBase, userId, chatId)
+    if (cachedDetail) {
+      setDetail(cachedDetail)
+      setIsDetailLoading(false)
+      setCounterpartLastReadId(
+        cachedDetail.chat.counterpartLastReadMessageId ?? null
+      )
+    }
+
+    const cachedMessages = getCachedChatMessages(apiBase, userId, chatId)
+    if (cachedMessages && cachedMessages.length > 0) {
+      const seeded = cachedMessages.map((item) => ({ ...item, status: 'sent' }))
+      setMessages(seeded)
+      setIsLoading(false)
+      hasInitialScrollRef.current = false
+    }
+
+    void loadDetail({ silent: Boolean(cachedDetail) })
+    void loadMessages(undefined, { silent: Boolean(cachedMessages?.length) })
+  }, [apiBase, chatId, loadDetail, loadMessages, userId])
 
   useLayoutEffect(() => {
     if (hasInitialScrollRef.current) return
     if (messages.length === 0) return
     scrollToBottom('auto')
     hasInitialScrollRef.current = true
+    isNearBottomRef.current = true
   }, [messages.length, scrollToBottom])
 
   useEffect(() => {
     messagesRef.current = messages
-  }, [messages])
+    const cached = messages.filter((item) => item.id > 0)
+    if (cached.length > 0) {
+      setCachedChatMessages(apiBase, userId, chatId, cached)
+    }
+  }, [apiBase, chatId, messages, userId])
 
   useEffect(() => {
-    const streamUrl = buildChatStreamUrl(apiBase, userId)
-    if (!streamUrl) return
-    const socket = new WebSocket(streamUrl)
-
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload?.type === 'message:new') {
-          const incoming = payload.message as ChatMessage | undefined
-          if (incoming?.chatId === chatId) {
-            const exists = messagesRef.current.some((item) => item.id === incoming.id)
-            if (exists) return
-            mergeMessages([incoming])
-            scrollToBottom()
-            if (incoming.senderId !== userId) {
-              void markRead(incoming.id)
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Chat stream payload failed:', error)
+    return () => {
+      if (selfTypingTimeoutRef.current) {
+        window.clearTimeout(selfTypingTimeoutRef.current)
+        selfTypingTimeoutRef.current = null
+      }
+      if (isSelfTypingRef.current) {
+        isSelfTypingRef.current = false
+        void stream.send({ type: 'typing', chatId, isTyping: false })
       }
     }
+  }, [chatId, stream])
+
+  useEffect(() => {
+    handleScroll()
+    const onScroll = () => handleScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [handleScroll])
+
+  useEffect(() => {
+    if (streamStatus === 'connected') return
+    const timer = window.setInterval(() => {
+      void loadDetail({ silent: true })
+      void loadMessages(undefined, { silent: true })
+    }, 15000)
+    return () => window.clearInterval(timer)
+  }, [loadDetail, loadMessages, streamStatus])
+
+  useEffect(() => {
+    const unsubscribeStatus = stream.subscribeStatus(setStreamStatus)
+    const unsubscribe = stream.subscribe((payload) => {
+      if (payload?.type === 'message:new') {
+        const incoming = payload.message as ChatMessage | undefined
+        if (incoming?.chatId !== chatId) return
+        const exists = messagesRef.current.some((item) => item.id === incoming.id)
+        if (exists) return
+        mergeMessages([incoming])
+        const isOwn = incoming.senderId === userId
+        if (isOwn || isNearBottomRef.current) {
+          scrollToBottom()
+          setHasNewMessage(false)
+        } else {
+          setHasNewMessage(true)
+        }
+        if (!isOwn) {
+          void markRead(incoming.id)
+        }
+        return
+      }
+
+      if (payload?.type === 'chat:read') {
+        const chatIdFromEvent =
+          typeof payload.chatId === 'number' ? payload.chatId : null
+        const readerId =
+          typeof payload.userId === 'string' ? payload.userId : null
+        const messageId =
+          typeof payload.messageId === 'number' ? payload.messageId : null
+        if (chatIdFromEvent === chatId && readerId && readerId !== userId) {
+          setCounterpartLastReadId((current) =>
+            messageId && (!current || messageId > current) ? messageId : current
+          )
+        }
+        return
+      }
+
+      if (payload?.type === 'typing') {
+        const chatIdFromEvent =
+          typeof payload.chatId === 'number' ? payload.chatId : null
+        const authorId =
+          typeof payload.userId === 'string' ? payload.userId : null
+        const isTyping = Boolean(payload.isTyping)
+        if (chatIdFromEvent !== chatId || !authorId || authorId === userId) {
+          return
+        }
+        if (typingTimeoutRef.current) {
+          window.clearTimeout(typingTimeoutRef.current)
+          typingTimeoutRef.current = null
+        }
+        setIsCounterpartTyping(isTyping)
+        if (isTyping) {
+          typingTimeoutRef.current = window.setTimeout(() => {
+            setIsCounterpartTyping(false)
+            typingTimeoutRef.current = null
+          }, 3200)
+        }
+      }
+    })
 
     return () => {
-      socket.close()
+      unsubscribe()
+      unsubscribeStatus()
     }
-  }, [apiBase, chatId, markRead, mergeMessages, scrollToBottom, userId])
+  }, [chatId, markRead, mergeMessages, scrollToBottom, stream, userId])
 
   const handleSendMessage = async (payload: {
     type: ChatMessage['type']
     body?: string | null
     meta?: Record<string, unknown> | null
     attachmentPath?: string | null
+    attachmentUrl?: string | null
+    localAttachmentUrl?: string | null
+    clientMessageId?: string
+    tempId?: number
   }) => {
-    if (isSending) return
-    setIsSending(true)
     setSendError('')
+    const meta =
+      payload.meta && typeof payload.meta === 'object'
+        ? { ...payload.meta }
+        : payload.meta
+    const { clientMessageId, tempId } = enqueueOptimisticMessage({
+      type: payload.type,
+      body: payload.body ?? null,
+      meta,
+      attachmentUrl: payload.attachmentUrl ?? null,
+      localAttachmentUrl: payload.localAttachmentUrl ?? null,
+      clientMessageId: payload.clientMessageId,
+      tempId: payload.tempId,
+    })
 
     try {
+      const requestMeta =
+        meta && typeof meta === 'object'
+          ? { ...meta, clientMessageId }
+          : { clientMessageId }
       const response = await fetch(`${apiBase}/api/chats/${chatId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -272,7 +583,7 @@ export const ChatThreadScreen = ({
           userId,
           type: payload.type,
           body: payload.body ?? null,
-          meta: payload.meta ?? null,
+          meta: requestMeta,
           attachmentPath: payload.attachmentPath ?? null,
         }),
       })
@@ -286,9 +597,10 @@ export const ChatThreadScreen = ({
       }
     } catch (error) {
       console.error('Chat send failed:', error)
+      updateMessageStatus(tempId, 'failed')
       setSendError('Не удалось отправить сообщение.')
     } finally {
-      setIsSending(false)
+      pendingByClientIdRef.current.delete(clientMessageId)
     }
   }
 
@@ -296,6 +608,14 @@ export const ChatThreadScreen = ({
     const trimmed = composerText.trim()
     if (!trimmed) return
     setComposerText('')
+    if (selfTypingTimeoutRef.current) {
+      window.clearTimeout(selfTypingTimeoutRef.current)
+      selfTypingTimeoutRef.current = null
+    }
+    if (isSelfTypingRef.current) {
+      isSelfTypingRef.current = false
+      void stream.send({ type: 'typing', chatId, isTyping: false })
+    }
     await handleSendMessage({ type: 'text', body: trimmed })
   }
 
@@ -318,6 +638,7 @@ export const ChatThreadScreen = ({
 
     setUploading(true)
     setSendError('')
+    let optimistic: { clientMessageId: string; tempId: number } | null = null
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -331,6 +652,12 @@ export const ChatThreadScreen = ({
         }
         reader.onerror = () => reject(new Error('read_failed'))
         reader.readAsDataURL(file)
+      })
+
+      optimistic = enqueueOptimisticMessage({
+        type: 'image',
+        attachmentUrl: dataUrl,
+        localAttachmentUrl: dataUrl,
       })
 
       const uploadResponse = await fetch(
@@ -354,10 +681,17 @@ export const ChatThreadScreen = ({
       await handleSendMessage({
         type: 'image',
         attachmentPath: upload.path,
+        attachmentUrl: dataUrl,
+        localAttachmentUrl: dataUrl,
+        clientMessageId: optimistic.clientMessageId,
+        tempId: optimistic.tempId,
       })
     } catch (error) {
       console.error('Chat upload failed:', error)
       setSendError('Не удалось загрузить фото.')
+      if (optimistic) {
+        updateMessageStatus(optimistic.tempId, 'failed')
+      }
     } finally {
       setUploading(false)
     }
@@ -405,9 +739,106 @@ export const ChatThreadScreen = ({
     })
   }
 
+  const handleRetryMessage = async (message: LocalChatMessage) => {
+    if (message.status !== 'failed') return
+    updateMessageStatus(message.id, 'sending')
+    const clientMessageId =
+      message.clientMessageId ?? extractClientMessageId(message.meta) ?? undefined
+
+    if (message.type === 'image') {
+      const dataUrl =
+        message.localAttachmentUrl ??
+        (message.attachmentUrl?.startsWith('data:') ? message.attachmentUrl : null)
+      if (!dataUrl) {
+        updateMessageStatus(message.id, 'failed')
+        setSendError('Не удалось повторить отправку фото.')
+        return
+      }
+      setUploading(true)
+      try {
+        const uploadResponse = await fetch(
+          `${apiBase}/api/chats/${chatId}/attachments`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, dataUrl }),
+          }
+        )
+        if (!uploadResponse.ok) {
+          throw new Error('upload_failed')
+        }
+        const upload = (await uploadResponse.json()) as {
+          url?: string | null
+          path?: string | null
+        }
+        if (!upload?.path) {
+          throw new Error('upload_failed')
+        }
+        await handleSendMessage({
+          type: 'image',
+          attachmentPath: upload.path,
+          attachmentUrl: dataUrl,
+          localAttachmentUrl: dataUrl,
+          clientMessageId,
+          tempId: message.id,
+        })
+      } catch (error) {
+        console.error('Chat retry upload failed:', error)
+        updateMessageStatus(message.id, 'failed')
+        setSendError('Не удалось повторить отправку фото.')
+      } finally {
+        setUploading(false)
+      }
+      return
+    }
+
+    await handleSendMessage({
+      type: message.type,
+      body: message.body ?? null,
+      meta: message.meta ?? null,
+      clientMessageId,
+      tempId: message.id,
+    })
+  }
+
+  const handleComposerChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const nextValue = event.target.value
+    setComposerText(nextValue)
+    if (sendError) {
+      setSendError('')
+    }
+
+    const hasText = Boolean(nextValue.trim())
+    if (!hasText) {
+      if (selfTypingTimeoutRef.current) {
+        window.clearTimeout(selfTypingTimeoutRef.current)
+        selfTypingTimeoutRef.current = null
+      }
+      if (isSelfTypingRef.current) {
+        isSelfTypingRef.current = false
+        void stream.send({ type: 'typing', chatId, isTyping: false })
+      }
+      return
+    }
+
+    if (!isSelfTypingRef.current) {
+      isSelfTypingRef.current = true
+      void stream.send({ type: 'typing', chatId, isTyping: true })
+    }
+
+    if (selfTypingTimeoutRef.current) {
+      window.clearTimeout(selfTypingTimeoutRef.current)
+    }
+    selfTypingTimeoutRef.current = window.setTimeout(() => {
+      isSelfTypingRef.current = false
+      void stream.send({ type: 'typing', chatId, isTyping: false })
+      selfTypingTimeoutRef.current = null
+    }, 1800)
+  }
+
   const onLoadMore = () => {
     const oldestId = messages[0]?.id
-    if (oldestId) {
+    if (oldestId && oldestId > 0) {
       void loadMessages(oldestId)
     }
   }
@@ -434,9 +865,12 @@ export const ChatThreadScreen = ({
             <span className="chat-thread-name">
               {counterpart?.name ?? 'Чат'}
             </span>
-            <span className="chat-thread-subtitle">
-              {headerSubtitle}
-            </span>
+            <div className="chat-thread-subline">
+              <span className="chat-thread-subtitle">{headerSubtitle}</span>
+              <span className={`chat-connection is-compact ${connectionTone}`}>
+                {connectionLabel}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -507,7 +941,11 @@ export const ChatThreadScreen = ({
           <p className="chat-status">Сообщений пока нет.</p>
         )}
 
-        <div className="chat-messages">
+        <div
+          className="chat-messages"
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+        >
           {hasMore && (
             <button
               className="chat-load-more"
@@ -523,6 +961,7 @@ export const ChatThreadScreen = ({
             const isMine = message.senderId === userId
             const isSystem = message.type === 'system'
             const isOffer = message.type.startsWith('offer_')
+            const showStatus = isMine && !isSystem
             const offerMeta = (message.meta ?? {}) as Record<string, unknown>
             const offerTitle =
               message.type === 'offer_price'
@@ -577,12 +1016,52 @@ export const ChatThreadScreen = ({
                       {formatMessageTime(message.createdAt)}
                     </span>
                   )}
+                  {showStatus && (
+                    <span className="chat-message-status">
+                      {message.status === 'sending'
+                        ? 'Отправляется...'
+                        : message.status === 'failed'
+                          ? 'Не отправлено'
+                          : message.id > 0 &&
+                              counterpartLastReadId &&
+                              message.id <= counterpartLastReadId
+                            ? 'Прочитано'
+                            : 'Отправлено'}
+                    </span>
+                  )}
+                  {message.status === 'failed' && (
+                    <button
+                      className="chat-message-retry"
+                      type="button"
+                      onClick={() => void handleRetryMessage(message)}
+                    >
+                      Повторить
+                    </button>
+                  )}
                 </div>
               </div>
             )
           })}
+          {isCounterpartTyping && (
+            <div className="chat-typing">
+              <span className="chat-typing-dot" />
+              <span className="chat-typing-dot" />
+              <span className="chat-typing-dot" />
+              <span className="chat-typing-text">Печатает...</span>
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
+
+        {hasNewMessage && (
+          <button
+            className="chat-new-message"
+            type="button"
+            onClick={() => scrollToBottom('smooth')}
+          >
+            Новые сообщения
+          </button>
+        )}
       </div>
 
       <div className="chat-composer">
@@ -697,13 +1176,13 @@ export const ChatThreadScreen = ({
             rows={1}
             placeholder="Напишите сообщение"
             value={composerText}
-            onChange={(event) => setComposerText(event.target.value)}
+            onChange={handleComposerChange}
           />
           <button
             className="chat-send"
             type="button"
             onClick={() => void handleSendText()}
-            disabled={isSending || uploading || !composerText.trim()}
+            disabled={uploading || !composerText.trim()}
           >
             Отправить
           </button>

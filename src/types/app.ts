@@ -236,6 +236,7 @@ export type ChatDetail = {
     memberRole?: 'client' | 'master'
     unreadCount?: number | null
     lastReadMessageId?: number | null
+    counterpartLastReadMessageId?: number | null
   }
   counterpart: {
     id: string

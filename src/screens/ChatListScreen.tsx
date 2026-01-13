@@ -7,8 +7,10 @@ import {
   IconUsers,
 } from '../components/icons'
 import { ProBottomNav } from '../components/ProBottomNav'
-import type { ChatSummary } from '../types/app'
-import { buildChatStreamUrl } from '../utils/chat'
+import type { ChatMessage, ChatSummary } from '../types/app'
+import type { ChatStreamStatus } from '../utils/chatStream'
+import { getChatStream } from '../utils/chatStream'
+import { getCachedChatList, setCachedChatList } from '../utils/chatCache'
 
 type ChatListScreenProps = {
   apiBase: string
@@ -64,9 +66,24 @@ export const ChatListScreen = ({
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [streamStatus, setStreamStatus] = useState<ChatStreamStatus>('idle')
   const reloadTimerRef = useRef<number | null>(null)
   const isReadyRef = useRef(false)
   const isLoadingRef = useRef(false)
+
+  const connectionLabel =
+    streamStatus === 'connected'
+      ? 'Онлайн'
+      : streamStatus === 'connecting' || streamStatus === 'reconnecting'
+        ? 'Соединяем...'
+        : 'Нет связи'
+  const connectionTone =
+    streamStatus === 'connected'
+      ? 'is-online'
+      : streamStatus === 'connecting' || streamStatus === 'reconnecting'
+        ? 'is-syncing'
+        : 'is-offline'
 
   const confirmedItems = useMemo(
     () =>
@@ -88,11 +105,21 @@ export const ChatListScreen = ({
   )
 
   const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    const byQuery = query
+      ? confirmedItems.filter((item) => {
+          const serviceName =
+            item.request?.serviceName || item.booking?.serviceName || ''
+          const haystack = `${item.counterpart.name} ${serviceName}`.toLowerCase()
+          return haystack.includes(query)
+        })
+      : confirmedItems
+
     if (filter === 'unread') {
-      return confirmedItems.filter((item) => (item.unreadCount ?? 0) > 0)
+      return byQuery.filter((item) => (item.unreadCount ?? 0) > 0)
     }
-    return confirmedItems
-  }, [confirmedItems, filter])
+    return byQuery
+  }, [confirmedItems, filter, searchQuery])
 
   const loadChats = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -114,7 +141,9 @@ export const ChatListScreen = ({
           throw new Error('Load chats failed')
         }
         const data = (await response.json()) as ChatSummary[]
-        setItems(Array.isArray(data) ? data : [])
+        const next = Array.isArray(data) ? data : []
+        setItems(next)
+        setCachedChatList(apiBase, userId, next)
         setLoadError('')
         isReadyRef.current = true
       } catch (error) {
@@ -142,43 +171,92 @@ export const ChatListScreen = ({
   }, [loadChats])
 
   useEffect(() => {
-    void loadChats()
+    const cached = getCachedChatList(apiBase, userId)
+    if (cached) {
+      setItems(cached)
+      isReadyRef.current = true
+    } else {
+      setIsLoading(true)
+    }
+    void loadChats({ silent: Boolean(cached) })
     return () => {
       if (reloadTimerRef.current !== null) {
         window.clearTimeout(reloadTimerRef.current)
       }
     }
-  }, [loadChats])
+  }, [apiBase, loadChats, userId])
 
   useEffect(() => {
-    const streamUrl = buildChatStreamUrl(apiBase, userId)
-    if (!streamUrl) return
-    const socket = new WebSocket(streamUrl)
-
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (!isReadyRef.current) return
-        if (
-          payload?.type === 'message:new' ||
-          payload?.type === 'chat:created' ||
-          payload?.type === 'chat:read'
-        ) {
+    const stream = getChatStream(apiBase, userId)
+    const unsubscribeStatus = stream.subscribeStatus(setStreamStatus)
+    const unsubscribe = stream.subscribe((payload) => {
+      if (!isReadyRef.current) return
+      if (payload?.type === 'message:new') {
+        const incoming = payload.message as ChatMessage | undefined
+        if (!incoming?.chatId) return
+        let handled = false
+        setItems((current) => {
+          const index = current.findIndex((item) => item.id === incoming.chatId)
+          if (index === -1) return current
+          handled = true
+          const target = current[index]
+          const nextUnread =
+            incoming.senderId === userId
+              ? target.unreadCount ?? 0
+              : (target.unreadCount ?? 0) + 1
+          const nextItem: ChatSummary = {
+            ...target,
+            lastMessage: {
+              id: incoming.id,
+              senderId: incoming.senderId ?? null,
+              type: incoming.type,
+              body: incoming.body ?? null,
+              createdAt: incoming.createdAt,
+              attachmentUrl: incoming.attachmentUrl ?? null,
+            },
+            unreadCount: nextUnread,
+          }
+          const next = [nextItem, ...current.filter((_, i) => i !== index)]
+          setCachedChatList(apiBase, userId, next)
+          return next
+        })
+        if (!handled) {
           scheduleReload()
         }
-      } catch (error) {
-        console.error('Chat stream payload failed:', error)
+        return
       }
-    }
-
-    socket.onerror = () => {
-      scheduleReload()
-    }
+      if (payload?.type === 'chat:read') {
+        const chatId = typeof payload.chatId === 'number' ? payload.chatId : null
+        const readerId =
+          typeof payload.userId === 'string' ? payload.userId : null
+        if (!chatId || readerId !== userId) return
+        setItems((current) => {
+          const next = current.map((item) =>
+            item.id === chatId ? { ...item, unreadCount: 0 } : item
+          )
+          setCachedChatList(apiBase, userId, next)
+          return next
+        })
+        return
+      }
+      if (payload?.type === 'chat:created') {
+        scheduleReload()
+      }
+    })
 
     return () => {
-      socket.close()
+      unsubscribe()
+      unsubscribeStatus()
     }
   }, [apiBase, scheduleReload, userId])
+
+  useEffect(() => {
+    if (streamStatus === 'connected') return
+    const timer = window.setInterval(() => {
+      void loadChats({ silent: true })
+    }, 15000)
+    return () => window.clearInterval(timer)
+  }, [loadChats, streamStatus])
 
   return (
     <div className="screen screen--chat-list">
@@ -187,6 +265,9 @@ export const ChatListScreen = ({
           <div>
             <p className="chat-eyebrow">Сообщения</p>
             <h1 className="chat-title">Чаты</h1>
+            <span className={`chat-connection ${connectionTone}`}>
+              {connectionLabel}
+            </span>
           </div>
           <div className="chat-summary">
             <span className="chat-summary-count">{totalUnread}</span>
@@ -224,8 +305,48 @@ export const ChatListScreen = ({
           </button>
         </div>
 
+        <div className="chat-search">
+          <input
+            className="chat-search-input"
+            type="search"
+            placeholder="Поиск по чатам"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          {searchQuery.trim() && (
+            <button
+              className="chat-search-clear"
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Очистить поиск"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
         {loadError && <p className="chat-error">{loadError}</p>}
-        {!isLoading && !loadError && filteredItems.length === 0 && (
+        {isLoading && items.length === 0 && (
+          <div className="chat-list is-skeleton" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div className="chat-card is-skeleton" key={`chat-skeleton-${index}`}>
+                <span className="chat-avatar" />
+                <span className="chat-card-main">
+                  <span className="chat-card-top">
+                    <span className="chat-card-name" />
+                    <span className="chat-card-time" />
+                  </span>
+                  <span className="chat-card-service" />
+                  <span className="chat-card-preview" />
+                </span>
+                <span className="chat-card-meta">
+                  <span className="chat-card-status" />
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {!isLoading && !loadError && confirmedItems.length === 0 && (
           <div className="chat-empty">
             <div className="chat-empty-icon">
               <IconChat />
@@ -248,18 +369,24 @@ export const ChatListScreen = ({
             )}
           </div>
         )}
+        {!isLoading &&
+          !loadError &&
+          confirmedItems.length > 0 &&
+          filteredItems.length === 0 && (
+            <div className="chat-empty is-compact">
+              <h2>Ничего не найдено</h2>
+              <p>Попробуйте изменить фильтр или запрос.</p>
+            </div>
+          )}
 
         <div className="chat-list" role="list">
           {filteredItems.map((chat) => {
             const counterpart = chat.counterpart
             const serviceName =
               chat.request?.serviceName || chat.booking?.serviceName || 'Диалог'
+            const contextLabel = chat.contextType === 'booking' ? 'Запись' : 'Заявка'
             const statusLabel =
-              chat.request?.status === 'closed'
-                ? 'Согласовано'
-                : chat.booking?.status
-                  ? 'Запись'
-                  : 'Активно'
+              chat.contextType === 'booking' ? 'Подтверждено' : 'Согласовано'
             const lastMessage = chat.lastMessage
             const lastLabel = lastMessage?.body ?? 'Откройте чат'
             const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
@@ -289,6 +416,9 @@ export const ChatListScreen = ({
                   <span className="chat-card-preview">{lastLabel}</span>
                 </span>
                 <span className="chat-card-meta">
+                  <span className={`chat-card-context is-${chat.contextType}`}>
+                    {contextLabel}
+                  </span>
                   <span className="chat-card-status">{statusLabel}</span>
                   {unreadCount > 0 && (
                     <span className="chat-unread">{unreadCount}</span>

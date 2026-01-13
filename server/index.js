@@ -4608,6 +4608,20 @@ app.get('/api/chats/:id', async (req, res) => {
       return
     }
 
+    const counterpartReadResult = await pool.query(
+      `
+        SELECT last_read_message_id AS "lastReadMessageId"
+        FROM chat_members
+        WHERE chat_id = $1
+          AND user_id <> $2
+        ORDER BY id ASC
+        LIMIT 1
+      `,
+      [chatId, normalizedUserId]
+    )
+    const counterpartLastReadMessageId =
+      counterpartReadResult.rows[0]?.lastReadMessageId ?? null
+
     const isClient = row.clientId === normalizedUserId
     const counterpartName = isClient
       ? row.masterName || 'Мастер'
@@ -4631,6 +4645,7 @@ app.get('/api/chats/:id', async (req, res) => {
         memberRole: access.memberRole,
         unreadCount: Number(access.unreadCount) || 0,
         lastReadMessageId: access.lastReadMessageId ?? null,
+        counterpartLastReadMessageId,
       },
       counterpart: {
         id: isClient ? row.masterId : row.clientId,
@@ -5199,8 +5214,30 @@ const start = async () => {
         ws.close(1008, 'userId_required')
         return
       }
+      ws.userId = userId
       registerChatClient(userId, ws)
       ws.send(JSON.stringify({ type: 'connected', userId }))
+
+      ws.on('message', async (payload) => {
+        try {
+          const text = payload.toString()
+          const parsed = JSON.parse(text)
+          if (parsed?.type !== 'typing') return
+          const chatId = parseOptionalInt(parsed.chatId)
+          const isTyping = Boolean(parsed.isTyping)
+          const actorId = normalizeText(ws.userId)
+          if (!chatId || !actorId) return
+          const access = await loadChatAccess(chatId, actorId)
+          if (!access) return
+          void notifyChatMembers(
+            chatId,
+            { type: 'typing', chatId, userId: actorId, isTyping },
+            actorId
+          )
+        } catch (error) {
+          console.error('Chat stream message failed:', error)
+        }
+      })
     } catch (error) {
       ws.close(1011, 'server_error')
     }
