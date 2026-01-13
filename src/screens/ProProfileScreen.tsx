@@ -383,7 +383,6 @@ export const ProProfileScreen = ({
   ])
   const displayNameValue =
     displayName.trim() || displayNameFallback.trim() || 'Мастер'
-  const activeTone = isActive ? 'is-active' : 'is-paused'
   const aboutPreview = about.trim() || 'Статус пока не добавлен.'
   const profileInitials = useMemo(() => {
     const source = displayNameValue.trim()
@@ -2139,6 +2138,17 @@ export const ProProfileScreen = ({
                 tabIndex={-1}
               />
             </div>
+            <div className="pro-profile-ig-name-row">
+              <h1 className="pro-profile-ig-name">{displayNameValue}</h1>
+              <button
+                className={`pro-profile-ig-status${isActive ? '' : ' is-paused'}`}
+                type="button"
+                onClick={() => setIsActive((current) => !current)}
+              >
+                <span className="pro-profile-social-dot" aria-hidden="true" />
+                {isActive ? 'Принимаю заявки' : 'Пауза'}
+              </button>
+            </div>
             <div className="pro-profile-ig-stats">
               {profileStats.map((stat) => (
                 <div className="pro-profile-ig-stat" key={stat.label}>
@@ -2146,17 +2156,6 @@ export const ProProfileScreen = ({
                   <span className="pro-profile-ig-stat-label">{stat.label}</span>
                 </div>
               ))}
-            </div>
-            <div className="pro-profile-ig-name-row">
-              <h1 className="pro-profile-ig-name">{displayNameValue}</h1>
-              <button
-                className={`pro-profile-ig-status ${activeTone}`}
-                type="button"
-                onClick={() => setIsActive((current) => !current)}
-              >
-                <span className="pro-profile-social-dot" aria-hidden="true" />
-                {isActive ? 'Принимаю заявки' : 'Пауза'}
-              </button>
             </div>
           </div>
           <div className="pro-profile-ig-body">

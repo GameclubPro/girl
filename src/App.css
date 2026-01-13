@@ -5184,6 +5184,7 @@
   background: rgba(var(--paper-rgb), 0.92);
   border: 1px solid rgba(var(--paper-rgb), 0.8);
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
+  grid-column: 1 / -1;
 }
 
 .pro-profile-ig-stat {
@@ -5508,7 +5509,8 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
+  align-self: center;
 }
 
 .pro-profile-ig-name {
@@ -5532,12 +5534,6 @@
   color: var(--pro-ink);
   appearance: none;
   font-family: inherit;
-}
-
-.pro-profile-ig-status.is-active {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  border-color: var(--accent-strong);
 }
 
 .pro-profile-ig-status.is-paused {

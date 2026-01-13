@@ -504,7 +504,6 @@ export const ClientMasterProfileScreen = ({
   const previewTags = previewTagSource.slice(0, 3)
   const previewTagRemainder = previewTagSource.length - previewTags.length
   const isActive = Boolean(profile?.isActive ?? true)
-  const activeTone = isActive ? 'is-active' : 'is-paused'
 
   const portfolioGridItems = useMemo(
     () =>
@@ -622,32 +621,34 @@ export const ClientMasterProfileScreen = ({
                   </span>
                 )}
               </div>
-              <div className="pro-profile-ig-header">
-                <div className="pro-profile-ig-avatar">
-                  {profile.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
-                  ) : (
-                    <span aria-hidden="true">{initials}</span>
-                  )}
-                </div>
-                <div className="pro-profile-ig-stats">
-                  {profileStats.map((stat) => (
-                    <div className="pro-profile-ig-stat" key={stat.label}>
-                      <span className="pro-profile-ig-stat-value">{stat.value}</span>
-                      <span className="pro-profile-ig-stat-label">
-                        {stat.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="pro-profile-ig-name-row">
-                  <h1 className="pro-profile-ig-name">{displayName}</h1>
-                  <span className={`pro-profile-ig-status ${activeTone}`}>
-                    <span className="pro-profile-social-dot" aria-hidden="true" />
-                    {isActive ? 'Запись открыта' : 'Пауза'}
-                  </span>
-                </div>
+            <div className="pro-profile-ig-header">
+              <div className="pro-profile-ig-avatar">
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
+                ) : (
+                  <span aria-hidden="true">{initials}</span>
+                )}
               </div>
+              <div className="pro-profile-ig-name-row">
+                <h1 className="pro-profile-ig-name">{displayName}</h1>
+                <span
+                  className={`pro-profile-ig-status${isActive ? '' : ' is-paused'}`}
+                >
+                  <span className="pro-profile-social-dot" aria-hidden="true" />
+                  {isActive ? 'Запись открыта' : 'Пауза'}
+                </span>
+              </div>
+              <div className="pro-profile-ig-stats">
+                {profileStats.map((stat) => (
+                  <div className="pro-profile-ig-stat" key={stat.label}>
+                    <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                    <span className="pro-profile-ig-stat-label">
+                      {stat.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
               <div className="pro-profile-ig-actions">
                 <button
                   className="pro-profile-ig-button pro-profile-ig-button--primary"
