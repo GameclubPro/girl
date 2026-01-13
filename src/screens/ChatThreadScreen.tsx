@@ -68,6 +68,7 @@ export const ChatThreadScreen = ({
   const [detail, setDetail] = useState<ChatDetail | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isDetailLoading, setIsDetailLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -175,6 +176,7 @@ export const ChatThreadScreen = ({
 
   const loadDetail = useCallback(async () => {
     if (!userId) return
+    setIsDetailLoading(true)
     try {
       const response = await fetch(
         `${apiBase}/api/chats/${chatId}?userId=${encodeURIComponent(userId)}`
@@ -187,6 +189,8 @@ export const ChatThreadScreen = ({
     } catch (error) {
       console.error('Failed to load chat detail:', error)
       setLoadError('Не удалось загрузить чат.')
+    } finally {
+      setIsDetailLoading(false)
     }
   }, [apiBase, chatId, userId])
 
@@ -422,7 +426,7 @@ export const ChatThreadScreen = ({
           </div>
         </header>
 
-        {request && (
+        {request ? (
           <section className="chat-request-card">
             <div className="chat-request-top">
               <span className="chat-request-title">{request.serviceName}</span>
@@ -446,6 +450,21 @@ export const ChatThreadScreen = ({
               <p className="chat-request-details">{request.details}</p>
             )}
           </section>
+        ) : (
+          isDetailLoading && (
+            <section
+              className="chat-request-card is-skeleton"
+              aria-hidden="true"
+            >
+              <span className="chat-request-skeleton-line is-title" />
+              <div className="chat-request-skeleton-row">
+                <span className="chat-request-skeleton-line is-chip" />
+                <span className="chat-request-skeleton-line is-chip" />
+                <span className="chat-request-skeleton-line is-chip" />
+              </div>
+              <span className="chat-request-skeleton-line is-body" />
+            </section>
+          )
         )}
 
         {loadError && <p className="chat-error">{loadError}</p>}

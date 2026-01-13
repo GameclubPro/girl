@@ -65,6 +65,8 @@ export const ChatListScreen = ({
   const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const reloadTimerRef = useRef<number | null>(null)
+  const isReadyRef = useRef(false)
+  const isLoadingRef = useRef(false)
 
   const totalUnread = useMemo(
     () => items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
@@ -81,6 +83,7 @@ export const ChatListScreen = ({
   const loadChats = useCallback(async () => {
     if (!userId) return
     setIsLoading(true)
+    isLoadingRef.current = true
     setLoadError('')
     try {
       const response = await fetch(
@@ -91,16 +94,19 @@ export const ChatListScreen = ({
       }
       const data = (await response.json()) as ChatSummary[]
       setItems(Array.isArray(data) ? data : [])
+      isReadyRef.current = true
     } catch (error) {
       console.error('Failed to load chats:', error)
       setLoadError('Не удалось загрузить чаты.')
       setItems([])
     } finally {
       setIsLoading(false)
+      isLoadingRef.current = false
     }
   }, [apiBase, userId])
 
   const scheduleReload = useCallback(() => {
+    if (!isReadyRef.current || isLoadingRef.current) return
     if (reloadTimerRef.current !== null) return
     reloadTimerRef.current = window.setTimeout(() => {
       reloadTimerRef.current = null
@@ -125,6 +131,7 @@ export const ChatListScreen = ({
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data)
+        if (!isReadyRef.current) return
         if (
           payload?.type === 'message:new' ||
           payload?.type === 'chat:created' ||
