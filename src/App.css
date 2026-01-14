@@ -2711,6 +2711,190 @@
   gap: 12px;
 }
 
+.pro-clients-preview {
+  position: relative;
+  overflow: hidden;
+}
+
+.pro-clients-preview::before {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  top: -90px;
+  right: -60px;
+  background: radial-gradient(
+    closest-side,
+    rgba(var(--accent-rgb), 0.25),
+    transparent 72%
+  );
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.pro-clients-preview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(var(--paper-rgb), 0.2),
+    transparent 55%
+  );
+  pointer-events: none;
+}
+
+.pro-clients-preview > * {
+  position: relative;
+  z-index: 1;
+}
+
+.pro-clients-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pro-clients-preview-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pro-clients-preview-kicker {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-clients-preview-heading {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-clients-preview-subtitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.pro-clients-preview-pill {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
+}
+
+.pro-clients-preview-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.pro-clients-preview-avatars {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+.pro-clients-preview-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 18px rgba(var(--accent-rgb), 0.18);
+}
+
+.pro-clients-preview-avatar + .pro-clients-preview-avatar {
+  margin-left: -10px;
+}
+
+.pro-clients-preview-avatar.is-ghost {
+  border-color: rgba(var(--shadow-rgb), 0.2);
+  background: rgba(var(--shadow-rgb), 0.1);
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.pro-clients-preview-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.pro-clients-preview-stat {
+  border-radius: 12px;
+  padding: 6px 8px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--surface-muted-rgb), 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pro-clients-preview-stat-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-clients-preview-stat-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-clients-preview-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pro-clients-preview-note {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.pro-clients-preview-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(var(--shadow-rgb), 0.12);
+  overflow: hidden;
+}
+
+.pro-clients-preview-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--accent-rgb), 0.9),
+    rgba(var(--accent-rgb), 0.4)
+  );
+}
+
 .pro-detail-card-head {
   display: flex;
   align-items: center;
@@ -3961,16 +4145,16 @@
 .pro-detail-list-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   border-radius: 14px;
-  padding: 8px 10px;
+  padding: 8px;
   background: rgba(var(--surface-muted-rgb), 0.7);
   border: 1px solid rgba(var(--shadow-rgb), 0.12);
 }
 
 .pro-detail-avatar {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 12px;
   background: rgba(var(--accent-rgb), 0.16);
   color: var(--accent-strong);

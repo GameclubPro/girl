@@ -1,5 +1,5 @@
 import { ProBottomNav } from '../components/ProBottomNav'
-import { useProCabinetData } from '../hooks/useProCabinetData'
+import { useProCabinetData, type ClientSummary } from '../hooks/useProCabinetData'
 
 type ProClientsScreenProps = {
   apiBase: string
@@ -47,6 +47,35 @@ export const ProClientsScreen = ({
       })}`
     : ''
   const hasClients = bookingStats.clientSummaries.length > 0
+  const topClients = bookingStats.clientSummaries.slice(0, 4)
+  const topClient = topClients[0]
+  const repeatRate =
+    bookingStats.uniqueClients > 0
+      ? bookingStats.repeatClients / bookingStats.uniqueClients
+      : 0
+  const repeatRatePercent = Math.round(repeatRate * 100)
+  const repeatRateFill =
+    repeatRatePercent > 0 ? Math.max(8, repeatRatePercent) : 0
+  const avgVisits =
+    bookingStats.uniqueClients > 0
+      ? bookingStats.total / bookingStats.uniqueClients
+      : 0
+  const avgVisitsLabel = avgVisits > 0
+    ? avgVisits.toFixed(avgVisits < 10 ? 1 : 0)
+    : '0'
+  const lastVisitLabel = topClient?.lastSeenTime
+    ? formatDate(topClient.lastSeenTime)
+    : '—'
+  const newClients = Math.max(
+    bookingStats.uniqueClients - bookingStats.repeatClients,
+    0
+  )
+  const previewSubtitle = hasClients
+    ? `${newClients} новых · ${bookingStats.repeatClients} лояльных`
+    : 'Первые клиенты появятся после подтвержденных записей.'
+  const previewClients = (
+    topClients.length > 0 ? topClients : new Array(4).fill(null)
+  ) as Array<ClientSummary | null>
 
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-clients">
@@ -78,7 +107,60 @@ export const ProClientsScreen = ({
           <p className="pro-detail-meta">{lastUpdatedLabel}</p>
         )}
 
-        <section className="pro-detail-card animate delay-1">
+        <section className="pro-detail-card pro-clients-preview animate delay-1">
+          <div className="pro-clients-preview-head">
+            <div className="pro-clients-preview-title">
+              <p className="pro-clients-preview-kicker">Превью</p>
+              <h2 className="pro-clients-preview-heading">Активность базы</h2>
+              <p className="pro-clients-preview-subtitle">{previewSubtitle}</p>
+            </div>
+            <span className="pro-clients-preview-pill">
+              {repeatRatePercent}% повторных
+            </span>
+          </div>
+          <div className="pro-clients-preview-body">
+            <div className="pro-clients-preview-avatars" aria-hidden="true">
+              {previewClients.map((client, index) => (
+                <span
+                  className={`pro-clients-preview-avatar${
+                    client ? '' : ' is-ghost'
+                  }`}
+                  key={`client-preview-${client?.id ?? index}`}
+                >
+                  {client ? getInitials(client.name) : '•'}
+                </span>
+              ))}
+            </div>
+            <div className="pro-clients-preview-stats">
+              <div className="pro-clients-preview-stat">
+                <span className="pro-clients-preview-stat-label">
+                  Средний визит
+                </span>
+                <span className="pro-clients-preview-stat-value">
+                  {avgVisitsLabel}x
+                </span>
+              </div>
+              <div className="pro-clients-preview-stat">
+                <span className="pro-clients-preview-stat-label">
+                  Последний визит
+                </span>
+                <span className="pro-clients-preview-stat-value">
+                  {lastVisitLabel}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="pro-clients-preview-foot">
+            <span className="pro-clients-preview-note">
+              {topClient ? `Топ: ${topClient.name}` : 'Пока нет активных клиентов'}
+            </span>
+            <div className="pro-clients-preview-bar" aria-hidden="true">
+              <span style={{ width: `${repeatRateFill}%` }} />
+            </div>
+          </div>
+        </section>
+
+        <section className="pro-detail-card animate delay-2">
           <div className="pro-detail-card-head">
             <h2>Сводка</h2>
             <span className="pro-detail-pill">
@@ -108,7 +190,7 @@ export const ProClientsScreen = ({
           </div>
         </section>
 
-        <section className="pro-detail-card animate delay-2">
+        <section className="pro-detail-card animate delay-3">
           <div className="pro-detail-card-head">
             <h2>Последние клиенты</h2>
             <span className="pro-detail-pill is-ghost">
@@ -141,7 +223,7 @@ export const ProClientsScreen = ({
           )}
         </section>
 
-        <section className="pro-detail-actions animate delay-3">
+        <section className="pro-detail-actions animate delay-4">
           <button className="pro-detail-action" type="button" onClick={onViewChats}>
             Перейти к чатам
           </button>
