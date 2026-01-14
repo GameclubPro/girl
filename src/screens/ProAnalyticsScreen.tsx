@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { LineChart } from '../components/analytics/Charts'
 import { categoryItems } from '../data/clientData'
@@ -56,6 +56,35 @@ const formatPercent = (value: number | null, showSign = false) => {
   return `${sign}${percent}%`
 }
 
+const createSeededRandom = (seed: number) => {
+  let value = seed % 2147483647
+  if (value <= 0) value += 2147483646
+  return () => {
+    value = (value * 48271) % 2147483647
+    return value / 2147483647
+  }
+}
+
+const buildBubbleSeed = (items: Array<{ label: string; value: number }>) =>
+  items.reduce((acc, item) => {
+    const labelScore = [...item.label].reduce(
+      (sum, char) => sum + char.charCodeAt(0),
+      0
+    )
+    return acc + item.value * 31 + labelScore * 17
+  }, 1)
+
+const shuffle = <T,>(items: T[], rng: () => number) => {
+  const copy = [...items]
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1))
+    const temp = copy[index]
+    copy[index] = copy[swapIndex]
+    copy[swapIndex] = temp
+  }
+  return copy
+}
+
 const getTooltipLeft = (index: number, count: number) => {
   if (count <= 1) return '50%'
   const ratio = index / (count - 1)
@@ -94,6 +123,11 @@ export const ProAnalyticsScreen = ({
   )
   const [showAllCategories, setShowAllCategories] = useState(false)
   const [showAllClients, setShowAllClients] = useState(false)
+  const statusBubbleRef = useRef<HTMLDivElement | null>(null)
+  const [statusBubbleBounds, setStatusBubbleBounds] = useState({
+    width: 0,
+    height: 0,
+  })
   const lastUpdatedLabel = lastUpdated
     ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
         hour: '2-digit',
@@ -111,6 +145,23 @@ export const ProAnalyticsScreen = ({
     setShowAllCategories(false)
     setShowAllClients(false)
   }, [range, timeseries.length])
+
+  useEffect(() => {
+    const node = statusBubbleRef.current
+    if (!node) return undefined
+    const update = () => {
+      const rect = node.getBoundingClientRect()
+      setStatusBubbleBounds({
+        width: rect.width,
+        height: rect.height,
+      })
+    }
+    update()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(() => update())
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
   const revenueSeries = timeseries.map((point) => point.revenue)
   const requestsSeries = timeseries.map((point) => point.requests)
@@ -168,19 +219,13 @@ export const ProAnalyticsScreen = ({
 
   const statusBubbles = useMemo(() => {
     if (bookingStatusItems.length === 0) return []
-    const labelOrder = ['Подтверждено', 'В ожидании', 'Отменено']
     const maxValue = Math.max(
       ...bookingStatusItems.map((item) => item.value),
       1
     )
     const minSize = 70
     const maxSize = 140
-    const slots = ['primary', 'secondary', 'tertiary'] as const
-    const sorted = [...bookingStatusItems].sort((a, b) => {
-      if (b.value !== a.value) return b.value - a.value
-      return labelOrder.indexOf(a.label) - labelOrder.indexOf(b.label)
-    })
-    return sorted.map((item, index) => {
+    return bookingStatusItems.map((item) => {
       const ratio = maxValue ? item.value / maxValue : 0
       const size = Math.round(
         minSize + (maxSize - minSize) * Math.sqrt(ratio)
@@ -188,10 +233,54 @@ export const ProAnalyticsScreen = ({
       return {
         ...item,
         size,
-        slot: slots[index] ?? 'secondary',
       }
     })
   }, [bookingStatusItems])
+
+  const positionedStatusBubbles = useMemo(() => {
+    if (statusBubbles.length === 0) return []
+    const width = statusBubbleBounds.width || 320
+    const height = statusBubbleBounds.height || 240
+    const padding = 14
+    const minGap = 12
+    const rng = createSeededRandom(buildBubbleSeed(statusBubbles))
+    const ordered = shuffle(statusBubbles, rng)
+    const placed: Array<
+      (typeof statusBubbles)[number] & { x: number; y: number; radius: number }
+    > = []
+    ordered.forEach((item, index) => {
+      const radius = item.size / 2
+      const minX = padding + radius
+      const maxX = Math.max(minX, width - padding - radius)
+      const minY = padding + radius
+      const maxY = Math.max(minY, height - padding - radius)
+      let placedItem: typeof placed[number] | null = null
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        const x = minX + rng() * (maxX - minX)
+        const y = minY + rng() * (maxY - minY)
+        const hasOverlap = placed.some((existing) => {
+          const dx = x - existing.x
+          const dy = y - existing.y
+          const minDistance = radius + existing.radius + minGap
+          return dx * dx + dy * dy < minDistance * minDistance
+        })
+        if (!hasOverlap) {
+          placedItem = { ...item, x, y, radius }
+          break
+        }
+      }
+      if (!placedItem) {
+        const angle =
+          (index / Math.max(ordered.length, 1)) * Math.PI * 2 + rng()
+        const radial = Math.min(width, height) * 0.28
+        const x = clamp(width / 2 + Math.cos(angle) * radial, minX, maxX)
+        const y = clamp(height / 2 + Math.sin(angle) * radial, minY, maxY)
+        placedItem = { ...item, x, y, radius }
+      }
+      placed.push(placedItem)
+    })
+    return placed
+  }, [statusBubbles, statusBubbleBounds])
 
   const peakRevenuePoint = useMemo(() => {
     if (!hasTimeseries) return null
@@ -605,44 +694,43 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
-              {statusBubbles.length > 0 ? (
+              {positionedStatusBubbles.length > 0 ? (
                 <div
                   className="analytics-status-bubbles"
+                  ref={statusBubbleRef}
                   role="list"
                   aria-label="Статусы записей"
                 >
-                  {statusBubbles.map((item, index) => {
+                  {positionedStatusBubbles.map((item, index) => {
                     const bubbleStyle: CSSProperties & {
                       '--bubble-rgb'?: string
                       '--bubble-size'?: string
                     } = {
                       '--bubble-rgb': item.colorRgb,
                       '--bubble-size': `${item.size}px`,
+                      left: `${item.x}px`,
+                      top: `${item.y}px`,
                       animationDelay: `${index * 0.35}s`,
                     }
                     return (
                       <div
                         key={item.label}
-                        className={`analytics-status-bubble-cell is-${item.slot}`}
+                        className="analytics-status-bubble"
+                        style={bubbleStyle}
                         role="listitem"
+                        aria-label={`${item.label}: ${formatNumber(
+                          item.value
+                        )} (${formatPercent(item.percent)})`}
                       >
-                        <div
-                          className="analytics-status-bubble"
-                          style={bubbleStyle}
-                          aria-label={`${item.label}: ${formatNumber(
-                            item.value
-                          )} (${formatPercent(item.percent)})`}
-                        >
-                          <span className="analytics-status-bubble-label">
-                            {item.label}
-                          </span>
-                          <span className="analytics-status-bubble-value">
-                            {formatNumber(item.value)}
-                          </span>
-                          <span className="analytics-status-bubble-meta">
-                            {formatPercent(item.percent)}
-                          </span>
-                        </div>
+                        <span className="analytics-status-bubble-label">
+                          {item.label}
+                        </span>
+                        <span className="analytics-status-bubble-value">
+                          {formatNumber(item.value)}
+                        </span>
+                        <span className="analytics-status-bubble-meta">
+                          {formatPercent(item.percent)}
+                        </span>
                       </div>
                     )
                   })}
