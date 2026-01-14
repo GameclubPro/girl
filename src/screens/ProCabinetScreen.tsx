@@ -29,6 +29,8 @@ export const ProCabinetScreen = ({
   onOpenClients,
   onOpenCampaigns,
   onOpenReminders,
+  onOpenCalendar,
+  onOpenShowcase,
 }: ProCabinetScreenProps) => {
   return (
     <div className="screen screen--pro screen--pro-cabinet">
