@@ -8,6 +8,7 @@ type ProBottomNavProps = {
   onRequests: () => void
   onChats: () => void
   onProfile: () => void
+  allowActiveClick?: boolean
 }
 
 export const ProBottomNav = ({
@@ -16,9 +17,10 @@ export const ProBottomNav = ({
   onRequests,
   onChats,
   onProfile,
+  allowActiveClick = false,
 }: ProBottomNavProps) => {
   const handleClick = (key: ProNavKey, action: () => void) => () => {
-    if (active === key) return
+    if (active === key && !allowActiveClick) return
     action()
   }
 

@@ -13,9 +13,13 @@ import {
 } from './screens/ClientShowcaseScreen'
 import { ClientMasterProfileScreen } from './screens/ClientMasterProfileScreen'
 import { BookingScreen } from './screens/BookingScreen'
+import { ProAnalyticsScreen } from './screens/ProAnalyticsScreen'
 import { ProCabinetScreen } from './screens/ProCabinetScreen'
+import { ProCampaignsScreen } from './screens/ProCampaignsScreen'
+import { ProClientsScreen } from './screens/ProClientsScreen'
 import { ProProfileScreen } from './screens/ProProfileScreen'
 import { ProRequestsScreen } from './screens/ProRequestsScreen'
+import { ProRemindersScreen } from './screens/ProRemindersScreen'
 import { RequestScreen } from './screens/RequestScreen'
 import { StartScreen } from './screens/StartScreen'
 import { categoryItems } from './data/clientData'
@@ -102,6 +106,10 @@ function App() {
     | 'requests'
     | 'pro-cabinet'
     | 'pro-profile'
+    | 'pro-analytics'
+    | 'pro-clients'
+    | 'pro-campaigns'
+    | 'pro-reminders'
     | 'pro-requests'
   >('start')
   const [role, setRole] = useState<Role>('client')
@@ -623,7 +631,11 @@ function App() {
       view === 'requests' ||
       view === 'pro-cabinet' ||
       view === 'pro-profile' ||
-      view === 'pro-requests'
+      view === 'pro-requests' ||
+      view === 'pro-analytics' ||
+      view === 'pro-clients' ||
+      view === 'pro-campaigns' ||
+      view === 'pro-reminders'
 
     const handleBack = () => {
       switch (view) {
@@ -669,6 +681,12 @@ function App() {
           setView('pro-cabinet')
           break
         case 'pro-requests':
+          setView('pro-cabinet')
+          break
+        case 'pro-analytics':
+        case 'pro-clients':
+        case 'pro-campaigns':
+        case 'pro-reminders':
           setView('pro-cabinet')
           break
         case 'pro-cabinet':
@@ -1215,6 +1233,72 @@ function App() {
     )
   }
 
+  if (view === 'pro-analytics') {
+    return (
+      <ProAnalyticsScreen
+        apiBase={apiBase}
+        userId={userId}
+        onBack={() => setView('pro-cabinet')}
+        onViewRequests={() => setView('pro-requests')}
+        onViewChats={openChatList}
+        onEditProfile={() => {
+          setProProfileSection(null)
+          setView('pro-profile')
+        }}
+      />
+    )
+  }
+
+  if (view === 'pro-clients') {
+    return (
+      <ProClientsScreen
+        apiBase={apiBase}
+        userId={userId}
+        onBack={() => setView('pro-cabinet')}
+        onViewRequests={() => setView('pro-requests')}
+        onViewChats={openChatList}
+        onEditProfile={() => {
+          setProProfileSection(null)
+          setView('pro-profile')
+        }}
+      />
+    )
+  }
+
+  if (view === 'pro-campaigns') {
+    return (
+      <ProCampaignsScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        onBack={() => setView('pro-cabinet')}
+        onViewRequests={() => setView('pro-requests')}
+        onViewChats={openChatList}
+        onEditProfile={() => {
+          setProProfileSection(null)
+          setView('pro-profile')
+        }}
+      />
+    )
+  }
+
+  if (view === 'pro-reminders') {
+    return (
+      <ProRemindersScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        onBack={() => setView('pro-cabinet')}
+        onViewRequests={() => setView('pro-requests')}
+        onViewChats={openChatList}
+        onEditProfile={() => {
+          setProProfileSection(null)
+          setView('pro-profile')
+        }}
+      />
+    )
+  }
+
   if (view === 'pro-cabinet') {
     return (
       <ProCabinetScreen
@@ -1227,6 +1311,10 @@ function App() {
         }}
         onViewRequests={() => setView('pro-requests')}
         onViewChats={openChatList}
+        onOpenAnalytics={() => setView('pro-analytics')}
+        onOpenClients={() => setView('pro-clients')}
+        onOpenCampaigns={() => setView('pro-campaigns')}
+        onOpenReminders={() => setView('pro-reminders')}
       />
     )
   }
