@@ -28,7 +28,17 @@ export type ProProfileSection =
   | 'services'
   | 'location'
   | 'availability'
+  | 'certificates'
   | 'portfolio'
+
+export type MasterCertificate = {
+  id: string
+  title?: string | null
+  issuer?: string | null
+  year?: number | null
+  url?: string | null
+  verifyUrl?: string | null
+}
 
 export type MasterProfile = {
   userId: string
@@ -47,6 +57,7 @@ export type MasterProfile = {
   services: string[]
   portfolioUrls: string[]
   showcaseUrls?: string[]
+  certificates?: MasterCertificate[]
   avatarUrl?: string | null
   coverUrl?: string | null
   isActive?: boolean

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
+  IconCertificate,
   IconClock,
   IconHome,
   IconList,
@@ -14,6 +15,7 @@ import { requestServiceCatalog } from '../data/requestData'
 import type {
   City,
   District,
+  MasterCertificate,
   MasterProfile,
   MasterReview,
   MasterReviewSummary,
@@ -75,6 +77,29 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
+
+const formatCertificateCount = (value: number) =>
+  formatCount(value, 'сертификат', 'сертификата', 'сертификатов')
+
+const buildCertificateId = () =>
+  `cert-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+const normalizeCertificate = (
+  value: Partial<MasterCertificate> | null | undefined
+): MasterCertificate => ({
+  id: value?.id ?? buildCertificateId(),
+  title: value?.title ?? '',
+  issuer: value?.issuer ?? '',
+  year: typeof value?.year === 'number' ? value.year : null,
+  url: value?.url ?? '',
+  verifyUrl: value?.verifyUrl ?? '',
+})
+
+const buildCertificateMeta = (certificate: MasterCertificate) => {
+  const parts = [certificate.issuer, certificate.year?.toString()]
+    .filter((item): item is string => Boolean(item && item.trim()))
+  return parts.join(' · ')
+}
 
 
 const buildReviewStars = (value: number) => {
@@ -214,6 +239,7 @@ type ProfilePayload = {
   services: string[]
   portfolioUrls: string[]
   showcaseUrls: string[]
+  certificates: MasterCertificate[]
 }
 
 type MasterFollower = {
@@ -233,6 +259,7 @@ type StatId = 'works' | 'rating' | 'reviews' | 'followers'
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
+const MAX_CERTIFICATES = 12
 const PORTFOLIO_ROW_LIMIT = 4
 const FOLLOWERS_PAGE_SIZE = 24
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
@@ -276,6 +303,7 @@ export const ProProfileScreen = ({
   const [openServiceMetaKeys, setOpenServiceMetaKeys] = useState<string[]>([])
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
+  const [certificates, setCertificates] = useState<MasterCertificate[]>([])
   const [portfolioView, setPortfolioView] = useState<'portfolio' | 'showcase'>(
     () => initialPortfolioView ?? 'portfolio'
   )
@@ -293,6 +321,7 @@ export const ProProfileScreen = ({
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
+  const [certificatesError, setCertificatesError] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
   const [reviews, setReviews] = useState<MasterReview[]>([])
@@ -315,8 +344,12 @@ export const ProProfileScreen = ({
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
     number | null
   >(null)
+  const [certificateLightboxIndex, setCertificateLightboxIndex] = useState<
+    number | null
+  >(null)
   const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
   const [isPortfolioPickerOpen, setIsPortfolioPickerOpen] = useState(false)
+  const [isCertificatesUploading, setIsCertificatesUploading] = useState(false)
   const [portfolioQuickActionIndex, setPortfolioQuickActionIndex] = useState<
     number | null
   >(null)
@@ -339,6 +372,9 @@ export const ProProfileScreen = ({
   const portfolioCameraInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceIndexRef = useRef<number | null>(null)
+  const certificateUploadInputRef = useRef<HTMLInputElement>(null)
+  const certificateReplaceInputRef = useRef<HTMLInputElement>(null)
+  const certificateReplaceIdRef = useRef<string | null>(null)
   const showcaseUploadInputRef = useRef<HTMLInputElement>(null)
   const showcaseReplaceInputRef = useRef<HTMLInputElement>(null)
   const showcaseReplaceIndexRef = useRef<number | null>(null)
@@ -346,6 +382,7 @@ export const ProProfileScreen = ({
   const portfolioFocusPointerRef = useRef(false)
   const showcaseFocusPointerRef = useRef(false)
   const portfolioLightboxIndexRef = useRef<number | null>(null)
+  const certificateLightboxIndexRef = useRef<number | null>(null)
   const portfolioFocusIndexRef = useRef<number | null>(null)
   const showcaseFocusIndexRef = useRef<number | null>(null)
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
@@ -375,6 +412,20 @@ export const ProProfileScreen = ({
   const showcaseStrings = useMemo(
     () => toPortfolioStrings(showcaseItems),
     [showcaseItems]
+  )
+  const certificatesPayload = useMemo(
+    () =>
+      certificates
+        .map((certificate) => ({
+          id: certificate.id,
+          title: certificate.title?.trim() || null,
+          issuer: certificate.issuer?.trim() || null,
+          year: typeof certificate.year === 'number' ? certificate.year : null,
+          url: certificate.url?.trim() || null,
+          verifyUrl: certificate.verifyUrl?.trim() || null,
+        }))
+        .filter((certificate) => certificate.title || certificate.url),
+    [certificates]
   )
   const portfolioAutosaveKey = useMemo(
     () =>
@@ -412,6 +463,7 @@ export const ProProfileScreen = ({
       services: [...serviceStrings],
       portfolioUrls: [...portfolioStrings],
       showcaseUrls: [...showcaseStrings],
+      certificates: certificatesPayload,
     }
   }, [
     about,
@@ -428,6 +480,7 @@ export const ProProfileScreen = ({
     scheduleEnd,
     scheduleStart,
     showcaseStrings,
+    certificatesPayload,
     serviceStrings,
     userId,
     worksAtClient,
@@ -493,6 +546,17 @@ export const ProProfileScreen = ({
   const followersInitialLoading = isFollowersLoading && followers.length === 0
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const showcaseCount = showcaseItems.length
+  const certificateItems = useMemo(
+    () =>
+      certificates.filter(
+        (certificate) => certificate.url?.toString().trim() || certificate.title
+      ),
+    [certificates]
+  )
+  const certificateCount = certificateItems.length
+  const certificateCountLabel =
+    certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
+  const certificatesActionLabel = certificateCount > 0 ? 'Редактировать' : 'Добавить'
   const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
   const showcaseCountLabel = `${showcaseCount} из ${MAX_SHOWCASE_ITEMS}`
   const portfolioPanelCountLabel =
@@ -605,6 +669,15 @@ export const ProProfileScreen = ({
   const isLightboxImage = portfolioLightboxItem
     ? isImageUrl(portfolioLightboxItem.url)
     : false
+  const certificateLightboxItem =
+    certificateLightboxIndex !== null
+      ? certificateItems[certificateLightboxIndex] ?? null
+      : null
+  const certificateLightboxTitle =
+    certificateLightboxItem?.title?.trim() || 'Сертификат'
+  const certificateLightboxMeta = certificateLightboxItem
+    ? buildCertificateMeta(certificateLightboxItem)
+    : ''
   const isLightboxInShowcase = portfolioLightboxItem
     ? showcaseItems.some((item) => item.url === portfolioLightboxItem.url)
     : false
@@ -618,6 +691,7 @@ export const ProProfileScreen = ({
   const quickActionFocus = resolvePortfolioFocus(portfolioQuickActionItem)
   const isPortfolioOverlayOpen =
     portfolioLightboxIndex !== null ||
+    certificateLightboxIndex !== null ||
     portfolioFocusIndex !== null ||
     showcaseFocusIndex !== null ||
     isPortfolioPickerOpen ||
@@ -692,6 +766,13 @@ export const ProProfileScreen = ({
     setPortfolioError('')
     setPortfolioFocusIndex(null)
     portfolioFocusPointerRef.current = false
+  }
+  const openCertificateLightbox = (index: number) => {
+    if (!certificateItems[index]) return
+    setCertificateLightboxIndex(index)
+  }
+  const closeCertificateLightbox = () => {
+    setCertificateLightboxIndex(null)
   }
   const openPortfolioPicker = () => {
     setPortfolioError('')
@@ -957,6 +1038,10 @@ export const ProProfileScreen = ({
   }, [portfolioLightboxIndex])
 
   useEffect(() => {
+    certificateLightboxIndexRef.current = certificateLightboxIndex
+  }, [certificateLightboxIndex])
+
+  useEffect(() => {
     portfolioFocusIndexRef.current = portfolioFocusIndex
   }, [portfolioFocusIndex])
 
@@ -981,6 +1066,10 @@ export const ProProfileScreen = ({
       }
       if (portfolioLightboxIndexRef.current !== null) {
         closePortfolioLightbox()
+        return true
+      }
+      if (certificateLightboxIndexRef.current !== null) {
+        closeCertificateLightbox()
         return true
       }
       if (portfolioQuickActionIndex !== null) {
@@ -1066,6 +1155,15 @@ export const ProProfileScreen = ({
       setPortfolioLightboxIndex(null)
     }
   }, [portfolioItems, portfolioLightboxIndex])
+
+  useEffect(() => {
+    if (
+      certificateLightboxIndex !== null &&
+      !certificateItems[certificateLightboxIndex]
+    ) {
+      setCertificateLightboxIndex(null)
+    }
+  }, [certificateItems, certificateLightboxIndex])
 
   useEffect(() => {
     if (
@@ -1221,6 +1319,9 @@ export const ProProfileScreen = ({
           0,
           MAX_SHOWCASE_ITEMS
         )
+        const nextCertificates = Array.isArray(data.certificates)
+          ? data.certificates.map((certificate) => normalizeCertificate(certificate))
+          : []
 
         setDisplayName(nextDisplayName)
         setAbout(nextAbout)
@@ -1242,6 +1343,7 @@ export const ProProfileScreen = ({
         setServiceItems(nextServiceItems)
         setPortfolioItems(nextPortfolioItems)
         setShowcaseItems(nextShowcaseItems)
+        setCertificates(nextCertificates)
         setAvatarUrl(data.avatarUrl ?? '')
         setCoverUrl(data.coverUrl ?? '')
         const nextFollowersCount =
@@ -1272,6 +1374,16 @@ export const ProProfileScreen = ({
           services: toServiceStrings(nextServiceItems),
           portfolioUrls: toPortfolioStrings(nextPortfolioItems),
           showcaseUrls: toPortfolioStrings(nextShowcaseItems),
+          certificates: nextCertificates
+            .map((certificate) => ({
+              id: certificate.id,
+              title: certificate.title?.trim() || null,
+              issuer: certificate.issuer?.trim() || null,
+              year: typeof certificate.year === 'number' ? certificate.year : null,
+              url: certificate.url?.trim() || null,
+              verifyUrl: certificate.verifyUrl?.trim() || null,
+            }))
+            .filter((certificate) => certificate.title || certificate.url),
         })
       } catch (error) {
         if (!cancelled) {
@@ -1719,6 +1831,42 @@ export const ProProfileScreen = ({
     }
   }
 
+  const updateCertificate = (
+    certificateId: string,
+    updates: Partial<MasterCertificate>
+  ) => {
+    setCertificates((current) =>
+      current.map((certificate) =>
+        certificate.id === certificateId
+          ? { ...certificate, ...updates }
+          : certificate
+      )
+    )
+  }
+
+  const removeCertificate = (certificateId: string) => {
+    setCertificates((current) =>
+      current.filter((certificate) => certificate.id !== certificateId)
+    )
+  }
+
+  const handleCertificateAddClick = () => {
+    if (isCertificatesUploading) return
+    if (certificates.length >= MAX_CERTIFICATES) {
+      setCertificatesError(`Можно добавить максимум ${MAX_CERTIFICATES} сертификатов.`)
+      return
+    }
+    setCertificatesError('')
+    certificateUploadInputRef.current?.click()
+  }
+
+  const handleCertificateReplaceClick = (certificateId: string) => {
+    if (isCertificatesUploading) return
+    setCertificatesError('')
+    certificateReplaceIdRef.current = certificateId
+    certificateReplaceInputRef.current?.click()
+  }
+
   const validatePortfolioFile = (file: File) => {
     if (!allowedImageTypes.has(file.type)) {
       return 'Поддерживаются только PNG, JPG или WebP.'
@@ -1779,9 +1927,36 @@ export const ProProfileScreen = ({
     return payload.url
   }
 
+  const uploadCertificateDataUrl = async (dataUrl: string) => {
+    if (!userId) {
+      throw new Error('Не удалось загрузить файл. Нет пользователя.')
+    }
+    const response = await fetch(`${apiBase}/api/masters/certificates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, dataUrl }),
+    })
+    const payload = (await response.json().catch(() => null)) as {
+      url?: string
+      error?: string
+    } | null
+    if (!response.ok) {
+      throw new Error(resolvePortfolioUploadError(payload))
+    }
+    if (!payload?.url) {
+      throw new Error('Не удалось загрузить файл.')
+    }
+    return payload.url
+  }
+
   const uploadPortfolioFile = async (file: File) => {
     const dataUrl = await readImageFileAsync(file)
     return uploadPortfolioDataUrl(dataUrl)
+  }
+
+  const uploadCertificateFile = async (file: File) => {
+    const dataUrl = await readImageFileAsync(file)
+    return uploadCertificateDataUrl(dataUrl)
   }
 
   const handlePortfolioUpload = async (files: FileList | null) => {
@@ -1911,6 +2086,82 @@ export const ProProfileScreen = ({
       return
     }
     void handlePortfolioReplace(file, index)
+    event.target.value = ''
+  }
+
+  const handleCertificateUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    if (certificates.length >= MAX_CERTIFICATES) {
+      setCertificatesError(`Можно добавить максимум ${MAX_CERTIFICATES} сертификатов.`)
+      return
+    }
+    const remaining = MAX_CERTIFICATES - certificates.length
+    const selection = Array.from(files).slice(0, remaining)
+    for (const file of selection) {
+      const errorMessage = validatePortfolioFile(file)
+      if (errorMessage) {
+        setCertificatesError(errorMessage)
+        return
+      }
+    }
+    setIsCertificatesUploading(true)
+    setCertificatesError('')
+    try {
+      const uploadedUrls: string[] = []
+      for (const file of selection) {
+        const url = await uploadCertificateFile(file)
+        uploadedUrls.push(url)
+      }
+      setCertificates((current) => {
+        const next = [
+          ...uploadedUrls.map((url) => normalizeCertificate({ url })),
+          ...current,
+        ]
+        return next.slice(0, MAX_CERTIFICATES)
+      })
+    } catch (error) {
+      setCertificatesError(
+        error instanceof Error ? error.message : 'Не удалось загрузить файл.'
+      )
+    } finally {
+      setIsCertificatesUploading(false)
+    }
+  }
+
+  const handleCertificateUploadChange = (event: ChangeEvent<HTMLInputElement>) => {
+    void handleCertificateUpload(event.target.files)
+    event.target.value = ''
+  }
+
+  const handleCertificateReplace = async (file: File, certificateId: string) => {
+    const errorMessage = validatePortfolioFile(file)
+    if (errorMessage) {
+      setCertificatesError(errorMessage)
+      return
+    }
+    setIsCertificatesUploading(true)
+    setCertificatesError('')
+    try {
+      const url = await uploadCertificateFile(file)
+      updateCertificate(certificateId, { url })
+    } catch (error) {
+      setCertificatesError(
+        error instanceof Error ? error.message : 'Не удалось загрузить файл.'
+      )
+    } finally {
+      setIsCertificatesUploading(false)
+    }
+  }
+
+  const handleCertificateReplaceChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    const certificateId = certificateReplaceIdRef.current
+    if (!file || !certificateId) {
+      event.target.value = ''
+      return
+    }
+    void handleCertificateReplace(file, certificateId)
+    certificateReplaceIdRef.current = null
     event.target.value = ''
   }
 
@@ -2435,6 +2686,70 @@ export const ProProfileScreen = ({
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="pro-profile-certificates">
+              <div className="pro-profile-certificates-head">
+                <div>
+                  <p className="pro-profile-certificates-kicker">Доверие</p>
+                  <h3 className="pro-profile-certificates-title">Сертификаты</h3>
+                </div>
+                <div className="pro-profile-certificates-actions">
+                  <span className="pro-profile-certificates-count">
+                    {certificateCountLabel}
+                  </span>
+                  <button
+                    className="pro-profile-certificates-action"
+                    type="button"
+                    onClick={() => openEditor('certificates')}
+                  >
+                    {certificatesActionLabel}
+                  </button>
+                </div>
+              </div>
+              {certificateItems.length > 0 ? (
+                <div className="pro-profile-certificates-list" role="list">
+                  {certificateItems.map((certificate, index) => {
+                    const meta = buildCertificateMeta(certificate)
+                    const title = certificate.title?.trim() || 'Сертификат'
+                    return (
+                      <button
+                        className="pro-profile-certificate-card"
+                        type="button"
+                        key={certificate.id}
+                        onClick={() => openCertificateLightbox(index)}
+                        role="listitem"
+                        aria-label={title}
+                      >
+                        <div className="pro-profile-certificate-media">
+                          {certificate.url ? (
+                            <img src={certificate.url} alt="" loading="lazy" />
+                          ) : (
+                            <span className="pro-profile-certificate-fallback">
+                              CERT
+                            </span>
+                          )}
+                        </div>
+                        <div className="pro-profile-certificate-info">
+                          <span className="pro-profile-certificate-title">
+                            {title}
+                          </span>
+                          <span
+                            className={`pro-profile-certificate-meta${
+                              meta ? '' : ' is-muted'
+                            }`}
+                          >
+                            {meta || 'Данные не указаны'}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="pro-profile-certificates-empty">
+                  <span>Добавьте сертификаты, чтобы усилить доверие клиентов.</span>
+                </div>
+              )}
             </div>
             <div className="pro-profile-ig-tags">
               {previewTags.length > 0 ? (
@@ -3015,6 +3330,66 @@ export const ProProfileScreen = ({
         </div>
       )}
 
+      {certificateLightboxItem && (
+        <div
+          className="pro-portfolio-lightbox-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeCertificateLightbox}
+        >
+          <div
+            className="pro-portfolio-lightbox is-certificate"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="pro-portfolio-lightbox-head">
+              <div>
+                <p className="pro-portfolio-lightbox-kicker">Сертификат</p>
+                <h3 className="pro-portfolio-lightbox-title">
+                  {certificateLightboxTitle}
+                </h3>
+                {certificateLightboxMeta && (
+                  <p className="pro-portfolio-lightbox-subtitle">
+                    {certificateLightboxMeta}
+                  </p>
+                )}
+              </div>
+              <button
+                className="pro-portfolio-lightbox-close"
+                type="button"
+                onClick={closeCertificateLightbox}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="pro-portfolio-lightbox-media is-certificate">
+              {certificateLightboxItem.url ? (
+                <img
+                  src={certificateLightboxItem.url}
+                  alt={certificateLightboxTitle}
+                  loading="lazy"
+                />
+              ) : (
+                <span className="pro-profile-certificate-fallback">
+                  Нет изображения
+                </span>
+              )}
+            </div>
+            {certificateLightboxItem.verifyUrl && (
+              <div className="pro-portfolio-lightbox-actions">
+                <a
+                  className="pro-portfolio-lightbox-action"
+                  href={certificateLightboxItem.verifyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Проверить сертификат
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {isPortfolioPickerOpen && (
         <div
           className="pro-portfolio-sheet-overlay"
@@ -3504,6 +3879,20 @@ export const ProProfileScreen = ({
                     <IconList />
                   </span>
                   <span className="pro-profile-editor-tab-label">Услуги</span>
+                </button>
+                <button
+                  className={`pro-profile-editor-tab${
+                    editingSection === 'certificates' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={editingSection === 'certificates'}
+                  onClick={() => openEditor('certificates')}
+                >
+                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
+                    <IconCertificate />
+                  </span>
+                  <span className="pro-profile-editor-tab-label">Сертификаты</span>
                 </button>
               </div>
             )}
@@ -4123,6 +4512,187 @@ export const ProProfileScreen = ({
                   </div>
 
                 </>
+              )}
+
+              {editingSection === 'certificates' && (
+                <div className="pro-profile-editor-certificates">
+                  <div className="pro-profile-editor-certificates-head">
+                    <div>
+                      <p className="pro-profile-editor-certificates-kicker">
+                        Сертификаты
+                      </p>
+                      <h3 className="pro-profile-editor-certificates-title">
+                        Подтвердите квалификацию
+                      </h3>
+                      <p className="pro-profile-editor-certificates-subtitle">
+                        Добавьте дипломы и курсы, чтобы клиентам было проще
+                        выбрать вас.
+                      </p>
+                    </div>
+                    <button
+                      className="pro-profile-editor-certificates-add"
+                      type="button"
+                      onClick={handleCertificateAddClick}
+                      disabled={
+                        isCertificatesUploading ||
+                        certificates.length >= MAX_CERTIFICATES
+                      }
+                    >
+                      + Добавить
+                    </button>
+                  </div>
+
+                  <input
+                    ref={certificateUploadInputRef}
+                    className="pro-file-input"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleCertificateUploadChange}
+                    disabled={isCertificatesUploading}
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <input
+                    ref={certificateReplaceInputRef}
+                    className="pro-file-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCertificateReplaceChange}
+                    disabled={isCertificatesUploading}
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+
+                  {certificatesError && (
+                    <div className="pro-profile-editor-messages">
+                      <p className="pro-error">{certificatesError}</p>
+                    </div>
+                  )}
+
+                  <div className="pro-profile-editor-certificates-list">
+                    {certificates.length > 0 ? (
+                      certificates.map((certificate) => {
+                        const title = certificate.title?.trim() || ''
+                        return (
+                          <div
+                            className="pro-profile-editor-certificate-card"
+                            key={certificate.id}
+                          >
+                            <button
+                              className="pro-profile-editor-certificate-media"
+                              type="button"
+                              onClick={() => handleCertificateReplaceClick(certificate.id)}
+                              aria-label="Загрузить изображение сертификата"
+                            >
+                              {certificate.url ? (
+                                <img src={certificate.url} alt="" loading="lazy" />
+                              ) : (
+                                <span className="pro-profile-editor-certificate-fallback">
+                                  Добавить фото
+                                </span>
+                              )}
+                            </button>
+                            <div className="pro-profile-editor-certificate-fields">
+                              <label className="pro-profile-editor-certificate-field">
+                                <span className="pro-label">Название</span>
+                                <input
+                                  className="pro-input"
+                                  type="text"
+                                  value={title}
+                                  onChange={(event) =>
+                                    updateCertificate(certificate.id, {
+                                      title: event.target.value,
+                                    })
+                                  }
+                                  placeholder="Сертификат повышения квалификации"
+                                />
+                              </label>
+                              <div className="pro-profile-editor-certificate-row">
+                                <label className="pro-profile-editor-certificate-field">
+                                  <span className="pro-label">Организация</span>
+                                  <input
+                                    className="pro-input"
+                                    type="text"
+                                    value={certificate.issuer ?? ''}
+                                    onChange={(event) =>
+                                      updateCertificate(certificate.id, {
+                                        issuer: event.target.value,
+                                      })
+                                    }
+                                    placeholder="Название школы"
+                                  />
+                                </label>
+                                <label className="pro-profile-editor-certificate-field">
+                                  <span className="pro-label">Год</span>
+                                  <input
+                                    className="pro-input"
+                                    type="number"
+                                    min="1900"
+                                    max={new Date().getFullYear() + 1}
+                                    value={certificate.year ?? ''}
+                                    onChange={(event) => {
+                                      const raw = event.target.value.trim()
+                                      if (!raw) {
+                                        updateCertificate(certificate.id, {
+                                          year: null,
+                                        })
+                                        return
+                                      }
+                                      const parsed = Number(raw)
+                                      updateCertificate(certificate.id, {
+                                        year: Number.isFinite(parsed)
+                                          ? Math.round(parsed)
+                                          : null,
+                                      })
+                                    }}
+                                    placeholder="2024"
+                                  />
+                                </label>
+                              </div>
+                              <label className="pro-profile-editor-certificate-field">
+                                <span className="pro-label">Ссылка на проверку</span>
+                                <input
+                                  className="pro-input"
+                                  type="url"
+                                  inputMode="url"
+                                  value={certificate.verifyUrl ?? ''}
+                                  onChange={(event) =>
+                                    updateCertificate(certificate.id, {
+                                      verifyUrl: event.target.value,
+                                    })
+                                  }
+                                  placeholder="https://..."
+                                />
+                              </label>
+                            </div>
+                            <div className="pro-profile-editor-certificate-actions">
+                              <button
+                                className="pro-profile-editor-certificate-action"
+                                type="button"
+                                onClick={() => handleCertificateReplaceClick(certificate.id)}
+                              >
+                                Заменить фото
+                              </button>
+                              <button
+                                className="pro-profile-editor-certificate-action is-danger"
+                                type="button"
+                                onClick={() => removeCertificate(certificate.id)}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="pro-profile-editor-certificates-empty">
+                        Пока нет сертификатов. Добавьте первый, чтобы повысить
+                        доверие.
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
             </section>

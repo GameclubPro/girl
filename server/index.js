@@ -23,6 +23,7 @@ const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
 const CHAT_MESSAGE_DEFAULT_LIMIT = 30
 const CHAT_MESSAGE_MAX_LIMIT = 80
 const CHAT_STREAM_PATH = '/api/chats/stream'
+const MAX_CERTIFICATES = 12
 const chatMessageTypes = new Set([
   'text',
   'image',
@@ -299,6 +300,19 @@ const buildChatUploadPath = (safeUserId, mime) => {
   return { relativePath, absolutePath }
 }
 
+const buildCertificateUploadPath = (safeUserId, mime) => {
+  const ext = getImageExtension(mime)
+  const filename = `certificate-${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`
+  const relativePath = path.posix.join(
+    'masters',
+    safeUserId,
+    'certificates',
+    filename
+  )
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  return { relativePath, absolutePath }
+}
+
 const normalizeUploadPath = (value) => {
   const normalized = normalizeText(value)
   if (!normalized) return ''
@@ -316,6 +330,56 @@ const resolvePublicUrl = (req, value) => {
   const safePath = normalizeUploadPath(normalized)
   return buildPublicUrl(req, safePath)
 }
+
+const normalizeExternalUrl = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  if (/^https?:\/\//i.test(normalized)) return normalized
+  return null
+}
+
+const normalizeCertificateUrl = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  if (/^https?:\/\//i.test(normalized)) return normalized
+  return normalizeUploadPath(normalized)
+}
+
+const normalizeCertificateEntry = (value) => {
+  if (!value || typeof value !== 'object') return null
+  const id = normalizeText(value.id) || randomUUID()
+  const title = normalizeText(value.title)
+  const issuer = normalizeText(value.issuer)
+  const rawYear = parseOptionalInt(value.year)
+  const currentYear = new Date().getFullYear() + 1
+  const year =
+    rawYear && rawYear >= 1900 && rawYear <= currentYear ? rawYear : null
+  const url = normalizeCertificateUrl(value.url)
+  const verifyUrl = normalizeExternalUrl(value.verifyUrl)
+  if (!title && !url) return null
+  return {
+    id,
+    title: title || null,
+    issuer: issuer || null,
+    year,
+    url,
+    verifyUrl,
+  }
+}
+
+const normalizeCertificates = (value) => {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => normalizeCertificateEntry(item))
+    .filter(Boolean)
+    .slice(0, MAX_CERTIFICATES)
+}
+
+const resolveCertificateUrls = (req, value) =>
+  normalizeCertificates(value).map((certificate) => ({
+    ...certificate,
+    url: certificate.url ? resolvePublicUrl(req, certificate.url) : null,
+  }))
 
 const extractPortfolioUrl = (value) => {
   const normalized = normalizeText(value)
@@ -879,6 +943,7 @@ const loadMasterProfile = async (userId) => {
         categories,
         services,
         portfolio_urls AS "portfolioUrls",
+        certificates,
         is_active AS "isActive",
         schedule_days AS "scheduleDays",
         schedule_start AS "scheduleStart",
@@ -1416,6 +1481,11 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS cover_path TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS certificates JSONB NOT NULL DEFAULT '[]'::jsonb;
   `)
 
   await pool.query(`
@@ -2085,6 +2155,7 @@ app.get('/api/masters', async (req, res) => {
           mp.categories,
           mp.services,
           mp.portfolio_urls AS "portfolioUrls",
+          COALESCE(mp.certificates, '[]'::jsonb) AS "certificates",
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
@@ -2135,6 +2206,7 @@ app.get('/api/masters', async (req, res) => {
             )
           : null
       const average = Number(row.reviewsAverage)
+      const certificates = resolveCertificateUrls(req, row.certificates)
       return {
         userId: row.userId,
         displayName: row.displayName,
@@ -2153,6 +2225,7 @@ app.get('/api/masters', async (req, res) => {
         categories: row.categories,
         services: row.services,
         portfolioUrls: row.portfolioUrls,
+        certificates,
         showcaseUrls: row.showcaseUrls,
         updatedAt: row.updatedAt,
         distanceKm,
@@ -2218,6 +2291,7 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.categories,
           mp.services,
           mp.portfolio_urls AS "portfolioUrls",
+          COALESCE(mp.certificates, '[]'::jsonb) AS "certificates",
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
@@ -2262,8 +2336,10 @@ app.get('/api/masters/:userId', async (req, res) => {
     const followersCount = Number.isFinite(Number(row.followersCount))
       ? Number(row.followersCount)
       : 0
+    const certificates = resolveCertificateUrls(req, row.certificates)
     res.json({
       ...row,
+      certificates,
       reviewsAverage,
       reviewsCount,
       followersCount,
@@ -2693,6 +2769,45 @@ app.post('/api/masters/portfolio', async (req, res) => {
   }
 })
 
+app.post('/api/masters/certificates', async (req, res) => {
+  const { userId, dataUrl } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const parsed = parseImageDataUrl(dataUrl)
+  if (!parsed) {
+    res.status(400).json({ error: 'invalid_image' })
+    return
+  }
+
+  if (parsed.buffer.length > MAX_UPLOAD_BYTES) {
+    res.status(413).json({ error: 'image_too_large' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    const { relativePath, absolutePath } = buildCertificateUploadPath(
+      safeUserId,
+      parsed.mime
+    )
+
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true })
+    await fs.writeFile(absolutePath, parsed.buffer)
+
+    res.json({ ok: true, url: buildPublicUrl(req, relativePath), path: relativePath })
+  } catch (error) {
+    console.error('POST /api/masters/certificates failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.post('/api/requests/media', async (req, res) => {
   const { userId, dataUrl } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
@@ -2846,6 +2961,7 @@ app.post('/api/masters', async (req, res) => {
     services,
     portfolioUrls,
     showcaseUrls,
+    certificates,
   } = req.body ?? {}
 
   const normalizedUserId = normalizeText(userId)
@@ -2858,6 +2974,7 @@ app.post('/api/masters', async (req, res) => {
     : null
   const hasShowcase = Array.isArray(showcaseUrls)
   const showcaseList = hasShowcase ? normalizeStringArray(showcaseUrls) : null
+  const certificateList = normalizeCertificates(certificates)
   const scheduleDayList = normalizeStringArray(scheduleDays)
   const normalizedScheduleStart = normalizeText(scheduleStart) || null
   const normalizedScheduleEnd = normalizeText(scheduleEnd) || null
@@ -2937,9 +3054,10 @@ app.post('/api/masters', async (req, res) => {
           works_at_master,
           categories,
           services,
-          portfolio_urls
+          portfolio_urls,
+          certificates
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE($17, '{}'::text[]))
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE($17, '{}'::text[]), $18)
         ON CONFLICT (user_id) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             about = EXCLUDED.about,
@@ -2961,6 +3079,7 @@ app.post('/api/masters', async (req, res) => {
                 WHEN $17 IS NULL THEN master_profiles.portfolio_urls
                 ELSE $17
               END,
+            certificates = EXCLUDED.certificates,
             updated_at = NOW()
       `,
       [
@@ -2981,6 +3100,7 @@ app.post('/api/masters', async (req, res) => {
         categoryList,
         serviceList,
         portfolioList,
+        certificateList,
       ]
     )
 

@@ -9,7 +9,12 @@ import {
   IconUsers,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
-import type { MasterProfile, MasterReview, MasterReviewSummary } from '../types/app'
+import type {
+  MasterCertificate,
+  MasterProfile,
+  MasterReview,
+  MasterReviewSummary,
+} from '../types/app'
 import {
   isImageUrl,
   parsePortfolioItems,
@@ -87,6 +92,15 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
+
+const formatCertificateCount = (value: number) =>
+  formatCount(value, 'сертификат', 'сертификата', 'сертификатов')
+
+const buildCertificateMeta = (certificate: MasterCertificate) => {
+  const parts = [certificate.issuer, certificate.year?.toString()]
+    .filter((item): item is string => Boolean(item && item.trim()))
+  return parts.join(' · ')
+}
 
 const formatDistanceLabel = (value: number) => {
   if (value < 1) {
@@ -214,6 +228,9 @@ export const ClientMasterProfileScreen = ({
   const [reviewsError, setReviewsError] = useState('')
   const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
+    number | null
+  >(null)
+  const [certificateLightboxIndex, setCertificateLightboxIndex] = useState<
     number | null
   >(null)
   const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false)
@@ -528,6 +545,16 @@ export const ClientMasterProfileScreen = ({
   const previewTags = previewTagSource.slice(0, 3)
   const previewTagRemainder = previewTagSource.length - previewTags.length
   const isActive = Boolean(profile?.isActive ?? true)
+  const certificateItems = useMemo(
+    () =>
+      (Array.isArray(profile?.certificates) ? profile?.certificates : []).filter(
+        (certificate) => certificate.url?.toString().trim() || certificate.title
+      ),
+    [profile]
+  )
+  const certificateCount = certificateItems.length
+  const certificateCountLabel =
+    certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
 
   const portfolioGridItems = useMemo(
     () =>
@@ -575,9 +602,43 @@ export const ClientMasterProfileScreen = ({
   const isLightboxImage = portfolioLightboxItem
     ? isImageUrl(portfolioLightboxItem.url)
     : false
+  const certificateLightboxItem =
+    certificateLightboxIndex !== null
+      ? certificateItems[certificateLightboxIndex] ?? null
+      : null
+  const certificateLightboxTitle =
+    certificateLightboxItem?.title?.trim() || 'Сертификат'
+  const certificateLightboxMeta = certificateLightboxItem
+    ? buildCertificateMeta(certificateLightboxItem)
+    : ''
 
   const coverUrl = profile?.coverUrl ?? null
   const coverFocus = '50% 50%'
+  const openCertificateLightbox = (index: number) => {
+    if (!certificateItems[index]) return
+    setCertificateLightboxIndex(index)
+  }
+  const closeCertificateLightbox = () => {
+    setCertificateLightboxIndex(null)
+  }
+
+  useEffect(() => {
+    if (
+      certificateLightboxIndex !== null &&
+      !certificateItems[certificateLightboxIndex]
+    ) {
+      setCertificateLightboxIndex(null)
+    }
+  }, [certificateItems, certificateLightboxIndex])
+
+  useEffect(() => {
+    if (!certificateLightboxItem) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [certificateLightboxItem])
 
   useEffect(() => {
     if (profile && isFavorite) {
@@ -781,6 +842,69 @@ export const ClientMasterProfileScreen = ({
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div className="pro-profile-certificates is-client">
+                    <div className="pro-profile-certificates-head">
+                      <div>
+                        <p className="pro-profile-certificates-kicker">Квалификация</p>
+                        <h3 className="pro-profile-certificates-title">
+                          Сертификаты
+                        </h3>
+                      </div>
+                      <div className="pro-profile-certificates-actions">
+                        <span className="pro-profile-certificates-count">
+                          {certificateCountLabel}
+                        </span>
+                      </div>
+                    </div>
+                    {certificateItems.length > 0 ? (
+                      <div className="pro-profile-certificates-list" role="list">
+                        {certificateItems.map((certificate, index) => {
+                          const meta = buildCertificateMeta(certificate)
+                          const title = certificate.title?.trim() || 'Сертификат'
+                          return (
+                            <button
+                              className="pro-profile-certificate-card"
+                              type="button"
+                              key={certificate.id ?? `${certificate.url}-${index}`}
+                              onClick={() => openCertificateLightbox(index)}
+                              role="listitem"
+                              aria-label={title}
+                            >
+                              <div className="pro-profile-certificate-media">
+                                {certificate.url ? (
+                                  <img
+                                    src={certificate.url}
+                                    alt=""
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <span className="pro-profile-certificate-fallback">
+                                    CERT
+                                  </span>
+                                )}
+                              </div>
+                              <div className="pro-profile-certificate-info">
+                                <span className="pro-profile-certificate-title">
+                                  {title}
+                                </span>
+                                <span
+                                  className={`pro-profile-certificate-meta${
+                                    meta ? '' : ' is-muted'
+                                  }`}
+                                >
+                                  {meta || 'Данные не указаны'}
+                                </span>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="pro-profile-certificates-empty">
+                        Сертификатов пока нет.
+                      </div>
+                    )}
                   </div>
                   <div className="pro-profile-ig-tags">
                     {previewTags.length > 0 ? (
@@ -1174,6 +1298,66 @@ export const ClientMasterProfileScreen = ({
                 </a>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {certificateLightboxItem && (
+        <div
+          className="pro-portfolio-lightbox-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeCertificateLightbox}
+        >
+          <div
+            className="pro-portfolio-lightbox is-certificate"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="pro-portfolio-lightbox-head">
+              <div>
+                <p className="pro-portfolio-lightbox-kicker">Сертификат</p>
+                <h3 className="pro-portfolio-lightbox-title">
+                  {certificateLightboxTitle}
+                </h3>
+                {certificateLightboxMeta && (
+                  <p className="pro-portfolio-lightbox-subtitle">
+                    {certificateLightboxMeta}
+                  </p>
+                )}
+              </div>
+              <button
+                className="pro-portfolio-lightbox-close"
+                type="button"
+                onClick={closeCertificateLightbox}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="pro-portfolio-lightbox-media is-certificate">
+              {certificateLightboxItem.url ? (
+                <img
+                  src={certificateLightboxItem.url}
+                  alt={certificateLightboxTitle}
+                  loading="lazy"
+                />
+              ) : (
+                <span className="pro-profile-certificate-fallback">
+                  Нет изображения
+                </span>
+              )}
+            </div>
+            {certificateLightboxItem.verifyUrl && (
+              <div className="pro-portfolio-lightbox-actions">
+                <a
+                  className="pro-portfolio-lightbox-action"
+                  href={certificateLightboxItem.verifyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Проверить сертификат
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}
