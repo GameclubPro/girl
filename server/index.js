@@ -623,6 +623,7 @@ const createChatForRequest = async ({
 
     let systemMessageId = null
     let systemMessageCreatedAt = null
+    let systemMessage = null
 
     if (isNew) {
       const body = serviceName
@@ -641,6 +642,16 @@ const createChatForRequest = async ({
       systemMessageId = messageId
       systemMessageCreatedAt = messageResult.rows[0]?.createdAt ?? null
       if (messageId) {
+        systemMessage = {
+          id: messageId,
+          chatId,
+          senderId: null,
+          type: 'system',
+          body,
+          meta,
+          attachmentUrl: null,
+          createdAt: systemMessageCreatedAt,
+        }
         await pool.query(
           `
             UPDATE chats
@@ -676,6 +687,7 @@ const createChatForRequest = async ({
       isNew,
       systemMessageId,
       systemMessageCreatedAt,
+      systemMessage,
     }
   } catch (error) {
     await pool.query('ROLLBACK')
@@ -737,6 +749,7 @@ const createChatForBooking = async ({
 
     let systemMessageId = null
     let systemMessageCreatedAt = null
+    let systemMessage = null
 
     if (isNew) {
       const body = serviceName
@@ -755,6 +768,16 @@ const createChatForBooking = async ({
       systemMessageId = messageId
       systemMessageCreatedAt = messageResult.rows[0]?.createdAt ?? null
       if (messageId) {
+        systemMessage = {
+          id: messageId,
+          chatId,
+          senderId: null,
+          type: 'system',
+          body,
+          meta,
+          attachmentUrl: null,
+          createdAt: systemMessageCreatedAt,
+        }
         await pool.query(
           `
             UPDATE chats
@@ -790,6 +813,7 @@ const createChatForBooking = async ({
       isNew,
       systemMessageId,
       systemMessageCreatedAt,
+      systemMessage,
     }
   } catch (error) {
     await pool.query('ROLLBACK')
@@ -3531,7 +3555,13 @@ app.patch('/api/bookings/:id', async (req, res) => {
             chatId: chatPayload.chatId,
             bookingId,
           })
-          if (chatPayload.systemMessageId) {
+          if (chatPayload.systemMessage) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              message: chatPayload.systemMessage,
+            })
+          } else if (chatPayload.systemMessageId) {
             void notifyChatMembers(chatPayload.chatId, {
               type: 'message:new',
               chatId: chatPayload.chatId,
@@ -3633,7 +3663,13 @@ app.patch('/api/bookings/:id', async (req, res) => {
             chatId: chatPayload.chatId,
             bookingId,
           })
-          if (chatPayload.systemMessageId) {
+          if (chatPayload.systemMessage) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              message: chatPayload.systemMessage,
+            })
+          } else if (chatPayload.systemMessageId) {
             void notifyChatMembers(chatPayload.chatId, {
               type: 'message:new',
               chatId: chatPayload.chatId,
@@ -4449,7 +4485,13 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             requestId,
             responseId,
           })
-          if (chatPayload?.systemMessageId) {
+          if (chatPayload?.systemMessage) {
+            void notifyChatMembers(chatId, {
+              type: 'message:new',
+              chatId,
+              message: chatPayload.systemMessage,
+            })
+          } else if (chatPayload?.systemMessageId) {
             void notifyChatMembers(chatId, {
               type: 'message:new',
               chatId,

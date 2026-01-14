@@ -139,6 +139,13 @@ export const ChatThreadScreen = ({
   const selfTypingTimeoutRef = useRef<number | null>(null)
   const isSelfTypingRef = useRef(false)
   const lastReadSentRef = useRef<number | null>(null)
+  const detailAbortRef = useRef<AbortController | null>(null)
+  const messagesAbortRef = useRef<{
+    initial: AbortController | null
+    more: AbortController | null
+  }>({ initial: null, more: null })
+  const detailRequestIdRef = useRef(0)
+  const messagesRequestIdRef = useRef({ initial: 0, more: 0 })
 
   const limit = 30
   const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
@@ -181,13 +188,16 @@ export const ChatThreadScreen = ({
     []
   )
 
-  const getScrollElement = useCallback(
-    () =>
-      messagesContainerRef.current ??
-      document.scrollingElement ??
-      document.documentElement,
-    []
-  )
+  const getScrollElement = useCallback(() => {
+    const container = messagesContainerRef.current
+    if (container) {
+      const isScrollable = container.scrollHeight - container.clientHeight > 4
+      if (isScrollable) {
+        return container
+      }
+    }
+    return (document.scrollingElement ?? document.documentElement) as HTMLElement
+  }, [])
 
   const mergeMessages = useCallback((incoming: ChatMessage[]) => {
     setMessages((current) => {
@@ -308,6 +318,7 @@ export const ChatThreadScreen = ({
     async (beforeId?: number, options?: { silent?: boolean }) => {
       const target = beforeId ? 'more' : 'initial'
       const silent = options?.silent ?? false
+      const requestId = (messagesRequestIdRef.current[target] += 1)
       if (target === 'more') {
         if (isLoadingMoreRef.current || !hasMoreRef.current) return
         isLoadingMoreRef.current = true
@@ -325,6 +336,11 @@ export const ChatThreadScreen = ({
       const container = getScrollElement()
       const prevScrollHeight = container?.scrollHeight ?? 0
       const prevScrollTop = container?.scrollTop ?? 0
+      if (messagesAbortRef.current[target]) {
+        messagesAbortRef.current[target]?.abort()
+      }
+      const controller = new AbortController()
+      messagesAbortRef.current[target] = controller
       try {
         const params = new URLSearchParams()
         params.set('userId', userId)
@@ -333,13 +349,20 @@ export const ChatThreadScreen = ({
           params.set('beforeId', String(beforeId))
         }
         const response = await fetch(
-          `${apiBase}/api/chats/${chatId}/messages?${params.toString()}`
+          `${apiBase}/api/chats/${chatId}/messages?${params.toString()}`,
+          { signal: controller.signal }
         )
         if (!response.ok) {
           throw new Error('Load messages failed')
         }
         const data = (await response.json()) as { items?: ChatMessage[] }
         const items = Array.isArray(data.items) ? data.items : []
+        if (
+          controller.signal.aborted ||
+          messagesRequestIdRef.current[target] !== requestId
+        ) {
+          return
+        }
         mergeMessages(items)
         if (items.length < limit) {
           hasMoreRef.current = false
@@ -347,7 +370,7 @@ export const ChatThreadScreen = ({
         }
         if (!beforeId) {
           const last = items[items.length - 1]
-          if (last && last.senderId !== userId) {
+          if (last && last.senderId !== userId && isNearBottomRef.current) {
             lastReadSentRef.current = last.id
             void markRead(last.id)
           }
@@ -362,16 +385,25 @@ export const ChatThreadScreen = ({
           })
         }
       } catch (error) {
+        if (controller.signal.aborted) {
+          return
+        }
         console.error('Failed to load messages:', error)
         if (!silent) {
           setLoadError('Не удалось загрузить сообщения.')
         }
       } finally {
-        if (!silent) {
-          setIsLoading(false)
+        if (messagesRequestIdRef.current[target] === requestId) {
+          if (target === 'more') {
+            isLoadingMoreRef.current = false
+            setIsLoadingMore(false)
+          } else if (!silent) {
+            setIsLoading(false)
+          }
+          if (messagesAbortRef.current[target] === controller) {
+            messagesAbortRef.current[target] = null
+          }
         }
-        isLoadingMoreRef.current = false
-        setIsLoadingMore(false)
       }
     },
     [apiBase, chatId, getScrollElement, limit, markRead, mergeMessages, userId]
@@ -381,17 +413,30 @@ export const ChatThreadScreen = ({
     async (options?: { silent?: boolean }) => {
       if (!userId) return
       const silent = options?.silent ?? false
+      const requestId = (detailRequestIdRef.current += 1)
       if (!silent) {
         setIsDetailLoading(true)
       }
+      if (detailAbortRef.current) {
+        detailAbortRef.current.abort()
+      }
+      const controller = new AbortController()
+      detailAbortRef.current = controller
       try {
         const response = await fetch(
-          `${apiBase}/api/chats/${chatId}?userId=${encodeURIComponent(userId)}`
+          `${apiBase}/api/chats/${chatId}?userId=${encodeURIComponent(userId)}`,
+          { signal: controller.signal }
         )
         if (!response.ok) {
           throw new Error('Load chat detail failed')
         }
         const data = (await response.json()) as ChatDetail
+        if (
+          controller.signal.aborted ||
+          detailRequestIdRef.current !== requestId
+        ) {
+          return
+        }
         if (data) {
           setDetail(data)
           setCachedChatDetail(apiBase, userId, chatId, data)
@@ -400,13 +445,21 @@ export const ChatThreadScreen = ({
           )
         }
       } catch (error) {
+        if (controller.signal.aborted) {
+          return
+        }
         console.error('Failed to load chat detail:', error)
         if (!silent) {
           setLoadError('Не удалось загрузить чат.')
         }
       } finally {
-        if (!silent) {
-          setIsDetailLoading(false)
+        if (detailRequestIdRef.current === requestId) {
+          if (!silent) {
+            setIsDetailLoading(false)
+          }
+          if (detailAbortRef.current === controller) {
+            detailAbortRef.current = null
+          }
         }
       }
     },
@@ -456,6 +509,23 @@ export const ChatThreadScreen = ({
 
   useEffect(() => {
     return () => {
+      if (detailAbortRef.current) {
+        detailAbortRef.current.abort()
+        detailAbortRef.current = null
+      }
+      if (messagesAbortRef.current.initial) {
+        messagesAbortRef.current.initial.abort()
+        messagesAbortRef.current.initial = null
+      }
+      if (messagesAbortRef.current.more) {
+        messagesAbortRef.current.more.abort()
+        messagesAbortRef.current.more = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
       if (selfTypingTimeoutRef.current) {
         window.clearTimeout(selfTypingTimeoutRef.current)
         selfTypingTimeoutRef.current = null
@@ -499,7 +569,7 @@ export const ChatThreadScreen = ({
         } else {
           setHasNewMessage(true)
         }
-        if (!isOwn) {
+        if (!isOwn && isNearBottomRef.current) {
           void markRead(incoming.id)
         }
         return
@@ -870,7 +940,11 @@ export const ChatThreadScreen = ({
             </span>
             <div className="chat-thread-subline">
               <span className="chat-thread-subtitle">{headerSubtitle}</span>
-              <span className={`chat-connection is-compact ${connectionTone}`}>
+              <span
+                className={`chat-connection is-compact ${connectionTone}`}
+                role="status"
+                aria-live="polite"
+              >
                 {connectionLabel}
               </span>
             </div>
@@ -936,12 +1010,20 @@ export const ChatThreadScreen = ({
           )
         )}
 
-        {loadError && <p className="chat-error">{loadError}</p>}
+        {loadError && (
+          <p className="chat-error" role="alert">
+            {loadError}
+          </p>
+        )}
         {isLoading && messages.length === 0 && (
-          <p className="chat-status">Загружаем сообщения...</p>
+          <p className="chat-status" role="status" aria-live="polite">
+            Загружаем сообщения...
+          </p>
         )}
         {!isLoading && messages.length === 0 && !loadError && (
-          <p className="chat-status">Сообщений пока нет.</p>
+          <p className="chat-status" role="status" aria-live="polite">
+            Сообщений пока нет.
+          </p>
         )}
 
         <div
@@ -1046,7 +1128,7 @@ export const ChatThreadScreen = ({
             )
           })}
           {isCounterpartTyping && (
-            <div className="chat-typing">
+            <div className="chat-typing" role="status" aria-live="polite">
               <span className="chat-typing-dot" />
               <span className="chat-typing-dot" />
               <span className="chat-typing-dot" />
@@ -1180,6 +1262,9 @@ export const ChatThreadScreen = ({
             placeholder="Напишите сообщение"
             value={composerText}
             onChange={handleComposerChange}
+            enterKeyHint="send"
+            autoCapitalize="sentences"
+            autoCorrect="on"
           />
           <button
             className="chat-send"
@@ -1190,7 +1275,11 @@ export const ChatThreadScreen = ({
             Отправить
           </button>
         </div>
-        {sendError && <p className="chat-error">{sendError}</p>}
+        {sendError && (
+          <p className="chat-error" role="alert">
+            {sendError}
+          </p>
+        )}
       </div>
     </div>
   )

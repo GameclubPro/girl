@@ -51,6 +51,24 @@ const getInitials = (value: string) => {
   return normalized.slice(0, 2).toUpperCase()
 }
 
+const getMessagePreview = (message?: ChatMessage | null) => {
+  if (!message) return ''
+  const body = message.body?.trim()
+  if (body) return body
+  switch (message.type) {
+    case 'image':
+      return 'Фото'
+    case 'system':
+      return 'Системное сообщение'
+    case 'offer_price':
+    case 'offer_time':
+    case 'offer_location':
+      return 'Новое предложение'
+    default:
+      return ''
+  }
+}
+
 export const ChatListScreen = ({
   apiBase,
   userId,
@@ -71,6 +89,9 @@ export const ChatListScreen = ({
   const reloadTimerRef = useRef<number | null>(null)
   const isReadyRef = useRef(false)
   const isLoadingRef = useRef(false)
+  const loadAbortRef = useRef<AbortController | null>(null)
+  const loadRequestIdRef = useRef(0)
+  const listUpdateTokenRef = useRef(0)
 
   const connectionLabel =
     streamStatus === 'connected'
@@ -126,6 +147,8 @@ export const ChatListScreen = ({
       if (!userId) return
       if (isLoadingRef.current) return
       const silent = options?.silent ?? false
+      const requestId = (loadRequestIdRef.current += 1)
+      const updateToken = listUpdateTokenRef.current
 
       isLoadingRef.current = true
       if (!silent) {
@@ -133,29 +156,50 @@ export const ChatListScreen = ({
         setLoadError('')
       }
 
+      if (loadAbortRef.current) {
+        loadAbortRef.current.abort()
+      }
+      const controller = new AbortController()
+      loadAbortRef.current = controller
+
       try {
         const response = await fetch(
-          `${apiBase}/api/chats?userId=${encodeURIComponent(userId)}`
+          `${apiBase}/api/chats?userId=${encodeURIComponent(userId)}`,
+          { signal: controller.signal }
         )
         if (!response.ok) {
           throw new Error('Load chats failed')
         }
         const data = (await response.json()) as ChatSummary[]
         const next = Array.isArray(data) ? data : []
+        if (
+          loadRequestIdRef.current !== requestId ||
+          listUpdateTokenRef.current !== updateToken
+        ) {
+          return
+        }
         setItems(next)
         setCachedChatList(apiBase, userId, next)
         setLoadError('')
         isReadyRef.current = true
       } catch (error) {
+        if (controller.signal.aborted) {
+          return
+        }
         console.error('Failed to load chats:', error)
         if (!silent) {
           setLoadError('Не удалось загрузить чаты.')
         }
       } finally {
-        if (!silent) {
-          setIsLoading(false)
+        if (loadRequestIdRef.current === requestId) {
+          if (!silent) {
+            setIsLoading(false)
+          }
+          isLoadingRef.current = false
+          if (loadAbortRef.current === controller) {
+            loadAbortRef.current = null
+          }
         }
-        isLoadingRef.current = false
       }
     },
     [apiBase, userId]
@@ -180,6 +224,10 @@ export const ChatListScreen = ({
     }
     void loadChats({ silent: Boolean(cached) })
     return () => {
+      if (loadAbortRef.current) {
+        loadAbortRef.current.abort()
+        loadAbortRef.current = null
+      }
       if (reloadTimerRef.current !== null) {
         window.clearTimeout(reloadTimerRef.current)
       }
@@ -193,8 +241,12 @@ export const ChatListScreen = ({
       if (!isReadyRef.current) return
       if (payload?.type === 'message:new') {
         const incoming = payload.message as ChatMessage | undefined
-        if (!incoming?.chatId) return
+        if (!incoming?.chatId) {
+          scheduleReload()
+          return
+        }
         let handled = false
+        listUpdateTokenRef.current += 1
         setItems((current) => {
           const index = current.findIndex((item) => item.id === incoming.chatId)
           if (index === -1) return current
@@ -230,6 +282,7 @@ export const ChatListScreen = ({
         const readerId =
           typeof payload.userId === 'string' ? payload.userId : null
         if (!chatId || readerId !== userId) return
+        listUpdateTokenRef.current += 1
         setItems((current) => {
           const next = current.map((item) =>
             item.id === chatId ? { ...item, unreadCount: 0 } : item
@@ -265,7 +318,11 @@ export const ChatListScreen = ({
           <div>
             <p className="chat-eyebrow">Сообщения</p>
             <h1 className="chat-title">Чаты</h1>
-            <span className={`chat-connection ${connectionTone}`}>
+            <span
+              className={`chat-connection ${connectionTone}`}
+              role="status"
+              aria-live="polite"
+            >
               {connectionLabel}
             </span>
           </div>
@@ -325,7 +382,11 @@ export const ChatListScreen = ({
           )}
         </div>
 
-        {loadError && <p className="chat-error">{loadError}</p>}
+        {loadError && (
+          <p className="chat-error" role="alert">
+            {loadError}
+          </p>
+        )}
         {isLoading && items.length === 0 && (
           <div className="chat-list is-skeleton" aria-hidden="true">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -388,7 +449,7 @@ export const ChatListScreen = ({
             const statusLabel =
               chat.contextType === 'booking' ? 'Подтверждено' : 'Согласовано'
             const lastMessage = chat.lastMessage
-            const lastLabel = lastMessage?.body ?? 'Откройте чат'
+            const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
             const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
             const unreadCount = chat.unreadCount ?? 0
 

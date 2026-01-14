@@ -15495,6 +15495,13 @@ h2 {
   text-align: left;
   cursor: pointer;
   box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.1);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.chat-card:active {
+  transform: scale(0.985);
 }
 
 .chat-card.is-skeleton {
