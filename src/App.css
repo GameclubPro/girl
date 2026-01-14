@@ -2930,28 +2930,40 @@
 .analytics-chart-wrap {
   position: relative;
   touch-action: pan-y;
+  padding: 8px 10px 6px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--surface-muted-rgb), 0.6),
+    rgba(var(--paper-rgb), 0.9)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 12px 20px rgba(var(--shadow-rgb), 0.08);
 }
 
 .analytics-chart--donut {
-  width: 150px;
-  height: 150px;
+  width: 160px;
+  height: 160px;
   margin: 0 auto;
 }
 
 .chart-grid line {
-  stroke: rgba(var(--shadow-rgb), 0.08);
+  stroke: rgba(var(--shadow-rgb), 0.12);
   stroke-width: 1;
+  stroke-dasharray: 4 6;
 }
 
 .chart-highlight-line {
-  stroke: rgba(var(--accent-rgb), 0.2);
+  stroke: rgba(var(--accent-rgb), 0.24);
   stroke-width: 1;
   stroke-dasharray: 4 4;
 }
 
 .chart-line {
   stroke: currentColor;
-  stroke-width: 3;
+  stroke-width: 3.2;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -2959,26 +2971,37 @@
 
 .chart-area {
   fill: currentColor;
-  opacity: 0.15;
+  opacity: 1;
 }
 
 .chart-dot {
   fill: currentColor;
-  stroke: #ffffff;
+  stroke: #f8fafc;
   stroke-width: 2;
 }
 
 .chart-bar {
-  fill: rgba(var(--accent-rgb), 0.78);
+  stroke: rgba(var(--shadow-rgb), 0.1);
+  stroke-width: 1;
+}
+
+.chart-bar-highlight {
+  opacity: 0.75;
 }
 
 .chart-donut-track {
-  stroke: rgba(var(--shadow-rgb), 0.08);
+  stroke: rgba(var(--shadow-rgb), 0.12);
 }
 
 .chart-donut-segment {
   stroke: currentColor;
   stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-donut-center {
+  stroke: rgba(var(--shadow-rgb), 0.08);
+  stroke-width: 1;
 }
 
 .chart-donut-label {
@@ -2994,21 +3017,17 @@
 }
 
 .chart-bubble circle {
-  fill: rgba(var(--accent-rgb), 0.2);
   stroke: rgba(var(--accent-rgb), 0.55);
-  stroke-width: 1.5;
+  stroke-width: 1.2;
 }
 
 .chart-waterfall-bar {
-  fill: rgba(var(--accent-rgb), 0.75);
+  stroke: rgba(var(--shadow-rgb), 0.1);
+  stroke-width: 1;
 }
 
-.chart-waterfall-bar.is-negative {
-  fill: rgba(var(--danger-rgb), 0.75);
-}
-
-.chart-waterfall-bar.is-total {
-  fill: rgba(var(--success-rgb), 0.8);
+.chart-waterfall-highlight {
+  opacity: 0.7;
 }
 
 .analytics-legend {
@@ -3207,13 +3226,14 @@
   padding: 8px 10px;
   border-radius: 14px;
   border: 1px solid rgba(var(--shadow-rgb), 0.16);
-  background: rgba(var(--paper-rgb), 0.96);
+  background: rgba(var(--paper-rgb), 0.92);
   box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.12);
   display: flex;
   flex-direction: column;
   gap: 6px;
   z-index: 2;
   pointer-events: none;
+  backdrop-filter: blur(10px);
 }
 
 .analytics-tooltip-date {
