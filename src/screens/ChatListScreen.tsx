@@ -51,7 +51,7 @@ const getInitials = (value: string) => {
   return normalized.slice(0, 2).toUpperCase()
 }
 
-const getMessagePreview = (message?: ChatMessage | null) => {
+const getMessagePreview = (message?: ChatSummary['lastMessage'] | null) => {
   if (!message) return ''
   const body = message.body?.trim()
   if (body) return body
