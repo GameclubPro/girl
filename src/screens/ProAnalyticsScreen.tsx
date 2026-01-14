@@ -421,8 +421,8 @@ export const ProAnalyticsScreen = ({
 
         {data && summary && (
           <>
-            <section className="analytics-summary-grid animate delay-1">
-              <article className="analytics-summary-card is-primary is-wide">
+            <section className="analytics-summary-grid">
+              <article className="analytics-summary-card">
                 <div className="analytics-summary-head">
                   <div>
                     <p className="analytics-summary-label">Выручка</p>
@@ -555,7 +555,9 @@ export const ProAnalyticsScreen = ({
 
             {insight && (
               <section
-                className={`analytics-insight animate delay-2 is-${insight.tone}`}
+                className={`analytics-insight${
+                  insight.tone === 'neutral' ? '' : ` is-${insight.tone}`
+                }`}
               >
                 <div className="analytics-insight-content">
                   <p className="analytics-insight-title">{insight.title}</p>
