@@ -7831,9 +7831,11 @@
 .pro-profile-certificates-list {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: clamp(120px, 38vw, 150px);
+  grid-auto-columns: 128px;
   gap: 8px;
   align-items: start;
+  justify-content: start;
+  align-content: start;
   overflow-x: auto;
   padding-bottom: 4px;
   scroll-snap-type: x proximity;
@@ -7922,7 +7924,7 @@
 
 @media (max-width: 360px) {
   .pro-profile-certificates-list {
-    grid-auto-columns: clamp(110px, 44vw, 132px);
+    grid-auto-columns: 116px;
     gap: 6px;
   }
 
