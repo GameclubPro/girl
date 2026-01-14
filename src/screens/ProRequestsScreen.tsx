@@ -581,11 +581,6 @@ export const ProRequestsScreen = ({
   }, [missingFields])
   const missingSummary =
     missingLabels.length > 0 ? missingLabels.join(', ') : 'минимум профиля'
-  const panelClassName =
-    activeTab === 'bookings'
-      ? 'pro-requests-panel animate delay-2'
-      : 'pro-card pro-requests-panel animate delay-2'
-
   const renderBookingItem = (booking: Booking, options?: { archived?: boolean }) => {
     const statusLabel =
       bookingStatusLabelMap[booking.status] ?? booking.status
@@ -1036,183 +1031,182 @@ export const ProRequestsScreen = ({
           </div>
         </section>
 
-        <section className={panelClassName}>
-          {!isActive && (
-            <div className="pro-banner">
-              <div>
-                <div className="pro-banner-title">Вы на паузе</div>
-                <p className="pro-banner-text">
-                  Включите прием заявок в кабинете или в профиле.
-                </p>
-              </div>
-              <button
-                className="pro-banner-button"
-                type="button"
-                onClick={() => onEditProfile('availability')}
-              >
-                Изменить
-              </button>
+        {!isActive && (
+          <div className="pro-banner">
+            <div>
+              <div className="pro-banner-title">Вы на паузе</div>
+              <p className="pro-banner-text">
+                Включите прием заявок в кабинете или в профиле.
+              </p>
             </div>
-          )}
-          {missingFields.length > 0 && (
-            <div className="pro-banner">
-              <div>
-                <div className="pro-banner-title">Чтобы откликаться</div>
-                <p className="pro-banner-text">
-                  Заполните профиль: {missingSummary}.
-                </p>
-              </div>
-              <button
-                className="pro-banner-button"
-                type="button"
-                onClick={() => onEditProfile('basic')}
-              >
-                Заполнить
-              </button>
-            </div>
-          )}
-          <div
-            className="requests-tabs pro-requests-tabs"
-            role="tablist"
-            aria-label="Разделы"
-          >
             <button
-              className={`requests-tab${activeTab === 'requests' ? ' is-active' : ''}`}
+              className="pro-banner-button"
               type="button"
-              role="tab"
-              aria-selected={activeTab === 'requests'}
-              onClick={() => setActiveTab('requests')}
+              onClick={() => onEditProfile('availability')}
             >
-              Заявки
-              <span className="requests-tab-count">
-                {items.length + pendingBookingItems.length}
-              </span>
-            </button>
-            <button
-              className={`requests-tab${activeTab === 'bookings' ? ' is-active' : ''}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'bookings'}
-              onClick={() => setActiveTab('bookings')}
-            >
-              Записи
-              <span className="requests-tab-count">
-                {confirmedBookingItems.length}
-              </span>
+              Изменить
             </button>
           </div>
+        )}
+        {missingFields.length > 0 && (
+          <div className="pro-banner">
+            <div>
+              <div className="pro-banner-title">Чтобы откликаться</div>
+              <p className="pro-banner-text">
+                Заполните профиль: {missingSummary}.
+              </p>
+            </div>
+            <button
+              className="pro-banner-button"
+              type="button"
+              onClick={() => onEditProfile('basic')}
+            >
+              Заполнить
+            </button>
+          </div>
+        )}
+        <div
+          className="requests-tabs pro-requests-tabs"
+          role="tablist"
+          aria-label="Разделы"
+        >
+          <button
+            className={`requests-tab${activeTab === 'requests' ? ' is-active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'requests'}
+            onClick={() => setActiveTab('requests')}
+          >
+            Заявки
+            <span className="requests-tab-count">
+              {items.length + pendingBookingItems.length}
+            </span>
+          </button>
+          <button
+            className={`requests-tab${activeTab === 'bookings' ? ' is-active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'bookings'}
+            onClick={() => setActiveTab('bookings')}
+          >
+            Записи
+            <span className="requests-tab-count">
+              {confirmedBookingItems.length}
+            </span>
+          </button>
+        </div>
 
-          {activeTab === 'requests' && (
-            <>
-              {isLoading && <p className="requests-status">Загружаем заявки...</p>}
-              {loadError && <p className="requests-error">{loadError}</p>}
-              {isBookingsLoading && (
-                <p className="requests-status">Загружаем записи...</p>
-              )}
-              {bookingsError && <p className="requests-error">{bookingsError}</p>}
+        {activeTab === 'requests' && (
+          <>
+            {isLoading && <p className="requests-status">Загружаем заявки...</p>}
+            {loadError && <p className="requests-error">{loadError}</p>}
+            {isBookingsLoading && (
+              <p className="requests-status">Загружаем записи...</p>
+            )}
+            {bookingsError && <p className="requests-error">{bookingsError}</p>}
 
-              {!isLoading &&
-                !isBookingsLoading &&
-                !items.length &&
-                pendingBookingItems.length === 0 &&
-                !loadError &&
-                !bookingsError && (
-                <p className="requests-empty">
-                  {!isActive
-                    ? 'Вы на паузе. Включите прием заявок.'
-                    : missingFields.some((field) => field !== 'displayName')
-                    ? 'Заполните профиль, чтобы видеть заявки рядом.'
-                    : 'Пока нет заявок и записей на подтверждении.'}
-                </p>
-              )}
+            {!isLoading &&
+              !isBookingsLoading &&
+              !items.length &&
+              pendingBookingItems.length === 0 &&
+              !loadError &&
+              !bookingsError && (
+              <p className="requests-empty">
+                {!isActive
+                  ? 'Вы на паузе. Включите прием заявок.'
+                  : missingFields.some((field) => field !== 'displayName')
+                  ? 'Заполните профиль, чтобы видеть заявки рядом.'
+                  : 'Пока нет заявок и записей на подтверждении.'}
+              </p>
+            )}
 
-              {items.length > 0 && (
-                <div className="requests-section">
-                  <div className="requests-section-head">
-                    <span className="requests-section-title">Входящие заявки</span>
-                    <span className="requests-section-count">{items.length}</span>
-                  </div>
-                  <div className="requests-list">
-                    {items.map((item) => {
-                      const categoryLabel =
-                        categoryItems.find(
-                          (category) => category.id === item.categoryId
-                        )?.label ?? item.categoryId
-                      const locationLabel =
-                        locationLabelMap[item.locationType] ?? 'Не важно'
-                      const distanceLabel = formatDistance(item.distanceKm)
-                      const dateLabel =
-                        item.dateOption === 'choose'
-                          ? formatDateTime(item.dateTime) || 'По договоренности'
-                          : dateLabelMap[item.dateOption]
-                      const statusLabel =
-                        item.status === 'open' ? 'Открыта' : 'Закрыта'
-                      const tagItems = Array.isArray(item.tags) ? item.tags : []
-                      const photoItems = Array.isArray(item.photoUrls)
-                        ? item.photoUrls
-                        : []
-                      const responseStatusLabel = item.responseStatus
-                        ? responseStatusLabelMap[
-                            item.responseStatus as keyof typeof responseStatusLabelMap
-                          ] ?? item.responseStatus
-                        : ''
-                      const dispatchTimeLeft = formatTimeLeft(item.dispatchExpiresAt)
-                      const dispatchBatchLabel = item.dispatchBatch
-                        ? `Волна ${item.dispatchBatch}`
-                        : ''
-                      const isFinalResponse = ['accepted', 'rejected', 'expired'].includes(
-                        item.responseStatus ?? ''
-                      )
-                      const draft = drafts[item.id] ?? {
-                        price: '',
-                        comment: '',
-                        proposedTime: '',
-                      }
-                      const isSubmitting = submittingId === item.id
-                      const canRespond =
-                        missingFields.length === 0 &&
-                        isActive &&
-                        item.status === 'open' &&
-                        !isFinalResponse &&
-                        (item.responseStatus === 'sent' || Boolean(dispatchTimeLeft))
+            {items.length > 0 && (
+              <div className="requests-section">
+                <div className="requests-section-head">
+                  <span className="requests-section-title">Входящие заявки</span>
+                  <span className="requests-section-count">{items.length}</span>
+                </div>
+                <div className="requests-list">
+                  {items.map((item) => {
+                    const categoryLabel =
+                      categoryItems.find(
+                        (category) => category.id === item.categoryId
+                      )?.label ?? item.categoryId
+                    const locationLabel =
+                      locationLabelMap[item.locationType] ?? 'Не важно'
+                    const distanceLabel = formatDistance(item.distanceKm)
+                    const dateLabel =
+                      item.dateOption === 'choose'
+                        ? formatDateTime(item.dateTime) || 'По договоренности'
+                        : dateLabelMap[item.dateOption]
+                    const statusLabel =
+                      item.status === 'open' ? 'Открыта' : 'Закрыта'
+                    const tagItems = Array.isArray(item.tags) ? item.tags : []
+                    const photoItems = Array.isArray(item.photoUrls)
+                      ? item.photoUrls
+                      : []
+                    const responseStatusLabel = item.responseStatus
+                      ? responseStatusLabelMap[
+                          item.responseStatus as keyof typeof responseStatusLabelMap
+                        ] ?? item.responseStatus
+                      : ''
+                    const dispatchTimeLeft = formatTimeLeft(item.dispatchExpiresAt)
+                    const dispatchBatchLabel = item.dispatchBatch
+                      ? `Волна ${item.dispatchBatch}`
+                      : ''
+                    const isFinalResponse = ['accepted', 'rejected', 'expired'].includes(
+                      item.responseStatus ?? ''
+                    )
+                    const draft = drafts[item.id] ?? {
+                      price: '',
+                      comment: '',
+                      proposedTime: '',
+                    }
+                    const isSubmitting = submittingId === item.id
+                    const canRespond =
+                      missingFields.length === 0 &&
+                      isActive &&
+                      item.status === 'open' &&
+                      !isFinalResponse &&
+                      (item.responseStatus === 'sent' || Boolean(dispatchTimeLeft))
 
-                      return (
-                        <div className="pro-request-item" key={item.id}>
-                          <div className="request-item-top">
-                            <div className="request-item-title">
-                              {item.serviceName}
+                    return (
+                      <div className="pro-request-item" key={item.id}>
+                        <div className="request-item-top">
+                          <div className="request-item-title">
+                            {item.serviceName}
+                          </div>
+                          <span
+                            className={`request-status${
+                              item.status === 'open' ? ' is-open' : ' is-closed'
+                            }`}
+                          >
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <div className="request-item-meta">
+                          {categoryLabel}
+                          {item.budget ? ` • ${item.budget}` : ''}
+                        </div>
+                        <div className="request-item-meta">
+                          {locationLabel}
+                          {item.cityName ? ` • ${item.cityName}` : ''}
+                          {item.districtName ? ` • ${item.districtName}` : ''}
+                          {distanceLabel ? ` • ${distanceLabel}` : ''}
+                        </div>
+                        <div className="request-item-meta">{dateLabel}</div>
+                        {item.status === 'open' &&
+                          !item.responseStatus &&
+                          (dispatchTimeLeft || dispatchBatchLabel) && (
+                            <div className="request-item-meta request-item-meta--hint">
+                              {dispatchBatchLabel}
+                              {dispatchBatchLabel && dispatchTimeLeft ? ' • ' : ''}
+                              {dispatchTimeLeft
+                                ? `Осталось ${dispatchTimeLeft} на отклик`
+                                : 'Окно отклика истекло'}
                             </div>
-                            <span
-                              className={`request-status${
-                                item.status === 'open' ? ' is-open' : ' is-closed'
-                              }`}
-                            >
-                              {statusLabel}
-                            </span>
-                          </div>
-                          <div className="request-item-meta">
-                            {categoryLabel}
-                            {item.budget ? ` • ${item.budget}` : ''}
-                          </div>
-                          <div className="request-item-meta">
-                            {locationLabel}
-                            {item.cityName ? ` • ${item.cityName}` : ''}
-                            {item.districtName ? ` • ${item.districtName}` : ''}
-                            {distanceLabel ? ` • ${distanceLabel}` : ''}
-                          </div>
-                          <div className="request-item-meta">{dateLabel}</div>
-                          {item.status === 'open' &&
-                            !item.responseStatus &&
-                            (dispatchTimeLeft || dispatchBatchLabel) && (
-                              <div className="request-item-meta request-item-meta--hint">
-                                {dispatchBatchLabel}
-                                {dispatchBatchLabel && dispatchTimeLeft ? ' • ' : ''}
-                                {dispatchTimeLeft
-                                  ? `Осталось ${dispatchTimeLeft} на отклик`
-                                  : 'Окно отклика истекло'}
-                              </div>
-                            )}
-                          {item.locationType === 'client' && item.address && (
+                          )}
+                        {item.locationType === 'client' && item.address && (
                             <div className="request-item-meta">
                               Адрес: {item.address}
                             </div>
@@ -1497,7 +1491,6 @@ export const ProRequestsScreen = ({
               )}
             </>
           )}
-        </section>
       </div>
 
       <ProBottomNav

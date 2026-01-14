@@ -9834,12 +9834,6 @@
   color: var(--pro-muted);
 }
 
-.pro-requests-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .pro-card-eyebrow {
   margin: 0;
   font-size: 11px;
