@@ -7871,7 +7871,7 @@
 
 .pro-profile-certificate-media {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--certificate-ratio, 4 / 3);
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(var(--shadow-rgb), 0.12);
@@ -9721,7 +9721,7 @@
 }
 
 .pro-portfolio-lightbox-media.is-certificate {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--certificate-ratio, 4 / 3);
   background: rgba(var(--paper-rgb), 0.92);
 }
 
@@ -10544,7 +10544,7 @@
   border: 1px dashed rgba(var(--shadow-rgb), 0.25);
   background: rgba(var(--paper-rgb), 0.85);
   border-radius: 16px;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--certificate-ratio, 4 / 3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10564,7 +10564,7 @@
 .pro-profile-editor-certificate-media img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 

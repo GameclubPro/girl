@@ -186,6 +186,10 @@ const buildStars = (value: number) => {
 }
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
+const CERTIFICATE_RATIO_MIN = 0.8
+const CERTIFICATE_RATIO_MAX = 1.6
+const clampCertificateRatio = (value: number) =>
+  Math.min(CERTIFICATE_RATIO_MAX, Math.max(CERTIFICATE_RATIO_MIN, value))
 
 const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
   const rawX = typeof item?.focusX === 'number' ? item.focusX : 0.5
@@ -233,6 +237,9 @@ export const ClientMasterProfileScreen = ({
   const [certificateLightboxIndex, setCertificateLightboxIndex] = useState<
     number | null
   >(null)
+  const [certificateRatios, setCertificateRatios] = useState<
+    Record<string, number>
+  >({})
   const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<MasterProfileTabId>('overview')
   const scheduleInfoRef = useRef<HTMLDivElement | null>(null)
@@ -555,6 +562,18 @@ export const ClientMasterProfileScreen = ({
   const certificateCount = certificateItems.length
   const certificateCountLabel =
     certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
+  const handleCertificateImageLoad = (
+    certificateId: string,
+    image: HTMLImageElement
+  ) => {
+    if (!image.naturalWidth || !image.naturalHeight) return
+    const ratio = clampCertificateRatio(image.naturalWidth / image.naturalHeight)
+    setCertificateRatios((current) =>
+      current[certificateId] === ratio
+        ? current
+        : { ...current, [certificateId]: ratio }
+    )
+  }
 
   const portfolioGridItems = useMemo(
     () =>
@@ -611,6 +630,12 @@ export const ClientMasterProfileScreen = ({
   const certificateLightboxMeta = certificateLightboxItem
     ? buildCertificateMeta(certificateLightboxItem)
     : ''
+  const certificateLightboxRatio = certificateLightboxItem
+    ? certificateRatios[certificateLightboxItem.id]
+    : undefined
+  const certificateLightboxStyle = certificateLightboxRatio
+    ? ({ '--certificate-ratio': certificateLightboxRatio } as CSSProperties)
+    : undefined
 
   const coverUrl = profile?.coverUrl ?? null
   const coverFocus = '50% 50%'
@@ -862,6 +887,11 @@ export const ClientMasterProfileScreen = ({
                         {certificateItems.map((certificate, index) => {
                           const meta = buildCertificateMeta(certificate)
                           const title = certificate.title?.trim() || 'Сертификат'
+                          const certificateStyle = certificateRatios[certificate.id]
+                            ? ({
+                                '--certificate-ratio': certificateRatios[certificate.id],
+                              } as CSSProperties)
+                            : undefined
                           return (
                             <button
                               className="pro-profile-certificate-card"
@@ -871,12 +901,21 @@ export const ClientMasterProfileScreen = ({
                               role="listitem"
                               aria-label={title}
                             >
-                              <div className="pro-profile-certificate-media">
+                              <div
+                                className="pro-profile-certificate-media"
+                                style={certificateStyle}
+                              >
                                 {certificate.url ? (
                                   <img
                                     src={certificate.url}
                                     alt=""
                                     loading="lazy"
+                                    onLoad={(event) =>
+                                      handleCertificateImageLoad(
+                                        certificate.id,
+                                        event.currentTarget
+                                      )
+                                    }
                                   />
                                 ) : (
                                   <span className="pro-profile-certificate-fallback">
@@ -1333,12 +1372,21 @@ export const ClientMasterProfileScreen = ({
                 Закрыть
               </button>
             </div>
-            <div className="pro-portfolio-lightbox-media is-certificate">
+            <div
+              className="pro-portfolio-lightbox-media is-certificate"
+              style={certificateLightboxStyle}
+            >
               {certificateLightboxItem.url ? (
                 <img
                   src={certificateLightboxItem.url}
                   alt={certificateLightboxTitle}
                   loading="lazy"
+                  onLoad={(event) =>
+                    handleCertificateImageLoad(
+                      certificateLightboxItem.id,
+                      event.currentTarget
+                    )
+                  }
                 />
               ) : (
                 <span className="pro-profile-certificate-fallback">

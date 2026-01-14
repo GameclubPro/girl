@@ -81,6 +81,11 @@ const formatReviewCount = (value: number) =>
 const formatCertificateCount = (value: number) =>
   formatCount(value, 'сертификат', 'сертификата', 'сертификатов')
 
+const CERTIFICATE_RATIO_MIN = 0.8
+const CERTIFICATE_RATIO_MAX = 1.6
+const clampCertificateRatio = (value: number) =>
+  Math.min(CERTIFICATE_RATIO_MAX, Math.max(CERTIFICATE_RATIO_MIN, value))
+
 const buildCertificateId = () =>
   `cert-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
@@ -304,6 +309,9 @@ export const ProProfileScreen = ({
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
   const [certificates, setCertificates] = useState<MasterCertificate[]>([])
+  const [certificateRatios, setCertificateRatios] = useState<
+    Record<string, number>
+  >({})
   const [portfolioView, setPortfolioView] = useState<'portfolio' | 'showcase'>(
     () => initialPortfolioView ?? 'portfolio'
   )
@@ -556,6 +564,18 @@ export const ProProfileScreen = ({
   const certificateCount = certificateItems.length
   const certificateCountLabel =
     certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
+  const handleCertificateImageLoad = (
+    certificateId: string,
+    image: HTMLImageElement
+  ) => {
+    if (!image.naturalWidth || !image.naturalHeight) return
+    const ratio = clampCertificateRatio(image.naturalWidth / image.naturalHeight)
+    setCertificateRatios((current) =>
+      current[certificateId] === ratio
+        ? current
+        : { ...current, [certificateId]: ratio }
+    )
+  }
   const certificatesActionLabel = certificateCount > 0 ? 'Редактировать' : 'Добавить'
   const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
   const showcaseCountLabel = `${showcaseCount} из ${MAX_SHOWCASE_ITEMS}`
@@ -678,6 +698,12 @@ export const ProProfileScreen = ({
   const certificateLightboxMeta = certificateLightboxItem
     ? buildCertificateMeta(certificateLightboxItem)
     : ''
+  const certificateLightboxRatio = certificateLightboxItem
+    ? certificateRatios[certificateLightboxItem.id]
+    : undefined
+  const certificateLightboxStyle = certificateLightboxRatio
+    ? ({ '--certificate-ratio': certificateLightboxRatio } as CSSProperties)
+    : undefined
   const isLightboxInShowcase = portfolioLightboxItem
     ? showcaseItems.some((item) => item.url === portfolioLightboxItem.url)
     : false
@@ -2711,6 +2737,11 @@ export const ProProfileScreen = ({
                   {certificateItems.map((certificate, index) => {
                     const meta = buildCertificateMeta(certificate)
                     const title = certificate.title?.trim() || 'Сертификат'
+                    const certificateStyle = certificateRatios[certificate.id]
+                      ? ({
+                          '--certificate-ratio': certificateRatios[certificate.id],
+                        } as CSSProperties)
+                      : undefined
                     return (
                       <button
                         className="pro-profile-certificate-card"
@@ -2720,9 +2751,22 @@ export const ProProfileScreen = ({
                         role="listitem"
                         aria-label={title}
                       >
-                        <div className="pro-profile-certificate-media">
+                        <div
+                          className="pro-profile-certificate-media"
+                          style={certificateStyle}
+                        >
                           {certificate.url ? (
-                            <img src={certificate.url} alt="" loading="lazy" />
+                            <img
+                              src={certificate.url}
+                              alt=""
+                              loading="lazy"
+                              onLoad={(event) =>
+                                handleCertificateImageLoad(
+                                  certificate.id,
+                                  event.currentTarget
+                                )
+                              }
+                            />
                           ) : (
                             <span className="pro-profile-certificate-fallback">
                               CERT
@@ -3361,12 +3405,21 @@ export const ProProfileScreen = ({
                 Закрыть
               </button>
             </div>
-            <div className="pro-portfolio-lightbox-media is-certificate">
+            <div
+              className="pro-portfolio-lightbox-media is-certificate"
+              style={certificateLightboxStyle}
+            >
               {certificateLightboxItem.url ? (
                 <img
                   src={certificateLightboxItem.url}
                   alt={certificateLightboxTitle}
                   loading="lazy"
+                  onLoad={(event) =>
+                    handleCertificateImageLoad(
+                      certificateLightboxItem.id,
+                      event.currentTarget
+                    )
+                  }
                 />
               ) : (
                 <span className="pro-profile-certificate-fallback">
@@ -4526,7 +4579,7 @@ export const ProProfileScreen = ({
                       </h3>
                       <p className="pro-profile-editor-certificates-subtitle">
                         Добавьте дипломы и курсы, чтобы клиентам было проще
-                        выбрать вас.
+                        выбрать вас. Любой формат — мы аккуратно подгоним превью.
                       </p>
                     </div>
                     <button
@@ -4574,6 +4627,11 @@ export const ProProfileScreen = ({
                     {certificates.length > 0 ? (
                       certificates.map((certificate) => {
                         const title = certificate.title?.trim() || ''
+                        const certificateStyle = certificateRatios[certificate.id]
+                          ? ({
+                              '--certificate-ratio': certificateRatios[certificate.id],
+                            } as CSSProperties)
+                          : undefined
                         return (
                           <div
                             className="pro-profile-editor-certificate-card"
@@ -4584,9 +4642,20 @@ export const ProProfileScreen = ({
                               type="button"
                               onClick={() => handleCertificateReplaceClick(certificate.id)}
                               aria-label="Загрузить изображение сертификата"
+                              style={certificateStyle}
                             >
                               {certificate.url ? (
-                                <img src={certificate.url} alt="" loading="lazy" />
+                                <img
+                                  src={certificate.url}
+                                  alt=""
+                                  loading="lazy"
+                                  onLoad={(event) =>
+                                    handleCertificateImageLoad(
+                                      certificate.id,
+                                      event.currentTarget
+                                    )
+                                  }
+                                />
                               ) : (
                                 <span className="pro-profile-editor-certificate-fallback">
                                   Добавить фото
