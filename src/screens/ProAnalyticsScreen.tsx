@@ -360,8 +360,8 @@ export const ProAnalyticsScreen = ({
       ...bookingStatusItems.map((item) => item.value),
       1
     )
-    const minSize = 70
-    const maxSize = 140
+    const minSize = 82
+    const maxSize = 150
     return bookingStatusItems.map((item) => {
       const ratio = maxValue ? item.value / maxValue : 0
       const size = Math.round(

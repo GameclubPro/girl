@@ -3038,12 +3038,14 @@
   top: 0;
   width: var(--bubble-size);
   height: var(--bubble-size);
+  box-sizing: border-box;
   border-radius: 999px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: clamp(2px, calc(var(--bubble-size) * 0.03), 6px);
+  padding: clamp(4px, calc(var(--bubble-size) * 0.06), 10px);
   text-align: center;
   color: rgba(15, 23, 42, 0.9);
   background:
@@ -3091,22 +3093,28 @@
 }
 
 .analytics-status-bubble-label {
-  font-size: 9px;
+  font-size: clamp(7px, calc(var(--bubble-size) * 0.08), 11px);
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  line-height: 1.15;
+  max-width: 85%;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
   color: rgba(15, 23, 42, 0.7);
 }
 
 .analytics-status-bubble-value {
-  font-size: 16px;
+  font-size: clamp(12px, calc(var(--bubble-size) * 0.18), 20px);
   font-weight: 700;
+  line-height: 1.05;
   color: rgba(15, 23, 42, 0.95);
 }
 
 .analytics-status-bubble-meta {
-  font-size: 11px;
+  font-size: clamp(9px, calc(var(--bubble-size) * 0.12), 12px);
   font-weight: 600;
+  line-height: 1.1;
   color: rgba(15, 23, 42, 0.65);
 }
 
