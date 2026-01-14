@@ -532,28 +532,6 @@ export const ProAnalyticsScreen = ({
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-analytics">
       <div className="analytics-shell">
-        <header className="analytics-header">
-          <button className="pro-back" type="button" onClick={onBack}>
-            ←
-          </button>
-          <div className="analytics-title">
-            <p className="analytics-kicker">Аналитика</p>
-            <h1 className="analytics-heading">Статистика бизнеса</h1>
-            <p className="analytics-subtitle">
-              Доход, заявки, клиенты и просмотры профиля в одном дашборде.
-            </p>
-          </div>
-          <button
-            className={`analytics-refresh${isRefreshing ? ' is-loading' : ''}`}
-            type="button"
-            onClick={() => reload({ force: true, silent: true })}
-            aria-label="Обновить данные"
-            disabled={isRefreshing}
-          >
-            ⟳
-          </button>
-        </header>
-
         <div className="analytics-toolbar">
           <div className="analytics-range">
             {rangeOptions.map((option) => (
@@ -569,12 +547,6 @@ export const ProAnalyticsScreen = ({
                 {option.label}
               </button>
             ))}
-          </div>
-          <div className="analytics-meta-row">
-            {lastUpdatedLabel && <p className="analytics-meta">{lastUpdatedLabel}</p>}
-            {compareRangeLabel && (
-              <p className="analytics-meta">Сравнение: {compareRangeLabel}</p>
-            )}
           </div>
         </div>
 
