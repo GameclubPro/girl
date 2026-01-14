@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
@@ -10,7 +10,12 @@ import {
   IconUsers,
 } from '../components/icons'
 import { useProCabinetData } from '../hooks/useProCabinetData'
-import type { ProProfileSection } from '../types/app'
+import type { MasterProfile, ProProfileSection } from '../types/app'
+import {
+  isImageUrl,
+  parsePortfolioItems,
+  type PortfolioItem,
+} from '../utils/profileContent'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -36,6 +41,20 @@ const formatWeekday = (value: Date) =>
     .format(value)
     .replace('.', '')
 
+const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
+
+const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
+  const rawX = typeof item?.focusX === 'number' ? item.focusX : 0.5
+  const rawY = typeof item?.focusY === 'number' ? item.focusY : 0.5
+  const x = clampUnit(rawX)
+  const y = clampUnit(rawY)
+  return {
+    x,
+    y,
+    position: `${x * 100}% ${y * 100}%`,
+  }
+}
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'К'
@@ -45,6 +64,8 @@ const getInitials = (value: string) => {
   if (joined) return joined
   return normalized.slice(0, 2).toUpperCase()
 }
+
+const showcaseSlotClasses = ['is-a', 'is-b', 'is-c', 'is-d'] as const
 
 type ProCabinetScreenProps = {
   apiBase: string
@@ -77,6 +98,48 @@ export const ProCabinetScreen = ({
     apiBase,
     userId
   )
+  const [showcasePreview, setShowcasePreview] = useState<PortfolioItem[]>([])
+  const [showcaseTotal, setShowcaseTotal] = useState(0)
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const loadShowcase = async () => {
+      try {
+        const response = await fetch(
+          `${apiBase}/api/masters/${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load showcase failed')
+        }
+        const data = (await response.json()) as MasterProfile
+        if (cancelled) return
+        const showcaseItems = parsePortfolioItems(data.showcaseUrls ?? [])
+        const portfolioItems = parsePortfolioItems(data.portfolioUrls ?? [])
+        const previewSource =
+          showcaseItems.length > 0 ? showcaseItems : portfolioItems
+        const imageItems = previewSource.filter((item) => isImageUrl(item.url))
+        const previewItems = (imageItems.length > 0 ? imageItems : previewSource).slice(
+          0,
+          4
+        )
+        setShowcasePreview(previewItems)
+        setShowcaseTotal(previewSource.length)
+      } catch (error) {
+        if (!cancelled) {
+          setShowcasePreview([])
+          setShowcaseTotal(0)
+        }
+      }
+    }
+
+    void loadShowcase()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
   const analyticsSpark = useMemo(() => {
     const values = [
       requestStats.open,
@@ -136,6 +199,14 @@ export const ProCabinetScreen = ({
     ? Math.min(100, Math.max(12, Math.round(campaignRepeatRate * 100)))
     : 0
   const todayBookings = calendarPreview[0]?.count ?? 0
+  const showcasePreviewFallback = useMemo<Array<PortfolioItem | null>>(
+    () => new Array(4).fill(null),
+    []
+  )
+  const showcaseTiles: Array<PortfolioItem | null> =
+    showcasePreview.length > 0 ? showcasePreview : showcasePreviewFallback
+  const showcaseMetaLabel =
+    showcaseTotal > 0 ? `${showcaseTotal} фото` : 'Добавьте фото'
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -299,12 +370,41 @@ export const ProCabinetScreen = ({
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-mosaic" aria-hidden="true">
-                <span className="pro-cabinet-nav-mosaic-tile is-a" />
-                <span className="pro-cabinet-nav-mosaic-tile is-b" />
-                <span className="pro-cabinet-nav-mosaic-tile is-c" />
-                <span className="pro-cabinet-nav-mosaic-tile is-d" />
+                {showcaseTiles.map((item, index) => {
+                  const slotClass =
+                    showcaseSlotClasses[index % showcaseSlotClasses.length]
+                  const isImage = item ? isImageUrl(item.url) : false
+                  const focus = item ? resolvePortfolioFocus(item) : null
+                  return (
+                    <span
+                      className={`pro-cabinet-nav-mosaic-tile ${slotClass}${
+                        item ? ' is-media' : ''
+                      }`}
+                      key={`showcase-preview-${item?.url ?? index}`}
+                    >
+                      {item ? (
+                        isImage ? (
+                          <img
+                            src={item.url}
+                            alt=""
+                            loading="lazy"
+                            style={{ objectPosition: focus?.position }}
+                          />
+                        ) : (
+                          <span className="pro-cabinet-nav-mosaic-fallback">
+                            LINK
+                          </span>
+                        )
+                      ) : (
+                        <span className="pro-cabinet-nav-mosaic-fallback">+</span>
+                      )}
+                    </span>
+                  )
+                })}
               </div>
-              <p className="pro-cabinet-nav-meta">4 слота · обновляйте витрину</p>
+              <p className="pro-cabinet-nav-meta">
+                {showcaseMetaLabel} · обновляйте витрину
+              </p>
             </div>
           </button>
           <button
