@@ -4,12 +4,15 @@ type LineSeries = {
   values: number[]
   color: string
   area?: boolean
+  dash?: string
+  opacity?: number
 }
 
 type LineChartProps = {
   labels: string[]
   series: LineSeries[]
   height?: number
+  activeIndex?: number | null
 }
 
 const buildLinePath = (points: Array<{ x: number; y: number }>) => {
@@ -28,7 +31,12 @@ const buildAreaPath = (
   return `${head} ${body} ${tail}`
 }
 
-export const LineChart = ({ labels, series, height = 160 }: LineChartProps) => {
+export const LineChart = ({
+  labels,
+  series,
+  height = 160,
+  activeIndex = null,
+}: LineChartProps) => {
   const width = 320
   const paddingX = 14
   const paddingY = 16
@@ -44,6 +52,12 @@ export const LineChart = ({ labels, series, height = 160 }: LineChartProps) => {
     0
   )
   const step = pointCount > 1 ? chartWidth / (pointCount - 1) : 0
+  const safeActiveIndex =
+    typeof activeIndex === 'number' && activeIndex >= 0 && pointCount > 0
+      ? Math.min(activeIndex, pointCount - 1)
+      : null
+  const activeX =
+    safeActiveIndex !== null ? paddingX + step * safeActiveIndex : null
 
   return (
     <svg
@@ -58,6 +72,15 @@ export const LineChart = ({ labels, series, height = 160 }: LineChartProps) => {
           return <line key={tick} x1={paddingX} x2={width - paddingX} y1={y} y2={y} />
         })}
       </g>
+      {activeX !== null ? (
+        <line
+          className="chart-highlight-line"
+          x1={activeX}
+          x2={activeX}
+          y1={paddingY}
+          y2={paddingY + chartHeight}
+        />
+      ) : null}
       {series.map((item) => {
         const points = item.values.map((value, index) => {
           const x = paddingX + step * index
@@ -67,16 +90,29 @@ export const LineChart = ({ labels, series, height = 160 }: LineChartProps) => {
         })
         const linePath = buildLinePath(points)
         const areaPath = item.area ? buildAreaPath(points, paddingY + chartHeight) : ''
-        const lastPoint = points[points.length - 1]
+        const dotIndex =
+          safeActiveIndex !== null ? Math.min(safeActiveIndex, points.length - 1) : points.length - 1
+        const dotPoint = points[dotIndex]
         return (
           <g key={item.id} className="chart-series">
-            {item.area && <path className="chart-area" d={areaPath} style={{ color: item.color }} />}
-            <path className="chart-line" d={linePath} style={{ color: item.color }} />
-            {lastPoint ? (
+            {item.area && (
+              <path
+                className="chart-area"
+                d={areaPath}
+                style={{ color: item.color, opacity: item.opacity ?? 1 }}
+              />
+            )}
+            <path
+              className="chart-line"
+              d={linePath}
+              style={{ color: item.color, opacity: item.opacity ?? 1 }}
+              strokeDasharray={item.dash}
+            />
+            {dotPoint ? (
               <circle
                 className="chart-dot"
-                cx={lastPoint.x}
-                cy={lastPoint.y}
+                cx={dotPoint.x}
+                cy={dotPoint.y}
                 r={4.5}
                 style={{ color: item.color }}
               />

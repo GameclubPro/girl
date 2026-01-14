@@ -75,6 +75,12 @@ export type AnalyticsWaterfallStep = {
   isTotal?: boolean
 }
 
+export type AnalyticsCompare = {
+  range: AnalyticsRange
+  summary: AnalyticsSummary
+  timeseries: AnalyticsTimePoint[]
+}
+
 export type ProAnalyticsResponse = {
   range: AnalyticsRange
   summary: AnalyticsSummary
@@ -84,6 +90,7 @@ export type ProAnalyticsResponse = {
   funnel: AnalyticsFunnel
   clients: AnalyticsClient[]
   waterfall: AnalyticsWaterfallStep[]
+  compare?: AnalyticsCompare
 }
 
 export type AnalyticsRangeKey = '7d' | '30d' | '90d' | '365d'

@@ -7,6 +7,7 @@ type CacheEntry = {
 }
 
 const cache = new Map<string, CacheEntry>()
+const CACHE_TTL_MS = 5 * 60 * 1000
 
 const buildKey = (apiBase: string, userId: string, range: AnalyticsRangeKey) =>
   `${apiBase.trim()}::${userId.trim()}::${range}`
@@ -26,6 +27,7 @@ export const useProAnalyticsData = (
   )
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(!cached)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const requestIdRef = useRef(0)
 
@@ -37,13 +39,26 @@ export const useProAnalyticsData = (
   )
 
   const loadAnalytics = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean; force?: boolean }) => {
       if (!userId || !apiBase) return
+      const cacheEntry = cache.get(key)
+      const isStale = cacheEntry
+        ? Date.now() - cacheEntry.lastUpdated > CACHE_TTL_MS
+        : true
+      const force = options?.force ?? false
       const silent = options?.silent ?? false
+      if (cacheEntry && !isStale && !force) {
+        setData(cacheEntry.data)
+        setLastUpdated(new Date(cacheEntry.lastUpdated))
+        setIsRefreshing(false)
+        return
+      }
       const requestId = (requestIdRef.current += 1)
       if (!silent) {
         setIsLoading(true)
         setError('')
+      } else {
+        setIsRefreshing(true)
       }
       if (abortRef.current) {
         abortRef.current.abort()
@@ -56,7 +71,9 @@ export const useProAnalyticsData = (
         const response = await fetch(
           `${apiBase}/api/pro/analytics?userId=${encodeURIComponent(
             userId
-          )}&range=${encodeURIComponent(range)}&tzOffset=${encodeURIComponent(tzOffset)}`,
+          )}&range=${encodeURIComponent(range)}&tzOffset=${encodeURIComponent(
+            tzOffset
+          )}&compare=1`,
           { signal: controller.signal }
         )
         if (!response.ok) {
@@ -85,6 +102,7 @@ export const useProAnalyticsData = (
           if (!silent) {
             setIsLoading(false)
           }
+          setIsRefreshing(false)
           if (abortRef.current === controller) {
             abortRef.current = null
           }
@@ -95,7 +113,7 @@ export const useProAnalyticsData = (
   )
 
   useEffect(() => {
-    loadAnalytics()
+    loadAnalytics({ silent: Boolean(cached) })
     return () => {
       if (abortRef.current) {
         abortRef.current.abort()
@@ -107,6 +125,7 @@ export const useProAnalyticsData = (
     data,
     lastUpdated,
     isLoading,
+    isRefreshing,
     error,
     reload: loadAnalytics,
   }

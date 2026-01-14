@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
   BarChart,
@@ -42,6 +42,62 @@ const formatRangeLabel = (start?: string, end?: string) => {
   return `${formatShortDate(start)} — ${formatShortDate(end)}`
 }
 
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max)
+
+const formatPercent = (value: number | null, showSign = false) => {
+  if (value === null || !Number.isFinite(value)) return '—'
+  const sign = showSign ? (value > 0 ? '+' : value < 0 ? '-' : '') : ''
+  const absValue = Math.abs(value)
+  const percent =
+    absValue < 0.1 ? (absValue * 100).toFixed(1) : Math.round(absValue * 100)
+  return `${sign}${percent}%`
+}
+
+type Delta = {
+  diff: number
+  percent: number | null
+  trend: 'up' | 'down' | 'flat'
+}
+
+const buildDelta = (current?: number, previous?: number): Delta | null => {
+  if (typeof current !== 'number' || typeof previous !== 'number') return null
+  const diff = current - previous
+  const percent = previous ? diff / previous : null
+  return {
+    diff,
+    percent,
+    trend: diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat',
+  }
+}
+
+const formatSignedValue = (value: number, format: (value: number) => string) => {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  return `${sign}${format(Math.abs(value))}`
+}
+
+const formatDeltaLabel = (
+  delta: Delta | null,
+  format: (value: number) => string,
+  usePercent = true
+) => {
+  if (!delta) return '—'
+  if (usePercent && delta.percent !== null) {
+    return formatPercent(delta.percent, true)
+  }
+  return formatSignedValue(delta.diff, format)
+}
+
+const getDeltaClass = (delta: Delta | null) =>
+  ` is-${delta?.trend ?? 'flat'}`
+
+const getTooltipLeft = (index: number, count: number) => {
+  if (count <= 1) return '50%'
+  const ratio = index / (count - 1)
+  const percent = clamp(ratio * 100, 6, 94)
+  return `${percent}%`
+}
+
 type ProAnalyticsScreenProps = {
   apiBase: string
   userId: string
@@ -60,10 +116,16 @@ export const ProAnalyticsScreen = ({
   onEditProfile,
 }: ProAnalyticsScreenProps) => {
   const [range, setRange] = useState<AnalyticsRangeKey>('30d')
-  const { data, lastUpdated, isLoading, error, reload } = useProAnalyticsData(
+  const { data, lastUpdated, isLoading, isRefreshing, error, reload } = useProAnalyticsData(
     apiBase,
     userId,
     range
+  )
+  const [activeRevenueIndex, setActiveRevenueIndex] = useState<number | null>(
+    null
+  )
+  const [activeActivityIndex, setActiveActivityIndex] = useState<number | null>(
+    null
   )
   const lastUpdatedLabel = lastUpdated
     ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
@@ -73,12 +135,63 @@ export const ProAnalyticsScreen = ({
     : ''
   const summary = data?.summary
   const timeseries = data?.timeseries ?? []
+  const compareSummary = data?.compare?.summary
+  const compareTimeseries = data?.compare?.timeseries ?? []
   const hasTimeseries = timeseries.length > 0
+
+  useEffect(() => {
+    setActiveRevenueIndex(null)
+    setActiveActivityIndex(null)
+  }, [range, timeseries.length])
+
   const revenueSeries = timeseries.map((point) => point.revenue)
   const requestsSeries = timeseries.map((point) => point.requests)
   const responsesSeries = timeseries.map((point) => point.responses)
   const bookingsSeries = timeseries.map((point) => point.bookings)
   const rangeLabel = formatRangeLabel(data?.range.start, data?.range.end)
+  const compareRangeLabel = formatRangeLabel(
+    data?.compare?.range.start,
+    data?.compare?.range.end
+  )
+  const compareRevenueSeries = compareTimeseries.map((point) => point.revenue)
+  const compareRevenueValues =
+    compareRevenueSeries.length > 0
+      ? compareRevenueSeries.slice(0, revenueSeries.length)
+      : []
+
+  const responseRate = summary?.requests.total
+    ? summary.requests.responded / summary.requests.total
+    : null
+  const bookingRate = summary?.requests.total
+    ? summary.bookings.confirmed / summary.requests.total
+    : null
+  const acceptRate = summary?.requests.responded
+    ? summary.requests.accepted / summary.requests.responded
+    : null
+  const revenueDelta = buildDelta(
+    summary?.revenue.confirmed,
+    compareSummary?.revenue.confirmed
+  )
+  const bookingsDelta = buildDelta(
+    summary?.bookings.total,
+    compareSummary?.bookings.total
+  )
+  const requestsDelta = buildDelta(
+    summary?.requests.total,
+    compareSummary?.requests.total
+  )
+  const followersDelta = buildDelta(
+    summary?.followers.total,
+    compareSummary?.followers.total
+  )
+  const avgCheckDelta = buildDelta(
+    summary?.revenue.avgCheck,
+    compareSummary?.revenue.avgCheck
+  )
+  const ratingDelta = buildDelta(
+    summary?.reviews.average,
+    compareSummary?.reviews.average
+  )
 
   const categoryChartData = useMemo(
     () =>
@@ -130,6 +243,78 @@ export const ProAnalyticsScreen = ({
       ]
     : []
   const funnelMax = Math.max(1, ...funnelSteps.map((step) => step.value))
+  const insight = useMemo(() => {
+    if (!summary) return null
+    const revenueTrend =
+      revenueDelta && revenueDelta.percent !== null ? revenueDelta.percent : null
+    if (revenueTrend !== null && revenueTrend <= -0.05) {
+      return {
+        tone: 'danger',
+        title: 'Выручка ниже прошлого периода',
+        text: 'Проверьте отмены и скорость ответа — это быстрее всего влияет на доход.',
+        action: 'requests',
+        actionLabel: 'Перейти к заявкам',
+      }
+    }
+    if (responseRate !== null && responseRate < 0.4) {
+      return {
+        tone: 'warning',
+        title: 'Ответы ниже 40%',
+        text: 'Быстрые ответы повышают вероятность записи и конверсию.',
+        action: 'requests',
+        actionLabel: 'Открыть заявки',
+      }
+    }
+    if (bookingRate !== null && bookingRate < 0.2) {
+      return {
+        tone: 'warning',
+        title: 'Низкая конверсия в запись',
+        text: 'Добавьте уточняющие вопросы в чате и предложите ближайшее окно.',
+        action: 'chats',
+        actionLabel: 'Открыть чаты',
+      }
+    }
+    if (revenueTrend !== null && revenueTrend >= 0.1) {
+      return {
+        tone: 'success',
+        title: 'Выручка растет',
+        text: 'Сохраните темп: закрепите лучшие услуги и поддержите активность.',
+        action: 'chats',
+        actionLabel: 'Открыть чаты',
+      }
+    }
+    return {
+      tone: 'neutral',
+      title: 'Стабильная динамика',
+      text: 'Держите стабильный отклик — это самый сильный драйвер конверсии.',
+      action: 'requests',
+      actionLabel: 'Перейти к заявкам',
+    }
+  }, [bookingRate, responseRate, revenueDelta, summary])
+
+  const isInitialLoading = isLoading && !data
+  const getPointerIndex = (event: { currentTarget: HTMLElement; clientX: number }, count: number) => {
+    if (count <= 1) return 0
+    const rect = event.currentTarget.getBoundingClientRect()
+    const offset = event.clientX - rect.left
+    const ratio = rect.width ? offset / rect.width : 0
+    const index = Math.round(ratio * (count - 1))
+    return clamp(index, 0, count - 1)
+  }
+  const handleRevenuePointer = (event: { currentTarget: HTMLElement; clientX: number }) => {
+    if (!hasTimeseries) return
+    setActiveRevenueIndex(getPointerIndex(event, timeseries.length))
+  }
+  const handleActivityPointer = (event: { currentTarget: HTMLElement; clientX: number }) => {
+    if (!hasTimeseries) return
+    setActiveActivityIndex(getPointerIndex(event, timeseries.length))
+  }
+  const activeRevenuePoint =
+    activeRevenueIndex !== null ? timeseries[activeRevenueIndex] : null
+  const activeRevenueComparePoint =
+    activeRevenueIndex !== null ? compareTimeseries[activeRevenueIndex] : null
+  const activeActivityPoint =
+    activeActivityIndex !== null ? timeseries[activeActivityIndex] : null
 
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-analytics">
@@ -146,10 +331,11 @@ export const ProAnalyticsScreen = ({
             </p>
           </div>
           <button
-            className="analytics-refresh"
+            className={`analytics-refresh${isRefreshing ? ' is-loading' : ''}`}
             type="button"
-            onClick={() => reload()}
+            onClick={() => reload({ force: true, silent: true })}
             aria-label="Обновить данные"
+            disabled={isRefreshing}
           >
             ⟳
           </button>
@@ -171,10 +357,15 @@ export const ProAnalyticsScreen = ({
               </button>
             ))}
           </div>
-          {lastUpdatedLabel && <p className="analytics-meta">{lastUpdatedLabel}</p>}
+          <div className="analytics-meta-row">
+            {lastUpdatedLabel && <p className="analytics-meta">{lastUpdatedLabel}</p>}
+            {compareRangeLabel && (
+              <p className="analytics-meta">Сравнение: {compareRangeLabel}</p>
+            )}
+          </div>
         </div>
 
-        {isLoading && (
+        {isInitialLoading && (
           <p className="analytics-status" role="status">
             Синхронизируем аналитику...
           </p>
@@ -192,17 +383,58 @@ export const ProAnalyticsScreen = ({
         {data && summary && (
           <>
             <section className="analytics-summary-grid animate delay-1">
-              <article className="analytics-summary-card is-primary">
-                <p className="analytics-summary-label">Выручка</p>
-                <p className="analytics-summary-value">
-                  {formatMoney(summary.revenue.confirmed)}
-                </p>
-                <p className="analytics-summary-meta">
-                  Прогноз: {formatMoney(summary.revenue.projected)}
-                </p>
+              <article className="analytics-summary-card is-primary is-wide">
+                <div className="analytics-summary-head">
+                  <div>
+                    <p className="analytics-summary-label">Выручка</p>
+                    <div className="analytics-summary-value-row">
+                      <p className="analytics-summary-value">
+                        {formatMoney(summary.revenue.confirmed)}
+                      </p>
+                      <span
+                        className={`analytics-delta${getDeltaClass(
+                          revenueDelta
+                        )}`}
+                      >
+                        {formatDeltaLabel(revenueDelta, formatMoney)}
+                      </span>
+                    </div>
+                    <p className="analytics-summary-meta">
+                      Прогноз: {formatMoney(summary.revenue.projected)}
+                    </p>
+                  </div>
+                  {rangeLabel && <span className="analytics-pill">{rangeLabel}</span>}
+                </div>
+                <div className="analytics-summary-row">
+                  <div className="analytics-summary-stat">
+                    <span className="analytics-summary-stat-label">Ответы</span>
+                    <span className="analytics-summary-stat-value">
+                      {formatPercent(responseRate)}
+                    </span>
+                  </div>
+                  <div className="analytics-summary-stat">
+                    <span className="analytics-summary-stat-label">Конверсия</span>
+                    <span className="analytics-summary-stat-value">
+                      {formatPercent(bookingRate)}
+                    </span>
+                  </div>
+                  <div className="analytics-summary-stat">
+                    <span className="analytics-summary-stat-label">Принято</span>
+                    <span className="analytics-summary-stat-value">
+                      {formatPercent(acceptRate)}
+                    </span>
+                  </div>
+                </div>
               </article>
               <article className="analytics-summary-card">
-                <p className="analytics-summary-label">Средний чек</p>
+                <div className="analytics-summary-head">
+                  <p className="analytics-summary-label">Средний чек</p>
+                  <span
+                    className={`analytics-delta${getDeltaClass(avgCheckDelta)}`}
+                  >
+                    {formatDeltaLabel(avgCheckDelta, formatMoney)}
+                  </span>
+                </div>
                 <p className="analytics-summary-value">
                   {formatMoney(summary.revenue.avgCheck)}
                 </p>
@@ -211,7 +443,14 @@ export const ProAnalyticsScreen = ({
                 </p>
               </article>
               <article className="analytics-summary-card">
-                <p className="analytics-summary-label">Записи</p>
+                <div className="analytics-summary-head">
+                  <p className="analytics-summary-label">Записи</p>
+                  <span
+                    className={`analytics-delta${getDeltaClass(bookingsDelta)}`}
+                  >
+                    {formatDeltaLabel(bookingsDelta, formatNumber)}
+                  </span>
+                </div>
                 <p className="analytics-summary-value">
                   {formatNumber(summary.bookings.total)}
                 </p>
@@ -220,7 +459,14 @@ export const ProAnalyticsScreen = ({
                 </p>
               </article>
               <article className="analytics-summary-card">
-                <p className="analytics-summary-label">Заявки</p>
+                <div className="analytics-summary-head">
+                  <p className="analytics-summary-label">Заявки</p>
+                  <span
+                    className={`analytics-delta${getDeltaClass(requestsDelta)}`}
+                  >
+                    {formatDeltaLabel(requestsDelta, formatNumber)}
+                  </span>
+                </div>
                 <p className="analytics-summary-value">
                   {formatNumber(summary.requests.total)}
                 </p>
@@ -229,7 +475,14 @@ export const ProAnalyticsScreen = ({
                 </p>
               </article>
               <article className="analytics-summary-card">
-                <p className="analytics-summary-label">Подписчики</p>
+                <div className="analytics-summary-head">
+                  <p className="analytics-summary-label">Подписчики</p>
+                  <span
+                    className={`analytics-delta${getDeltaClass(followersDelta)}`}
+                  >
+                    {formatDeltaLabel(followersDelta, formatNumber)}
+                  </span>
+                </div>
                 <p className="analytics-summary-value">
                   {formatNumber(summary.followers.total)}
                 </p>
@@ -238,7 +491,18 @@ export const ProAnalyticsScreen = ({
                 </p>
               </article>
               <article className="analytics-summary-card">
-                <p className="analytics-summary-label">Рейтинг</p>
+                <div className="analytics-summary-head">
+                  <p className="analytics-summary-label">Рейтинг</p>
+                  <span
+                    className={`analytics-delta${getDeltaClass(ratingDelta)}`}
+                  >
+                    {formatDeltaLabel(
+                      ratingDelta,
+                      (value) => value.toFixed(1),
+                      false
+                    )}
+                  </span>
+                </div>
                 <p className="analytics-summary-value">
                   {summary.reviews.average
                     ? summary.reviews.average.toFixed(1)
@@ -250,7 +514,29 @@ export const ProAnalyticsScreen = ({
               </article>
             </section>
 
-            <section className="analytics-card animate delay-2">
+            {insight && (
+              <section
+                className={`analytics-insight animate delay-2 is-${insight.tone}`}
+              >
+                <div className="analytics-insight-content">
+                  <p className="analytics-insight-title">{insight.title}</p>
+                  <p className="analytics-insight-text">{insight.text}</p>
+                </div>
+                {insight.action && (
+                  <button
+                    className="analytics-insight-action"
+                    type="button"
+                    onClick={
+                      insight.action === 'requests' ? onViewRequests : onViewChats
+                    }
+                  >
+                    {insight.actionLabel}
+                  </button>
+                )}
+              </section>
+            )}
+
+            <section className="analytics-card animate delay-5">
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Доход</p>
@@ -262,20 +548,82 @@ export const ProAnalyticsScreen = ({
                 {rangeLabel && <span className="analytics-pill">{rangeLabel}</span>}
               </div>
               {hasTimeseries ? (
-                <LineChart
-                  labels={timeseries.map((point) => point.date)}
-                  series={[
-                    {
-                      id: 'revenue',
-                      label: 'Выручка',
-                      values: revenueSeries,
-                      color: 'var(--accent-strong)',
-                      area: true,
-                    },
-                  ]}
-                />
+                <div
+                  className="analytics-chart-wrap"
+                  onPointerDown={handleRevenuePointer}
+                  onPointerMove={handleRevenuePointer}
+                  onPointerLeave={() => setActiveRevenueIndex(null)}
+                >
+                  <LineChart
+                    labels={timeseries.map((point) => point.date)}
+                    activeIndex={activeRevenueIndex}
+                    series={[
+                      {
+                        id: 'revenue',
+                        label: 'Выручка',
+                        values: revenueSeries,
+                        color: 'var(--accent-strong)',
+                        area: true,
+                      },
+                      ...(compareRevenueValues.length > 0
+                        ? [
+                            {
+                              id: 'revenue-compare',
+                              label: 'Прошлый период',
+                              values: compareRevenueValues,
+                              color: 'var(--accent-strong)',
+                              dash: '6 6',
+                              opacity: 0.5,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                  {activeRevenuePoint && activeRevenueIndex !== null && (
+                    <div
+                      className="analytics-tooltip"
+                      style={{
+                        left: getTooltipLeft(
+                          activeRevenueIndex,
+                          timeseries.length
+                        ),
+                      }}
+                    >
+                      <span className="analytics-tooltip-date">
+                        {formatShortDate(activeRevenuePoint.date)}
+                      </span>
+                      <div className="analytics-tooltip-row">
+                        <span className="analytics-tooltip-label">Выручка</span>
+                        <span className="analytics-tooltip-value">
+                          {formatMoney(activeRevenuePoint.revenue)}
+                        </span>
+                      </div>
+                      {activeRevenueComparePoint && (
+                        <div className="analytics-tooltip-row is-muted">
+                          <span className="analytics-tooltip-label">
+                            Прошлый период
+                          </span>
+                          <span className="analytics-tooltip-value">
+                            {formatMoney(activeRevenueComparePoint.revenue)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <p className="analytics-empty">Нет данных по выручке.</p>
+              )}
+              {compareRevenueValues.length > 0 && (
+                <div className="analytics-compare">
+                  <span className="analytics-compare-line" />
+                  <span className="analytics-compare-label">Прошлый период</span>
+                  {compareRangeLabel && (
+                    <span className="analytics-compare-meta">
+                      {compareRangeLabel}
+                    </span>
+                  )}
+                </div>
               )}
               <div className="analytics-legend">
                 <div className="analytics-legend-item">
@@ -314,30 +662,71 @@ export const ProAnalyticsScreen = ({
                 </div>
               </div>
               {hasTimeseries ? (
-                <LineChart
-                  labels={timeseries.map((point) => point.date)}
-                  series={[
-                    {
-                      id: 'requests',
-                      label: 'Заявки',
-                      values: requestsSeries,
-                      color: 'var(--accent)',
-                      area: true,
-                    },
-                    {
-                      id: 'responses',
-                      label: 'Ответы',
-                      values: responsesSeries,
-                      color: 'var(--success)',
-                    },
-                    {
-                      id: 'bookings',
-                      label: 'Записи',
-                      values: bookingsSeries,
-                      color: 'var(--warning)',
-                    },
-                  ]}
-                />
+                <div
+                  className="analytics-chart-wrap"
+                  onPointerDown={handleActivityPointer}
+                  onPointerMove={handleActivityPointer}
+                  onPointerLeave={() => setActiveActivityIndex(null)}
+                >
+                  <LineChart
+                    labels={timeseries.map((point) => point.date)}
+                    activeIndex={activeActivityIndex}
+                    series={[
+                      {
+                        id: 'requests',
+                        label: 'Заявки',
+                        values: requestsSeries,
+                        color: 'var(--accent)',
+                        area: true,
+                      },
+                      {
+                        id: 'responses',
+                        label: 'Ответы',
+                        values: responsesSeries,
+                        color: 'var(--success)',
+                      },
+                      {
+                        id: 'bookings',
+                        label: 'Записи',
+                        values: bookingsSeries,
+                        color: 'var(--warning)',
+                      },
+                    ]}
+                  />
+                  {activeActivityPoint && activeActivityIndex !== null && (
+                    <div
+                      className="analytics-tooltip"
+                      style={{
+                        left: getTooltipLeft(
+                          activeActivityIndex,
+                          timeseries.length
+                        ),
+                      }}
+                    >
+                      <span className="analytics-tooltip-date">
+                        {formatShortDate(activeActivityPoint.date)}
+                      </span>
+                      <div className="analytics-tooltip-row">
+                        <span className="analytics-tooltip-label">Заявки</span>
+                        <span className="analytics-tooltip-value">
+                          {formatNumber(activeActivityPoint.requests)}
+                        </span>
+                      </div>
+                      <div className="analytics-tooltip-row">
+                        <span className="analytics-tooltip-label">Ответы</span>
+                        <span className="analytics-tooltip-value">
+                          {formatNumber(activeActivityPoint.responses)}
+                        </span>
+                      </div>
+                      <div className="analytics-tooltip-row">
+                        <span className="analytics-tooltip-label">Записи</span>
+                        <span className="analytics-tooltip-value">
+                          {formatNumber(activeActivityPoint.bookings)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <p className="analytics-empty">Нет данных по заявкам.</p>
               )}
@@ -399,7 +788,7 @@ export const ProAnalyticsScreen = ({
               </div>
             </section>
 
-            <section className="analytics-card animate delay-5">
+            <section className="analytics-card animate delay-6">
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Категории</p>
@@ -431,7 +820,7 @@ export const ProAnalyticsScreen = ({
               )}
             </section>
 
-            <section className="analytics-card animate delay-6">
+            <section className="analytics-card animate delay-7">
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Клиенты</p>
@@ -536,7 +925,7 @@ export const ProAnalyticsScreen = ({
               </div>
             </section>
 
-            <section className="pro-detail-actions animate delay-6">
+            <section className="pro-detail-actions animate delay-7">
               <button
                 className="pro-detail-action"
                 type="button"

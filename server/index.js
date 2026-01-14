@@ -3287,6 +3287,319 @@ app.get('/api/pro/bookings', async (req, res) => {
   }
 })
 
+const loadProAnalyticsRange = async (
+  userId,
+  start,
+  end,
+  tzOffsetMinutes
+) => {
+  const days = Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1
+  )
+  const dateKeys = Array.from({ length: days }, (_, index) =>
+    toDateKey(new Date(start.getTime() + index * DAY_MS), tzOffsetMinutes)
+  ).filter(Boolean)
+  const series = dateKeys.map((date) => ({
+    date,
+    revenue: 0,
+    bookings: 0,
+    requests: 0,
+    responses: 0,
+    followers: 0,
+    reviews: 0,
+  }))
+  const seriesIndex = new Map(dateKeys.map((date, index) => [date, index]))
+
+  const [
+    bookingsResult,
+    dispatchResult,
+    responsesResult,
+    chatsResult,
+    reviewsResult,
+    followersResult,
+    followersTotalResult,
+  ] = await Promise.all([
+    pool.query(
+      `
+          SELECT
+            b.id,
+            b.client_id AS "clientId",
+            b.category_id AS "categoryId",
+            b.service_price AS "servicePrice",
+            b.proposed_price AS "proposedPrice",
+            b.status,
+            b.created_at AS "createdAt",
+            u.first_name AS "clientFirstName",
+            u.last_name AS "clientLastName",
+            u.username AS "clientUsername"
+          FROM service_bookings b
+          LEFT JOIN users u ON u.user_id = b.client_id
+          WHERE b.master_id = $1
+            AND b.created_at >= $2
+            AND b.created_at <= $3
+        `,
+      [userId, start, end]
+    ),
+    pool.query(
+      `
+          SELECT request_id AS "requestId", sent_at AS "sentAt"
+          FROM request_dispatches
+          WHERE master_id = $1
+            AND sent_at >= $2
+            AND sent_at <= $3
+        `,
+      [userId, start, end]
+    ),
+    pool.query(
+      `
+          SELECT request_id AS "requestId", status, created_at AS "createdAt"
+          FROM request_responses
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+      [userId, start, end]
+    ),
+    pool.query(
+      `
+          SELECT id, created_at AS "createdAt"
+          FROM chats
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+      [userId, start, end]
+    ),
+    pool.query(
+      `
+          SELECT rating, created_at AS "createdAt"
+          FROM master_reviews
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+      [userId, start, end]
+    ),
+    pool.query(
+      `
+          SELECT created_at AS "createdAt"
+          FROM master_followers
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+      [userId, start, end]
+    ),
+    pool.query(
+      `
+          SELECT COUNT(*)::int AS total
+          FROM master_followers
+          WHERE master_id = $1
+        `,
+      [userId]
+    ),
+  ])
+
+  const bookings = bookingsResult.rows ?? []
+  const dispatches = dispatchResult.rows ?? []
+  const responses = responsesResult.rows ?? []
+  const chats = chatsResult.rows ?? []
+  const reviews = reviewsResult.rows ?? []
+  const followers = followersResult.rows ?? []
+
+  const statusCounts = {}
+  const categoryMap = new Map()
+  const clientMap = new Map()
+  const pendingStatuses = new Set(['pending', 'price_pending', 'price_proposed'])
+  const cancelledStatuses = new Set(['declined', 'cancelled'])
+
+  let confirmedRevenue = 0
+  let projectedRevenue = 0
+  let lostRevenue = 0
+  let confirmedBookings = 0
+  let pendingBookings = 0
+  let cancelledBookings = 0
+
+  bookings.forEach((booking) => {
+    const amount = Number(booking.servicePrice ?? booking.proposedPrice ?? 0) || 0
+    const status = booking.status
+
+    statusCounts[status] = (statusCounts[status] ?? 0) + 1
+    if (status === 'confirmed') {
+      confirmedBookings += 1
+      confirmedRevenue += amount
+    } else if (pendingStatuses.has(status)) {
+      pendingBookings += 1
+      projectedRevenue += amount
+    } else if (cancelledStatuses.has(status)) {
+      cancelledBookings += 1
+      lostRevenue += amount
+    }
+
+    const dateKey = toDateKey(booking.createdAt, tzOffsetMinutes)
+    const seriesIdx = seriesIndex.get(dateKey)
+    if (seriesIdx !== undefined) {
+      series[seriesIdx].bookings += 1
+      if (status === 'confirmed') {
+        series[seriesIdx].revenue += amount
+      }
+    }
+
+    if (status === 'confirmed' && booking.categoryId) {
+      const entry = categoryMap.get(booking.categoryId) ?? {
+        id: booking.categoryId,
+        count: 0,
+        revenue: 0,
+      }
+      entry.count += 1
+      entry.revenue += amount
+      categoryMap.set(booking.categoryId, entry)
+    }
+
+    if (booking.clientId) {
+      const existing = clientMap.get(booking.clientId) ?? {
+        id: booking.clientId,
+        name: formatUserDisplayName(
+          booking.clientFirstName,
+          booking.clientLastName,
+          booking.clientUsername,
+          'Клиент'
+        ),
+        visits: 0,
+        revenue: 0,
+        lastSeenAt: null,
+      }
+      existing.visits += 1
+      if (status === 'confirmed') {
+        existing.revenue += amount
+      }
+      const createdAt = new Date(booking.createdAt)
+      if (!Number.isNaN(createdAt.getTime())) {
+        if (!existing.lastSeenAt || createdAt > existing.lastSeenAt) {
+          existing.lastSeenAt = createdAt
+        }
+      }
+      clientMap.set(booking.clientId, existing)
+    }
+  })
+
+  dispatches.forEach((dispatch) => {
+    const dateKey = toDateKey(dispatch.sentAt, tzOffsetMinutes)
+    const seriesIdx = seriesIndex.get(dateKey)
+    if (seriesIdx !== undefined) {
+      series[seriesIdx].requests += 1
+    }
+  })
+
+  responses.forEach((response) => {
+    const dateKey = toDateKey(response.createdAt, tzOffsetMinutes)
+    const seriesIdx = seriesIndex.get(dateKey)
+    if (seriesIdx !== undefined) {
+      series[seriesIdx].responses += 1
+    }
+  })
+
+  followers.forEach((follower) => {
+    const dateKey = toDateKey(follower.createdAt, tzOffsetMinutes)
+    const seriesIdx = seriesIndex.get(dateKey)
+    if (seriesIdx !== undefined) {
+      series[seriesIdx].followers += 1
+    }
+  })
+
+  let ratingSum = 0
+  reviews.forEach((review) => {
+    const dateKey = toDateKey(review.createdAt, tzOffsetMinutes)
+    const seriesIdx = seriesIndex.get(dateKey)
+    if (seriesIdx !== undefined) {
+      series[seriesIdx].reviews += 1
+    }
+    const ratingValue = Number(review.rating) || 0
+    ratingSum += ratingValue
+  })
+
+  const averageRating = reviews.length > 0 ? ratingSum / reviews.length : 0
+  const followersTotal = followersTotalResult.rows[0]?.total ?? 0
+
+  const categories = Array.from(categoryMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 6)
+  const statuses = Object.entries(statusCounts).map(([status, count]) => ({
+    status,
+    count,
+  }))
+  const clients = Array.from(clientMap.values())
+    .sort((a, b) => {
+      const revenueDiff = b.revenue - a.revenue
+      if (revenueDiff !== 0) return revenueDiff
+      return b.visits - a.visits
+    })
+    .slice(0, 12)
+    .map((client) => ({
+      ...client,
+      lastSeenAt: client.lastSeenAt ? client.lastSeenAt.toISOString() : null,
+    }))
+
+  const waterfall = [
+    { label: 'Подтверждено', value: confirmedRevenue },
+    { label: 'В ожидании', value: projectedRevenue },
+    { label: 'Потери', value: -lostRevenue },
+    {
+      label: 'Итого',
+      value: confirmedRevenue + projectedRevenue - lostRevenue,
+      isTotal: true,
+    },
+  ]
+
+  return {
+    range: {
+      start: dateKeys[0] ?? '',
+      end: dateKeys[dateKeys.length - 1] ?? '',
+      days,
+    },
+    summary: {
+      revenue: {
+        confirmed: confirmedRevenue,
+        projected: confirmedRevenue + projectedRevenue,
+        lost: lostRevenue,
+        avgCheck: confirmedBookings ? confirmedRevenue / confirmedBookings : 0,
+      },
+      bookings: {
+        total: bookings.length,
+        confirmed: confirmedBookings,
+        pending: pendingBookings,
+        cancelled: cancelledBookings,
+      },
+      requests: {
+        total: dispatches.length,
+        responded: responses.length,
+        accepted: responses.filter((item) => item.status === 'accepted').length,
+      },
+      followers: {
+        total: followersTotal,
+        new: followers.length,
+      },
+      reviews: {
+        count: reviews.length,
+        average: averageRating,
+      },
+    },
+    timeseries: series,
+    categories,
+    statuses,
+    funnel: {
+      requests: dispatches.length,
+      responses: responses.length,
+      chats: chats.length,
+      bookings: bookings.length,
+      confirmed: confirmedBookings,
+    },
+    clients,
+    waterfall,
+  }
+}
+
 app.get('/api/pro/analytics', async (req, res) => {
   const normalizedUserId = normalizeText(req.query.userId)
   if (!normalizedUserId) {
@@ -3310,311 +3623,36 @@ app.get('/api/pro/analytics', async (req, res) => {
   const start = startTime <= endTime ? startTime : endTime
   const end = startTime <= endTime ? endTime : startTime
   const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1)
-
-  const dateKeys = Array.from({ length: days }, (_, index) =>
-    toDateKey(new Date(start.getTime() + index * DAY_MS), tzOffsetMinutes)
-  ).filter(Boolean)
-  const series = dateKeys.map((date) => ({
-    date,
-    revenue: 0,
-    bookings: 0,
-    requests: 0,
-    responses: 0,
-    followers: 0,
-    reviews: 0,
-  }))
-  const seriesIndex = new Map(dateKeys.map((date, index) => [date, index]))
+  const compareParam = normalizeText(req.query.compare).toLowerCase()
+  const shouldCompare = ['1', 'true', 'yes', 'on'].includes(compareParam)
 
   try {
-    const [
-      bookingsResult,
-      dispatchResult,
-      responsesResult,
-      chatsResult,
-      reviewsResult,
-      followersResult,
-      followersTotalResult,
-    ] = await Promise.all([
-      pool.query(
-        `
-          SELECT
-            b.id,
-            b.client_id AS "clientId",
-            b.category_id AS "categoryId",
-            b.service_price AS "servicePrice",
-            b.proposed_price AS "proposedPrice",
-            b.status,
-            b.created_at AS "createdAt",
-            u.first_name AS "clientFirstName",
-            u.last_name AS "clientLastName",
-            u.username AS "clientUsername"
-          FROM service_bookings b
-          LEFT JOIN users u ON u.user_id = b.client_id
-          WHERE b.master_id = $1
-            AND b.created_at >= $2
-            AND b.created_at <= $3
-        `,
-        [normalizedUserId, start, end]
-      ),
-      pool.query(
-        `
-          SELECT request_id AS "requestId", sent_at AS "sentAt"
-          FROM request_dispatches
-          WHERE master_id = $1
-            AND sent_at >= $2
-            AND sent_at <= $3
-        `,
-        [normalizedUserId, start, end]
-      ),
-      pool.query(
-        `
-          SELECT request_id AS "requestId", status, created_at AS "createdAt"
-          FROM request_responses
-          WHERE master_id = $1
-            AND created_at >= $2
-            AND created_at <= $3
-        `,
-        [normalizedUserId, start, end]
-      ),
-      pool.query(
-        `
-          SELECT id, created_at AS "createdAt"
-          FROM chats
-          WHERE master_id = $1
-            AND created_at >= $2
-            AND created_at <= $3
-        `,
-        [normalizedUserId, start, end]
-      ),
-      pool.query(
-        `
-          SELECT rating, created_at AS "createdAt"
-          FROM master_reviews
-          WHERE master_id = $1
-            AND created_at >= $2
-            AND created_at <= $3
-        `,
-        [normalizedUserId, start, end]
-      ),
-      pool.query(
-        `
-          SELECT created_at AS "createdAt"
-          FROM master_followers
-          WHERE master_id = $1
-            AND created_at >= $2
-            AND created_at <= $3
-        `,
-        [normalizedUserId, start, end]
-      ),
-      pool.query(
-        `
-          SELECT COUNT(*)::int AS total
-          FROM master_followers
-          WHERE master_id = $1
-        `,
-        [normalizedUserId]
-      ),
-    ])
+    const payload = await loadProAnalyticsRange(
+      normalizedUserId,
+      start,
+      end,
+      tzOffsetMinutes
+    )
 
-    const bookings = bookingsResult.rows ?? []
-    const dispatches = dispatchResult.rows ?? []
-    const responses = responsesResult.rows ?? []
-    const chats = chatsResult.rows ?? []
-    const reviews = reviewsResult.rows ?? []
-    const followers = followersResult.rows ?? []
-
-    const statusCounts = {}
-    const categoryMap = new Map()
-    const clientMap = new Map()
-    const pendingStatuses = new Set(['pending', 'price_pending', 'price_proposed'])
-    const cancelledStatuses = new Set(['declined', 'cancelled'])
-
-    let confirmedRevenue = 0
-    let projectedRevenue = 0
-    let lostRevenue = 0
-    let confirmedBookings = 0
-    let pendingBookings = 0
-    let cancelledBookings = 0
-    let totalBookingRevenue = 0
-
-    bookings.forEach((booking) => {
-      const amount = Number(booking.servicePrice ?? booking.proposedPrice ?? 0) || 0
-      const status = booking.status
-      totalBookingRevenue += amount
-
-      statusCounts[status] = (statusCounts[status] ?? 0) + 1
-      if (status === 'confirmed') {
-        confirmedBookings += 1
-        confirmedRevenue += amount
-      } else if (pendingStatuses.has(status)) {
-        pendingBookings += 1
-        projectedRevenue += amount
-      } else if (cancelledStatuses.has(status)) {
-        cancelledBookings += 1
-        lostRevenue += amount
+    if (shouldCompare) {
+      const compareEnd = new Date(start.getTime() - DAY_MS)
+      const compareStart = new Date(
+        compareEnd.getTime() - (days - 1) * DAY_MS
+      )
+      const comparePayload = await loadProAnalyticsRange(
+        normalizedUserId,
+        compareStart,
+        compareEnd,
+        tzOffsetMinutes
+      )
+      payload.compare = {
+        range: comparePayload.range,
+        summary: comparePayload.summary,
+        timeseries: comparePayload.timeseries,
       }
+    }
 
-      const dateKey = toDateKey(booking.createdAt, tzOffsetMinutes)
-      const seriesIdx = seriesIndex.get(dateKey)
-      if (seriesIdx !== undefined) {
-        series[seriesIdx].bookings += 1
-        if (status === 'confirmed') {
-          series[seriesIdx].revenue += amount
-        }
-      }
-
-      if (status === 'confirmed' && booking.categoryId) {
-        const entry = categoryMap.get(booking.categoryId) ?? {
-          id: booking.categoryId,
-          count: 0,
-          revenue: 0,
-        }
-        entry.count += 1
-        entry.revenue += amount
-        categoryMap.set(booking.categoryId, entry)
-      }
-
-      if (booking.clientId) {
-        const existing = clientMap.get(booking.clientId) ?? {
-          id: booking.clientId,
-          name: formatUserDisplayName(
-            booking.clientFirstName,
-            booking.clientLastName,
-            booking.clientUsername,
-            'Клиент'
-          ),
-          visits: 0,
-          revenue: 0,
-          lastSeenAt: null,
-        }
-        existing.visits += 1
-        if (status === 'confirmed') {
-          existing.revenue += amount
-        }
-        const createdAt = new Date(booking.createdAt)
-        if (!Number.isNaN(createdAt.getTime())) {
-          if (!existing.lastSeenAt || createdAt > existing.lastSeenAt) {
-            existing.lastSeenAt = createdAt
-          }
-        }
-        clientMap.set(booking.clientId, existing)
-      }
-    })
-
-    dispatches.forEach((dispatch) => {
-      const dateKey = toDateKey(dispatch.sentAt, tzOffsetMinutes)
-      const seriesIdx = seriesIndex.get(dateKey)
-      if (seriesIdx !== undefined) {
-        series[seriesIdx].requests += 1
-      }
-    })
-
-    responses.forEach((response) => {
-      const dateKey = toDateKey(response.createdAt, tzOffsetMinutes)
-      const seriesIdx = seriesIndex.get(dateKey)
-      if (seriesIdx !== undefined) {
-        series[seriesIdx].responses += 1
-      }
-    })
-
-    followers.forEach((follower) => {
-      const dateKey = toDateKey(follower.createdAt, tzOffsetMinutes)
-      const seriesIdx = seriesIndex.get(dateKey)
-      if (seriesIdx !== undefined) {
-        series[seriesIdx].followers += 1
-      }
-    })
-
-    let ratingSum = 0
-    reviews.forEach((review) => {
-      const dateKey = toDateKey(review.createdAt, tzOffsetMinutes)
-      const seriesIdx = seriesIndex.get(dateKey)
-      if (seriesIdx !== undefined) {
-        series[seriesIdx].reviews += 1
-      }
-      const ratingValue = Number(review.rating) || 0
-      ratingSum += ratingValue
-    })
-
-    const averageRating = reviews.length > 0 ? ratingSum / reviews.length : 0
-    const followersTotal = followersTotalResult.rows[0]?.total ?? 0
-
-    const categories = Array.from(categoryMap.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 6)
-    const statuses = Object.entries(statusCounts).map(([status, count]) => ({
-      status,
-      count,
-    }))
-    const clients = Array.from(clientMap.values())
-      .sort((a, b) => {
-        const revenueDiff = b.revenue - a.revenue
-        if (revenueDiff !== 0) return revenueDiff
-        return b.visits - a.visits
-      })
-      .slice(0, 12)
-      .map((client) => ({
-        ...client,
-        lastSeenAt: client.lastSeenAt ? client.lastSeenAt.toISOString() : null,
-      }))
-
-    const waterfall = [
-      { label: 'Подтверждено', value: confirmedRevenue },
-      { label: 'В ожидании', value: projectedRevenue },
-      { label: 'Потери', value: -lostRevenue },
-      {
-        label: 'Итого',
-        value: confirmedRevenue + projectedRevenue - lostRevenue,
-        isTotal: true,
-      },
-    ]
-
-    res.json({
-      range: {
-        start: dateKeys[0] ?? '',
-        end: dateKeys[dateKeys.length - 1] ?? '',
-        days,
-      },
-      summary: {
-        revenue: {
-          confirmed: confirmedRevenue,
-          projected: confirmedRevenue + projectedRevenue,
-          lost: lostRevenue,
-          avgCheck: confirmedBookings ? confirmedRevenue / confirmedBookings : 0,
-        },
-        bookings: {
-          total: bookings.length,
-          confirmed: confirmedBookings,
-          pending: pendingBookings,
-          cancelled: cancelledBookings,
-        },
-        requests: {
-          total: dispatches.length,
-          responded: responses.length,
-          accepted: responses.filter((item) => item.status === 'accepted').length,
-        },
-        followers: {
-          total: followersTotal,
-          new: followers.length,
-        },
-        reviews: {
-          count: reviews.length,
-          average: averageRating,
-        },
-      },
-      timeseries: series,
-      categories,
-      statuses,
-      funnel: {
-        requests: dispatches.length,
-        responses: responses.length,
-        chats: chats.length,
-        bookings: bookings.length,
-        confirmed: confirmedBookings,
-      },
-      clients,
-      waterfall,
-    })
+    res.json(payload)
   } catch (error) {
     console.error('GET /api/pro/analytics failed:', error)
     res.status(500).json({ error: 'server_error' })
