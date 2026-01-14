@@ -527,6 +527,35 @@ export const ChatThreadScreen = ({
   }, [])
 
   useEffect(() => {
+    const screen = screenRef.current
+    if (!screen) return
+    const update = () => {
+      const viewport = window.visualViewport
+      const offset = viewport
+        ? Math.max(0, window.innerHeight - (viewport.height + viewport.offsetTop))
+        : 0
+      screen.style.setProperty('--chat-keyboard-offset', `${Math.round(offset)}px`)
+      if (isNearBottomRef.current) {
+        requestAnimationFrame(() => scrollToBottom('auto'))
+      }
+    }
+    update()
+    window.addEventListener('resize', update)
+    const viewport = window.visualViewport
+    if (viewport) {
+      viewport.addEventListener('resize', update)
+      viewport.addEventListener('scroll', update)
+    }
+    return () => {
+      window.removeEventListener('resize', update)
+      if (viewport) {
+        viewport.removeEventListener('resize', update)
+        viewport.removeEventListener('scroll', update)
+      }
+    }
+  }, [scrollToBottom])
+
+  useEffect(() => {
     messagesRef.current = messages
     const cached = messages.filter((item) => item.id > 0)
     if (cached.length > 0) {
@@ -936,6 +965,11 @@ export const ChatThreadScreen = ({
     }, 1800)
   }
 
+  const handleComposerFocus = () => {
+    requestAnimationFrame(() => scrollToBottom('auto'))
+    window.setTimeout(() => scrollToBottom('auto'), 120)
+  }
+
   const onLoadMore = () => {
     const oldestId = messages[0]?.id
     if (oldestId && oldestId > 0) {
@@ -1289,6 +1323,7 @@ export const ChatThreadScreen = ({
             placeholder="Напишите сообщение"
             value={composerText}
             onChange={handleComposerChange}
+            onFocus={handleComposerFocus}
             enterKeyHint="send"
             autoCapitalize="sentences"
             autoCorrect="on"
