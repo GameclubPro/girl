@@ -126,9 +126,11 @@ export const ChatThreadScreen = ({
     null | 'price' | 'time' | 'location'
   >(null)
   const [quickValue, setQuickValue] = useState('')
+  const screenRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const composerRef = useRef<HTMLDivElement | null>(null)
   const hasMoreRef = useRef(true)
   const isLoadingMoreRef = useRef(false)
   const hasInitialScrollRef = useRef(false)
@@ -498,6 +500,22 @@ export const ChatThreadScreen = ({
     hasInitialScrollRef.current = true
     isNearBottomRef.current = true
   }, [messages.length, scrollToBottom])
+
+  useLayoutEffect(() => {
+    const screen = screenRef.current
+    const composer = composerRef.current
+    if (!screen || !composer) return
+    const update = () => {
+      const height = composer.getBoundingClientRect().height
+      if (!Number.isFinite(height) || height <= 0) return
+      screen.style.setProperty('--chat-composer-height', `${Math.ceil(height)}px`)
+    }
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => update())
+    observer.observe(composer)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     messagesRef.current = messages
@@ -928,7 +946,7 @@ export const ChatThreadScreen = ({
   }, [messages])
 
   return (
-    <div className="screen screen--chat-thread">
+    <div className="screen screen--chat-thread" ref={screenRef}>
       <div className="chat-thread">
         <header className="chat-thread-header">
           <button className="chat-back" type="button" onClick={onBack}>
@@ -1149,7 +1167,7 @@ export const ChatThreadScreen = ({
         )}
       </div>
 
-      <div className="chat-composer">
+      <div className="chat-composer" ref={composerRef}>
         {quickMode && (
           <div className="chat-quick-panel">
             {quickMode === 'price' && (
