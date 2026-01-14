@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import type { Booking, ProProfileSection, ServiceRequest } from '../types/app'
+import { buildBookingStartParam } from '../utils/deeplink'
 
 type ProCabinetScreenProps = {
   apiBase: string
@@ -11,118 +12,76 @@ type ProCabinetScreenProps = {
   onViewChats: () => void
 }
 
-type CalendarFilter = 'all' | 'bookings' | 'requests'
-
-type CalendarItem = {
-  id: string
-  type: 'booking' | 'request'
-  date: Date
-  dateKey: string
-  title: string
-  subtitle: string
-  timeLabel: string
-  statusLabel: string
-  statusTone: 'is-waiting' | 'is-warning' | 'is-confirmed' | 'is-muted'
+type TileStatus = {
+  id: 'broadcast' | 'reminder'
+  message: string
 }
 
-const bookingStatusLabelMap: Record<Booking['status'], string> = {
-  pending: 'Новая',
-  price_pending: 'Ожидает цены',
-  price_proposed: 'Цена предложена',
-  confirmed: 'Подтверждена',
-  declined: 'Отклонена',
-  cancelled: 'Отменена',
-}
-
-const bookingStatusToneMap: Record<Booking['status'], CalendarItem['statusTone']> =
-  {
-    pending: 'is-waiting',
-    price_pending: 'is-waiting',
-    price_proposed: 'is-warning',
-    confirmed: 'is-confirmed',
-    declined: 'is-muted',
-    cancelled: 'is-muted',
-  }
-
-const requestStatusLabelMap: Record<ServiceRequest['status'], string> = {
-  open: 'Новая заявка',
-  closed: 'Закрыта',
-}
-
-const requestStatusToneMap: Record<
-  ServiceRequest['status'],
-  CalendarItem['statusTone']
-> = {
-  open: 'is-waiting',
-  closed: 'is-muted',
-}
-
-const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
-
-const addDays = (date: Date, days: number) => {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-const startOfWeek = (date: Date) => {
-  const next = new Date(date)
-  const day = next.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  next.setDate(next.getDate() + diff)
-  next.setHours(0, 0, 0, 0)
-  return next
-}
-
-const toDateKey = (date: Date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const formatTime = (date: Date) =>
-  date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-
-const formatRangeLabel = (start: Date, end: Date) => {
-  const startLabel = start.toLocaleDateString('ru-RU', {
+const formatShortDate = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', {
     day: 'numeric',
     month: 'short',
-  })
-  const endLabel = end.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  })
-  return `${startLabel} — ${endLabel}`
-}
+  }).format(value)
 
-const formatMonthLabel = (date: Date) => {
-  const label = date.toLocaleDateString('ru-RU', {
+const formatLongDate = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
     month: 'long',
-    year: 'numeric',
-  })
-  return label.charAt(0).toUpperCase() + label.slice(1)
-}
+  }).format(value)
 
-const parseDate = (value?: string | null) => {
+const formatTime = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value)
+
+const toTimeMs = (value?: string | null) => {
   if (!value) return null
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
-  return parsed
+  return parsed.getTime()
 }
 
-const resolveRequestDate = (request: ServiceRequest) => {
-  const directDate = parseDate(request.dateTime)
-  if (directDate) return directDate
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  if (request.dateOption === 'tomorrow') {
-    return addDays(today, 1)
+const buildShareLink = (base: string, startParam: string) => {
+  const trimmedBase = base.trim()
+  const trimmedParam = startParam.trim()
+  if (!trimmedBase || !trimmedParam) return ''
+  const encodedParam = encodeURIComponent(trimmedParam)
+  if (/startapp=/i.test(trimmedBase)) {
+    return trimmedBase.replace(/startapp=[^&]*/i, `startapp=${encodedParam}`)
   }
-  if (request.dateOption === 'today') {
-    return today
+  const joiner = trimmedBase.includes('?') ? '&' : '?'
+  return `${trimmedBase}${joiner}startapp=${encodedParam}`
+}
+
+const buildTelegramShareUrl = (link: string, text: string) => {
+  const params = new URLSearchParams()
+  params.set('url', link)
+  if (text.trim()) {
+    params.set('text', text)
   }
-  return parseDate(request.createdAt) ?? today
+  return `https://t.me/share/url?${params.toString()}`
+}
+
+const copyToClipboard = async (value: string) => {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value)
+      return true
+    }
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    const success = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return success
+  } catch (error) {
+    return false
+  }
 }
 
 export const ProCabinetScreen = ({
@@ -140,18 +99,24 @@ export const ProCabinetScreen = ({
   const [isRequestsLoading, setIsRequestsLoading] = useState(false)
   const [isBookingsLoading, setIsBookingsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>('all')
-  const [weekStartDate, setWeekStartDate] = useState(() =>
-    startOfWeek(new Date())
-  )
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return today
-  })
+  const [tileStatus, setTileStatus] = useState<TileStatus | null>(null)
+  const statusTimerRef = useRef<number | null>(null)
   const displayName = displayNameFallback.trim()
   const isLoading = isRequestsLoading || isBookingsLoading
   const combinedError = requestsError || bookingsError
+  const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
+  const shareConfigured = Boolean(shareBase)
+  const bookingStartParam = useMemo(
+    () => buildBookingStartParam(userId),
+    [userId]
+  )
+  const shareLink = useMemo(
+    () => (shareBase ? buildShareLink(shareBase, bookingStartParam) : ''),
+    [bookingStartParam, shareBase]
+  )
+  const masterLabel = displayName ? `у мастера ${displayName}` : 'у мастера'
+  const broadcastText = `Открылись новые окна для записи ${masterLabel}. Выберите удобное время:`
+  const reminderText = `Напоминаю о записи ${masterLabel}. Выберите удобное время:`
 
   useEffect(() => {
     if (!userId) return
@@ -222,106 +187,107 @@ export const ProCabinetScreen = ({
   }, [apiBase, userId])
 
   useEffect(() => {
-    const weekEnd = addDays(weekStartDate, 6)
-    if (selectedDate < weekStartDate || selectedDate > weekEnd) {
-      setSelectedDate(weekStartDate)
+    return () => {
+      if (statusTimerRef.current) {
+        window.clearTimeout(statusTimerRef.current)
+      }
     }
-  }, [selectedDate, weekStartDate])
+  }, [])
 
-  const calendarItems = useMemo(() => {
-    const items: CalendarItem[] = []
+  const requestStats = useMemo(() => {
+    const total = requests.length
+    const open = requests.filter((request) => request.status === 'open').length
+    const responses = requests.reduce(
+      (sum, request) => sum + (request.responsesCount ?? 0),
+      0
+    )
+    return {
+      total,
+      open,
+      closed: total - open,
+      responses,
+    }
+  }, [requests])
+
+  const bookingStats = useMemo(() => {
+    const now = Date.now()
+    const weekEnd = now + 7 * 24 * 60 * 60 * 1000
+    const clients = new Map<string, { name: string; count: number }>()
+    const recentClients: string[] = []
+    const seenRecent = new Set<string>()
+    let confirmed = 0
+    let pending = 0
+    let cancelled = 0
+    let upcoming = 0
+    let upcomingWeek = 0
+    let nextBookingTime: number | null = null
+    let lastCreatedTime: number | null = null
 
     bookings.forEach((booking) => {
-      const date = parseDate(booking.scheduledAt)
-      if (!date) return
-      const dateKey = toDateKey(date)
-      items.push({
-        id: `booking-${booking.id}`,
-        type: 'booking',
-        date,
-        dateKey,
-        title: booking.serviceName,
-        subtitle: `${booking.clientName ?? 'Клиент'} · ${
-          booking.locationType === 'client' ? 'У клиента' : 'У мастера'
-        }`,
-        timeLabel: formatTime(date),
-        statusLabel: bookingStatusLabelMap[booking.status] ?? 'Запись',
-        statusTone: bookingStatusToneMap[booking.status] ?? 'is-waiting',
-      })
-    })
-
-    requests.forEach((request) => {
-      const date = resolveRequestDate(request)
-      const dateKey = toDateKey(date)
-      const timeLabel = request.dateTime ? formatTime(date) : 'В течение дня'
-      items.push({
-        id: `request-${request.id}`,
-        type: 'request',
-        date,
-        dateKey,
-        title: request.serviceName,
-        subtitle: `Заявка · ${
-          request.locationType === 'client'
-            ? 'У клиента'
-            : request.locationType === 'master'
-              ? 'У мастера'
-              : 'Гибкий формат'
-        }`,
-        timeLabel,
-        statusLabel: requestStatusLabelMap[request.status] ?? 'Заявка',
-        statusTone: requestStatusToneMap[request.status] ?? 'is-waiting',
-      })
-    })
-
-    return items.sort((a, b) => a.date.getTime() - b.date.getTime())
-  }, [bookings, requests])
-
-  const countsByDate = useMemo(() => {
-    const map = new Map<string, { booking: number; request: number }>()
-    calendarItems.forEach((item) => {
-      const current = map.get(item.dateKey) ?? { booking: 0, request: 0 }
-      if (item.type === 'booking') {
-        current.booking += 1
-      } else {
-        current.request += 1
+      if (booking.status === 'confirmed') {
+        confirmed += 1
       }
-      map.set(item.dateKey, current)
+      if (['pending', 'price_pending', 'price_proposed'].includes(booking.status)) {
+        pending += 1
+      }
+      if (['declined', 'cancelled'].includes(booking.status)) {
+        cancelled += 1
+      }
+
+      const scheduledMs = toTimeMs(booking.scheduledAt)
+      if (scheduledMs !== null) {
+        if (
+          scheduledMs >= now &&
+          !['declined', 'cancelled'].includes(booking.status)
+        ) {
+          upcoming += 1
+          if (scheduledMs < weekEnd) {
+            upcomingWeek += 1
+          }
+          if (nextBookingTime === null || scheduledMs < nextBookingTime) {
+            nextBookingTime = scheduledMs
+          }
+        }
+      }
+
+      const createdMs = toTimeMs(booking.createdAt)
+      if (createdMs !== null) {
+        if (lastCreatedTime === null || createdMs > lastCreatedTime) {
+          lastCreatedTime = createdMs
+        }
+      }
+
+      const clientId = booking.clientId
+      const clientName = booking.clientName?.trim() || 'Клиент'
+      const existing = clients.get(clientId)
+      clients.set(clientId, {
+        name: clientName,
+        count: (existing?.count ?? 0) + 1,
+      })
+      if (!seenRecent.has(clientId) && recentClients.length < 3) {
+        seenRecent.add(clientId)
+        recentClients.push(clientName)
+      }
     })
-    return map
-  }, [calendarItems])
 
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, index) => addDays(weekStartDate, index)),
-    [weekStartDate]
-  )
-  const weekEnd = useMemo(() => addDays(weekStartDate, 6), [weekStartDate])
-  const weekRangeLabel = useMemo(
-    () => formatRangeLabel(weekStartDate, weekEnd),
-    [weekStartDate, weekEnd]
-  )
-  const monthLabel = useMemo(() => formatMonthLabel(weekStartDate), [weekStartDate])
-  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate])
-  const todayKey = useMemo(() => toDateKey(new Date()), [])
+    const repeatClients = Array.from(clients.values()).filter(
+      (client) => client.count > 1
+    ).length
 
-  const filteredItems = useMemo(() => {
-    if (calendarFilter === 'bookings') {
-      return calendarItems.filter((item) => item.type === 'booking')
+    return {
+      total: bookings.length,
+      confirmed,
+      pending,
+      cancelled,
+      upcoming,
+      upcomingWeek,
+      nextBookingTime,
+      lastCreatedTime,
+      uniqueClients: clients.size,
+      repeatClients,
+      recentClients,
     }
-    if (calendarFilter === 'requests') {
-      return calendarItems.filter((item) => item.type === 'request')
-    }
-    return calendarItems
-  }, [calendarFilter, calendarItems])
-
-  const selectedItems = useMemo(
-    () => filteredItems.filter((item) => item.dateKey === selectedDateKey),
-    [filteredItems, selectedDateKey]
-  )
-
-  const selectedCounts = countsByDate.get(selectedDateKey) ?? {
-    booking: 0,
-    request: 0,
-  }
+  }, [bookings])
 
   const lastUpdatedLabel = lastUpdated
     ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
@@ -329,183 +295,258 @@ export const ProCabinetScreen = ({
         minute: '2-digit',
       })}`
     : ''
+  const nextBookingLabel = bookingStats.nextBookingTime
+    ? `${formatShortDate(new Date(bookingStats.nextBookingTime))} · ${formatTime(
+        new Date(bookingStats.nextBookingTime)
+      )}`
+    : 'Пока нет записей'
+  const lastBookingLabel = bookingStats.lastCreatedTime
+    ? formatLongDate(new Date(bookingStats.lastCreatedTime))
+    : 'Пока нет записей'
+  const recentClientsLabel =
+    bookingStats.recentClients.length > 0
+      ? bookingStats.recentClients.join(', ')
+      : 'Пока нет клиентов'
+  const broadcastStatusMessage =
+    tileStatus?.id === 'broadcast'
+      ? tileStatus.message
+      : !shareConfigured
+        ? 'Добавьте VITE_TG_APP_URL, чтобы отправлять рассылку.'
+        : ''
+  const reminderStatusMessage =
+    tileStatus?.id === 'reminder'
+      ? tileStatus.message
+      : !shareConfigured
+        ? 'Добавьте VITE_TG_APP_URL, чтобы отправлять напоминания.'
+        : ''
+
+  const setTileMessage = (id: TileStatus['id'], message: string) => {
+    setTileStatus({ id, message })
+    if (statusTimerRef.current) {
+      window.clearTimeout(statusTimerRef.current)
+    }
+    statusTimerRef.current = window.setTimeout(() => {
+      setTileStatus(null)
+    }, 2400)
+  }
+
+  const handleCopyShare = async (id: TileStatus['id'], text: string) => {
+    if (!shareLink) {
+      setTileMessage(id, 'Ссылка пока недоступна.')
+      return
+    }
+    const payload = `${text}\n${shareLink}`.trim()
+    const success = await copyToClipboard(payload)
+    setTileMessage(
+      id,
+      success ? 'Текст скопирован.' : 'Не удалось скопировать.'
+    )
+  }
+
+  const handleOpenShare = (id: TileStatus['id'], text: string) => {
+    if (!shareLink) {
+      setTileMessage(id, 'Ссылка пока недоступна.')
+      return
+    }
+    if (!shareConfigured) {
+      setTileMessage(id, 'Добавьте VITE_TG_APP_URL, чтобы открыть Telegram.')
+      return
+    }
+    const shareUrl = buildTelegramShareUrl(shareLink, text)
+    const webApp = window.Telegram?.WebApp
+    if (webApp?.openTelegramLink) {
+      webApp.openTelegramLink(shareUrl)
+    } else if (webApp?.openLink) {
+      webApp.openLink(shareUrl)
+    } else {
+      window.open(shareUrl, '_blank', 'noopener,noreferrer')
+    }
+    if (webApp?.close) {
+      window.setTimeout(() => webApp.close?.(), 250)
+    }
+    setTileMessage(id, 'Открываем личку...')
+  }
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
-      <div className="pro-cabinet-shell">
-        <section className="pro-cabinet-calendar animate delay-1">
-          <header className="pro-cabinet-calendar-head">
-            <div>
-              <h1 className="pro-cabinet-calendar-title">Календарь</h1>
-              <p className="pro-cabinet-calendar-subtitle">
-                {displayName ? `Привет, ${displayName}` : 'Записи и заявки в одном месте'}
-              </p>
+      <div className="pro-cabinet-shell pro-cabinet-shell--dashboard">
+        <header className="pro-cabinet-dashboard-head animate delay-1">
+          <div>
+            <p className="pro-cabinet-dashboard-kicker">Кабинет</p>
+            <h1 className="pro-cabinet-dashboard-title">
+              {displayName ? `Привет, ${displayName}` : 'Кабинет мастера'}
+            </h1>
+            <p className="pro-cabinet-dashboard-subtitle">
+              Управляйте клиентами, касаниями и загрузкой на неделю вперед.
+            </p>
+            <p className="pro-cabinet-dashboard-meta">
+              {requestStats.total > 0 || bookingStats.total > 0
+                ? `Заявок: ${requestStats.open} · Записей на 7 дней: ${bookingStats.upcomingWeek}`
+                : 'Первые данные появятся после заявок и записей.'}
+            </p>
+            {lastUpdatedLabel && (
+              <p className="pro-cabinet-dashboard-meta">{lastUpdatedLabel}</p>
+            )}
+          </div>
+          <button
+            className="pro-cabinet-dashboard-profile"
+            type="button"
+            onClick={() => onEditProfile()}
+          >
+            Профиль
+          </button>
+        </header>
+
+        {isLoading && (
+          <p className="pro-cabinet-dashboard-status">Синхронизируем данные...</p>
+        )}
+        {combinedError && (
+          <p className="pro-cabinet-dashboard-status is-error">{combinedError}</p>
+        )}
+
+        <div className="pro-cabinet-nav-grid animate delay-2">
+          <article className="pro-cabinet-nav-card is-analytics">
+            <p className="pro-cabinet-nav-kicker">Статистика</p>
+            <h2 className="pro-cabinet-nav-title">Статистика и аналитика</h2>
+            <p className="pro-cabinet-nav-subtitle">
+              Сводка по заявкам и записям без лишних экранов.
+            </p>
+            <div className="pro-cabinet-nav-stats">
+              <div className="pro-cabinet-nav-stat">
+                <span className="pro-cabinet-nav-stat-value">
+                  {requestStats.open}
+                </span>
+                <span className="pro-cabinet-nav-stat-label">заявок</span>
+              </div>
+              <div className="pro-cabinet-nav-stat">
+                <span className="pro-cabinet-nav-stat-value">
+                  {bookingStats.confirmed}
+                </span>
+                <span className="pro-cabinet-nav-stat-label">подтв.</span>
+              </div>
+              <div className="pro-cabinet-nav-stat">
+                <span className="pro-cabinet-nav-stat-value">
+                  {bookingStats.upcomingWeek}
+                </span>
+                <span className="pro-cabinet-nav-stat-label">7 дней</span>
+              </div>
             </div>
-            <div className="pro-cabinet-calendar-head-actions">
+            <div className="pro-cabinet-nav-footer">
               <button
-                className="pro-cabinet-calendar-action"
+                className="pro-cabinet-nav-action is-primary"
                 type="button"
                 onClick={onViewRequests}
               >
-                Все заявки
-              </button>
-              <button
-                className="pro-cabinet-calendar-action is-ghost"
-                type="button"
-                onClick={() => onEditProfile()}
-              >
-                Профиль
+                Открыть заявки
               </button>
             </div>
-          </header>
+          </article>
 
-          {isLoading && <p className="pro-status">Синхронизируем календарь...</p>}
-          {combinedError && <p className="pro-error">{combinedError}</p>}
-
-          <div className="pro-cabinet-calendar-card">
-            <div className="pro-cabinet-calendar-top">
-              <button
-                className="pro-cabinet-calendar-nav"
-                type="button"
-                aria-label="Предыдущая неделя"
-                onClick={() => setWeekStartDate((current) => addDays(current, -7))}
-              >
-                ‹
-              </button>
-              <div className="pro-cabinet-calendar-month">
-                <span className="pro-cabinet-calendar-month-label">{monthLabel}</span>
-                <span className="pro-cabinet-calendar-range">{weekRangeLabel}</span>
-                {lastUpdatedLabel && (
-                  <span className="pro-cabinet-calendar-sync">{lastUpdatedLabel}</span>
-                )}
+          <article className="pro-cabinet-nav-card is-clients">
+            <p className="pro-cabinet-nav-kicker">Клиенты</p>
+            <h2 className="pro-cabinet-nav-title">Клиентская база</h2>
+            <p className="pro-cabinet-nav-subtitle">
+              {bookingStats.uniqueClients > 0
+                ? `Уникальных клиентов: ${bookingStats.uniqueClients}`
+                : 'Клиенты появятся после первых записей.'}
+            </p>
+            <p className="pro-cabinet-nav-meta">{recentClientsLabel}</p>
+            <div className="pro-cabinet-nav-footer">
+              <div className="pro-cabinet-nav-pills">
+                <span className="pro-cabinet-nav-pill">
+                  Повторных: {bookingStats.repeatClients}
+                </span>
+                <span className="pro-cabinet-nav-pill is-ghost">
+                  Активных: {bookingStats.upcoming}
+                </span>
               </div>
               <button
-                className="pro-cabinet-calendar-nav"
+                className="pro-cabinet-nav-action is-primary"
                 type="button"
-                aria-label="Следующая неделя"
-                onClick={() => setWeekStartDate((current) => addDays(current, 7))}
+                onClick={onViewChats}
               >
-                ›
+                Открыть чаты
               </button>
             </div>
+          </article>
 
-            <div className="pro-cabinet-calendar-week" role="tablist">
-              {weekDays.map((day, index) => {
-                const dayKey = toDateKey(day)
-                const dayCounts = countsByDate.get(dayKey) ?? {
-                  booking: 0,
-                  request: 0,
-                }
-                const isSelected = dayKey === selectedDateKey
-                const isToday = dayKey === todayKey
-                return (
-                  <button
-                    key={dayKey}
-                    className={`pro-cabinet-calendar-day${
-                      isSelected ? ' is-selected' : ''
-                    }${isToday ? ' is-today' : ''}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={isSelected}
-                    onClick={() => setSelectedDate(day)}
-                  >
-                    <span className="pro-cabinet-calendar-day-name">
-                      {weekDayLabels[index]}
-                    </span>
-                    <span className="pro-cabinet-calendar-day-number">
-                      {day.getDate()}
-                    </span>
-                    <span className="pro-cabinet-calendar-day-dots">
-                      {dayCounts.booking > 0 && (
-                        <span className="pro-cabinet-calendar-day-dot is-booking">
-                          {dayCounts.booking}
-                        </span>
-                      )}
-                      {dayCounts.request > 0 && (
-                        <span className="pro-cabinet-calendar-day-dot is-request">
-                          {dayCounts.request}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="pro-cabinet-calendar-summary">
-              <span className="pro-cabinet-calendar-summary-pill is-booking">
-                Записей: {selectedCounts.booking}
+          <article className="pro-cabinet-nav-card is-campaigns">
+            <p className="pro-cabinet-nav-kicker">Рассылка</p>
+            <h2 className="pro-cabinet-nav-title">Рассылка</h2>
+            <p className="pro-cabinet-nav-subtitle">
+              Сообщите о свободных окнах всем клиентам сразу.
+            </p>
+            <div className="pro-cabinet-nav-pills">
+              <span className="pro-cabinet-nav-pill">
+                Аудитория: {bookingStats.uniqueClients}
               </span>
-              <span className="pro-cabinet-calendar-summary-pill is-request">
-                Заявок: {selectedCounts.request}
-              </span>
-              <span className="pro-cabinet-calendar-summary-date">
-                {selectedDate.toLocaleDateString('ru-RU', {
-                  day: 'numeric',
-                  month: 'long',
-                })}
+              <span className="pro-cabinet-nav-pill is-ghost">
+                Откликов: {requestStats.responses}
               </span>
             </div>
-
-            <div className="pro-cabinet-calendar-filters" role="tablist">
-              {(
-                [
-                  { id: 'all', label: 'Все' },
-                  { id: 'bookings', label: 'Записи' },
-                  { id: 'requests', label: 'Заявки' },
-                ] as const
-              ).map((filter) => (
+            <div className="pro-cabinet-nav-footer">
+              <div className="pro-cabinet-nav-actions">
                 <button
-                  key={filter.id}
-                  className={`pro-cabinet-calendar-filter${
-                    calendarFilter === filter.id ? ' is-active' : ''
-                  }`}
+                  className="pro-cabinet-nav-action is-primary"
                   type="button"
-                  role="tab"
-                  aria-selected={calendarFilter === filter.id}
-                  onClick={() => setCalendarFilter(filter.id)}
+                  onClick={() => handleOpenShare('broadcast', broadcastText)}
+                  disabled={!shareLink || !shareConfigured}
                 >
-                  {filter.label}
+                  Отправить
                 </button>
-              ))}
-            </div>
-
-            <div className="pro-cabinet-calendar-list">
-              {selectedItems.length === 0 ? (
-                <div className="pro-cabinet-calendar-empty">
-                  На этот день пока нет записей или заявок.
-                </div>
-              ) : (
-                selectedItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`pro-cabinet-calendar-item is-${item.type}`}
-                  >
-                    <div className="pro-cabinet-calendar-item-time">
-                      <span
-                        className={`pro-cabinet-calendar-item-dot is-${item.type}`}
-                      />
-                      <span>{item.timeLabel}</span>
-                    </div>
-                    <div className="pro-cabinet-calendar-item-body">
-                      <span className="pro-cabinet-calendar-item-title">
-                        {item.title}
-                      </span>
-                      <span className="pro-cabinet-calendar-item-meta">
-                        {item.subtitle}
-                      </span>
-                    </div>
-                    <span
-                      className={`pro-cabinet-calendar-item-badge ${item.statusTone}`}
-                    >
-                      {item.statusLabel}
-                    </span>
-                  </div>
-                ))
+                <button
+                  className="pro-cabinet-nav-action is-ghost"
+                  type="button"
+                  onClick={() => handleCopyShare('broadcast', broadcastText)}
+                  disabled={!shareLink}
+                >
+                  Скопировать
+                </button>
+              </div>
+              {broadcastStatusMessage && (
+                <p className="pro-cabinet-nav-status" role="status">
+                  {broadcastStatusMessage}
+                </p>
               )}
             </div>
-          </div>
-        </section>
+          </article>
+
+          <article className="pro-cabinet-nav-card is-reminders">
+            <p className="pro-cabinet-nav-kicker">Напоминание</p>
+            <h2 className="pro-cabinet-nav-title">Напомнить записаться</h2>
+            <p className="pro-cabinet-nav-subtitle">
+              {bookingStats.lastCreatedTime
+                ? `Последняя запись: ${lastBookingLabel}`
+                : 'Добавьте первое касание, чтобы напомнить.'}
+            </p>
+            <p className="pro-cabinet-nav-meta">Следующая: {nextBookingLabel}</p>
+            <div className="pro-cabinet-nav-footer">
+              <div className="pro-cabinet-nav-actions">
+                <button
+                  className="pro-cabinet-nav-action is-primary"
+                  type="button"
+                  onClick={() => handleOpenShare('reminder', reminderText)}
+                  disabled={!shareLink || !shareConfigured}
+                >
+                  Напомнить
+                </button>
+                <button
+                  className="pro-cabinet-nav-action is-ghost"
+                  type="button"
+                  onClick={() => handleCopyShare('reminder', reminderText)}
+                  disabled={!shareLink}
+                >
+                  Скопировать
+                </button>
+              </div>
+              {reminderStatusMessage && (
+                <p className="pro-cabinet-nav-status" role="status">
+                  {reminderStatusMessage}
+                </p>
+              )}
+            </div>
+          </article>
+        </div>
       </div>
 
       <ProBottomNav
