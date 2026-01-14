@@ -21,6 +21,7 @@ import type { FavoriteMaster } from '../utils/favorites'
 type ClientMasterProfileScreenProps = {
   apiBase: string
   masterId: string
+  userId: string
   onBack: () => void
   onViewHome: () => void
   onViewMasters: () => void
@@ -191,6 +192,7 @@ type MasterProfileTabId = 'overview' | 'portfolio' | 'schedule' | 'reviews'
 export const ClientMasterProfileScreen = ({
   apiBase,
   masterId,
+  userId,
   onBack,
   onViewHome,
   onViewMasters,
@@ -253,6 +255,25 @@ export const ClientMasterProfileScreen = ({
       cancelled = true
     }
   }, [apiBase, masterId])
+
+  useEffect(() => {
+    if (!masterId || !userId || masterId === userId) return
+    const reportView = async () => {
+      try {
+        await fetch(`${apiBase}/api/masters/${masterId}/view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            tzOffset: new Date().getTimezoneOffset(),
+          }),
+        })
+      } catch (error) {
+        // View tracking should not block profile usage.
+      }
+    }
+    void reportView()
+  }, [apiBase, masterId, userId])
 
   useEffect(() => {
     if (!masterId) return

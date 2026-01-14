@@ -271,9 +271,9 @@ export const ProAnalyticsScreen = ({
   const [activeActivityIndex, setActiveActivityIndex] = useState<number | null>(
     null
   )
-  const [activeConversionIndex, setActiveConversionIndex] = useState<number | null>(
-    null
-  )
+  const [activeProfileViewsIndex, setActiveProfileViewsIndex] = useState<
+    number | null
+  >(null)
   const [showAllCategories, setShowAllCategories] = useState(false)
   const [showAllClients, setShowAllClients] = useState(false)
   const statusBubbleRef = useRef<HTMLDivElement | null>(null)
@@ -295,7 +295,7 @@ export const ProAnalyticsScreen = ({
   useEffect(() => {
     setActiveRevenueIndex(null)
     setActiveActivityIndex(null)
-    setActiveConversionIndex(null)
+    setActiveProfileViewsIndex(null)
     setShowAllCategories(false)
     setShowAllClients(false)
   }, [range, timeseries.length])
@@ -321,8 +321,8 @@ export const ProAnalyticsScreen = ({
   const requestsSeries = timeseries.map((point) => point.requests)
   const responsesSeries = timeseries.map((point) => point.responses)
   const bookingsSeries = timeseries.map((point) => point.bookings)
-  const conversionSeries = timeseries.map((point) =>
-    point.requests ? point.bookings / point.requests : 0
+  const profileViewsSeries = timeseries.map(
+    (point) => point.profileViews ?? 0
   )
   const rangeLabel = formatRangeLabel(data?.range.start, data?.range.end)
   const compareRangeLabel = formatRangeLabel(
@@ -330,16 +330,16 @@ export const ProAnalyticsScreen = ({
     data?.compare?.range.end
   )
   const compareRevenueSeries = compareTimeseries.map((point) => point.revenue)
-  const compareConversionSeries = compareTimeseries.map((point) =>
-    point.requests ? point.bookings / point.requests : 0
+  const compareProfileViewsSeries = compareTimeseries.map(
+    (point) => point.profileViews ?? 0
   )
   const compareRevenueValues =
     compareRevenueSeries.length > 0
       ? compareRevenueSeries.slice(0, revenueSeries.length)
       : []
-  const compareConversionValues =
-    compareConversionSeries.length > 0
-      ? compareConversionSeries.slice(0, conversionSeries.length)
+  const compareProfileViewsValues =
+    compareProfileViewsSeries.length > 0
+      ? compareProfileViewsSeries.slice(0, profileViewsSeries.length)
       : []
 
   const categoryList = useMemo(
@@ -470,23 +470,21 @@ export const ProAnalyticsScreen = ({
     )
   }, [hasTimeseries, timeseries])
 
-  const averageConversion = useMemo(() => {
-    if (conversionSeries.length === 0) return 0
-    const total = conversionSeries.reduce((sum, value) => sum + value, 0)
-    return total / conversionSeries.length
-  }, [conversionSeries])
-  const peakConversionPoint = useMemo(() => {
+  const profileViewsTotal = useMemo(
+    () => profileViewsSeries.reduce((sum, value) => sum + value, 0),
+    [profileViewsSeries]
+  )
+  const averageProfileViews = useMemo(() => {
+    if (profileViewsSeries.length === 0) return 0
+    return profileViewsTotal / profileViewsSeries.length
+  }, [profileViewsSeries, profileViewsTotal])
+  const peakProfileViewsPoint = useMemo(() => {
     if (!hasTimeseries) return null
-    return timeseries.reduce<{ date: string; rate: number } | null>(
-      (best, point) => {
-        const rate = point.requests ? point.bookings / point.requests : 0
-        if (!best || rate > best.rate) {
-          return { date: point.date, rate }
-        }
-        return best
-      },
-      null
-    )
+    return timeseries.reduce((best, point) => {
+      const current = point.profileViews ?? 0
+      const bestValue = best?.profileViews ?? 0
+      return current > bestValue ? point : best
+    }, timeseries[0] ?? null)
   }, [hasTimeseries, timeseries])
   const isInitialLoading = isLoading && !data
   const getPointerIndex = (event: { currentTarget: HTMLElement; clientX: number }, count: number) => {
@@ -505,9 +503,12 @@ export const ProAnalyticsScreen = ({
     if (!hasTimeseries) return
     setActiveActivityIndex(getPointerIndex(event, timeseries.length))
   }
-  const handleConversionPointer = (event: { currentTarget: HTMLElement; clientX: number }) => {
+  const handleProfileViewsPointer = (event: {
+    currentTarget: HTMLElement
+    clientX: number
+  }) => {
     if (!hasTimeseries) return
-    setActiveConversionIndex(getPointerIndex(event, timeseries.length))
+    setActiveProfileViewsIndex(getPointerIndex(event, timeseries.length))
   }
   const activeRevenuePoint =
     activeRevenueIndex !== null ? timeseries[activeRevenueIndex] : null
@@ -515,12 +516,18 @@ export const ProAnalyticsScreen = ({
     activeRevenueIndex !== null ? compareTimeseries[activeRevenueIndex] : null
   const activeActivityPoint =
     activeActivityIndex !== null ? timeseries[activeActivityIndex] : null
-  const activeConversionPoint =
-    activeConversionIndex !== null ? timeseries[activeConversionIndex] : null
-  const activeConversionValue =
-    activeConversionIndex !== null ? conversionSeries[activeConversionIndex] : null
-  const activeConversionCompareValue =
-    activeConversionIndex !== null ? compareConversionValues[activeConversionIndex] : null
+  const activeProfileViewsPoint =
+    activeProfileViewsIndex !== null
+      ? timeseries[activeProfileViewsIndex]
+      : null
+  const activeProfileViewsValue =
+    activeProfileViewsIndex !== null
+      ? profileViewsSeries[activeProfileViewsIndex]
+      : null
+  const activeProfileViewsCompareValue =
+    activeProfileViewsIndex !== null
+      ? compareProfileViewsValues[activeProfileViewsIndex]
+      : null
 
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-analytics">
@@ -533,7 +540,7 @@ export const ProAnalyticsScreen = ({
             <p className="analytics-kicker">Аналитика</p>
             <h1 className="analytics-heading">Статистика бизнеса</h1>
             <p className="analytics-subtitle">
-              Доход, заявки, клиенты и конверсии в одном мобильном дашборде.
+              Доход, заявки, клиенты и просмотры профиля в одном дашборде.
             </p>
           </div>
           <button
@@ -1032,10 +1039,10 @@ export const ProAnalyticsScreen = ({
             <section className="analytics-card animate delay-7">
               <div className="analytics-card-head">
                 <div>
-                  <p className="analytics-card-kicker">Конверсия</p>
-                  <h2 className="analytics-card-title">Конверсия в запись</h2>
+                  <p className="analytics-card-kicker">Профиль</p>
+                  <h2 className="analytics-card-title">Просмотры профиля</h2>
                   <p className="analytics-card-subtitle">
-                    Доля записей от заявок по дням
+                    Всего {formatNumber(profileViewsTotal)} просмотров
                   </p>
                 </div>
                 {rangeLabel && <span className="analytics-pill">{rangeLabel}</span>}
@@ -1043,29 +1050,29 @@ export const ProAnalyticsScreen = ({
               {hasTimeseries ? (
                 <div
                   className="analytics-chart-wrap"
-                  onPointerDown={handleConversionPointer}
-                  onPointerMove={handleConversionPointer}
-                  onPointerLeave={() => setActiveConversionIndex(null)}
+                  onPointerDown={handleProfileViewsPointer}
+                  onPointerMove={handleProfileViewsPointer}
+                  onPointerLeave={() => setActiveProfileViewsIndex(null)}
                 >
                   <LineChart
                     labels={timeseries.map((point) => point.date)}
-                    activeIndex={activeConversionIndex}
+                    activeIndex={activeProfileViewsIndex}
                     series={[
                       {
-                        id: 'conversion',
-                        label: 'Конверсия',
-                        values: conversionSeries,
-                        color: 'var(--success)',
+                        id: 'profile-views',
+                        label: 'Просмотры',
+                        values: profileViewsSeries,
+                        color: 'var(--accent)',
                         area: true,
                         curve: true,
                       },
-                      ...(compareConversionValues.length > 0
+                      ...(compareProfileViewsValues.length > 0
                         ? [
                             {
-                              id: 'conversion-compare',
+                              id: 'profile-views-compare',
                               label: 'Прошлый период',
-                              values: compareConversionValues,
-                              color: 'var(--success)',
+                              values: compareProfileViewsValues,
+                              color: 'var(--accent)',
                               dash: '6 6',
                               opacity: 0.45,
                               curve: true,
@@ -1074,46 +1081,37 @@ export const ProAnalyticsScreen = ({
                         : []),
                     ]}
                   />
-                  {activeConversionPoint &&
-                    activeConversionIndex !== null &&
-                    activeConversionValue !== null && (
+                  {activeProfileViewsPoint &&
+                    activeProfileViewsIndex !== null &&
+                    activeProfileViewsValue !== null && (
                       <div
                         className="analytics-tooltip"
                         style={{
                           left: getTooltipLeft(
-                            activeConversionIndex,
+                            activeProfileViewsIndex,
                             timeseries.length
                           ),
                         }}
                       >
                         <span className="analytics-tooltip-date">
-                          {formatShortDate(activeConversionPoint.date)}
+                          {formatShortDate(activeProfileViewsPoint.date)}
                         </span>
                         <div className="analytics-tooltip-row">
                           <span className="analytics-tooltip-label">
-                            Конверсия
+                            Просмотры
                           </span>
                           <span className="analytics-tooltip-value">
-                            {formatPercent(activeConversionValue)}
+                            {formatNumber(activeProfileViewsValue)}
                           </span>
                         </div>
-                        <div className="analytics-tooltip-row is-muted">
-                          <span className="analytics-tooltip-label">
-                            Записи / Заявки
-                          </span>
-                          <span className="analytics-tooltip-value">
-                            {formatNumber(activeConversionPoint.bookings)} /{' '}
-                            {formatNumber(activeConversionPoint.requests)}
-                          </span>
-                        </div>
-                        {activeConversionCompareValue !== null &&
-                          activeConversionCompareValue !== undefined && (
+                        {activeProfileViewsCompareValue !== null &&
+                          activeProfileViewsCompareValue !== undefined && (
                             <div className="analytics-tooltip-row is-muted">
                               <span className="analytics-tooltip-label">
                                 Прошлый период
                               </span>
                               <span className="analytics-tooltip-value">
-                                {formatPercent(activeConversionCompareValue)}
+                                {formatNumber(activeProfileViewsCompareValue)}
                               </span>
                             </div>
                           )}
@@ -1121,9 +1119,9 @@ export const ProAnalyticsScreen = ({
                     )}
                 </div>
               ) : (
-                <p className="analytics-empty">Нет данных по конверсии.</p>
+                <p className="analytics-empty">Нет данных по просмотрам.</p>
               )}
-              {compareConversionValues.length > 0 && (
+              {compareProfileViewsValues.length > 0 && (
                 <div className="analytics-compare">
                   <span className="analytics-compare-line" />
                   <span className="analytics-compare-label">Прошлый период</span>
@@ -1137,20 +1135,22 @@ export const ProAnalyticsScreen = ({
               {hasTimeseries && (
                 <div className="analytics-note-row">
                   <div className="analytics-note">
-                    <span className="analytics-note-label">Средняя конверсия</span>
+                    <span className="analytics-note-label">
+                      В среднем за день
+                    </span>
                     <span className="analytics-note-value">
-                      {formatPercent(averageConversion)}
+                      {formatNumber(Math.round(averageProfileViews))}
                     </span>
                     <span className="analytics-note-meta">за период</span>
                   </div>
-                  {peakConversionPoint && (
+                  {peakProfileViewsPoint && (
                     <div className="analytics-note">
-                      <span className="analytics-note-label">Пик конверсии</span>
+                      <span className="analytics-note-label">Пик просмотров</span>
                       <span className="analytics-note-value">
-                        {formatPercent(peakConversionPoint.rate)}
+                        {formatNumber(peakProfileViewsPoint.profileViews ?? 0)}
                       </span>
                       <span className="analytics-note-meta">
-                        {formatShortDate(peakConversionPoint.date)}
+                        {formatShortDate(peakProfileViewsPoint.date)}
                       </span>
                     </div>
                   )}

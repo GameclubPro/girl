@@ -1000,6 +1000,7 @@ function App() {
       <ClientMasterProfileScreen
         apiBase={apiBase}
         masterId={selectedMasterId}
+        userId={userId}
         onBack={() => {
           setSelectedMasterId(null)
           setView('client-showcase')

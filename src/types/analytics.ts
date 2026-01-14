@@ -30,6 +30,9 @@ export type AnalyticsSummary = {
     count: number
     average: number
   }
+  profileViews: {
+    total: number
+  }
 }
 
 export type AnalyticsTimePoint = {
@@ -40,6 +43,7 @@ export type AnalyticsTimePoint = {
   responses: number
   followers: number
   reviews: number
+  profileViews: number
 }
 
 export type AnalyticsCategory = {

@@ -1369,6 +1369,26 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_profile_views (
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      viewer_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      view_date DATE NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (master_id, viewer_id, view_date)
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_profile_views_master_idx
+    ON master_profile_views (master_id, created_at);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_profile_views_date_idx
+    ON master_profile_views (master_id, view_date);
+  `)
+
+  await pool.query(`
     ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
   `)
@@ -2253,6 +2273,36 @@ app.get('/api/masters/:userId', async (req, res) => {
     })
   } catch (error) {
     console.error('GET /api/masters/:userId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/:userId/view', async (req, res) => {
+  const masterId = normalizeText(req.params.userId)
+  const viewerId = normalizeText(req.body?.userId ?? req.body?.viewerId)
+  if (!masterId || !viewerId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (masterId === viewerId) {
+    res.json({ ok: true, skipped: 'self' })
+    return
+  }
+  const tzOffsetMinutes = parseOptionalInt(req.body?.tzOffset) ?? 0
+  const viewDate = toDateKey(new Date(), tzOffsetMinutes) || new Date().toISOString().slice(0, 10)
+
+  try {
+    await pool.query(
+      `
+        INSERT INTO master_profile_views (master_id, viewer_id, view_date)
+        VALUES ($1, $2, $3::date)
+        ON CONFLICT DO NOTHING
+      `,
+      [masterId, viewerId, viewDate]
+    )
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/masters/:userId/view failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -3308,6 +3358,7 @@ const loadProAnalyticsRange = async (
     responses: 0,
     followers: 0,
     reviews: 0,
+    profileViews: 0,
   }))
   const seriesIndex = new Map(dateKeys.map((date, index) => [date, index]))
 
@@ -3319,6 +3370,7 @@ const loadProAnalyticsRange = async (
     reviewsResult,
     followersResult,
     followersTotalResult,
+    profileViewsResult,
   ] = await Promise.all([
     pool.query(
       `
@@ -3399,6 +3451,16 @@ const loadProAnalyticsRange = async (
         `,
       [userId]
     ),
+    pool.query(
+      `
+          SELECT created_at AS "createdAt"
+          FROM master_profile_views
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+      [userId, start, end]
+    ),
   ])
 
   const bookings = bookingsResult.rows ?? []
@@ -3407,6 +3469,7 @@ const loadProAnalyticsRange = async (
   const chats = chatsResult.rows ?? []
   const reviews = reviewsResult.rows ?? []
   const followers = followersResult.rows ?? []
+  const profileViews = profileViewsResult.rows ?? []
 
   const statusCounts = {}
   const categoryMap = new Map()
@@ -3508,6 +3571,14 @@ const loadProAnalyticsRange = async (
     }
   })
 
+  profileViews.forEach((view) => {
+    const dateKey = toDateKey(view.createdAt, tzOffsetMinutes)
+    const seriesIdx = seriesIndex.get(dateKey)
+    if (seriesIdx !== undefined) {
+      series[seriesIdx].profileViews += 1
+    }
+  })
+
   let ratingSum = 0
   reviews.forEach((review) => {
     const dateKey = toDateKey(review.createdAt, tzOffsetMinutes)
@@ -3583,6 +3654,9 @@ const loadProAnalyticsRange = async (
       reviews: {
         count: reviews.length,
         average: averageRating,
+      },
+      profileViews: {
+        total: profileViews.length,
       },
     },
     timeseries: series,
