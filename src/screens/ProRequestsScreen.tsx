@@ -1466,21 +1466,20 @@ export const ProRequestsScreen = ({
                     разделе «Заявки».
                   </p>
                 )}
-              )}
 
               {!isBookingsLoading &&
                 confirmedBookingItems.length > 0 &&
                 !bookingsError && (
-                <div className="booking-calendar-label">
-                  <span>Записи на</span>
-                  <span className="booking-calendar-label-date">
-                    {selectedDateLabel}
-                  </span>
-                  <span className="booking-calendar-label-count">
-                    {selectedBookings.length}
-                  </span>
-                </div>
-              )}
+                  <div className="booking-calendar-label">
+                    <span>Записи на</span>
+                    <span className="booking-calendar-label-date">
+                      {selectedDateLabel}
+                    </span>
+                    <span className="booking-calendar-label-count">
+                      {selectedBookings.length}
+                    </span>
+                  </div>
+                )}
 
               {!isBookingsLoading &&
                 confirmedBookingItems.length > 0 &&
