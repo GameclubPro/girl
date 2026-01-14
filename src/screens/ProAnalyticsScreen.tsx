@@ -314,7 +314,6 @@ export const ProAnalyticsScreen = ({
   const profileViewsSeries = timeseries.map(
     (point) => point.profileViews ?? 0
   )
-  const rangeLabel = formatRangeLabel(data?.range.start, data?.range.end)
   const compareRangeLabel = formatRangeLabel(
     data?.compare?.range.start,
     data?.compare?.range.end
