@@ -7869,7 +7869,7 @@
 
 .pro-profile-certificate-media {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 4 / 3;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(var(--shadow-rgb), 0.12);
