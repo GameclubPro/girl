@@ -89,6 +89,51 @@ const parseOptionalFloat = (value) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const parseDateParam = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+const parseRangeDays = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (!normalized) return 30
+  const map = {
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+    '365d': 365,
+    week: 7,
+    month: 30,
+    quarter: 90,
+    year: 365,
+  }
+  if (map[normalized]) return map[normalized]
+  const numeric = parseOptionalInt(normalized)
+  if (numeric && numeric > 0 && numeric <= 365) return numeric
+  return 30
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const toDateKey = (value, tzOffsetMinutes) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const shifted = new Date(parsed.getTime() - tzOffsetMinutes * 60000)
+  return shifted.toISOString().slice(0, 10)
+}
+
+const formatUserDisplayName = (firstName, lastName, username, fallback) => {
+  const parts = [normalizeText(firstName), normalizeText(lastName)].filter(Boolean)
+  const name = parts.join(' ').trim()
+  if (name) return name
+  const handle = normalizeText(username)
+  if (handle) return `@${handle}`
+  return fallback
+}
+
 const normalizeServiceName = (value) => normalizeText(value).toLowerCase()
 
 const parseServiceItem = (value) => {
@@ -312,15 +357,6 @@ const buildPublicUrl = (req, relativePath) => {
     process.env.PUBLIC_BASE_URL ?? `${req.protocol}://${req.get('host')}`
   const safePath = normalized.replace(/^\/+/, '')
   return `${baseUrl}/uploads/${safePath}`
-}
-
-const formatUserDisplayName = (firstName, lastName, username, fallback) => {
-  const parts = [normalizeText(firstName), normalizeText(lastName)].filter(Boolean)
-  const name = parts.join(' ').trim()
-  if (name) return name
-  const handle = normalizeText(username)
-  if (handle) return `@${handle}`
-  return fallback
 }
 
 const safeJson = (value) => {
@@ -3247,6 +3283,340 @@ app.get('/api/pro/bookings', async (req, res) => {
     res.json(payload)
   } catch (error) {
     console.error('GET /api/pro/bookings failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/pro/analytics', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const tzOffsetMinutes = parseOptionalInt(req.query.tzOffset) ?? 0
+  const startParam = parseDateParam(req.query.start)
+  const endParam = parseDateParam(req.query.end)
+  const rangeDays = parseRangeDays(req.query.range)
+
+  const now = new Date()
+  const endTime = endParam ?? now
+  const startTime = startParam ?? new Date(endTime.getTime() - (rangeDays - 1) * DAY_MS)
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+    res.status(400).json({ error: 'date_invalid' })
+    return
+  }
+
+  const start = startTime <= endTime ? startTime : endTime
+  const end = startTime <= endTime ? endTime : startTime
+  const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1)
+
+  const dateKeys = Array.from({ length: days }, (_, index) =>
+    toDateKey(new Date(start.getTime() + index * DAY_MS), tzOffsetMinutes)
+  ).filter(Boolean)
+  const series = dateKeys.map((date) => ({
+    date,
+    revenue: 0,
+    bookings: 0,
+    requests: 0,
+    responses: 0,
+    followers: 0,
+    reviews: 0,
+  }))
+  const seriesIndex = new Map(dateKeys.map((date, index) => [date, index]))
+
+  try {
+    const [
+      bookingsResult,
+      dispatchResult,
+      responsesResult,
+      chatsResult,
+      reviewsResult,
+      followersResult,
+      followersTotalResult,
+    ] = await Promise.all([
+      pool.query(
+        `
+          SELECT
+            b.id,
+            b.client_id AS "clientId",
+            b.category_id AS "categoryId",
+            b.service_price AS "servicePrice",
+            b.proposed_price AS "proposedPrice",
+            b.status,
+            b.created_at AS "createdAt",
+            u.first_name AS "clientFirstName",
+            u.last_name AS "clientLastName",
+            u.username AS "clientUsername"
+          FROM service_bookings b
+          LEFT JOIN users u ON u.user_id = b.client_id
+          WHERE b.master_id = $1
+            AND b.created_at >= $2
+            AND b.created_at <= $3
+        `,
+        [normalizedUserId, start, end]
+      ),
+      pool.query(
+        `
+          SELECT request_id AS "requestId", sent_at AS "sentAt"
+          FROM request_dispatches
+          WHERE master_id = $1
+            AND sent_at >= $2
+            AND sent_at <= $3
+        `,
+        [normalizedUserId, start, end]
+      ),
+      pool.query(
+        `
+          SELECT request_id AS "requestId", status, created_at AS "createdAt"
+          FROM request_responses
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+        [normalizedUserId, start, end]
+      ),
+      pool.query(
+        `
+          SELECT id, created_at AS "createdAt"
+          FROM chats
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+        [normalizedUserId, start, end]
+      ),
+      pool.query(
+        `
+          SELECT rating, created_at AS "createdAt"
+          FROM master_reviews
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+        [normalizedUserId, start, end]
+      ),
+      pool.query(
+        `
+          SELECT created_at AS "createdAt"
+          FROM master_followers
+          WHERE master_id = $1
+            AND created_at >= $2
+            AND created_at <= $3
+        `,
+        [normalizedUserId, start, end]
+      ),
+      pool.query(
+        `
+          SELECT COUNT(*)::int AS total
+          FROM master_followers
+          WHERE master_id = $1
+        `,
+        [normalizedUserId]
+      ),
+    ])
+
+    const bookings = bookingsResult.rows ?? []
+    const dispatches = dispatchResult.rows ?? []
+    const responses = responsesResult.rows ?? []
+    const chats = chatsResult.rows ?? []
+    const reviews = reviewsResult.rows ?? []
+    const followers = followersResult.rows ?? []
+
+    const statusCounts = {}
+    const categoryMap = new Map()
+    const clientMap = new Map()
+    const pendingStatuses = new Set(['pending', 'price_pending', 'price_proposed'])
+    const cancelledStatuses = new Set(['declined', 'cancelled'])
+
+    let confirmedRevenue = 0
+    let projectedRevenue = 0
+    let lostRevenue = 0
+    let confirmedBookings = 0
+    let pendingBookings = 0
+    let cancelledBookings = 0
+    let totalBookingRevenue = 0
+
+    bookings.forEach((booking) => {
+      const amount = Number(booking.servicePrice ?? booking.proposedPrice ?? 0) || 0
+      const status = booking.status
+      totalBookingRevenue += amount
+
+      statusCounts[status] = (statusCounts[status] ?? 0) + 1
+      if (status === 'confirmed') {
+        confirmedBookings += 1
+        confirmedRevenue += amount
+      } else if (pendingStatuses.has(status)) {
+        pendingBookings += 1
+        projectedRevenue += amount
+      } else if (cancelledStatuses.has(status)) {
+        cancelledBookings += 1
+        lostRevenue += amount
+      }
+
+      const dateKey = toDateKey(booking.createdAt, tzOffsetMinutes)
+      const seriesIdx = seriesIndex.get(dateKey)
+      if (seriesIdx !== undefined) {
+        series[seriesIdx].bookings += 1
+        if (status === 'confirmed') {
+          series[seriesIdx].revenue += amount
+        }
+      }
+
+      if (status === 'confirmed' && booking.categoryId) {
+        const entry = categoryMap.get(booking.categoryId) ?? {
+          id: booking.categoryId,
+          count: 0,
+          revenue: 0,
+        }
+        entry.count += 1
+        entry.revenue += amount
+        categoryMap.set(booking.categoryId, entry)
+      }
+
+      if (booking.clientId) {
+        const existing = clientMap.get(booking.clientId) ?? {
+          id: booking.clientId,
+          name: formatUserDisplayName(
+            booking.clientFirstName,
+            booking.clientLastName,
+            booking.clientUsername,
+            'Клиент'
+          ),
+          visits: 0,
+          revenue: 0,
+          lastSeenAt: null,
+        }
+        existing.visits += 1
+        if (status === 'confirmed') {
+          existing.revenue += amount
+        }
+        const createdAt = new Date(booking.createdAt)
+        if (!Number.isNaN(createdAt.getTime())) {
+          if (!existing.lastSeenAt || createdAt > existing.lastSeenAt) {
+            existing.lastSeenAt = createdAt
+          }
+        }
+        clientMap.set(booking.clientId, existing)
+      }
+    })
+
+    dispatches.forEach((dispatch) => {
+      const dateKey = toDateKey(dispatch.sentAt, tzOffsetMinutes)
+      const seriesIdx = seriesIndex.get(dateKey)
+      if (seriesIdx !== undefined) {
+        series[seriesIdx].requests += 1
+      }
+    })
+
+    responses.forEach((response) => {
+      const dateKey = toDateKey(response.createdAt, tzOffsetMinutes)
+      const seriesIdx = seriesIndex.get(dateKey)
+      if (seriesIdx !== undefined) {
+        series[seriesIdx].responses += 1
+      }
+    })
+
+    followers.forEach((follower) => {
+      const dateKey = toDateKey(follower.createdAt, tzOffsetMinutes)
+      const seriesIdx = seriesIndex.get(dateKey)
+      if (seriesIdx !== undefined) {
+        series[seriesIdx].followers += 1
+      }
+    })
+
+    let ratingSum = 0
+    reviews.forEach((review) => {
+      const dateKey = toDateKey(review.createdAt, tzOffsetMinutes)
+      const seriesIdx = seriesIndex.get(dateKey)
+      if (seriesIdx !== undefined) {
+        series[seriesIdx].reviews += 1
+      }
+      const ratingValue = Number(review.rating) || 0
+      ratingSum += ratingValue
+    })
+
+    const averageRating = reviews.length > 0 ? ratingSum / reviews.length : 0
+    const followersTotal = followersTotalResult.rows[0]?.total ?? 0
+
+    const categories = Array.from(categoryMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 6)
+    const statuses = Object.entries(statusCounts).map(([status, count]) => ({
+      status,
+      count,
+    }))
+    const clients = Array.from(clientMap.values())
+      .sort((a, b) => {
+        const revenueDiff = b.revenue - a.revenue
+        if (revenueDiff !== 0) return revenueDiff
+        return b.visits - a.visits
+      })
+      .slice(0, 12)
+      .map((client) => ({
+        ...client,
+        lastSeenAt: client.lastSeenAt ? client.lastSeenAt.toISOString() : null,
+      }))
+
+    const waterfall = [
+      { label: 'Подтверждено', value: confirmedRevenue },
+      { label: 'В ожидании', value: projectedRevenue },
+      { label: 'Потери', value: -lostRevenue },
+      {
+        label: 'Итого',
+        value: confirmedRevenue + projectedRevenue - lostRevenue,
+        isTotal: true,
+      },
+    ]
+
+    res.json({
+      range: {
+        start: dateKeys[0] ?? '',
+        end: dateKeys[dateKeys.length - 1] ?? '',
+        days,
+      },
+      summary: {
+        revenue: {
+          confirmed: confirmedRevenue,
+          projected: confirmedRevenue + projectedRevenue,
+          lost: lostRevenue,
+          avgCheck: confirmedBookings ? confirmedRevenue / confirmedBookings : 0,
+        },
+        bookings: {
+          total: bookings.length,
+          confirmed: confirmedBookings,
+          pending: pendingBookings,
+          cancelled: cancelledBookings,
+        },
+        requests: {
+          total: dispatches.length,
+          responded: responses.length,
+          accepted: responses.filter((item) => item.status === 'accepted').length,
+        },
+        followers: {
+          total: followersTotal,
+          new: followers.length,
+        },
+        reviews: {
+          count: reviews.length,
+          average: averageRating,
+        },
+      },
+      timeseries: series,
+      categories,
+      statuses,
+      funnel: {
+        requests: dispatches.length,
+        responses: responses.length,
+        chats: chats.length,
+        bookings: bookings.length,
+        confirmed: confirmedBookings,
+      },
+      clients,
+      waterfall,
+    })
+  } catch (error) {
+    console.error('GET /api/pro/analytics failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
