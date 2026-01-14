@@ -331,6 +331,23 @@ export const ProAnalyticsScreen = ({
     compareProfileViewsSeries.length > 0
       ? compareProfileViewsSeries.slice(0, profileViewsSeries.length)
       : []
+  const renderRangeControls = () => (
+    <div className="analytics-range analytics-range--card" role="group">
+      {rangeOptions.map((option) => (
+        <button
+          key={option.id}
+          className={`analytics-range-chip${
+            range === option.id ? ' is-active' : ''
+          }`}
+          type="button"
+          onClick={() => setRange(option.id)}
+          aria-pressed={range === option.id}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
 
   const categoryList = useMemo(
     () =>
@@ -522,24 +539,6 @@ export const ProAnalyticsScreen = ({
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-analytics">
       <div className="analytics-shell">
-        <div className="analytics-toolbar">
-          <div className="analytics-range">
-            {rangeOptions.map((option) => (
-              <button
-                key={option.id}
-                className={`analytics-range-chip${
-                  range === option.id ? ' is-active' : ''
-                }`}
-                type="button"
-                onClick={() => setRange(option.id)}
-                aria-pressed={range === option.id}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {isInitialLoading && (
           <p className="analytics-status" role="status">
             Синхронизируем аналитику...
@@ -566,8 +565,8 @@ export const ProAnalyticsScreen = ({
                     Подтверждено {formatMoney(summary.revenue.confirmed)}
                   </p>
                 </div>
-                {rangeLabel && <span className="analytics-pill">{rangeLabel}</span>}
               </div>
+              {renderRangeControls()}
               {hasTimeseries ? (
                 <div
                   className="analytics-chart-wrap"
@@ -704,6 +703,7 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
+              {renderRangeControls()}
               {hasTimeseries ? (
                 <div
                   className="analytics-chart-wrap"
@@ -835,6 +835,7 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
+              {renderRangeControls()}
               {positionedStatusBubbles.length > 0 ? (
                 <div
                   className="analytics-status-bubbles"
@@ -893,6 +894,7 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
+              {renderRangeControls()}
               {categoryList.length > 0 ? (
                 <>
                   <div className="analytics-rank-list">
@@ -942,6 +944,7 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
+              {renderRangeControls()}
               {clients.length > 0 ? (
                 <>
                   <div
@@ -1019,8 +1022,8 @@ export const ProAnalyticsScreen = ({
                     Всего {formatNumber(profileViewsTotal)} просмотров
                   </p>
                 </div>
-                {rangeLabel && <span className="analytics-pill">{rangeLabel}</span>}
               </div>
+              {renderRangeControls()}
               {hasTimeseries ? (
                 <div
                   className="analytics-chart-wrap"

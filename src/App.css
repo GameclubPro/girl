@@ -2578,27 +2578,26 @@
   cursor: not-allowed;
 }
 
-.analytics-toolbar {
-  position: sticky;
-  top: calc(var(--safe-top) + var(--tg-top-offset));
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 0;
-  background: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.96),
-    rgba(var(--paper-rgb), 0.72)
-  );
-  backdrop-filter: blur(12px);
-  border-radius: 18px;
-}
-
 .analytics-range {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.analytics-range--card {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  background: rgba(var(--surface-muted-rgb), 0.65);
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.analytics-range--card::-webkit-scrollbar {
+  display: none;
 }
 
 .analytics-range-chip {
@@ -2613,11 +2612,21 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
+.analytics-range--card .analytics-range-chip {
+  font-size: 10px;
+  padding: 5px 10px;
+  box-shadow: none;
+}
+
 .analytics-range-chip.is-active {
   border-color: transparent;
   background: rgba(var(--accent-rgb), 0.95);
   color: #ffffff;
   box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.25);
+}
+
+.analytics-range--card .analytics-range-chip.is-active {
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.22);
 }
 
 .analytics-range-chip:active {
