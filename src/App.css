@@ -2179,6 +2179,10 @@
     gap: 10px;
     grid-auto-rows: auto;
   }
+
+  .pro-cabinet-nav-head {
+    gap: 10px;
+  }
 }
 
 .pro-cabinet-nav-card {
@@ -2346,10 +2350,15 @@
 .pro-cabinet-nav-title {
   margin: 0;
   font-family: var(--font-title);
-  font-size: 15px;
+  font-size: clamp(13px, 3.6vw, 15px);
   font-weight: 700;
   color: var(--pro-ink);
   text-align: left;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .pro-cabinet-nav-subtitle {
