@@ -1328,6 +1328,8 @@ function App() {
   if (view === 'pro-cabinet') {
     return (
       <ProCabinetScreen
+        apiBase={apiBase}
+        userId={userId}
         onEditProfile={(section) => openProProfile({ section: section ?? null })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
