@@ -216,14 +216,16 @@ export const ProCabinetScreen = ({
       count: counts.get(day.key) ?? 0,
     }))
   }, [bookings])
-  const clientAvatarPreview = useMemo(
-    () => bookingStats.clientSummaries.slice(0, 3),
-    [bookingStats.clientSummaries]
-  )
   const clientHighlights = useMemo(
     () => bookingStats.clientSummaries.slice(0, 2),
     [bookingStats.clientSummaries]
   )
+  const activeWeekClients = useMemo(() => {
+    const since = Date.now() - 7 * DAY_MS
+    return bookingStats.clientSummaries.filter(
+      (client) => (client.lastSeenTime ?? 0) >= since
+    ).length
+  }, [bookingStats.clientSummaries])
   const clientRows = clientHighlights.length > 0 ? clientHighlights : [null, null]
   const totalClients = bookingStats.uniqueClients
   const repeatClients = bookingStats.repeatClients
@@ -373,20 +375,13 @@ export const ProCabinetScreen = ({
             </div>
             <div className="pro-cabinet-nav-preview is-clients-preview">
               <div className="pro-cabinet-nav-client-top">
-                <div className="pro-cabinet-nav-avatars is-compact" aria-hidden="true">
-                  {(clientAvatarPreview.length > 0
-                    ? clientAvatarPreview
-                    : [null, null, null]
-                  ).map((client, index) => (
-                    <span
-                      className={`pro-cabinet-nav-avatar${
-                        client ? '' : ' is-ghost'
-                      }`}
-                      key={`client-preview-${client?.id ?? index}`}
-                    >
-                      {client ? getInitials(client.name) : '•'}
-                    </span>
-                  ))}
+                <div className="pro-cabinet-nav-client-activity">
+                  <span className="pro-cabinet-nav-client-activity-value">
+                    {activeWeekClients}
+                  </span>
+                  <span className="pro-cabinet-nav-client-activity-label">
+                    Активные 7д
+                  </span>
                 </div>
                 <div className="pro-cabinet-nav-client-count">
                   <span className="pro-cabinet-nav-client-count-value">
