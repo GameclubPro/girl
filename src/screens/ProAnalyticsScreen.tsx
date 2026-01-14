@@ -1007,15 +1007,23 @@ export const ProAnalyticsScreen = ({
                             client.revenue
                           )}, ${formatNumber(client.visits)} визитов`}
                         >
-                          <div className="analytics-histogram-bar" aria-hidden="true">
-                            <span className="analytics-histogram-fill" />
-                            <span className="analytics-histogram-bar-value">
-                              {formatMoney(client.revenue)}
+                          <div className="analytics-histogram-track">
+                            <span
+                              className="analytics-histogram-name"
+                              title={client.name}
+                            >
+                              {client.name}
                             </span>
+                            <div
+                              className="analytics-histogram-bar"
+                              aria-hidden="true"
+                            >
+                              <span className="analytics-histogram-fill" />
+                              <span className="analytics-histogram-bar-value">
+                                {formatMoney(client.revenue)}
+                              </span>
+                            </div>
                           </div>
-                          <span className="analytics-histogram-name">
-                            {client.name}
-                          </span>
                           <span className="analytics-histogram-meta">
                             {formatNumber(client.visits)} визитов
                           </span>
