@@ -3131,15 +3131,15 @@
 .analytics-histogram {
   margin-top: 8px;
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-end;
   overflow-x: auto;
   padding: 10px 6px 8px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  --histogram-height: 140px;
-  --histogram-bar-width: 86px;
-  --histogram-label-width: 14px;
+  --histogram-height: 150px;
+  --histogram-bar-width: 68px;
+  --histogram-label-width: 12px;
 }
 
 .analytics-histogram::-webkit-scrollbar {
@@ -3162,7 +3162,7 @@
 .analytics-histogram-track {
   display: grid;
   grid-template-columns: var(--histogram-label-width) var(--histogram-bar-width);
-  gap: 8px;
+  gap: 6px;
   align-items: end;
   height: var(--histogram-height);
 }
@@ -3170,12 +3170,12 @@
 .analytics-histogram-bar {
   width: 100%;
   height: var(--histogram-height);
-  border-radius: 20px;
+  border-radius: 18px;
   background:
     radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.7), transparent 60%),
     linear-gradient(180deg, rgba(var(--paper-rgb), 0.96), rgba(var(--surface-muted-rgb), 0.65));
   border: 1px solid rgba(var(--shadow-rgb), 0.1);
-  padding: 6px;
+  padding: 5px;
   display: flex;
   align-items: flex-end;
   position: relative;
@@ -3188,7 +3188,7 @@
 .analytics-histogram-fill {
   width: 100%;
   height: var(--bar-height);
-  border-radius: 14px 14px 12px 12px;
+  border-radius: 12px 12px 10px 10px;
   background: linear-gradient(
     165deg,
     rgba(var(--accent-rgb), 1),
@@ -3533,9 +3533,9 @@
   }
 
   .analytics-histogram {
-    --histogram-height: 128px;
-    --histogram-bar-width: 78px;
-    --histogram-label-width: 12px;
+    --histogram-height: 132px;
+    --histogram-bar-width: 60px;
+    --histogram-label-width: 10px;
   }
 }
 
