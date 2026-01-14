@@ -802,46 +802,63 @@ export const ProAnalyticsScreen = ({
                 </div>
               </div>
               {positionedStatusBubbles.length > 0 ? (
-                <div
-                  className="analytics-status-bubbles"
-                  ref={statusBubbleRef}
-                  role="list"
-                  aria-label="Статусы записей"
-                >
-                  {positionedStatusBubbles.map((item, index) => {
-                    const bubbleStyle: CSSProperties & {
-                      '--bubble-rgb'?: string
-                      '--bubble-size'?: string
-                    } = {
-                      '--bubble-rgb': item.colorRgb,
-                      '--bubble-size': `${item.size}px`,
-                      left: `${item.x}px`,
-                      top: `${item.y}px`,
-                      animationDelay: `${index * 0.35}s`,
-                    }
-                    return (
+                <>
+                  <div
+                    className="analytics-status-bubbles"
+                    ref={statusBubbleRef}
+                    aria-hidden="true"
+                  >
+                    {positionedStatusBubbles.map((item, index) => {
+                      const bubbleStyle: CSSProperties & {
+                        '--bubble-rgb'?: string
+                        '--bubble-size'?: string
+                      } = {
+                        '--bubble-rgb': item.colorRgb,
+                        '--bubble-size': `${item.size}px`,
+                        left: `${item.x}px`,
+                        top: `${item.y}px`,
+                        animationDelay: `${index * 0.35}s`,
+                      }
+                      return (
+                        <div
+                          key={item.label}
+                          className="analytics-status-bubble"
+                          style={bubbleStyle}
+                        />
+                      )
+                    })}
+                  </div>
+                  <div
+                    className="analytics-status-legend"
+                    role="list"
+                    aria-label="Статусы записей"
+                  >
+                    {positionedStatusBubbles.map((item) => (
                       <div
                         key={item.label}
-                        className="analytics-status-bubble"
-                        style={bubbleStyle}
+                        className="analytics-status-legend-item"
                         role="listitem"
-                        aria-label={`${item.label}: ${formatNumber(
-                          item.value
-                        )} (${formatPercent(item.percent)})`}
                       >
-                        <span className="analytics-status-bubble-label">
-                          {item.label}
-                        </span>
-                        <span className="analytics-status-bubble-value">
-                          {formatNumber(item.value)}
-                        </span>
-                        <span className="analytics-status-bubble-meta">
-                          {formatPercent(item.percent)}
-                        </span>
+                        <span
+                          className="analytics-status-legend-dot"
+                          style={{ color: `rgb(${item.colorRgb})` }}
+                          aria-hidden="true"
+                        />
+                        <div className="analytics-status-legend-content">
+                          <span className="analytics-status-legend-label">
+                            {item.label}
+                          </span>
+                          <span className="analytics-status-legend-value">
+                            {formatNumber(item.value)}
+                          </span>
+                          <span className="analytics-status-legend-meta">
+                            {formatPercent(item.percent)}
+                          </span>
+                        </div>
                       </div>
-                    )
-                  })}
-                </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <p className="analytics-empty">Пока нет данных по записям.</p>
               )}
