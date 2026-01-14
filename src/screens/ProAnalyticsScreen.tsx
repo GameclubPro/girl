@@ -260,11 +260,7 @@ export const ProAnalyticsScreen = ({
   onEditProfile,
 }: ProAnalyticsScreenProps) => {
   const [range, setRange] = useState<AnalyticsRangeKey>('30d')
-  const { data, lastUpdated, isLoading, isRefreshing, error, reload } = useProAnalyticsData(
-    apiBase,
-    userId,
-    range
-  )
+  const { data, isLoading, error } = useProAnalyticsData(apiBase, userId, range)
   const [activeRevenueIndex, setActiveRevenueIndex] = useState<number | null>(
     null
   )
@@ -281,12 +277,6 @@ export const ProAnalyticsScreen = ({
     width: 0,
     height: 0,
   })
-  const lastUpdatedLabel = lastUpdated
-    ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
-    : ''
   const summary = data?.summary
   const timeseries = data?.timeseries ?? []
   const compareTimeseries = data?.compare?.timeseries ?? []
