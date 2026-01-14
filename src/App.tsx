@@ -606,6 +606,11 @@ function App() {
       const content = webApp.contentSafeAreaInset
       root.style.setProperty('--tg-safe-top-js', `${safe?.top ?? 0}px`)
       root.style.setProperty('--tg-content-safe-top-js', `${content?.top ?? 0}px`)
+      root.style.setProperty('--tg-safe-bottom-js', `${safe?.bottom ?? 0}px`)
+      root.style.setProperty(
+        '--tg-content-safe-bottom-js',
+        `${content?.bottom ?? 0}px`
+      )
     }
 
     updateSafeArea()
