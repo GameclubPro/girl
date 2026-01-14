@@ -8,6 +8,7 @@ type LineSeries = {
   area?: boolean
   dash?: string
   opacity?: number
+  curve?: boolean
 }
 
 type LineChartProps = {
@@ -22,6 +23,33 @@ const buildLinePath = (points: Array<{ x: number; y: number }>) => {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ')
 }
 
+const buildSmoothPath = (
+  points: Array<{ x: number; y: number }>,
+  tension = 0.8
+) => {
+  if (points.length === 0) return ''
+  if (points.length === 1) {
+    const point = points[0]
+    return `M${point.x},${point.y}`
+  }
+  const head = `M${points[0].x},${points[0].y}`
+  const body = points
+    .slice(0, -1)
+    .map((point, index) => {
+      const p0 = points[index - 1] ?? point
+      const p1 = point
+      const p2 = points[index + 1] ?? point
+      const p3 = points[index + 2] ?? p2
+      const c1x = p1.x + ((p2.x - p0.x) / 6) * tension
+      const c1y = p1.y + ((p2.y - p0.y) / 6) * tension
+      const c2x = p2.x - ((p3.x - p1.x) / 6) * tension
+      const c2y = p2.y - ((p3.y - p1.y) / 6) * tension
+      return `C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`
+    })
+    .join(' ')
+  return `${head} ${body}`
+}
+
 const buildAreaPath = (
   points: Array<{ x: number; y: number }>,
   baseline: number
@@ -31,6 +59,17 @@ const buildAreaPath = (
   const body = points.slice(1).map((point) => `L${point.x},${point.y}`).join(' ')
   const tail = `L${points[points.length - 1].x},${baseline} L${points[0].x},${baseline} Z`
   return `${head} ${body} ${tail}`
+}
+
+const buildSmoothAreaPath = (
+  points: Array<{ x: number; y: number }>,
+  baseline: number
+) => {
+  if (points.length === 0) return ''
+  const linePath = buildSmoothPath(points)
+  const last = points[points.length - 1]
+  const first = points[0]
+  return `${linePath} L${last.x},${baseline} L${first.x},${baseline} Z`
 }
 
 export const LineChart = ({
@@ -121,8 +160,14 @@ export const LineChart = ({
             paddingY + chartHeight - ((value - minValue) / range) * chartHeight
           return { x, y }
         })
-        const linePath = buildLinePath(points)
-        const areaPath = item.area ? buildAreaPath(points, paddingY + chartHeight) : ''
+        const linePath = item.curve
+          ? buildSmoothPath(points)
+          : buildLinePath(points)
+        const areaPath = item.area
+          ? item.curve
+            ? buildSmoothAreaPath(points, paddingY + chartHeight)
+            : buildAreaPath(points, paddingY + chartHeight)
+          : ''
         const dotIndex =
           safeActiveIndex !== null ? Math.min(safeActiveIndex, points.length - 1) : points.length - 1
         const dotPoint = points[dotIndex]

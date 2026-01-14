@@ -271,6 +271,9 @@ export const ProAnalyticsScreen = ({
   const [activeActivityIndex, setActiveActivityIndex] = useState<number | null>(
     null
   )
+  const [activeConversionIndex, setActiveConversionIndex] = useState<number | null>(
+    null
+  )
   const [showAllCategories, setShowAllCategories] = useState(false)
   const [showAllClients, setShowAllClients] = useState(false)
   const statusBubbleRef = useRef<HTMLDivElement | null>(null)
@@ -292,6 +295,7 @@ export const ProAnalyticsScreen = ({
   useEffect(() => {
     setActiveRevenueIndex(null)
     setActiveActivityIndex(null)
+    setActiveConversionIndex(null)
     setShowAllCategories(false)
     setShowAllClients(false)
   }, [range, timeseries.length])
@@ -317,15 +321,25 @@ export const ProAnalyticsScreen = ({
   const requestsSeries = timeseries.map((point) => point.requests)
   const responsesSeries = timeseries.map((point) => point.responses)
   const bookingsSeries = timeseries.map((point) => point.bookings)
+  const conversionSeries = timeseries.map((point) =>
+    point.requests ? point.bookings / point.requests : 0
+  )
   const rangeLabel = formatRangeLabel(data?.range.start, data?.range.end)
   const compareRangeLabel = formatRangeLabel(
     data?.compare?.range.start,
     data?.compare?.range.end
   )
   const compareRevenueSeries = compareTimeseries.map((point) => point.revenue)
+  const compareConversionSeries = compareTimeseries.map((point) =>
+    point.requests ? point.bookings / point.requests : 0
+  )
   const compareRevenueValues =
     compareRevenueSeries.length > 0
       ? compareRevenueSeries.slice(0, revenueSeries.length)
+      : []
+  const compareConversionValues =
+    compareConversionSeries.length > 0
+      ? compareConversionSeries.slice(0, conversionSeries.length)
       : []
 
   const categoryList = useMemo(
@@ -337,11 +351,30 @@ export const ProAnalyticsScreen = ({
     [data?.categories]
   )
   const clients = data?.clients ?? []
+  const sortedClients = useMemo(
+    () => [...clients].sort((a, b) => b.revenue - a.revenue),
+    [clients]
+  )
   const categoryTotal = categoryList.reduce((sum, item) => sum + item.value, 0)
   const visibleCategories = showAllCategories
     ? categoryList
     : categoryList.slice(0, 4)
-  const visibleClients = showAllClients ? clients : clients.slice(0, 6)
+  const visibleClients = showAllClients ? sortedClients : sortedClients.slice(0, 6)
+  const clientHistogramItems = useMemo(() => {
+    if (visibleClients.length === 0) return []
+    const maxRevenue = Math.max(
+      1,
+      ...visibleClients.map((client) => client.revenue)
+    )
+    return visibleClients.map((client) => {
+      const ratio = maxRevenue ? client.revenue / maxRevenue : 0
+      const height = ratio > 0 ? Math.max(0.18, ratio) : 0.08
+      return {
+        ...client,
+        barHeight: Math.round(height * 100),
+      }
+    })
+  }, [visibleClients])
 
   const bookingTotal = summary?.bookings.total ?? 0
   const bookingStatusItems = summary
@@ -437,16 +470,24 @@ export const ProAnalyticsScreen = ({
     )
   }, [hasTimeseries, timeseries])
 
-  const funnelSteps = summary
-    ? [
-        { label: 'Заявки', value: data?.funnel.requests ?? 0 },
-        { label: 'Ответы', value: data?.funnel.responses ?? 0 },
-        { label: 'Чаты', value: data?.funnel.chats ?? 0 },
-        { label: 'Записи', value: data?.funnel.bookings ?? 0 },
-        { label: 'Подтверждено', value: data?.funnel.confirmed ?? 0 },
-      ]
-    : []
-  const funnelMax = Math.max(1, ...funnelSteps.map((step) => step.value))
+  const averageConversion = useMemo(() => {
+    if (conversionSeries.length === 0) return 0
+    const total = conversionSeries.reduce((sum, value) => sum + value, 0)
+    return total / conversionSeries.length
+  }, [conversionSeries])
+  const peakConversionPoint = useMemo(() => {
+    if (!hasTimeseries) return null
+    return timeseries.reduce<{ date: string; rate: number } | null>(
+      (best, point) => {
+        const rate = point.requests ? point.bookings / point.requests : 0
+        if (!best || rate > best.rate) {
+          return { date: point.date, rate }
+        }
+        return best
+      },
+      null
+    )
+  }, [hasTimeseries, timeseries])
   const isInitialLoading = isLoading && !data
   const getPointerIndex = (event: { currentTarget: HTMLElement; clientX: number }, count: number) => {
     if (count <= 1) return 0
@@ -464,12 +505,22 @@ export const ProAnalyticsScreen = ({
     if (!hasTimeseries) return
     setActiveActivityIndex(getPointerIndex(event, timeseries.length))
   }
+  const handleConversionPointer = (event: { currentTarget: HTMLElement; clientX: number }) => {
+    if (!hasTimeseries) return
+    setActiveConversionIndex(getPointerIndex(event, timeseries.length))
+  }
   const activeRevenuePoint =
     activeRevenueIndex !== null ? timeseries[activeRevenueIndex] : null
   const activeRevenueComparePoint =
     activeRevenueIndex !== null ? compareTimeseries[activeRevenueIndex] : null
   const activeActivityPoint =
     activeActivityIndex !== null ? timeseries[activeActivityIndex] : null
+  const activeConversionPoint =
+    activeConversionIndex !== null ? timeseries[activeConversionIndex] : null
+  const activeConversionValue =
+    activeConversionIndex !== null ? conversionSeries[activeConversionIndex] : null
+  const activeConversionCompareValue =
+    activeConversionIndex !== null ? compareConversionValues[activeConversionIndex] : null
 
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-analytics">
@@ -918,28 +969,48 @@ export const ProAnalyticsScreen = ({
                   <p className="analytics-card-kicker">Клиенты</p>
                   <h2 className="analytics-card-title">Топ клиенты</h2>
                   <p className="analytics-card-subtitle">
-                    Частота визитов и вклад в доход
+                    Высота столбца — выручка, подпись — визиты
                   </p>
                 </div>
               </div>
               {clients.length > 0 ? (
                 <>
-                  <div className="analytics-list">
-                    {visibleClients.map((client) => (
-                      <div key={client.id} className="analytics-list-item is-compact">
-                        <span className="analytics-list-dot is-success" />
-                        <div className="analytics-list-content">
-                          <span className="analytics-list-title">{client.name}</span>
-                          <span className="analytics-list-meta">
-                            {formatNumber(client.visits)} визитов ·{' '}
-                            {formatMoney(client.revenue)}
-                            {client.lastSeenAt
-                              ? ` · ${formatShortDate(client.lastSeenAt)}`
-                              : ''}
+                  <div
+                    className="analytics-histogram"
+                    role="list"
+                    aria-label="Топ клиенты по выручке"
+                  >
+                    {clientHistogramItems.map((client) => {
+                      const itemStyle: CSSProperties & {
+                        '--bar-height'?: string
+                      } = {
+                        '--bar-height': `${client.barHeight}%`,
+                      }
+                      return (
+                        <div
+                          key={client.id}
+                          className="analytics-histogram-item"
+                          style={itemStyle}
+                          role="listitem"
+                          aria-label={`${client.name}: ${formatMoney(
+                            client.revenue
+                          )}, ${formatNumber(client.visits)} визитов`}
+                        >
+                          <div className="analytics-histogram-bar" aria-hidden="true">
+                            <span className="analytics-histogram-fill" />
+                            <span className="analytics-histogram-bar-value">
+                              {formatMoney(client.revenue)}
+                            </span>
+                          </div>
+                          <span className="analytics-histogram-name">
+                            {client.name}
+                          </span>
+                          <span className="analytics-histogram-meta">
+                            {formatNumber(client.visits)} визитов
                           </span>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   {clients.length > 6 && (
                     <div className="analytics-action-row">
@@ -962,47 +1033,129 @@ export const ProAnalyticsScreen = ({
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Конверсия</p>
-                  <h2 className="analytics-card-title">Воронка в заявки</h2>
+                  <h2 className="analytics-card-title">Конверсия в запись</h2>
                   <p className="analytics-card-subtitle">
-                    Сколько клиентов дошли до записи
+                    Доля записей от заявок по дням
                   </p>
                 </div>
+                {rangeLabel && <span className="analytics-pill">{rangeLabel}</span>}
               </div>
-              <div className="analytics-funnel">
-                {funnelSteps.map((step, index) => {
-                  const previousValue =
-                    index === 0 ? null : funnelSteps[index - 1]?.value ?? null
-                  const stepRate =
-                    previousValue && previousValue > 0
-                      ? step.value / previousValue
-                      : null
-                  return (
-                  <div key={step.label} className="analytics-funnel-row">
-                    <span className="analytics-funnel-label">
-                      <span className="analytics-funnel-title">{step.label}</span>
-                      {stepRate !== null && (
-                        <span className="analytics-funnel-meta">
-                          {formatPercent(stepRate)}
-                        </span>
-                      )}
-                    </span>
-                    <div className="analytics-funnel-bar">
-                      <span
-                        className="analytics-funnel-fill"
+              {hasTimeseries ? (
+                <div
+                  className="analytics-chart-wrap"
+                  onPointerDown={handleConversionPointer}
+                  onPointerMove={handleConversionPointer}
+                  onPointerLeave={() => setActiveConversionIndex(null)}
+                >
+                  <LineChart
+                    labels={timeseries.map((point) => point.date)}
+                    activeIndex={activeConversionIndex}
+                    series={[
+                      {
+                        id: 'conversion',
+                        label: 'Конверсия',
+                        values: conversionSeries,
+                        color: 'var(--success)',
+                        area: true,
+                        curve: true,
+                      },
+                      ...(compareConversionValues.length > 0
+                        ? [
+                            {
+                              id: 'conversion-compare',
+                              label: 'Прошлый период',
+                              values: compareConversionValues,
+                              color: 'var(--success)',
+                              dash: '6 6',
+                              opacity: 0.45,
+                              curve: true,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                  {activeConversionPoint &&
+                    activeConversionIndex !== null &&
+                    activeConversionValue !== null && (
+                      <div
+                        className="analytics-tooltip"
                         style={{
-                          width: `${Math.round(
-                            (step.value / funnelMax) * 100
-                          )}%`,
+                          left: getTooltipLeft(
+                            activeConversionIndex,
+                            timeseries.length
+                          ),
                         }}
-                      />
-                    </div>
-                    <span className="analytics-funnel-value">
-                      {formatNumber(step.value)}
+                      >
+                        <span className="analytics-tooltip-date">
+                          {formatShortDate(activeConversionPoint.date)}
+                        </span>
+                        <div className="analytics-tooltip-row">
+                          <span className="analytics-tooltip-label">
+                            Конверсия
+                          </span>
+                          <span className="analytics-tooltip-value">
+                            {formatPercent(activeConversionValue)}
+                          </span>
+                        </div>
+                        <div className="analytics-tooltip-row is-muted">
+                          <span className="analytics-tooltip-label">
+                            Записи / Заявки
+                          </span>
+                          <span className="analytics-tooltip-value">
+                            {formatNumber(activeConversionPoint.bookings)} /{' '}
+                            {formatNumber(activeConversionPoint.requests)}
+                          </span>
+                        </div>
+                        {activeConversionCompareValue !== null &&
+                          activeConversionCompareValue !== undefined && (
+                            <div className="analytics-tooltip-row is-muted">
+                              <span className="analytics-tooltip-label">
+                                Прошлый период
+                              </span>
+                              <span className="analytics-tooltip-value">
+                                {formatPercent(activeConversionCompareValue)}
+                              </span>
+                            </div>
+                          )}
+                      </div>
+                    )}
+                </div>
+              ) : (
+                <p className="analytics-empty">Нет данных по конверсии.</p>
+              )}
+              {compareConversionValues.length > 0 && (
+                <div className="analytics-compare">
+                  <span className="analytics-compare-line" />
+                  <span className="analytics-compare-label">Прошлый период</span>
+                  {compareRangeLabel && (
+                    <span className="analytics-compare-meta">
+                      {compareRangeLabel}
                     </span>
+                  )}
+                </div>
+              )}
+              {hasTimeseries && (
+                <div className="analytics-note-row">
+                  <div className="analytics-note">
+                    <span className="analytics-note-label">Средняя конверсия</span>
+                    <span className="analytics-note-value">
+                      {formatPercent(averageConversion)}
+                    </span>
+                    <span className="analytics-note-meta">за период</span>
                   </div>
-                  )
-                })}
-              </div>
+                  {peakConversionPoint && (
+                    <div className="analytics-note">
+                      <span className="analytics-note-label">Пик конверсии</span>
+                      <span className="analytics-note-value">
+                        {formatPercent(peakConversionPoint.rate)}
+                      </span>
+                      <span className="analytics-note-meta">
+                        {formatShortDate(peakConversionPoint.date)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className="pro-detail-actions animate delay-7">
