@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import type {
@@ -7,6 +7,7 @@ import type {
   ProProfileSection,
   ServiceRequest,
 } from '../types/app'
+import { buildBookingStartParam } from '../utils/deeplink'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -131,6 +132,27 @@ const formatTimeLeft = (value?: string | null) => {
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
 }
 
+const buildShareLink = (base: string, startParam: string) => {
+  const trimmedBase = base.trim()
+  const trimmedParam = startParam.trim()
+  if (!trimmedBase || !trimmedParam) return ''
+  const encodedParam = encodeURIComponent(trimmedParam)
+  if (/startapp=/i.test(trimmedBase)) {
+    return trimmedBase.replace(/startapp=[^&]*/i, `startapp=${encodedParam}`)
+  }
+  const joiner = trimmedBase.includes('?') ? '&' : '?'
+  return `${trimmedBase}${joiner}startapp=${encodedParam}`
+}
+
+const buildTelegramShareUrl = (link: string, text: string) => {
+  const params = new URLSearchParams()
+  params.set('url', link)
+  if (text.trim()) {
+    params.set('text', text)
+  }
+  return `https://t.me/share/url?${params.toString()}`
+}
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'К'
@@ -207,6 +229,21 @@ export const ProRequestsScreen = ({
     return today
   })
   const [calendarInitialized, setCalendarInitialized] = useState(false)
+  const [shareStatus, setShareStatus] = useState('')
+  const shareTimerRef = useRef<number | null>(null)
+  const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
+  const shareConfigured = Boolean(shareBase)
+  const bookingStartParam = useMemo(
+    () => buildBookingStartParam(userId),
+    [userId]
+  )
+  const shareLink = useMemo(
+    () => (shareBase ? buildShareLink(shareBase, bookingStartParam) : ''),
+    [bookingStartParam, shareBase]
+  )
+  const shareText =
+    'Запись к мастеру\nОткройте ссылку, чтобы выбрать услугу и время.'
+  const shareUrl = shareLink ? buildTelegramShareUrl(shareLink, shareText) : ''
 
   useEffect(() => {
     if (!userId) return
@@ -324,6 +361,14 @@ export const ProRequestsScreen = ({
     }
   }, [apiBase, userId])
 
+  useEffect(() => {
+    return () => {
+      if (shareTimerRef.current) {
+        window.clearTimeout(shareTimerRef.current)
+      }
+    }
+  }, [])
+
   const items = useMemo(() => requests, [requests])
   const bookingItems = useMemo(() => bookings, [bookings])
   const bookingCalendarItems = useMemo(() => {
@@ -425,6 +470,67 @@ export const ProRequestsScreen = ({
     setWeekStartDate((current) => addDays(current, direction * 7))
     setSelectedDate((current) => addDays(current, direction * 7))
     setCalendarInitialized(true)
+  }
+
+  const setShareMessage = (message: string) => {
+    setShareStatus(message)
+    if (shareTimerRef.current) {
+      window.clearTimeout(shareTimerRef.current)
+    }
+    shareTimerRef.current = window.setTimeout(() => {
+      setShareStatus('')
+    }, 2400)
+  }
+
+  const handleCopyLink = async () => {
+    if (!shareLink) {
+      setShareMessage('Ссылка пока недоступна.')
+      return
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareLink)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = shareLink
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        const success = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        if (!success) {
+          throw new Error('Copy failed')
+        }
+      }
+      setShareMessage('Ссылка скопирована.')
+    } catch (error) {
+      setShareMessage('Не удалось скопировать ссылку.')
+    }
+  }
+
+  const handleSendLink = () => {
+    if (!shareLink) {
+      setShareMessage('Ссылка пока недоступна.')
+      return
+    }
+    if (!shareConfigured) {
+      setShareMessage('Добавьте VITE_TG_APP_URL, чтобы открыть Telegram.')
+      return
+    }
+    const webApp = window.Telegram?.WebApp
+    if (webApp?.openTelegramLink) {
+      webApp.openTelegramLink(shareUrl)
+    } else if (webApp?.openLink) {
+      webApp.openLink(shareUrl)
+    } else {
+      window.open(shareUrl, '_blank', 'noopener,noreferrer')
+    }
+    if (webApp?.close) {
+      window.setTimeout(() => webApp.close?.(), 250)
+    }
+    setShareMessage('Открываем личку...')
   }
 
   const missingLabels = useMemo(() => {
@@ -692,13 +798,58 @@ export const ProRequestsScreen = ({
   return (
     <div className="screen screen--pro screen--pro-requests">
       <div className="pro-shell">
-        <section className="pro-card pro-requests-hero animate delay-1">
-          <div>
-            <p className="pro-card-eyebrow">Заявки и записи</p>
-            <h1 className="pro-card-title">Заявки и записи</h1>
-            <p className="pro-requests-subtitle">
-              Отклики, подтверждения и цены в одном месте
-            </p>
+        <section className="pro-cabinet-share pro-cabinet-card animate delay-1">
+          <header className="pro-cabinet-share-head">
+            <div>
+              <p className="pro-cabinet-share-kicker">Новые клиенты</p>
+              <h2 className="pro-cabinet-share-title">Ссылка для записи</h2>
+              <p className="pro-cabinet-share-subtitle">
+                Отправьте клиенту — он сразу откроет анкету записи к вам.
+              </p>
+            </div>
+            <span className="pro-cabinet-pill is-primary">Быстро</span>
+          </header>
+          <div className="pro-cabinet-share-body">
+            <button
+              className="pro-cabinet-share-link"
+              type="button"
+              onClick={handleCopyLink}
+              disabled={!shareLink}
+              aria-label="Скопировать ссылку для записи"
+            >
+              <span className="pro-cabinet-share-link-label">Ваша ссылка</span>
+              <span className="pro-cabinet-share-link-value">
+                {shareLink || 'Ссылка будет доступна после настройки'}
+              </span>
+            </button>
+            <div className="pro-cabinet-share-actions">
+              <button
+                className="pro-cabinet-share-action is-primary"
+                type="button"
+                onClick={handleSendLink}
+                disabled={!shareLink || !shareConfigured}
+              >
+                Отправить в личку
+              </button>
+              <button
+                className="pro-cabinet-share-action is-ghost"
+                type="button"
+                onClick={handleCopyLink}
+                disabled={!shareLink}
+              >
+                Скопировать
+              </button>
+            </div>
+            {shareStatus && (
+              <p className="pro-cabinet-share-status" role="status">
+                {shareStatus}
+              </p>
+            )}
+            {!shareConfigured && (
+              <p className="pro-cabinet-share-warning">
+                Добавьте VITE_TG_APP_URL в env, чтобы ссылка открывалась в Telegram.
+              </p>
+            )}
           </div>
         </section>
 
