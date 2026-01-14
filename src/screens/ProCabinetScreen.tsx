@@ -370,41 +370,17 @@ export const ProCabinetScreen = ({
   return (
     <div className="screen screen--pro screen--pro-cabinet">
       <div className="pro-cabinet-shell pro-cabinet-shell--dashboard">
-        <header className="pro-cabinet-dashboard-head animate delay-1">
-          <div>
-            <p className="pro-cabinet-dashboard-kicker">Кабинет</p>
-            <h1 className="pro-cabinet-dashboard-title">
-              {displayName ? `Привет, ${displayName}` : 'Кабинет мастера'}
-            </h1>
-            <p className="pro-cabinet-dashboard-subtitle">
-              Управляйте клиентами, касаниями и загрузкой на неделю вперед.
-            </p>
-            <p className="pro-cabinet-dashboard-meta">
-              {requestStats.total > 0 || bookingStats.total > 0
-                ? `Заявок: ${requestStats.open} · Записей на 7 дней: ${bookingStats.upcomingWeek}`
-                : 'Первые данные появятся после заявок и записей.'}
-            </p>
-            {lastUpdatedLabel && (
-              <p className="pro-cabinet-dashboard-meta">{lastUpdatedLabel}</p>
-            )}
-          </div>
-          <button
-            className="pro-cabinet-dashboard-profile"
-            type="button"
-            onClick={() => onEditProfile()}
-          >
-            Профиль
-          </button>
-        </header>
-
         {isLoading && (
           <p className="pro-cabinet-dashboard-status">Синхронизируем данные...</p>
         )}
         {combinedError && (
           <p className="pro-cabinet-dashboard-status is-error">{combinedError}</p>
         )}
+        {lastUpdatedLabel && !combinedError && (
+          <p className="pro-cabinet-dashboard-meta">{lastUpdatedLabel}</p>
+        )}
 
-        <div className="pro-cabinet-nav-grid animate delay-2">
+        <div className="pro-cabinet-nav-grid animate delay-1">
           <article className="pro-cabinet-nav-card is-analytics">
             <p className="pro-cabinet-nav-kicker">Статистика</p>
             <h2 className="pro-cabinet-nav-title">Статистика и аналитика</h2>
