@@ -3032,10 +3032,21 @@
   pointer-events: none;
 }
 
-.analytics-status-bubble {
+.analytics-status-bubble-item {
   position: absolute;
   left: 0;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  width: var(--bubble-size);
+  pointer-events: none;
+}
+
+.analytics-status-bubble {
   width: var(--bubble-size);
   height: var(--bubble-size);
   box-sizing: border-box;
@@ -3044,8 +3055,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(2px, calc(var(--bubble-size) * 0.03), 6px);
-  padding: clamp(4px, calc(var(--bubble-size) * 0.06), 10px);
+  gap: 4px;
+  padding: clamp(4px, calc(var(--bubble-size) * 0.06), 8px);
   text-align: center;
   color: rgba(15, 23, 42, 0.9);
   background:
@@ -3059,7 +3070,6 @@
   box-shadow:
     0 12px 22px rgba(var(--shadow-rgb), 0.12);
   overflow: hidden;
-  transform: translate(-50%, -50%);
   animation: analytics-bubble-glow 7s ease-in-out infinite;
 }
 
@@ -3092,66 +3102,13 @@
   -webkit-mask-image: radial-gradient(circle, transparent 0 54%, black 70% 100%);
 }
 
-.analytics-status-legend {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-}
-
-.analytics-status-legend-item {
-  border-radius: 14px;
-  padding: 8px 10px;
-  display: grid;
-  grid-template-columns: 12px 1fr;
-  gap: 8px;
-  align-items: center;
-  border: 1px solid rgba(var(--shadow-rgb), 0.1);
-  background: rgba(var(--surface-muted-rgb), 0.7);
-}
-
-.analytics-status-legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
-}
-
-.analytics-status-legend-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.analytics-status-legend-label {
+.analytics-status-bubble-label {
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--pro-muted);
-}
-
-.analytics-status-legend-value {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--pro-ink);
-}
-
-.analytics-status-legend-meta {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--pro-muted);
-}
-
-.analytics-status-bubble-label {
-  font-size: clamp(7px, calc(var(--bubble-size) * 0.08), 11px);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1.15;
-  max-width: 85%;
+  line-height: 1.1;
+  max-width: calc(var(--bubble-size) + 8px);
   text-wrap: balance;
   overflow-wrap: anywhere;
   color: rgba(15, 23, 42, 0.7);

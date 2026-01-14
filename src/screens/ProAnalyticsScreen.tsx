@@ -85,10 +85,17 @@ const shuffle = <T,>(items: T[], rng: () => number) => {
   return copy
 }
 
-type PackedBubble<T> = T & { x: number; y: number; radius: number; size: number }
+type PackedBubble<T> = T & {
+  x: number
+  y: number
+  radius: number
+  size: number
+  labelOffset: number
+  collisionRadius: number
+}
 type IndexedBubble<T> = PackedBubble<T> & { __index: number }
 
-const packBubbles = <T extends { size: number }>(
+const packBubbles = <T extends { size: number; labelOffset?: number }>(
   items: T[],
   options: {
     width: number
@@ -114,6 +121,8 @@ const packBubbles = <T extends { size: number }>(
     const laidOut: IndexedBubble<T>[] = ordered.map((item, index) => {
       const scaledSize = item.size * scale
       const radius = scaledSize / 2
+      const labelOffset = item.labelOffset ?? 0
+      const collisionRadius = radius + labelOffset * 0.6
       const minX = options.padding + radius
       const maxX = Math.max(
         minX,
@@ -122,13 +131,14 @@ const packBubbles = <T extends { size: number }>(
       const minY = options.padding + radius
       const maxY = Math.max(
         minY,
-        containerHeight - options.padding - radius
+        containerHeight - options.padding - radius - labelOffset
       )
       const maxRadial = Math.max(
         0,
         Math.min(containerWidth, containerHeight) / 2 -
           options.padding -
-          radius
+          radius -
+          labelOffset * 0.35
       )
       const radial =
         maxRadial * ((index + 1) / Math.max(ordered.length, 1))
@@ -147,6 +157,8 @@ const packBubbles = <T extends { size: number }>(
         ...item,
         size: scaledSize,
         radius,
+        labelOffset,
+        collisionRadius,
         x,
         y,
       }
@@ -162,7 +174,7 @@ const packBubbles = <T extends { size: number }>(
           let dy = other.y - current.y
           let distance = Math.hypot(dx, dy)
           const minDistance =
-            current.radius + other.radius + options.gap
+            current.collisionRadius + other.collisionRadius + options.gap
           if (distance < minDistance) {
             if (distance < 0.001) {
               const angle = rng() * Math.PI * 2
@@ -191,7 +203,7 @@ const packBubbles = <T extends { size: number }>(
         const minY = options.padding + item.radius
         const maxY = Math.max(
           minY,
-          containerHeight - options.padding - item.radius
+          containerHeight - options.padding - item.radius - item.labelOffset
         )
         item.x = clamp(item.x, minX, maxX)
         item.y = clamp(item.y, minY, maxY)
@@ -204,7 +216,8 @@ const packBubbles = <T extends { size: number }>(
       laidOut.slice(index + 1).some((other) => {
         const dx = other.x - item.x
         const dy = other.y - item.y
-        const minDistance = item.radius + other.radius + options.gap
+        const minDistance =
+          item.collisionRadius + other.collisionRadius + options.gap
         return dx * dx + dy * dy < minDistance * minDistance
       })
     )
@@ -370,6 +383,7 @@ export const ProAnalyticsScreen = ({
       return {
         ...item,
         size,
+        labelOffset: 24,
       }
     })
   }, [bookingStatusItems])
@@ -802,63 +816,48 @@ export const ProAnalyticsScreen = ({
                 </div>
               </div>
               {positionedStatusBubbles.length > 0 ? (
-                <>
-                  <div
-                    className="analytics-status-bubbles"
-                    ref={statusBubbleRef}
-                    aria-hidden="true"
-                  >
-                    {positionedStatusBubbles.map((item, index) => {
-                      const bubbleStyle: CSSProperties & {
-                        '--bubble-rgb'?: string
-                        '--bubble-size'?: string
-                      } = {
-                        '--bubble-rgb': item.colorRgb,
-                        '--bubble-size': `${item.size}px`,
-                        left: `${item.x}px`,
-                        top: `${item.y}px`,
-                        animationDelay: `${index * 0.35}s`,
-                      }
-                      return (
-                        <div
-                          key={item.label}
-                          className="analytics-status-bubble"
-                          style={bubbleStyle}
-                        />
-                      )
-                    })}
-                  </div>
-                  <div
-                    className="analytics-status-legend"
-                    role="list"
-                    aria-label="Статусы записей"
-                  >
-                    {positionedStatusBubbles.map((item) => (
+                <div
+                  className="analytics-status-bubbles"
+                  ref={statusBubbleRef}
+                  role="list"
+                  aria-label="Статусы записей"
+                >
+                  {positionedStatusBubbles.map((item, index) => {
+                    const itemStyle: CSSProperties & {
+                      '--bubble-rgb'?: string
+                      '--bubble-size'?: string
+                    } = {
+                      '--bubble-rgb': item.colorRgb,
+                      '--bubble-size': `${item.size}px`,
+                      left: `${item.x}px`,
+                      top: `${item.y}px`,
+                      animationDelay: `${index * 0.35}s`,
+                    }
+                    return (
                       <div
                         key={item.label}
-                        className="analytics-status-legend-item"
+                        className="analytics-status-bubble-item"
+                        style={itemStyle}
                         role="listitem"
+                        aria-label={`${item.label}: ${formatNumber(
+                          item.value
+                        )} (${formatPercent(item.percent)})`}
                       >
-                        <span
-                          className="analytics-status-legend-dot"
-                          style={{ color: `rgb(${item.colorRgb})` }}
-                          aria-hidden="true"
-                        />
-                        <div className="analytics-status-legend-content">
-                          <span className="analytics-status-legend-label">
-                            {item.label}
-                          </span>
-                          <span className="analytics-status-legend-value">
+                        <div className="analytics-status-bubble" aria-hidden="true">
+                          <span className="analytics-status-bubble-value">
                             {formatNumber(item.value)}
                           </span>
-                          <span className="analytics-status-legend-meta">
+                          <span className="analytics-status-bubble-meta">
                             {formatPercent(item.percent)}
                           </span>
                         </div>
+                        <span className="analytics-status-bubble-label" aria-hidden="true">
+                          {item.label}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                </>
+                    )
+                  })}
+                </div>
               ) : (
                 <p className="analytics-empty">Пока нет данных по записям.</p>
               )}
