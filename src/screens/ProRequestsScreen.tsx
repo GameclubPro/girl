@@ -219,6 +219,7 @@ export const ProRequestsScreen = ({
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isBookingsLoading, setIsBookingsLoading] = useState(false)
   const [bookingsError, setBookingsError] = useState('')
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [bookingActionId, setBookingActionId] = useState<number | null>(null)
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
@@ -581,6 +582,73 @@ export const ProRequestsScreen = ({
   }, [missingFields])
   const missingSummary =
     missingLabels.length > 0 ? missingLabels.join(', ') : 'минимум профиля'
+  const hasActiveRequests = items.length > 0
+  const hasPendingBookings = pendingBookingItems.length > 0
+  const showRequestsEmpty =
+    !isLoading &&
+    !isBookingsLoading &&
+    !hasActiveRequests &&
+    !hasPendingBookings &&
+    !loadError &&
+    !bookingsError
+  const historySectionId = 'pro-requests-history'
+  const historyToggleLabel = isHistoryOpen ? 'Свернуть' : 'Показать'
+  const renderShareCard = () => (
+    <section className="pro-cabinet-share pro-cabinet-card animate delay-1">
+      <header className="pro-cabinet-share-head">
+        <div>
+          <p className="pro-cabinet-share-kicker">Новые клиенты</p>
+          <h2 className="pro-cabinet-share-title">Ссылка для записи</h2>
+          <p className="pro-cabinet-share-subtitle">
+            Отправьте клиенту — он сразу откроет анкету записи к вам.
+          </p>
+        </div>
+        <span className="pro-cabinet-pill is-primary">Быстро</span>
+      </header>
+      <div className="pro-cabinet-share-body">
+        <button
+          className="pro-cabinet-share-link"
+          type="button"
+          onClick={handleCopyLink}
+          disabled={!shareLink}
+          aria-label="Скопировать ссылку для записи"
+        >
+          <span className="pro-cabinet-share-link-label">Ваша ссылка</span>
+          <span className="pro-cabinet-share-link-value">
+            {shareLink || 'Ссылка будет доступна после настройки'}
+          </span>
+        </button>
+        <div className="pro-cabinet-share-actions">
+          <button
+            className="pro-cabinet-share-action is-primary"
+            type="button"
+            onClick={handleSendLink}
+            disabled={!shareLink || !shareConfigured}
+          >
+            Отправить в личку
+          </button>
+          <button
+            className="pro-cabinet-share-action is-ghost"
+            type="button"
+            onClick={handleCopyLink}
+            disabled={!shareLink}
+          >
+            Скопировать
+          </button>
+        </div>
+        {shareStatus && (
+          <p className="pro-cabinet-share-status" role="status">
+            {shareStatus}
+          </p>
+        )}
+        {!shareConfigured && (
+          <p className="pro-cabinet-share-warning">
+            Добавьте VITE_TG_APP_URL в env, чтобы ссылка открывалась в Telegram.
+          </p>
+        )}
+      </div>
+    </section>
+  )
   const renderBookingItem = (booking: Booking, options?: { archived?: boolean }) => {
     const statusLabel =
       bookingStatusLabelMap[booking.status] ?? booking.status
@@ -976,61 +1044,6 @@ export const ProRequestsScreen = ({
   return (
     <div className="screen screen--pro screen--pro-requests">
       <div className="pro-shell">
-        <section className="pro-cabinet-share pro-cabinet-card animate delay-1">
-          <header className="pro-cabinet-share-head">
-            <div>
-              <p className="pro-cabinet-share-kicker">Новые клиенты</p>
-              <h2 className="pro-cabinet-share-title">Ссылка для записи</h2>
-              <p className="pro-cabinet-share-subtitle">
-                Отправьте клиенту — он сразу откроет анкету записи к вам.
-              </p>
-            </div>
-            <span className="pro-cabinet-pill is-primary">Быстро</span>
-          </header>
-          <div className="pro-cabinet-share-body">
-            <button
-              className="pro-cabinet-share-link"
-              type="button"
-              onClick={handleCopyLink}
-              disabled={!shareLink}
-              aria-label="Скопировать ссылку для записи"
-            >
-              <span className="pro-cabinet-share-link-label">Ваша ссылка</span>
-              <span className="pro-cabinet-share-link-value">
-                {shareLink || 'Ссылка будет доступна после настройки'}
-              </span>
-            </button>
-            <div className="pro-cabinet-share-actions">
-              <button
-                className="pro-cabinet-share-action is-primary"
-                type="button"
-                onClick={handleSendLink}
-                disabled={!shareLink || !shareConfigured}
-              >
-                Отправить в личку
-              </button>
-              <button
-                className="pro-cabinet-share-action is-ghost"
-                type="button"
-                onClick={handleCopyLink}
-                disabled={!shareLink}
-              >
-                Скопировать
-              </button>
-            </div>
-            {shareStatus && (
-              <p className="pro-cabinet-share-status" role="status">
-                {shareStatus}
-              </p>
-            )}
-            {!shareConfigured && (
-              <p className="pro-cabinet-share-warning">
-                Добавьте VITE_TG_APP_URL в env, чтобы ссылка открывалась в Telegram.
-              </p>
-            )}
-          </div>
-        </section>
-
         {!isActive && (
           <div className="pro-banner">
             <div>
@@ -1105,12 +1118,7 @@ export const ProRequestsScreen = ({
             )}
             {bookingsError && <p className="requests-error">{bookingsError}</p>}
 
-            {!isLoading &&
-              !isBookingsLoading &&
-              !items.length &&
-              pendingBookingItems.length === 0 &&
-              !loadError &&
-              !bookingsError && (
+            {showRequestsEmpty && (
               <p className="requests-empty">
                 {!isActive
                   ? 'Вы на паузе. Включите прием заявок.'
@@ -1119,6 +1127,7 @@ export const ProRequestsScreen = ({
                   : 'Пока нет заявок и записей на подтверждении.'}
               </p>
             )}
+            {showRequestsEmpty && renderShareCard()}
 
             {items.length > 0 && (
               <div className="requests-section">
@@ -1352,16 +1361,40 @@ export const ProRequestsScreen = ({
               {archivedBookingItems.length > 0 && (
                 <div className="requests-section is-muted">
                   <div className="requests-section-head">
-                    <span className="requests-section-title">История записей</span>
-                    <span className="requests-section-count">
-                      {archivedBookingItems.length}
-                    </span>
+                    <div className="requests-section-title-group">
+                      <span className="requests-section-title">История записей</span>
+                      <span className="requests-section-count">
+                        {archivedBookingItems.length}
+                      </span>
+                    </div>
+                    <button
+                      className={`requests-section-toggle${
+                        isHistoryOpen ? ' is-open' : ''
+                      }`}
+                      type="button"
+                      onClick={() => setIsHistoryOpen((current) => !current)}
+                      aria-expanded={isHistoryOpen}
+                      aria-controls={historySectionId}
+                    >
+                      <span>{historyToggleLabel}</span>
+                      <span
+                        className="requests-section-toggle-icon"
+                        aria-hidden="true"
+                      >
+                        {isHistoryOpen ? '-' : '+'}
+                      </span>
+                    </button>
                   </div>
-                  <div className="requests-list booking-list is-archived">
-                    {archivedBookingItems.map((booking) =>
-                      renderBookingItem(booking, { archived: true })
-                    )}
-                  </div>
+                  {isHistoryOpen && (
+                    <div
+                      className="requests-list booking-list is-archived"
+                      id={historySectionId}
+                    >
+                      {archivedBookingItems.map((booking) =>
+                        renderBookingItem(booking, { archived: true })
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -1497,6 +1530,7 @@ export const ProRequestsScreen = ({
                   {selectedBookings.map((booking) => renderBookingItem(booking))}
                 </div>
               )}
+              {renderShareCard()}
             </>
           )}
       </div>
