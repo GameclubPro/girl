@@ -7833,6 +7833,7 @@
   grid-auto-flow: column;
   grid-auto-columns: minmax(132px, 1fr);
   gap: 8px;
+  align-items: start;
   overflow-x: auto;
   padding-bottom: 4px;
   scroll-snap-type: x proximity;
@@ -7868,7 +7869,9 @@
 
 .pro-profile-certificate-media {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: auto;
+  height: auto;
+  min-height: 92px;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(var(--shadow-rgb), 0.12);
@@ -7880,8 +7883,8 @@
 
 .pro-profile-certificate-media img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
   display: block;
 }
 
