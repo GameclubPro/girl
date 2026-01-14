@@ -2975,6 +2975,7 @@ app.post('/api/masters', async (req, res) => {
   const hasShowcase = Array.isArray(showcaseUrls)
   const showcaseList = hasShowcase ? normalizeStringArray(showcaseUrls) : null
   const certificateList = normalizeCertificates(certificates)
+  const certificatePayload = JSON.stringify(certificateList)
   const scheduleDayList = normalizeStringArray(scheduleDays)
   const normalizedScheduleStart = normalizeText(scheduleStart) || null
   const normalizedScheduleEnd = normalizeText(scheduleEnd) || null
@@ -3057,7 +3058,26 @@ app.post('/api/masters', async (req, res) => {
           portfolio_urls,
           certificates
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE($17, '{}'::text[]), $18)
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          $14,
+          $15,
+          $16,
+          COALESCE($17, '{}'::text[]),
+          $18::jsonb
+        )
         ON CONFLICT (user_id) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             about = EXCLUDED.about,
@@ -3100,7 +3120,7 @@ app.post('/api/masters', async (req, res) => {
         categoryList,
         serviceList,
         portfolioList,
-        certificateList,
+        certificatePayload,
       ]
     )
 
