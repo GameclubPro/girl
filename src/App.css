@@ -10214,6 +10214,7 @@
     linear-gradient(180deg, #ffffff 0%, var(--surface-muted) 55%, var(--surface-muted) 100%);
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   overflow-y: auto;
   padding: calc(16px + var(--safe-top) + var(--tg-top-offset)) 18px
     calc(24px + var(--safe-bottom));
