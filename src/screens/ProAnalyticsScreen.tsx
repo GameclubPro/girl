@@ -987,16 +987,20 @@ export const ProAnalyticsScreen = ({
                     role="list"
                     aria-label="Топ клиенты по выручке"
                   >
-                    {clientHistogramItems.map((client) => {
+                    {clientHistogramItems.map((client, index) => {
                       const itemStyle: CSSProperties & {
                         '--bar-height'?: string
+                        '--bar-index'?: string
                       } = {
                         '--bar-height': `${client.barHeight}%`,
+                        '--bar-index': `${index}`,
                       }
                       return (
                         <div
                           key={client.id}
-                          className="analytics-histogram-item"
+                          className={`analytics-histogram-item${
+                            index === 0 ? ' is-leader' : ''
+                          }`}
                           style={itemStyle}
                           role="listitem"
                           aria-label={`${client.name}: ${formatMoney(

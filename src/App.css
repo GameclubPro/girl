@@ -3129,11 +3129,12 @@
 }
 
 .analytics-histogram {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
-  gap: 12px;
+  gap: 14px;
+  align-items: flex-end;
   overflow-x: auto;
-  padding: 8px 4px 6px;
+  padding: 10px 6px 8px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
 }
@@ -3143,7 +3144,7 @@
 }
 
 .analytics-histogram-item {
-  min-width: 84px;
+  min-width: 96px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -3155,44 +3156,90 @@
 
 .analytics-histogram-bar {
   width: 100%;
-  height: 120px;
-  border-radius: 18px;
-  background: linear-gradient(
-    180deg,
-    rgba(var(--surface-muted-rgb), 0.6),
-    rgba(var(--paper-rgb), 0.92)
-  );
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  height: 140px;
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.7), transparent 60%),
+    linear-gradient(180deg, rgba(var(--paper-rgb), 0.96), rgba(var(--surface-muted-rgb), 0.65));
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
   padding: 6px;
   display: flex;
   align-items: flex-end;
   position: relative;
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 12px 18px rgba(var(--shadow-rgb), 0.1);
 }
 
 .analytics-histogram-fill {
   width: 100%;
   height: var(--bar-height);
-  border-radius: 14px;
+  border-radius: 14px 14px 12px 12px;
   background: linear-gradient(
-    180deg,
-    rgba(var(--accent-rgb), 0.95),
-    rgba(var(--accent-rgb), 0.35)
+    165deg,
+    rgba(var(--accent-rgb), 1),
+    rgba(var(--accent-rgb), 0.55) 55%,
+    rgba(var(--accent-rgb), 0.25) 100%
   );
-  box-shadow: 0 10px 18px rgba(var(--accent-rgb), 0.18);
+  box-shadow:
+    0 12px 20px rgba(var(--accent-rgb), 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  position: relative;
+  overflow: hidden;
+  transform-origin: bottom;
+  animation: analytics-histogram-rise 0.7s ease-out both;
+  animation-delay: calc(var(--bar-index, 0) * 0.06s);
+}
+
+.analytics-histogram-fill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.45),
+    transparent 42%,
+    rgba(255, 255, 255, 0.08) 70%,
+    transparent 100%
+  );
+  opacity: 0.75;
+}
+
+.analytics-histogram-fill::after {
+  content: '';
+  position: absolute;
+  top: 6%;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.65);
+  opacity: 0.7;
+}
+
+.analytics-histogram-item.is-leader .analytics-histogram-fill {
+  box-shadow:
+    0 16px 22px rgba(var(--accent-rgb), 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .analytics-histogram-bar-value {
   position: absolute;
-  top: 6px;
-  left: 6px;
-  right: 6px;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
   font-size: 9px;
   font-weight: 700;
   color: var(--pro-ink);
   text-align: center;
   pointer-events: none;
+  background: rgba(var(--paper-rgb), 0.92);
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  box-shadow: 0 6px 12px rgba(var(--shadow-rgb), 0.12);
+  white-space: nowrap;
 }
 
 .analytics-histogram-name {
@@ -3209,6 +3256,17 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--pro-muted);
+}
+
+@keyframes analytics-histogram-rise {
+  from {
+    transform: scaleY(0.2);
+    opacity: 0.6;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 
 @keyframes analytics-bubble-glow {
@@ -3437,11 +3495,11 @@
   }
 
   .analytics-histogram-item {
-    min-width: 74px;
+    min-width: 86px;
   }
 
   .analytics-histogram-bar {
-    height: 110px;
+    height: 128px;
   }
 }
 
