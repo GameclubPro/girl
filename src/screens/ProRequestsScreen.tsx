@@ -188,6 +188,7 @@ type BookingCalendarItem = {
 type ProRequestsScreenProps = {
   apiBase: string
   userId: string
+  initialTab?: 'requests' | 'bookings'
   onBack: () => void
   onEditProfile: (section?: ProProfileSection) => void
   onViewChats: () => void
@@ -197,12 +198,15 @@ type ProRequestsScreenProps = {
 export const ProRequestsScreen = ({
   apiBase,
   userId,
+  initialTab,
   onBack,
   onEditProfile,
   onViewChats,
   onOpenChat,
 }: ProRequestsScreenProps) => {
-  const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>('requests')
+  const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>(
+    () => initialTab ?? 'requests'
+  )
   const [requests, setRequests] = useState<ProRequest[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -241,6 +245,11 @@ export const ProRequestsScreen = ({
     () => (shareBase ? buildShareLink(shareBase, bookingStartParam) : ''),
     [bookingStartParam, shareBase]
   )
+
+  useEffect(() => {
+    if (!initialTab) return
+    setActiveTab(initialTab)
+  }, [initialTab])
   const shareText =
     'Запись к мастеру\nОткройте ссылку, чтобы выбрать услугу и время.'
   const shareUrl = shareLink ? buildTelegramShareUrl(shareLink, shareText) : ''

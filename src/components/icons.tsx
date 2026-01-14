@@ -249,6 +249,28 @@ export const IconClock = () => (
   </svg>
 )
 
+export const IconCalendar = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="6"
+      width="16"
+      height="14"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M8 4v4M16 4v4M4 10h16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
 export const IconRefresh = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -295,6 +317,35 @@ export const IconPhoto = () => (
       fill="none"
       stroke="currentColor"
       strokeWidth="1.4"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconShowcase = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="6"
+      width="16"
+      height="12"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="m7.2 15.4 3.2-3 2.2 2.2 3.4-3 2 1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="m16.2 4.6.6 1.2 1.4.2-1 1 .2 1.4-1.2-.6-1.2.6.2-1.4-1-1 1.4-.2.6-1.2Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
       strokeLinejoin="round"
     />
   </svg>

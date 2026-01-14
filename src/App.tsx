@@ -115,6 +115,9 @@ function App() {
   const [role, setRole] = useState<Role>('client')
   const [proProfileSection, setProProfileSection] =
     useState<ProProfileSection | null>(null)
+  const [proProfilePortfolioView, setProProfilePortfolioView] = useState<
+    'portfolio' | 'showcase' | null
+  >(null)
   const [address, setAddress] = useState('')
   const [telegramUser] = useState(() => getTelegramUser())
   const [userId] = useState(() => telegramUser?.id?.toString() ?? 'local-dev')
@@ -163,6 +166,9 @@ function App() {
     null
   )
   const [requestsInitialTab, setRequestsInitialTab] = useState<
+    'requests' | 'bookings'
+  >('requests')
+  const [proRequestsInitialTab, setProRequestsInitialTab] = useState<
     'requests' | 'bookings'
   >('requests')
   const [favorites, setFavorites] = useState<FavoriteMaster[]>(() =>
@@ -678,6 +684,7 @@ function App() {
             return
           }
           setProProfileSection(null)
+          setProProfilePortfolioView(null)
           setView('pro-cabinet')
           break
         case 'pro-requests':
@@ -780,6 +787,26 @@ function App() {
     setRequestsInitialTab(tab ?? 'requests')
     setView('requests')
   }, [])
+
+  const openProRequests = useCallback(
+    (tab?: 'requests' | 'bookings') => {
+      setProRequestsInitialTab(tab ?? 'requests')
+      setView('pro-requests')
+    },
+    []
+  )
+
+  const openProProfile = useCallback(
+    (options?: {
+      section?: ProProfileSection | null
+      portfolioView?: 'portfolio' | 'showcase' | null
+    }) => {
+      setProProfileSection(options?.section ?? null)
+      setProProfilePortfolioView(options?.portfolioView ?? null)
+      setView('pro-profile')
+    },
+    []
+  )
 
   const openChatList = useCallback(() => {
     setSelectedChatId(null)
@@ -1088,10 +1115,10 @@ function App() {
         onViewHome={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
         onViewRequests={() =>
-          role === 'pro' ? setView('pro-requests') : openRequests()
+          role === 'pro' ? openProRequests() : openRequests()
         }
         onViewProfile={() =>
-          setView(role === 'pro' ? 'pro-profile' : 'client-profile')
+          role === 'pro' ? openProProfile() : setView('client-profile')
         }
         onViewCabinet={() => setView('pro-cabinet')}
       />
@@ -1207,11 +1234,13 @@ function App() {
         displayNameFallback={clientName}
         onBack={() => {
           setProProfileSection(null)
+          setProProfilePortfolioView(null)
           setView('pro-cabinet')
         }}
-        onViewRequests={() => setView('pro-requests')}
+        onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         focusSection={proProfileSection}
+        initialPortfolioView={proProfilePortfolioView ?? undefined}
         onBackHandlerChange={registerProProfileBackHandler}
       />
     )
@@ -1222,10 +1251,10 @@ function App() {
       <ProRequestsScreen
         apiBase={apiBase}
         userId={userId}
+        initialTab={proRequestsInitialTab}
         onBack={() => setView('pro-cabinet')}
         onEditProfile={(section) => {
-          setProProfileSection(section ?? null)
-          setView('pro-profile')
+          openProProfile({ section: section ?? null })
         }}
         onViewChats={openChatList}
         onOpenChat={(chatId) => openChatThread(chatId, 'pro-requests')}
@@ -1239,11 +1268,10 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         onBack={() => setView('pro-cabinet')}
-        onViewRequests={() => setView('pro-requests')}
+        onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
-          setProProfileSection(null)
-          setView('pro-profile')
+          openProProfile()
         }}
       />
     )
@@ -1255,11 +1283,10 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         onBack={() => setView('pro-cabinet')}
-        onViewRequests={() => setView('pro-requests')}
+        onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
-          setProProfileSection(null)
-          setView('pro-profile')
+          openProProfile()
         }}
       />
     )
@@ -1272,11 +1299,10 @@ function App() {
         userId={userId}
         displayNameFallback={clientName}
         onBack={() => setView('pro-cabinet')}
-        onViewRequests={() => setView('pro-requests')}
+        onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
-          setProProfileSection(null)
-          setView('pro-profile')
+          openProProfile()
         }}
       />
     )
@@ -1289,11 +1315,10 @@ function App() {
         userId={userId}
         displayNameFallback={clientName}
         onBack={() => setView('pro-cabinet')}
-        onViewRequests={() => setView('pro-requests')}
+        onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
-          setProProfileSection(null)
-          setView('pro-profile')
+          openProProfile()
         }}
       />
     )
@@ -1302,16 +1327,17 @@ function App() {
   if (view === 'pro-cabinet') {
     return (
       <ProCabinetScreen
-        onEditProfile={(section) => {
-          setProProfileSection(section ?? null)
-          setView('pro-profile')
-        }}
-        onViewRequests={() => setView('pro-requests')}
+        onEditProfile={(section) => openProProfile({ section: section ?? null })}
+        onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onOpenAnalytics={() => setView('pro-analytics')}
         onOpenClients={() => setView('pro-clients')}
         onOpenCampaigns={() => setView('pro-campaigns')}
         onOpenReminders={() => setView('pro-reminders')}
+        onOpenCalendar={() => openProRequests('bookings')}
+        onOpenShowcase={() =>
+          openProProfile({ section: 'portfolio', portfolioView: 'showcase' })
+        }
       />
     )
   }

@@ -40,6 +40,7 @@ type ProProfileScreenProps = {
   onViewRequests: () => void
   onViewChats: () => void
   focusSection?: ProProfileSection | null
+  initialPortfolioView?: 'portfolio' | 'showcase'
   onBackHandlerChange?: ((handler: (() => boolean) | null) => void) | undefined
 }
 
@@ -252,6 +253,7 @@ export const ProProfileScreen = ({
   onViewRequests,
   onViewChats,
   focusSection,
+  initialPortfolioView,
   onBackHandlerChange,
 }: ProProfileScreenProps) => {
   const [cities, setCities] = useState<City[]>([])
@@ -275,7 +277,7 @@ export const ProProfileScreen = ({
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [showcaseItems, setShowcaseItems] = useState<PortfolioItem[]>([])
   const [portfolioView, setPortfolioView] = useState<'portfolio' | 'showcase'>(
-    'portfolio'
+    () => initialPortfolioView ?? 'portfolio'
   )
   const [worksAtClient, setWorksAtClient] = useState(true)
   const [worksAtMaster, setWorksAtMaster] = useState(false)
@@ -1018,6 +1020,11 @@ export const ProProfileScreen = ({
     }
     setEditingSection(focusSection)
   }, [focusSection])
+
+  useEffect(() => {
+    if (!initialPortfolioView) return
+    setPortfolioView(initialPortfolioView)
+  }, [initialPortfolioView])
 
   useEffect(() => {
     if (!editingSection) return

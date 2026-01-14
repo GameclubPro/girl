@@ -1,8 +1,10 @@
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
   IconBell,
+  IconCalendar,
   IconChat,
   IconDashboard,
+  IconShowcase,
   IconUsers,
 } from '../components/icons'
 import type { ProProfileSection } from '../types/app'
@@ -15,6 +17,8 @@ type ProCabinetScreenProps = {
   onOpenClients: () => void
   onOpenCampaigns: () => void
   onOpenReminders: () => void
+  onOpenCalendar: () => void
+  onOpenShowcase: () => void
 }
 
 export const ProCabinetScreen = ({
@@ -41,7 +45,17 @@ export const ProCabinetScreen = ({
             <span className="pro-cabinet-nav-title">Аналитика</span>
           </button>
           <button
-            className="pro-cabinet-nav-card is-clients animate delay-2"
+            className="pro-cabinet-nav-card is-calendar animate delay-2"
+            type="button"
+            onClick={onOpenCalendar}
+          >
+            <span className="pro-cabinet-nav-icon" aria-hidden="true">
+              <IconCalendar />
+            </span>
+            <span className="pro-cabinet-nav-title">Календарь</span>
+          </button>
+          <button
+            className="pro-cabinet-nav-card is-clients animate delay-3"
             type="button"
             onClick={onOpenClients}
           >
@@ -51,7 +65,17 @@ export const ProCabinetScreen = ({
             <span className="pro-cabinet-nav-title">Клиенты</span>
           </button>
           <button
-            className="pro-cabinet-nav-card is-campaigns animate delay-3"
+            className="pro-cabinet-nav-card is-showcase animate delay-4"
+            type="button"
+            onClick={onOpenShowcase}
+          >
+            <span className="pro-cabinet-nav-icon" aria-hidden="true">
+              <IconShowcase />
+            </span>
+            <span className="pro-cabinet-nav-title">Витрина</span>
+          </button>
+          <button
+            className="pro-cabinet-nav-card is-campaigns animate delay-5"
             type="button"
             onClick={onOpenCampaigns}
           >
@@ -61,7 +85,7 @@ export const ProCabinetScreen = ({
             <span className="pro-cabinet-nav-title">Рассылка</span>
           </button>
           <button
-            className="pro-cabinet-nav-card is-reminders animate delay-4"
+            className="pro-cabinet-nav-card is-reminders animate delay-6"
             type="button"
             onClick={onOpenReminders}
           >
