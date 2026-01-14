@@ -2363,6 +2363,95 @@ app.get('/api/masters/:userId/reviews', async (req, res) => {
   }
 })
 
+app.get('/api/masters/:userId/followers', async (req, res) => {
+  const normalizedUserId = normalizeText(req.params.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const limitParam = Number(req.query.limit)
+  const limit = Number.isInteger(limitParam)
+    ? Math.min(Math.max(limitParam, 1), 50)
+    : 30
+  const offsetParam = Number(req.query.offset)
+  const offset = Number.isInteger(offsetParam) ? Math.max(offsetParam, 0) : 0
+  const searchQuery = normalizeText(req.query.q)
+  const searchValue = searchQuery ? `%${searchQuery}%` : null
+
+  try {
+    const baseValues = [normalizedUserId]
+    let searchClause = ''
+    if (searchValue) {
+      baseValues.push(searchValue)
+      const searchIndex = baseValues.length
+      searchClause = `
+        AND (
+          u.first_name ILIKE $${searchIndex}
+          OR u.last_name ILIKE $${searchIndex}
+          OR u.username ILIKE $${searchIndex}
+          OR mp.display_name ILIKE $${searchIndex}
+        )
+      `
+    }
+
+    const countResult = await pool.query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM master_followers mf
+        LEFT JOIN users u ON u.user_id = mf.follower_id
+        LEFT JOIN master_profiles mp ON mp.user_id = mf.follower_id
+        WHERE mf.master_id = $1
+        ${searchClause}
+      `,
+      baseValues
+    )
+
+    const values = [...baseValues, limit, offset]
+    const dataResult = await pool.query(
+      `
+        SELECT
+          mf.follower_id AS "userId",
+          mf.created_at AS "followedAt",
+          u.first_name AS "firstName",
+          u.last_name AS "lastName",
+          u.username AS "username",
+          u.updated_at AS "updatedAt",
+          mp.user_id AS "proUserId",
+          mp.display_name AS "displayName",
+          mp.avatar_path AS "avatarPath"
+        FROM master_followers mf
+        LEFT JOIN users u ON u.user_id = mf.follower_id
+        LEFT JOIN master_profiles mp ON mp.user_id = mf.follower_id
+        WHERE mf.master_id = $1
+        ${searchClause}
+        ORDER BY mf.created_at DESC
+        LIMIT $${values.length - 1}
+        OFFSET $${values.length}
+      `,
+      values
+    )
+
+    const total = countResult.rows[0]?.total ?? 0
+    const followers = dataResult.rows.map((row) => ({
+      userId: row.userId,
+      firstName: row.firstName ?? null,
+      lastName: row.lastName ?? null,
+      username: row.username ?? null,
+      updatedAt: row.updatedAt ?? null,
+      followedAt: row.followedAt ?? null,
+      displayName: row.displayName ?? null,
+      isPro: Boolean(row.proUserId),
+      avatarUrl: buildPublicUrl(req, row.avatarPath),
+    }))
+
+    res.json({ total, followers })
+  } catch (error) {
+    console.error('GET /api/masters/:userId/followers failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.post('/api/masters/media', async (req, res) => {
   const { userId, kind, dataUrl } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)

@@ -5514,6 +5514,37 @@
   text-align: center;
 }
 
+.pro-profile-ig-stat-button {
+  border: none;
+  background: transparent;
+  padding: 6px 4px;
+  border-radius: 14px;
+  cursor: pointer;
+  width: 100%;
+  min-height: 46px;
+  touch-action: manipulation;
+  appearance: none;
+  font-family: inherit;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.pro-profile-ig-stat-button.is-active {
+  background: rgba(var(--accent-rgb), 0.12);
+  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.14);
+}
+
+.pro-profile-ig-stat-button:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.3);
+  outline-offset: 2px;
+}
+
+.pro-profile-ig-stat-button:active {
+  transform: translateY(1px) scale(0.98);
+}
+
 .pro-profile-ig-stat-value {
   font-size: 16px;
   font-weight: 700;
@@ -7048,6 +7079,245 @@
   font-weight: 700;
   color: var(--pro-muted);
   cursor: pointer;
+}
+
+.pro-followers-sheet {
+  max-height: min(78vh, 640px);
+}
+
+.pro-followers-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pro-followers-sheet-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pro-followers-sheet-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-followers-sheet-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-followers-sheet-subtitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.pro-followers-sheet-close {
+  border: none;
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  background: rgba(var(--shadow-rgb), 0.08);
+  cursor: pointer;
+}
+
+.pro-followers-sheet-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pro-followers-search-input {
+  flex: 1;
+}
+
+.pro-followers-sheet-clear {
+  border: none;
+  border-radius: 14px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pro-muted);
+  background: rgba(var(--shadow-rgb), 0.08);
+  cursor: pointer;
+}
+
+.pro-followers-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: min(50vh, 380px);
+  padding-right: 4px;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.pro-followers-sheet-list::-webkit-scrollbar {
+  display: none;
+}
+
+.pro-followers-card {
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.94);
+  border-radius: 18px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.1);
+}
+
+.pro-followers-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--pro-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pro-followers-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pro-followers-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pro-followers-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pro-followers-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-followers-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.16);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--pro-ink);
+}
+
+.pro-followers-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.pro-followers-username {
+  color: var(--pro-muted);
+}
+
+.pro-followers-since {
+  color: var(--pro-muted);
+}
+
+.pro-followers-empty {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pro-muted);
+  text-align: center;
+  padding: 16px 12px;
+}
+
+.pro-followers-sheet-load {
+  border: none;
+  border-radius: 16px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  background: rgba(var(--accent-rgb), 0.16);
+  cursor: pointer;
+}
+
+.pro-followers-sheet-close:focus-visible,
+.pro-followers-sheet-clear:focus-visible,
+.pro-followers-sheet-load:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.3);
+  outline-offset: 2px;
+}
+
+.pro-followers-card.is-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: none;
+}
+
+.pro-followers-card.is-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(var(--paper-rgb), 0.8) 45%,
+    transparent 90%
+  );
+  animation: master-shimmer 1.6s linear infinite;
+}
+
+.pro-followers-card.is-skeleton .pro-followers-avatar,
+.pro-followers-card.is-skeleton .pro-followers-name,
+.pro-followers-card.is-skeleton .pro-followers-username {
+  background: rgba(var(--shadow-rgb), 0.08);
+  color: transparent;
+  border-radius: 999px;
+}
+
+.pro-followers-card.is-skeleton .pro-followers-avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.pro-followers-card.is-skeleton .pro-followers-name {
+  width: 120px;
+  height: 12px;
+}
+
+.pro-followers-card.is-skeleton .pro-followers-username {
+  width: 90px;
+  height: 10px;
 }
 
 .pro-profile-portfolio-fallback {

@@ -93,6 +93,15 @@ const formatReviewDate = (value: string) => {
   })
 }
 
+const formatFollowerDate = (value: string) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 const formatGeoError = (error: unknown) => {
   if (!isGeoFailure(error)) {
     return 'Не удалось получить геолокацию.'
@@ -127,6 +136,23 @@ const buildReviewerName = (review: MasterReview) => {
   if (name) return name
   if (review.reviewerUsername) return `@${review.reviewerUsername}`
   return 'Клиент'
+}
+
+const buildFollowerName = (follower: MasterFollower) => {
+  const profileName = follower.displayName?.trim()
+  if (profileName) return profileName
+  const name = [follower.firstName, follower.lastName].filter(Boolean).join(' ').trim()
+  if (name) return name
+  if (follower.username) return `@${follower.username}`
+  return 'Подписчик'
+}
+
+const buildFollowerHandle = (follower: MasterFollower, name: string) => {
+  const handle = follower.username?.trim()
+  if (!handle) return ''
+  const normalizedName = name.trim().toLowerCase()
+  if (normalizedName === `@${handle.toLowerCase()}`) return ''
+  return `@${handle}`
 }
 
 const getNameInitials = (value: string) => {
@@ -189,10 +215,25 @@ type ProfilePayload = {
   showcaseUrls: string[]
 }
 
+type MasterFollower = {
+  userId: string
+  firstName?: string | null
+  lastName?: string | null
+  username?: string | null
+  displayName?: string | null
+  avatarUrl?: string | null
+  followedAt?: string | null
+  updatedAt?: string | null
+  isPro?: boolean
+}
+
+type StatId = 'works' | 'rating' | 'reviews' | 'followers'
+
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
 const PORTFOLIO_ROW_LIMIT = 4
+const FOLLOWERS_PAGE_SIZE = 24
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const showcaseSlotClasses = [
   'is-slot-portrait-a',
@@ -256,6 +297,14 @@ export const ProProfileScreen = ({
   const [reviewSummary, setReviewSummary] =
     useState<MasterReviewSummary | null>(null)
   const [followersCount, setFollowersCount] = useState(0)
+  const [isFollowersOpen, setIsFollowersOpen] = useState(false)
+  const [followers, setFollowers] = useState<MasterFollower[]>([])
+  const [followersTotal, setFollowersTotal] = useState(0)
+  const [followersQuery, setFollowersQuery] = useState('')
+  const [followersQueryDebounced, setFollowersQueryDebounced] = useState('')
+  const [followersError, setFollowersError] = useState('')
+  const [isFollowersLoading, setIsFollowersLoading] = useState(false)
+  const [activeStat, setActiveStat] = useState<StatId | null>(null)
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
@@ -298,10 +347,12 @@ export const ProProfileScreen = ({
   const portfolioFocusIndexRef = useRef<number | null>(null)
   const showcaseFocusIndexRef = useRef<number | null>(null)
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
+  const reviewsSectionRef = useRef<HTMLElement | null>(null)
   const portfolioAutosaveTimerRef = useRef<number | null>(null)
   const portfolioLongPressTimerRef = useRef<number | null>(null)
   const portfolioLongPressTriggeredRef = useRef(false)
   const portfolioLongPressStartRef = useRef<{ x: number; y: number } | null>(null)
+  const followersRequestIdRef = useRef(0)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection && focusSection !== 'portfolio' ? focusSection : null
   )
@@ -422,6 +473,22 @@ export const ProProfileScreen = ({
   const reviewCountLabel =
     reviewCount > 0 ? formatReviewCount(reviewCount) : 'Нет отзывов'
   const followersValue = followersCount.toLocaleString('ru-RU')
+  const followersQueryValue = followersQuery.trim()
+  const followersQueryFetch = followersQueryDebounced
+  const followersTotalLabel = formatCount(
+    followersTotal,
+    'подписчик',
+    'подписчика',
+    'подписчиков'
+  )
+  const followersSummaryLabel = followersQueryFetch
+    ? `Найдено: ${followersTotalLabel}`
+    : `Всего: ${followersTotalLabel}`
+  const followersHasMore = followers.length < followersTotal
+  const followersEmptyLabel = followersQueryFetch
+    ? 'Никого не нашли.'
+    : 'Пока нет подписчиков.'
+  const followersInitialLoading = isFollowersLoading && followers.length === 0
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const showcaseCount = showcaseItems.length
   const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
@@ -430,11 +497,11 @@ export const ProProfileScreen = ({
     portfolioView === 'portfolio' ? portfolioCountLabel : showcaseCountLabel
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
   const profileStats = [
-    { label: 'Работы', value: String(portfolioCount) },
-    { label: 'Рейтинг', value: reviewAverageLabel },
-    { label: 'Отзывы', value: String(reviewCount) },
-    { label: 'Подписчики', value: followersValue },
-  ]
+    { id: 'works', label: 'Работы', value: String(portfolioCount) },
+    { id: 'rating', label: 'Рейтинг', value: reviewAverageLabel },
+    { id: 'reviews', label: 'Отзывы', value: String(reviewCount) },
+    { id: 'followers', label: 'Подписчики', value: followersValue },
+  ] satisfies { id: StatId; label: string; value: string }[]
   const locationLabel = useMemo(() => {
     const cityLabel = cityId
       ? cities.find((city) => city.id === cityId)?.name
@@ -661,6 +728,112 @@ export const ProProfileScreen = ({
     }, 2000)
   }
 
+  const openFollowersSheet = useCallback(() => {
+    setFollowersTotal((current) => (current > 0 ? current : followersCount))
+    setIsFollowersOpen(true)
+  }, [followersCount])
+
+  const closeFollowersSheet = useCallback(() => {
+    followersRequestIdRef.current += 1
+    setIsFollowersOpen(false)
+    setFollowers([])
+    setFollowersTotal(0)
+    setFollowersQuery('')
+    setFollowersQueryDebounced('')
+    setFollowersError('')
+    setIsFollowersLoading(false)
+  }, [])
+
+  const loadFollowers = useCallback(
+    async (options: { offset: number; append: boolean }) => {
+      if (!userId) return
+      const requestId = (followersRequestIdRef.current += 1)
+      setFollowersError('')
+      setIsFollowersLoading(true)
+      if (!options.append) {
+        setFollowers([])
+      }
+
+      const params = new URLSearchParams({
+        limit: String(FOLLOWERS_PAGE_SIZE),
+        offset: String(Math.max(0, options.offset)),
+      })
+      if (followersQueryFetch) {
+        params.set('q', followersQueryFetch)
+      }
+
+      try {
+        const response = await fetch(
+          `${apiBase}/api/masters/${encodeURIComponent(userId)}/followers?${params.toString()}`
+        )
+        if (!response.ok) {
+          throw new Error('Load followers failed')
+        }
+        const data = (await response.json()) as {
+          total?: number
+          followers?: MasterFollower[]
+        }
+        if (followersRequestIdRef.current !== requestId) return
+        const nextFollowers = Array.isArray(data.followers) ? data.followers : []
+        const nextTotal =
+          typeof data.total === 'number' ? data.total : nextFollowers.length
+        setFollowersTotal(nextTotal)
+        setFollowersCount(nextTotal)
+        setFollowers((current) =>
+          options.append ? [...current, ...nextFollowers] : nextFollowers
+        )
+      } catch (error) {
+        if (followersRequestIdRef.current === requestId) {
+          setFollowersError('Не удалось загрузить подписчиков.')
+        }
+      } finally {
+        if (followersRequestIdRef.current === requestId) {
+          setIsFollowersLoading(false)
+        }
+      }
+    },
+    [apiBase, followersQueryFetch, userId]
+  )
+
+  const handleStatTap = (statId: StatId) => {
+    setActiveStat(statId)
+    if (statId === 'followers') {
+      openFollowersSheet()
+      return
+    }
+    if (statId === 'works') {
+      setPortfolioView('portfolio')
+      portfolioPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+      return
+    }
+    reviewsSectionRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
+  const getStatAriaLabel = (stat: { id: StatId; label: string; value: string }) => {
+    switch (stat.id) {
+      case 'followers':
+        return `Открыть список подписчиков: ${stat.value}`
+      case 'works':
+        return `Портфолио: ${stat.value}`
+      case 'rating':
+        return `Рейтинг: ${stat.value}`
+      case 'reviews':
+      default:
+        return `Отзывы: ${stat.value}`
+    }
+  }
+
+  const handleFollowersLoadMore = () => {
+    if (isFollowersLoading) return
+    loadFollowers({ offset: followers.length, append: true })
+  }
+
   const setLocationState = (location: UserLocation | null) => {
     setProLocation(location)
   }
@@ -744,6 +917,36 @@ export const ProProfileScreen = ({
   }, [apiBase, userId])
 
   useEffect(() => {
+    const trimmed = followersQuery.trim()
+    const timer = window.setTimeout(() => {
+      setFollowersQueryDebounced(trimmed)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [followersQuery])
+
+  useEffect(() => {
+    if (!activeStat) return
+    const timer = window.setTimeout(() => {
+      setActiveStat(null)
+    }, 360)
+    return () => window.clearTimeout(timer)
+  }, [activeStat])
+
+  useEffect(() => {
+    if (!isFollowersOpen) return
+    loadFollowers({ offset: 0, append: false })
+  }, [followersQueryDebounced, isFollowersOpen, loadFollowers])
+
+  useEffect(() => {
+    if (!isFollowersOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isFollowersOpen])
+
+  useEffect(() => {
     editingSectionRef.current = editingSection
   }, [editingSection])
 
@@ -762,6 +965,10 @@ export const ProProfileScreen = ({
   useEffect(() => {
     if (!onBackHandlerChange) return
     const handler = () => {
+      if (isFollowersOpen) {
+        closeFollowersSheet()
+        return true
+      }
       if (showcaseFocusIndexRef.current !== null) {
         closeShowcaseFocusEditor()
         return true
@@ -792,7 +999,13 @@ export const ProProfileScreen = ({
     return () => {
       onBackHandlerChange(null)
     }
-  }, [isPortfolioPickerOpen, onBackHandlerChange, portfolioQuickActionIndex])
+  }, [
+    closeFollowersSheet,
+    isFollowersOpen,
+    isPortfolioPickerOpen,
+    onBackHandlerChange,
+    portfolioQuickActionIndex,
+  ])
 
   useEffect(() => {
     if (!focusSection) return
@@ -2153,10 +2366,19 @@ export const ProProfileScreen = ({
             </div>
             <div className="pro-profile-ig-stats">
               {profileStats.map((stat) => (
-                <div className="pro-profile-ig-stat" key={stat.label}>
+                <button
+                  className={`pro-profile-ig-stat pro-profile-ig-stat-button${
+                    activeStat === stat.id ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  key={stat.label}
+                  onClick={() => handleStatTap(stat.id)}
+                  aria-label={getStatAriaLabel(stat)}
+                  aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
+                >
                   <span className="pro-profile-ig-stat-value">{stat.value}</span>
                   <span className="pro-profile-ig-stat-label">{stat.label}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -2566,7 +2788,10 @@ export const ProProfileScreen = ({
           )}
         </section>
 
-        <section className="pro-profile-reviews animate delay-3">
+        <section
+          className="pro-profile-reviews animate delay-3"
+          ref={reviewsSectionRef}
+        >
           <div className="pro-profile-reviews-head">
             <div>
               <p className="pro-profile-reviews-kicker">Отзывы</p>
@@ -3060,6 +3285,148 @@ export const ProProfileScreen = ({
             <p className="pro-portfolio-focus-hint">
               Перетащите точку, чтобы выбрать главный фокус кадра.
             </p>
+          </div>
+        </div>
+      )}
+
+      {isFollowersOpen && (
+        <div
+          className="pro-portfolio-sheet-overlay pro-followers-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pro-followers-title"
+          onClick={closeFollowersSheet}
+        >
+          <div
+            className="pro-portfolio-sheet pro-followers-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-portfolio-sheet-handle" aria-hidden="true" />
+            <div className="pro-followers-sheet-head">
+              <div className="pro-followers-sheet-title-block">
+                <p className="pro-followers-sheet-kicker">Аудитория</p>
+                <h3 className="pro-followers-sheet-title" id="pro-followers-title">
+                  Подписчики
+                </h3>
+                <p className="pro-followers-sheet-subtitle">
+                  {followersSummaryLabel}
+                </p>
+              </div>
+              <button
+                className="pro-followers-sheet-close"
+                type="button"
+                onClick={closeFollowersSheet}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="pro-followers-sheet-search">
+              <input
+                className="pro-input pro-followers-search-input"
+                type="search"
+                placeholder="Поиск по имени или @username"
+                value={followersQuery}
+                onChange={(event) => setFollowersQuery(event.target.value)}
+                aria-label="Поиск подписчиков"
+              />
+              {followersQueryValue && (
+                <button
+                  className="pro-followers-sheet-clear"
+                  type="button"
+                  onClick={() => setFollowersQuery('')}
+                >
+                  Сбросить
+                </button>
+              )}
+            </div>
+            {followersError && <p className="pro-error">{followersError}</p>}
+            <div
+              className="pro-followers-sheet-list"
+              role="list"
+              aria-busy={isFollowersLoading}
+            >
+              {followersInitialLoading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    className="pro-followers-card is-skeleton"
+                    key={`followers-skeleton-${index}`}
+                    role="listitem"
+                    aria-hidden="true"
+                  >
+                    <div className="pro-followers-avatar" />
+                    <div className="pro-followers-info">
+                      <span className="pro-followers-name">Загрузка</span>
+                      <span className="pro-followers-username">Загрузка</span>
+                    </div>
+                  </div>
+                ))
+              ) : followers.length > 0 ? (
+                followers.map((follower) => {
+                  const followerName = buildFollowerName(follower)
+                  const followerHandle = buildFollowerHandle(
+                    follower,
+                    followerName
+                  )
+                  const initialsSource = followerName.startsWith('@')
+                    ? followerName.slice(1)
+                    : followerName
+                  const followerInitials = getNameInitials(initialsSource)
+                  const followerSince = follower.followedAt
+                    ? formatFollowerDate(follower.followedAt)
+                    : ''
+
+                  return (
+                    <div
+                      className="pro-followers-card"
+                      key={follower.userId}
+                      role="listitem"
+                    >
+                      <div className="pro-followers-avatar" aria-hidden="true">
+                        {follower.avatarUrl ? (
+                          <img src={follower.avatarUrl} alt="" />
+                        ) : (
+                          <span>{followerInitials}</span>
+                        )}
+                      </div>
+                      <div className="pro-followers-info">
+                        <div className="pro-followers-name-row">
+                          <span className="pro-followers-name">
+                            {followerName}
+                          </span>
+                          {follower.isPro && (
+                            <span className="pro-followers-badge">Мастер</span>
+                          )}
+                        </div>
+                        <div className="pro-followers-meta">
+                          {followerHandle && (
+                            <span className="pro-followers-username">
+                              {followerHandle}
+                            </span>
+                          )}
+                          {followerSince && (
+                            <span className="pro-followers-since">
+                              с {followerSince}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="pro-followers-empty">{followersEmptyLabel}</p>
+              )}
+            </div>
+            {followersHasMore && !followersInitialLoading && (
+              <button
+                className="pro-followers-sheet-load"
+                type="button"
+                onClick={handleFollowersLoadMore}
+                disabled={isFollowersLoading}
+              >
+                {isFollowersLoading ? 'Загружаем...' : 'Показать еще'}
+              </button>
+            )}
           </div>
         </div>
       )}
