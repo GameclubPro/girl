@@ -7833,7 +7833,7 @@
   grid-auto-flow: column;
   grid-auto-columns: 128px;
   gap: 8px;
-  align-items: start;
+  align-items: stretch;
   justify-content: start;
   align-content: start;
   overflow-x: auto;
@@ -7856,9 +7856,10 @@
   background: rgba(var(--paper-rgb), 0.94);
   border-radius: 16px;
   padding: 6px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 6px;
+  height: 100%;
   text-align: left;
   cursor: pointer;
   box-shadow: 0 10px 14px rgba(var(--shadow-rgb), 0.1);
@@ -7879,6 +7880,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
 }
 
 .pro-profile-certificate-media img {
