@@ -368,17 +368,22 @@ const resolveUserDisplayName = async (userId) => {
   return formatUserDisplayName(row.firstName, row.lastName, row.username, '')
 }
 
-const sendTelegramMessage = async ({ recipientId, text, url }) => {
+const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl }) => {
   if (!telegramBotToken) return
   if (typeof fetch !== 'function') return
+  const button = webAppUrl
+    ? { text: 'Открыть чат', web_app: { url: webAppUrl } }
+    : url
+      ? { text: 'Открыть чат', url }
+      : null
   const payload = {
     chat_id: recipientId,
     text,
     disable_web_page_preview: true,
-    ...(url
+    ...(button
       ? {
           reply_markup: {
-            inline_keyboard: [[{ text: 'Открыть чат', url }]],
+            inline_keyboard: [[button]],
           },
         }
       : {}),
@@ -417,7 +422,7 @@ const sendChatNotification = async ({ chatId, senderId, preview }) => {
 
   await Promise.all(
     recipients.map((recipientId) =>
-      sendTelegramMessage({ recipientId, text, url: link })
+      sendTelegramMessage({ recipientId, text, webAppUrl: link, url: link })
     )
   )
 }

@@ -556,6 +556,26 @@ export const ChatThreadScreen = ({
   }, [scrollToBottom])
 
   useEffect(() => {
+    const screen = screenRef.current
+    if (!screen || typeof ResizeObserver === 'undefined') return
+    let rafId: number | null = null
+    const observer = new ResizeObserver(() => {
+      if (!isNearBottomRef.current) return
+      if (rafId) {
+        cancelAnimationFrame(rafId)
+      }
+      rafId = requestAnimationFrame(() => scrollToBottom('auto'))
+    })
+    observer.observe(screen)
+    return () => {
+      observer.disconnect()
+      if (rafId) {
+        cancelAnimationFrame(rafId)
+      }
+    }
+  }, [scrollToBottom])
+
+  useEffect(() => {
     messagesRef.current = messages
     const cached = messages.filter((item) => item.id > 0)
     if (cached.length > 0) {
@@ -966,6 +986,7 @@ export const ChatThreadScreen = ({
   }
 
   const handleComposerFocus = () => {
+    isNearBottomRef.current = true
     requestAnimationFrame(() => scrollToBottom('auto'))
     window.setTimeout(() => scrollToBottom('auto'), 120)
   }
