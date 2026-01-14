@@ -182,6 +182,17 @@ export const ChatThreadScreen = ({
         ? 'is-syncing'
         : 'is-offline'
 
+  const getScrollElement = useCallback(() => {
+    const container = messagesContainerRef.current
+    if (container) {
+      const isScrollable = container.scrollHeight - container.clientHeight > 4
+      if (isScrollable) {
+        return container
+      }
+    }
+    return (document.scrollingElement ?? document.documentElement) as HTMLElement
+  }, [])
+
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
       const container = getScrollElement()
@@ -195,17 +206,6 @@ export const ChatThreadScreen = ({
     },
     [getScrollElement]
   )
-
-  const getScrollElement = useCallback(() => {
-    const container = messagesContainerRef.current
-    if (container) {
-      const isScrollable = container.scrollHeight - container.clientHeight > 4
-      if (isScrollable) {
-        return container
-      }
-    }
-    return (document.scrollingElement ?? document.documentElement) as HTMLElement
-  }, [])
 
   const mergeMessages = useCallback((incoming: ChatMessage[]) => {
     setMessages((current) => {
