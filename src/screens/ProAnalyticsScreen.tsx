@@ -18,7 +18,7 @@ const rangeOptions: Array<{ id: AnalyticsRangeKey; label: string }> = [
   { id: '365d', label: 'Год' },
 ]
 
-const categoryLabelMap = new Map(
+const categoryLabelMap = new Map<string, string>(
   categoryItems.map((item) => [item.id, item.label])
 )
 
