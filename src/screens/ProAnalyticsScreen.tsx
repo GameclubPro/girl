@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
-import {
-  BarChart,
-  BubbleChart,
-  DonutChart,
-  LineChart,
-  WaterfallChart,
-} from '../components/analytics/Charts'
+import { LineChart } from '../components/analytics/Charts'
 import { categoryItems } from '../data/clientData'
 import { useProAnalyticsData } from '../hooks/useProAnalyticsData'
 import type { AnalyticsRangeKey } from '../types/analytics'
@@ -29,8 +23,16 @@ const formatMoney = (value: number) => `${formatNumber(value)} ₽`
 
 const formatShortDate = (value: string) => {
   if (!value) return ''
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
+  const normalized = value.includes('T') ? value : `${value}T00:00:00`
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) {
+    const fallback = new Date(value)
+    if (Number.isNaN(fallback.getTime())) return value
+    return new Intl.DateTimeFormat('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+    }).format(fallback)
+  }
   return new Intl.DateTimeFormat('ru-RU', {
     day: 'numeric',
     month: 'short',
@@ -127,6 +129,8 @@ export const ProAnalyticsScreen = ({
   const [activeActivityIndex, setActiveActivityIndex] = useState<number | null>(
     null
   )
+  const [showAllCategories, setShowAllCategories] = useState(false)
+  const [showAllClients, setShowAllClients] = useState(false)
   const lastUpdatedLabel = lastUpdated
     ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
         hour: '2-digit',
@@ -142,6 +146,8 @@ export const ProAnalyticsScreen = ({
   useEffect(() => {
     setActiveRevenueIndex(null)
     setActiveActivityIndex(null)
+    setShowAllCategories(false)
+    setShowAllClients(false)
   }, [range, timeseries.length])
 
   const revenueSeries = timeseries.map((point) => point.revenue)
@@ -193,7 +199,7 @@ export const ProAnalyticsScreen = ({
     compareSummary?.reviews.average
   )
 
-  const categoryChartData = useMemo(
+  const categoryList = useMemo(
     () =>
       (data?.categories ?? []).map((item) => ({
         label: categoryLabelMap.get(item.id) ?? item.id,
@@ -201,19 +207,15 @@ export const ProAnalyticsScreen = ({
       })),
     [data?.categories]
   )
+  const clients = data?.clients ?? []
+  const categoryTotal = categoryList.reduce((sum, item) => sum + item.value, 0)
+  const visibleCategories = showAllCategories
+    ? categoryList
+    : categoryList.slice(0, 4)
+  const visibleClients = showAllClients ? clients : clients.slice(0, 6)
 
-  const bubbleData = useMemo(
-    () =>
-      (data?.clients ?? []).map((client) => ({
-        label: client.name,
-        x: client.visits,
-        y: client.revenue,
-        size: Math.max(client.visits, 1),
-      })),
-    [data?.clients]
-  )
-
-  const donutData = summary
+  const bookingTotal = summary?.bookings.total ?? 0
+  const bookingStatusItems = summary
     ? [
         {
           label: 'Подтверждено',
@@ -230,8 +232,45 @@ export const ProAnalyticsScreen = ({
           value: summary.bookings.cancelled,
           color: 'var(--danger)',
         },
-      ]
+      ].map((item) => ({
+        ...item,
+        percent: bookingTotal ? item.value / bookingTotal : 0,
+      }))
     : []
+
+  const peakRevenuePoint = useMemo(() => {
+    if (!hasTimeseries) return null
+    return timeseries.reduce((best, point) =>
+      point.revenue > best.revenue ? point : best
+    )
+  }, [hasTimeseries, timeseries])
+
+  const zeroRevenueDays = useMemo(() => {
+    if (!hasTimeseries) return 0
+    return timeseries.filter((point) => point.revenue === 0).length
+  }, [hasTimeseries, timeseries])
+
+  const peakRequestPoint = useMemo(() => {
+    if (!hasTimeseries) return null
+    return timeseries.reduce((best, point) =>
+      point.requests > best.requests ? point : best
+    )
+  }, [hasTimeseries, timeseries])
+
+  const bestResponseRatePoint = useMemo(() => {
+    if (!hasTimeseries) return null
+    return timeseries.reduce<{ date: string; rate: number } | null>(
+      (best, point) => {
+        if (!point.requests) return best
+        const rate = point.responses / point.requests
+        if (!best || rate > best.rate) {
+          return { date: point.date, rate }
+        }
+        return best
+      },
+      null
+    )
+  }, [hasTimeseries, timeseries])
 
   const funnelSteps = summary
     ? [
@@ -536,7 +575,7 @@ export const ProAnalyticsScreen = ({
               </section>
             )}
 
-            <section className="analytics-card animate delay-5">
+            <section className="analytics-card animate delay-3">
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Доход</p>
@@ -648,9 +687,31 @@ export const ProAnalyticsScreen = ({
                   </span>
                 </div>
               </div>
+              {hasTimeseries && (
+                <div className="analytics-note-row">
+                  {peakRevenuePoint && (
+                    <div className="analytics-note">
+                      <span className="analytics-note-label">Пик выручки</span>
+                      <span className="analytics-note-value">
+                        {formatMoney(peakRevenuePoint.revenue)}
+                      </span>
+                      <span className="analytics-note-meta">
+                        {formatShortDate(peakRevenuePoint.date)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="analytics-note">
+                    <span className="analytics-note-label">Дней без выручки</span>
+                    <span className="analytics-note-value">
+                      {formatNumber(zeroRevenueDays)}
+                    </span>
+                    <span className="analytics-note-meta">за период</span>
+                  </div>
+                </div>
+              )}
             </section>
 
-            <section className="analytics-card animate delay-3">
+            <section className="analytics-card animate delay-4">
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Активность</p>
@@ -753,9 +814,35 @@ export const ProAnalyticsScreen = ({
                   </span>
                 </div>
               </div>
+              {hasTimeseries && (
+                <div className="analytics-note-row">
+                  {peakRequestPoint && (
+                    <div className="analytics-note">
+                      <span className="analytics-note-label">Пик заявок</span>
+                      <span className="analytics-note-value">
+                        {formatNumber(peakRequestPoint.requests)}
+                      </span>
+                      <span className="analytics-note-meta">
+                        {formatShortDate(peakRequestPoint.date)}
+                      </span>
+                    </div>
+                  )}
+                  {bestResponseRatePoint && (
+                    <div className="analytics-note">
+                      <span className="analytics-note-label">Лучший отклик</span>
+                      <span className="analytics-note-value">
+                        {formatPercent(bestResponseRatePoint.rate)}
+                      </span>
+                      <span className="analytics-note-meta">
+                        {formatShortDate(bestResponseRatePoint.date)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
-            <section className="analytics-card animate delay-4">
+            <section className="analytics-card animate delay-5">
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Записи</p>
@@ -766,54 +853,74 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
-              <div className="analytics-split">
-                <DonutChart
-                  data={donutData}
-                  centerLabel="Записи"
-                  centerValue={formatNumber(summary.bookings.total)}
-                />
-                <div className="analytics-list">
-                  {donutData.map((item) => (
-                    <div key={item.label} className="analytics-list-item">
-                      <span className="analytics-list-dot" style={{ color: item.color }} />
-                      <div className="analytics-list-content">
-                        <span className="analytics-list-title">{item.label}</span>
-                        <span className="analytics-list-meta">
+              {bookingStatusItems.length > 0 ? (
+                <div className="analytics-status-grid">
+                  {bookingStatusItems.map((item) => (
+                    <div key={item.label} className="analytics-status-card">
+                      <span
+                        className="analytics-status-dot"
+                        style={{ color: item.color }}
+                      />
+                      <div className="analytics-status-content">
+                        <span className="analytics-status-title">{item.label}</span>
+                        <span className="analytics-status-value">
                           {formatNumber(item.value)}
+                        </span>
+                        <span className="analytics-status-meta">
+                          {formatPercent(item.percent)}
                         </span>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              ) : (
+                <p className="analytics-empty">Пока нет данных по записям.</p>
+              )}
             </section>
 
             <section className="analytics-card animate delay-6">
               <div className="analytics-card-head">
                 <div>
                   <p className="analytics-card-kicker">Категории</p>
-                  <h2 className="analytics-card-title">Выручка по категориям</h2>
+                  <h2 className="analytics-card-title">Сильные направления</h2>
                   <p className="analytics-card-subtitle">
-                    Топ направлений по доходу
+                    Топ направлений по подтвержденной выручке
                   </p>
                 </div>
               </div>
-              {categoryChartData.length > 0 ? (
+              {categoryList.length > 0 ? (
                 <>
-                  <BarChart data={categoryChartData} />
-                  <div className="analytics-list analytics-list--grid">
-                    {categoryChartData.map((item) => (
-                      <div key={item.label} className="analytics-list-item">
-                        <span className="analytics-list-dot is-accent" />
-                        <div className="analytics-list-content">
-                          <span className="analytics-list-title">{item.label}</span>
-                          <span className="analytics-list-meta">
-                            {formatMoney(item.value)}
+                  <div className="analytics-rank-list">
+                    {visibleCategories.map((item, index) => {
+                      const share = categoryTotal ? item.value / categoryTotal : 0
+                      return (
+                        <div key={item.label} className="analytics-rank-item">
+                          <span className="analytics-rank-index">
+                            {index + 1}
                           </span>
+                          <div className="analytics-rank-content">
+                            <span className="analytics-rank-title">
+                              {item.label}
+                            </span>
+                            <span className="analytics-rank-meta">
+                              {formatMoney(item.value)} · {formatPercent(share)}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
+                  {categoryList.length > 4 && (
+                    <div className="analytics-action-row">
+                      <button
+                        className="analytics-link-button"
+                        type="button"
+                        onClick={() => setShowAllCategories((prev) => !prev)}
+                      >
+                        {showAllCategories ? 'Скрыть' : 'Показать еще'}
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="analytics-empty">Пока нет данных по категориям.</p>
@@ -830,66 +937,39 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
-              {bubbleData.length > 0 ? (
+              {clients.length > 0 ? (
                 <>
-                  <BubbleChart data={bubbleData} />
                   <div className="analytics-list">
-                    {data.clients.map((client) => (
-                      <div key={client.id} className="analytics-list-item">
+                    {visibleClients.map((client) => (
+                      <div key={client.id} className="analytics-list-item is-compact">
                         <span className="analytics-list-dot is-success" />
                         <div className="analytics-list-content">
                           <span className="analytics-list-title">{client.name}</span>
                           <span className="analytics-list-meta">
                             {formatNumber(client.visits)} визитов ·{' '}
                             {formatMoney(client.revenue)}
+                            {client.lastSeenAt
+                              ? ` · ${formatShortDate(client.lastSeenAt)}`
+                              : ''}
                           </span>
                         </div>
                       </div>
                     ))}
                   </div>
+                  {clients.length > 6 && (
+                    <div className="analytics-action-row">
+                      <button
+                        className="analytics-link-button"
+                        type="button"
+                        onClick={() => setShowAllClients((prev) => !prev)}
+                      >
+                        {showAllClients ? 'Скрыть' : 'Показать еще'}
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="analytics-empty">Пока нет данных по клиентам.</p>
-              )}
-            </section>
-
-            <section className="analytics-card animate delay-7">
-              <div className="analytics-card-head">
-                <div>
-                  <p className="analytics-card-kicker">Доход</p>
-                  <h2 className="analytics-card-title">Waterfall поток</h2>
-                  <p className="analytics-card-subtitle">
-                    Потенциал, потери и итог по выручке
-                  </p>
-                </div>
-              </div>
-              {data.waterfall.length > 0 ? (
-                <>
-                  <WaterfallChart data={data.waterfall} />
-                  <div className="analytics-list analytics-list--grid">
-                    {data.waterfall.map((step) => (
-                      <div key={step.label} className="analytics-list-item">
-                        <span
-                          className={`analytics-list-dot${
-                            step.isTotal
-                              ? ' is-accent'
-                              : step.value < 0
-                                ? ' is-danger'
-                                : ' is-warning'
-                          }`}
-                        />
-                        <div className="analytics-list-content">
-                          <span className="analytics-list-title">{step.label}</span>
-                          <span className="analytics-list-meta">
-                            {formatMoney(step.value)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="analytics-empty">Пока нет данных по доходу.</p>
               )}
             </section>
 
@@ -904,9 +984,23 @@ export const ProAnalyticsScreen = ({
                 </div>
               </div>
               <div className="analytics-funnel">
-                {funnelSteps.map((step) => (
+                {funnelSteps.map((step, index) => {
+                  const previousValue =
+                    index === 0 ? null : funnelSteps[index - 1]?.value ?? null
+                  const stepRate =
+                    previousValue && previousValue > 0
+                      ? step.value / previousValue
+                      : null
+                  return (
                   <div key={step.label} className="analytics-funnel-row">
-                    <span className="analytics-funnel-label">{step.label}</span>
+                    <span className="analytics-funnel-label">
+                      <span className="analytics-funnel-title">{step.label}</span>
+                      {stepRate !== null && (
+                        <span className="analytics-funnel-meta">
+                          {formatPercent(stepRate)}
+                        </span>
+                      )}
+                    </span>
                     <div className="analytics-funnel-bar">
                       <span
                         className="analytics-funnel-fill"
@@ -921,7 +1015,8 @@ export const ProAnalyticsScreen = ({
                       {formatNumber(step.value)}
                     </span>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
 
