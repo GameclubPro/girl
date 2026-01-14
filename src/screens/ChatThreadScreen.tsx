@@ -184,10 +184,16 @@ export const ChatThreadScreen = ({
 
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
-      bottomRef.current?.scrollIntoView({ behavior, block: 'end' })
+      const container = getScrollElement()
+      const top = Math.max(0, container.scrollHeight - container.clientHeight)
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ top, behavior })
+      } else {
+        container.scrollTop = top
+      }
       setHasNewMessage(false)
     },
-    []
+    [getScrollElement]
   )
 
   const getScrollElement = useCallback(() => {
@@ -509,6 +515,9 @@ export const ChatThreadScreen = ({
       const height = composer.getBoundingClientRect().height
       if (!Number.isFinite(height) || height <= 0) return
       screen.style.setProperty('--chat-composer-height', `${Math.ceil(height)}px`)
+      if (isNearBottomRef.current) {
+        requestAnimationFrame(() => scrollToBottom('auto'))
+      }
     }
     update()
     if (typeof ResizeObserver === 'undefined') return
