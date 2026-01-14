@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { LineChart } from '../components/analytics/Charts'
 import { categoryItems } from '../data/clientData'
@@ -165,6 +165,37 @@ export const ProAnalyticsScreen = ({
         percent: bookingTotal ? item.value / bookingTotal : 0,
       }))
     : []
+
+  const statusBubbles = useMemo(() => {
+    if (bookingStatusItems.length === 0) return []
+    const maxValue = Math.max(
+      ...bookingStatusItems.map((item) => item.value),
+      1
+    )
+    const minSize = 70
+    const maxSize = 140
+    const bubblePositions: Record<string, { x: number; y: number }> = {
+      Подтверждено: { x: 44, y: 58 },
+      'В ожидании': { x: 70, y: 38 },
+      Отменено: { x: 58, y: 82 },
+    }
+    return bookingStatusItems.map((item, index) => {
+      const ratio = maxValue ? item.value / maxValue : 0
+      const size = Math.round(
+        minSize + (maxSize - minSize) * Math.sqrt(ratio)
+      )
+      const position = bubblePositions[item.label] ?? {
+        x: 50 + index * 2,
+        y: 50 + index * 6,
+      }
+      return {
+        ...item,
+        size,
+        x: position.x,
+        y: position.y,
+      }
+    })
+  }, [bookingStatusItems])
 
   const peakRevenuePoint = useMemo(() => {
     if (!hasTimeseries) return null
@@ -578,25 +609,44 @@ export const ProAnalyticsScreen = ({
                   </p>
                 </div>
               </div>
-              {bookingStatusItems.length > 0 ? (
-                <div className="analytics-status-grid">
-                  {bookingStatusItems.map((item) => (
-                    <div key={item.label} className="analytics-status-card">
-                      <span
-                        className="analytics-status-dot"
-                        style={{ color: item.color }}
-                      />
-                      <div className="analytics-status-content">
-                        <span className="analytics-status-title">{item.label}</span>
-                        <span className="analytics-status-value">
+              {statusBubbles.length > 0 ? (
+                <div
+                  className="analytics-status-bubbles"
+                  role="list"
+                  aria-label="Статусы записей"
+                >
+                  {statusBubbles.map((item, index) => {
+                    const bubbleStyle: CSSProperties & { '--bubble-color'?: string } =
+                      {
+                        '--bubble-color': item.color,
+                        width: `${item.size}px`,
+                        height: `${item.size}px`,
+                        left: `${item.x}%`,
+                        top: `${item.y}%`,
+                        animationDelay: `${index * 0.3}s`,
+                      }
+                    return (
+                      <div
+                        key={item.label}
+                        className="analytics-status-bubble"
+                        style={bubbleStyle}
+                        role="listitem"
+                        aria-label={`${item.label}: ${formatNumber(
+                          item.value
+                        )} (${formatPercent(item.percent)})`}
+                      >
+                        <span className="analytics-status-bubble-label">
+                          {item.label}
+                        </span>
+                        <span className="analytics-status-bubble-value">
                           {formatNumber(item.value)}
                         </span>
-                        <span className="analytics-status-meta">
+                        <span className="analytics-status-bubble-meta">
                           {formatPercent(item.percent)}
                         </span>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="analytics-empty">Пока нет данных по записям.</p>
