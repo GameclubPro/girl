@@ -56,43 +56,6 @@ const formatPercent = (value: number | null, showSign = false) => {
   return `${sign}${percent}%`
 }
 
-type Delta = {
-  diff: number
-  percent: number | null
-  trend: 'up' | 'down' | 'flat'
-}
-
-const buildDelta = (current?: number, previous?: number): Delta | null => {
-  if (typeof current !== 'number' || typeof previous !== 'number') return null
-  const diff = current - previous
-  const percent = previous ? diff / previous : null
-  return {
-    diff,
-    percent,
-    trend: diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat',
-  }
-}
-
-const formatSignedValue = (value: number, format: (value: number) => string) => {
-  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
-  return `${sign}${format(Math.abs(value))}`
-}
-
-const formatDeltaLabel = (
-  delta: Delta | null,
-  format: (value: number) => string,
-  usePercent = true
-) => {
-  if (!delta) return '—'
-  if (usePercent && delta.percent !== null) {
-    return formatPercent(delta.percent, true)
-  }
-  return formatSignedValue(delta.diff, format)
-}
-
-const getDeltaClass = (delta: Delta | null) =>
-  ` is-${delta?.trend ?? 'flat'}`
-
 const getTooltipLeft = (index: number, count: number) => {
   if (count <= 1) return '50%'
   const ratio = index / (count - 1)
@@ -139,7 +102,6 @@ export const ProAnalyticsScreen = ({
     : ''
   const summary = data?.summary
   const timeseries = data?.timeseries ?? []
-  const compareSummary = data?.compare?.summary
   const compareTimeseries = data?.compare?.timeseries ?? []
   const hasTimeseries = timeseries.length > 0
 
@@ -164,40 +126,6 @@ export const ProAnalyticsScreen = ({
     compareRevenueSeries.length > 0
       ? compareRevenueSeries.slice(0, revenueSeries.length)
       : []
-
-  const responseRate = summary?.requests.total
-    ? summary.requests.responded / summary.requests.total
-    : null
-  const bookingRate = summary?.requests.total
-    ? summary.bookings.confirmed / summary.requests.total
-    : null
-  const acceptRate = summary?.requests.responded
-    ? summary.requests.accepted / summary.requests.responded
-    : null
-  const revenueDelta = buildDelta(
-    summary?.revenue.confirmed,
-    compareSummary?.revenue.confirmed
-  )
-  const bookingsDelta = buildDelta(
-    summary?.bookings.total,
-    compareSummary?.bookings.total
-  )
-  const requestsDelta = buildDelta(
-    summary?.requests.total,
-    compareSummary?.requests.total
-  )
-  const followersDelta = buildDelta(
-    summary?.followers.total,
-    compareSummary?.followers.total
-  )
-  const avgCheckDelta = buildDelta(
-    summary?.revenue.avgCheck,
-    compareSummary?.revenue.avgCheck
-  )
-  const ratingDelta = buildDelta(
-    summary?.reviews.average,
-    compareSummary?.reviews.average
-  )
 
   const categoryList = useMemo(
     () =>
@@ -282,55 +210,6 @@ export const ProAnalyticsScreen = ({
       ]
     : []
   const funnelMax = Math.max(1, ...funnelSteps.map((step) => step.value))
-  const insight = useMemo(() => {
-    if (!summary) return null
-    const revenueTrend =
-      revenueDelta && revenueDelta.percent !== null ? revenueDelta.percent : null
-    if (revenueTrend !== null && revenueTrend <= -0.05) {
-      return {
-        tone: 'danger',
-        title: 'Выручка ниже прошлого периода',
-        text: 'Проверьте отмены и скорость ответа — это быстрее всего влияет на доход.',
-        action: 'requests',
-        actionLabel: 'Перейти к заявкам',
-      }
-    }
-    if (responseRate !== null && responseRate < 0.4) {
-      return {
-        tone: 'warning',
-        title: 'Ответы ниже 40%',
-        text: 'Быстрые ответы повышают вероятность записи и конверсию.',
-        action: 'requests',
-        actionLabel: 'Открыть заявки',
-      }
-    }
-    if (bookingRate !== null && bookingRate < 0.2) {
-      return {
-        tone: 'warning',
-        title: 'Низкая конверсия в запись',
-        text: 'Добавьте уточняющие вопросы в чате и предложите ближайшее окно.',
-        action: 'chats',
-        actionLabel: 'Открыть чаты',
-      }
-    }
-    if (revenueTrend !== null && revenueTrend >= 0.1) {
-      return {
-        tone: 'success',
-        title: 'Выручка растет',
-        text: 'Сохраните темп: закрепите лучшие услуги и поддержите активность.',
-        action: 'chats',
-        actionLabel: 'Открыть чаты',
-      }
-    }
-    return {
-      tone: 'neutral',
-      title: 'Стабильная динамика',
-      text: 'Держите стабильный отклик — это самый сильный драйвер конверсии.',
-      action: 'requests',
-      actionLabel: 'Перейти к заявкам',
-    }
-  }, [bookingRate, responseRate, revenueDelta, summary])
-
   const isInitialLoading = isLoading && !data
   const getPointerIndex = (event: { currentTarget: HTMLElement; clientX: number }, count: number) => {
     if (count <= 1) return 0
@@ -421,162 +300,6 @@ export const ProAnalyticsScreen = ({
 
         {data && summary && (
           <>
-            <section className="analytics-summary-grid">
-              <article className="analytics-summary-card">
-                <div className="analytics-summary-head">
-                  <div>
-                    <p className="analytics-summary-label">Выручка</p>
-                    <div className="analytics-summary-value-row">
-                      <p className="analytics-summary-value">
-                        {formatMoney(summary.revenue.confirmed)}
-                      </p>
-                      <span
-                        className={`analytics-delta${getDeltaClass(
-                          revenueDelta
-                        )}`}
-                      >
-                        {formatDeltaLabel(revenueDelta, formatMoney)}
-                      </span>
-                    </div>
-                    <p className="analytics-summary-meta">
-                      Прогноз: {formatMoney(summary.revenue.projected)}
-                    </p>
-                  </div>
-                  {rangeLabel && <span className="analytics-pill">{rangeLabel}</span>}
-                </div>
-                <div className="analytics-summary-row">
-                  <div className="analytics-summary-stat">
-                    <span className="analytics-summary-stat-label">Ответы</span>
-                    <span className="analytics-summary-stat-value">
-                      {formatPercent(responseRate)}
-                    </span>
-                  </div>
-                  <div className="analytics-summary-stat">
-                    <span className="analytics-summary-stat-label">Конверсия</span>
-                    <span className="analytics-summary-stat-value">
-                      {formatPercent(bookingRate)}
-                    </span>
-                  </div>
-                  <div className="analytics-summary-stat">
-                    <span className="analytics-summary-stat-label">Принято</span>
-                    <span className="analytics-summary-stat-value">
-                      {formatPercent(acceptRate)}
-                    </span>
-                  </div>
-                </div>
-              </article>
-              <article className="analytics-summary-card">
-                <div className="analytics-summary-head">
-                  <p className="analytics-summary-label">Средний чек</p>
-                  <span
-                    className={`analytics-delta${getDeltaClass(avgCheckDelta)}`}
-                  >
-                    {formatDeltaLabel(avgCheckDelta, formatMoney)}
-                  </span>
-                </div>
-                <p className="analytics-summary-value">
-                  {formatMoney(summary.revenue.avgCheck)}
-                </p>
-                <p className="analytics-summary-meta">
-                  Записей: {formatNumber(summary.bookings.confirmed)}
-                </p>
-              </article>
-              <article className="analytics-summary-card">
-                <div className="analytics-summary-head">
-                  <p className="analytics-summary-label">Записи</p>
-                  <span
-                    className={`analytics-delta${getDeltaClass(bookingsDelta)}`}
-                  >
-                    {formatDeltaLabel(bookingsDelta, formatNumber)}
-                  </span>
-                </div>
-                <p className="analytics-summary-value">
-                  {formatNumber(summary.bookings.total)}
-                </p>
-                <p className="analytics-summary-meta">
-                  Активные: {formatNumber(summary.bookings.pending)}
-                </p>
-              </article>
-              <article className="analytics-summary-card">
-                <div className="analytics-summary-head">
-                  <p className="analytics-summary-label">Заявки</p>
-                  <span
-                    className={`analytics-delta${getDeltaClass(requestsDelta)}`}
-                  >
-                    {formatDeltaLabel(requestsDelta, formatNumber)}
-                  </span>
-                </div>
-                <p className="analytics-summary-value">
-                  {formatNumber(summary.requests.total)}
-                </p>
-                <p className="analytics-summary-meta">
-                  Ответов: {formatNumber(summary.requests.responded)}
-                </p>
-              </article>
-              <article className="analytics-summary-card">
-                <div className="analytics-summary-head">
-                  <p className="analytics-summary-label">Подписчики</p>
-                  <span
-                    className={`analytics-delta${getDeltaClass(followersDelta)}`}
-                  >
-                    {formatDeltaLabel(followersDelta, formatNumber)}
-                  </span>
-                </div>
-                <p className="analytics-summary-value">
-                  {formatNumber(summary.followers.total)}
-                </p>
-                <p className="analytics-summary-meta">
-                  Новые: {formatNumber(summary.followers.new)}
-                </p>
-              </article>
-              <article className="analytics-summary-card">
-                <div className="analytics-summary-head">
-                  <p className="analytics-summary-label">Рейтинг</p>
-                  <span
-                    className={`analytics-delta${getDeltaClass(ratingDelta)}`}
-                  >
-                    {formatDeltaLabel(
-                      ratingDelta,
-                      (value) => value.toFixed(1),
-                      false
-                    )}
-                  </span>
-                </div>
-                <p className="analytics-summary-value">
-                  {summary.reviews.average
-                    ? summary.reviews.average.toFixed(1)
-                    : '—'}
-                </p>
-                <p className="analytics-summary-meta">
-                  Отзывов: {formatNumber(summary.reviews.count)}
-                </p>
-              </article>
-            </section>
-
-            {insight && (
-              <section
-                className={`analytics-insight${
-                  insight.tone === 'neutral' ? '' : ` is-${insight.tone}`
-                }`}
-              >
-                <div className="analytics-insight-content">
-                  <p className="analytics-insight-title">{insight.title}</p>
-                  <p className="analytics-insight-text">{insight.text}</p>
-                </div>
-                {insight.action && (
-                  <button
-                    className="analytics-insight-action"
-                    type="button"
-                    onClick={
-                      insight.action === 'requests' ? onViewRequests : onViewChats
-                    }
-                  >
-                    {insight.actionLabel}
-                  </button>
-                )}
-              </section>
-            )}
-
             <section className="analytics-card animate delay-3">
               <div className="analytics-card-head">
                 <div>
