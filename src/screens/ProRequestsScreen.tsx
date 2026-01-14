@@ -1141,6 +1141,8 @@ export const ProRequestsScreen = ({
                         : dateLabelMap[item.dateOption]
                     const statusLabel =
                       item.status === 'open' ? 'Открыта' : 'Закрыта'
+                    const clientName = item.clientName?.trim() || 'Клиент'
+                    const clientInitials = getInitials(clientName)
                     const tagItems = Array.isArray(item.tags) ? item.tags : []
                     const photoItems = Array.isArray(item.photoUrls)
                       ? item.photoUrls
@@ -1172,9 +1174,15 @@ export const ProRequestsScreen = ({
 
                     return (
                       <div className="pro-request-item" key={item.id}>
-                        <div className="request-item-top">
-                          <div className="request-item-title">
-                            {item.serviceName}
+                        <div className="booking-item-head">
+                          <span className="booking-item-avatar" aria-hidden="true">
+                            <span>{clientInitials}</span>
+                          </span>
+                          <div className="booking-item-main">
+                            <div className="booking-item-master">{clientName}</div>
+                            <div className="booking-item-service">
+                              {item.serviceName}
+                            </div>
                           </div>
                           <span
                             className={`request-status${

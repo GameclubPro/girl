@@ -80,6 +80,7 @@ export type MasterReviewSummary = {
 export type ServiceRequest = {
   id: number
   userId: string
+  clientName?: string | null
   cityId: number | null
   districtId: number | null
   cityName?: string | null

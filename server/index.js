@@ -3105,6 +3105,9 @@ app.get('/api/pro/requests', async (req, res) => {
         SELECT
           r.id,
           r.user_id AS "userId",
+          u.first_name AS "clientFirstName",
+          u.last_name AS "clientLastName",
+          u.username AS "clientUsername",
           r.city_id AS "cityId",
           r.district_id AS "districtId",
           c.name AS "cityName",
@@ -3137,6 +3140,7 @@ app.get('/api/pro/requests', async (req, res) => {
           ul.share_to_masters AS "clientShareToMasters"
         FROM request_dispatches rd
         JOIN service_requests r ON r.id = rd.request_id
+        LEFT JOIN users u ON u.user_id = r.user_id
         LEFT JOIN cities c ON c.id = r.city_id
         LEFT JOIN districts d ON d.id = r.district_id
         LEFT JOIN user_locations ul ON ul.user_id = r.user_id
@@ -3160,6 +3164,12 @@ app.get('/api/pro/requests', async (req, res) => {
     )
 
     const payload = result.rows.map((row) => {
+      const clientName = formatUserDisplayName(
+        row.clientFirstName,
+        row.clientLastName,
+        row.clientUsername,
+        'Клиент'
+      )
       const distanceKm =
         masterLocation &&
         row.clientShareToMasters &&
@@ -3178,10 +3188,14 @@ app.get('/api/pro/requests', async (req, res) => {
           : null
       return {
         ...row,
+        clientName,
         distanceKm,
         clientLat: undefined,
         clientLng: undefined,
         clientShareToMasters: undefined,
+        clientFirstName: undefined,
+        clientLastName: undefined,
+        clientUsername: undefined,
       }
     })
     res.json({ ...summary, isActive: profile.isActive, requests: payload })
