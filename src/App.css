@@ -7869,9 +7869,7 @@
 
 .pro-profile-certificate-media {
   width: 100%;
-  aspect-ratio: auto;
-  height: auto;
-  min-height: 92px;
+  aspect-ratio: 3 / 4;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(var(--shadow-rgb), 0.12);
@@ -7883,7 +7881,7 @@
 
 .pro-profile-certificate-media img {
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: contain;
   display: block;
 }
