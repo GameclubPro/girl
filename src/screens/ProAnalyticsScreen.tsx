@@ -85,6 +85,143 @@ const shuffle = <T,>(items: T[], rng: () => number) => {
   return copy
 }
 
+type PackedBubble<T> = T & { x: number; y: number; radius: number; size: number }
+type IndexedBubble<T> = PackedBubble<T> & { __index: number }
+
+const packBubbles = <T extends { size: number }>(
+  items: T[],
+  options: {
+    width: number
+    height: number
+    padding: number
+    gap: number
+    seed: number
+  }
+): PackedBubble<T>[] => {
+  if (items.length === 0) return []
+  const containerWidth = Math.max(options.width, 1)
+  const containerHeight = Math.max(options.height, 1)
+  const angleStep = Math.PI * (3 - Math.sqrt(5))
+  const maxScaleAttempts = 6
+  const maxIterations = 90
+  let result: IndexedBubble<T>[] = []
+
+  for (let attempt = 0; attempt < maxScaleAttempts; attempt += 1) {
+    const scale = Math.pow(0.92, attempt)
+    const rng = createSeededRandom(options.seed + attempt * 101)
+    const indexed = items.map((item, index) => ({ ...item, __index: index }))
+    const ordered = shuffle(indexed, rng)
+    const laidOut: IndexedBubble<T>[] = ordered.map((item, index) => {
+      const scaledSize = item.size * scale
+      const radius = scaledSize / 2
+      const minX = options.padding + radius
+      const maxX = Math.max(
+        minX,
+        containerWidth - options.padding - radius
+      )
+      const minY = options.padding + radius
+      const maxY = Math.max(
+        minY,
+        containerHeight - options.padding - radius
+      )
+      const maxRadial = Math.max(
+        0,
+        Math.min(containerWidth, containerHeight) / 2 -
+          options.padding -
+          radius
+      )
+      const radial =
+        maxRadial * ((index + 1) / Math.max(ordered.length, 1))
+      const angle = angleStep * index + rng() * 0.6
+      const x = clamp(
+        containerWidth / 2 + Math.cos(angle) * radial,
+        minX,
+        maxX
+      )
+      const y = clamp(
+        containerHeight / 2 + Math.sin(angle) * radial,
+        minY,
+        maxY
+      )
+      return {
+        ...item,
+        size: scaledSize,
+        radius,
+        x,
+        y,
+      }
+    })
+
+    for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+      let moved = false
+      for (let i = 0; i < laidOut.length; i += 1) {
+        for (let j = i + 1; j < laidOut.length; j += 1) {
+          const current = laidOut[i]
+          const other = laidOut[j]
+          let dx = other.x - current.x
+          let dy = other.y - current.y
+          let distance = Math.hypot(dx, dy)
+          const minDistance =
+            current.radius + other.radius + options.gap
+          if (distance < minDistance) {
+            if (distance < 0.001) {
+              const angle = rng() * Math.PI * 2
+              dx = Math.cos(angle) * 0.001
+              dy = Math.sin(angle) * 0.001
+              distance = 0.001
+            }
+            const push = (minDistance - distance) / 2
+            const nx = dx / distance
+            const ny = dy / distance
+            current.x -= nx * push
+            current.y -= ny * push
+            other.x += nx * push
+            other.y += ny * push
+            moved = true
+          }
+        }
+      }
+
+      laidOut.forEach((item) => {
+        const minX = options.padding + item.radius
+        const maxX = Math.max(
+          minX,
+          containerWidth - options.padding - item.radius
+        )
+        const minY = options.padding + item.radius
+        const maxY = Math.max(
+          minY,
+          containerHeight - options.padding - item.radius
+        )
+        item.x = clamp(item.x, minX, maxX)
+        item.y = clamp(item.y, minY, maxY)
+      })
+
+      if (!moved) break
+    }
+
+    const hasOverlap = laidOut.some((item, index) =>
+      laidOut.slice(index + 1).some((other) => {
+        const dx = other.x - item.x
+        const dy = other.y - item.y
+        const minDistance = item.radius + other.radius + options.gap
+        return dx * dx + dy * dy < minDistance * minDistance
+      })
+    )
+
+    result = laidOut
+    if (!hasOverlap) {
+      return [...laidOut]
+        .sort((a, b) => a.__index - b.__index)
+        .map(({ __index, ...rest }) => rest as PackedBubble<T>)
+    }
+  }
+
+  return [...result]
+    .sort((a, b) => a.__index - b.__index)
+    .map(({ __index, ...rest }) => rest as PackedBubble<T>)
+}
+
 const getTooltipLeft = (index: number, count: number) => {
   if (count <= 1) return '50%'
   const ratio = index / (count - 1)
@@ -243,43 +380,13 @@ export const ProAnalyticsScreen = ({
     const height = statusBubbleBounds.height || 240
     const padding = 14
     const minGap = 12
-    const rng = createSeededRandom(buildBubbleSeed(statusBubbles))
-    const ordered = shuffle(statusBubbles, rng)
-    const placed: Array<
-      (typeof statusBubbles)[number] & { x: number; y: number; radius: number }
-    > = []
-    ordered.forEach((item, index) => {
-      const radius = item.size / 2
-      const minX = padding + radius
-      const maxX = Math.max(minX, width - padding - radius)
-      const minY = padding + radius
-      const maxY = Math.max(minY, height - padding - radius)
-      let placedItem: typeof placed[number] | null = null
-      for (let attempt = 0; attempt < 120; attempt += 1) {
-        const x = minX + rng() * (maxX - minX)
-        const y = minY + rng() * (maxY - minY)
-        const hasOverlap = placed.some((existing) => {
-          const dx = x - existing.x
-          const dy = y - existing.y
-          const minDistance = radius + existing.radius + minGap
-          return dx * dx + dy * dy < minDistance * minDistance
-        })
-        if (!hasOverlap) {
-          placedItem = { ...item, x, y, radius }
-          break
-        }
-      }
-      if (!placedItem) {
-        const angle =
-          (index / Math.max(ordered.length, 1)) * Math.PI * 2 + rng()
-        const radial = Math.min(width, height) * 0.28
-        const x = clamp(width / 2 + Math.cos(angle) * radial, minX, maxX)
-        const y = clamp(height / 2 + Math.sin(angle) * radial, minY, maxY)
-        placedItem = { ...item, x, y, radius }
-      }
-      placed.push(placedItem)
+    return packBubbles(statusBubbles, {
+      width,
+      height,
+      padding,
+      gap: minGap,
+      seed: buildBubbleSeed(statusBubbles),
     })
-    return placed
   }, [statusBubbles, statusBubbleBounds])
 
   const peakRevenuePoint = useMemo(() => {
