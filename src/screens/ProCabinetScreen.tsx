@@ -9,7 +9,7 @@ import {
   IconShowcase,
   IconUsers,
 } from '../components/icons'
-import { useProCabinetData } from '../hooks/useProCabinetData'
+import { useProCabinetData, type ClientSummary } from '../hooks/useProCabinetData'
 import type { MasterProfile, ProProfileSection } from '../types/app'
 import {
   isImageUrl,
@@ -41,6 +41,35 @@ const formatWeekday = (value: Date) =>
     .format(value)
     .replace('.', '')
 
+const formatCountLabel = (
+  value: number,
+  one: string,
+  few: string,
+  many: string
+) => {
+  const abs = Math.abs(value)
+  const mod10 = abs % 10
+  const mod100 = abs % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few
+  return many
+}
+
+const formatVisits = (value: number) =>
+  `${value} ${formatCountLabel(value, 'визит', 'визита', 'визитов')}`
+
+const formatRelativeDay = (value: Date) => {
+  if (Number.isNaN(value.getTime())) return 'без даты'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(value)
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / DAY_MS)
+  if (diffDays === 0) return 'сегодня'
+  if (diffDays === -1) return 'вчера'
+  return formatShortDate(value)
+}
+
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 
 const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
@@ -63,6 +92,12 @@ const getInitials = (value: string) => {
   const joined = letters.join('').toUpperCase()
   if (joined) return joined
   return normalized.slice(0, 2).toUpperCase()
+}
+
+const formatClientMeta = (client: ClientSummary) => {
+  const visits = formatVisits(client.count)
+  if (!client.lastSeenTime) return `без даты · ${visits}`
+  return `${formatRelativeDay(new Date(client.lastSeenTime))} · ${visits}`
 }
 
 const showcaseSlotClasses = ['is-a', 'is-b', 'is-c', 'is-d'] as const
@@ -181,10 +216,21 @@ export const ProCabinetScreen = ({
       count: counts.get(day.key) ?? 0,
     }))
   }, [bookings])
-  const clientPreview = useMemo(
+  const clientAvatarPreview = useMemo(
     () => bookingStats.clientSummaries.slice(0, 3),
     [bookingStats.clientSummaries]
   )
+  const clientHighlights = useMemo(
+    () => bookingStats.clientSummaries.slice(0, 2),
+    [bookingStats.clientSummaries]
+  )
+  const clientRows = clientHighlights.length > 0 ? clientHighlights : [null, null]
+  const totalClients = bookingStats.uniqueClients
+  const repeatClients = bookingStats.repeatClients
+  const newClients = Math.max(0, totalClients - repeatClients)
+  const repeatShare = totalClients
+    ? Math.max(0, Math.min(100, Math.round((repeatClients / totalClients) * 100)))
+    : 0
   const nextBookingDate = bookingStats.nextBookingTime
     ? new Date(bookingStats.nextBookingTime)
     : null
@@ -325,29 +371,82 @@ export const ProCabinetScreen = ({
                 </span>
               </div>
             </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-avatars" aria-hidden="true">
-                {(clientPreview.length > 0
-                  ? clientPreview
-                  : [null, null, null]
-                ).map((client, index) => (
-                  <span
-                    className={`pro-cabinet-nav-avatar${
-                      client ? '' : ' is-ghost'
-                    }`}
-                    key={`client-preview-${client?.id ?? index}`}
-                  >
-                    {client ? getInitials(client.name) : '•'}
+            <div className="pro-cabinet-nav-preview is-clients-preview">
+              <div className="pro-cabinet-nav-client-top">
+                <div className="pro-cabinet-nav-avatars is-compact" aria-hidden="true">
+                  {(clientAvatarPreview.length > 0
+                    ? clientAvatarPreview
+                    : [null, null, null]
+                  ).map((client, index) => (
+                    <span
+                      className={`pro-cabinet-nav-avatar${
+                        client ? '' : ' is-ghost'
+                      }`}
+                      key={`client-preview-${client?.id ?? index}`}
+                    >
+                      {client ? getInitials(client.name) : '•'}
+                    </span>
+                  ))}
+                </div>
+                <div className="pro-cabinet-nav-client-count">
+                  <span className="pro-cabinet-nav-client-count-value">
+                    {totalClients}
                   </span>
-                ))}
+                  <span className="pro-cabinet-nav-client-count-label">
+                    клиентов
+                  </span>
+                </div>
               </div>
-              <div className="pro-cabinet-nav-pills">
-                <span className="pro-cabinet-nav-pill">
-                  Повторных {bookingStats.repeatClients}
-                </span>
-                <span className="pro-cabinet-nav-pill is-ghost">
-                  Визитов {bookingStats.total}
-                </span>
+              <div className="pro-cabinet-nav-client-list">
+                {clientRows.map((client, index) => {
+                  const isGhost = !client
+                  const name = client?.name ?? 'Первые клиенты'
+                  const meta = client
+                    ? formatClientMeta(client)
+                    : 'Появятся после записи'
+                  const isRepeat = client ? client.count > 1 : false
+                  const badge = client ? (isRepeat ? 'повторный' : 'новый') : null
+                  return (
+                    <div
+                      className={`pro-cabinet-nav-client-row${
+                        isGhost ? ' is-ghost' : ''
+                      }`}
+                      key={`client-row-${client?.id ?? index}`}
+                    >
+                      <span className="pro-cabinet-nav-client-avatar" aria-hidden="true">
+                        {client ? getInitials(client.name) : '•'}
+                      </span>
+                      <div className="pro-cabinet-nav-client-text">
+                        <span className="pro-cabinet-nav-client-name">{name}</span>
+                        <span className="pro-cabinet-nav-client-meta-text">
+                          {meta}
+                        </span>
+                      </div>
+                      {badge ? (
+                        <span
+                          className={`pro-cabinet-nav-client-badge${
+                            isRepeat ? ' is-repeat' : ' is-new'
+                          }`}
+                        >
+                          {badge}
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="pro-cabinet-nav-client-foot">
+                <div
+                  className={`pro-cabinet-nav-client-meter${
+                    totalClients > 0 ? '' : ' is-empty'
+                  }`}
+                  style={{ '--repeat-share': repeatShare } as CSSProperties}
+                  aria-hidden="true"
+                />
+                <div className="pro-cabinet-nav-client-meta">
+                  <span>Повторные {repeatClients}</span>
+                  <span className="is-muted">Новые {newClients}</span>
+                </div>
               </div>
             </div>
           </button>

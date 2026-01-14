@@ -2372,6 +2372,272 @@
   gap: 8px;
 }
 
+.pro-cabinet-nav-preview.is-clients-preview {
+  gap: 6px;
+}
+
+.pro-cabinet-nav-client-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pro-cabinet-nav-avatars.is-compact {
+  min-height: 28px;
+}
+
+.pro-cabinet-nav-avatars.is-compact .pro-cabinet-nav-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+.pro-cabinet-nav-avatars.is-compact .pro-cabinet-nav-avatar + .pro-cabinet-nav-avatar {
+  margin-left: -10px;
+}
+
+.pro-cabinet-nav-client-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.pro-cabinet-nav-client-count-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  line-height: 1;
+}
+
+.pro-cabinet-nav-client-count-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-cabinet-nav-client-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pro-cabinet-nav-client-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--tile-accent), 0.14);
+  background: rgba(var(--paper-rgb), 0.7);
+  overflow: hidden;
+}
+
+.pro-cabinet-nav-client-row.is-ghost {
+  border-color: rgba(var(--shadow-rgb), 0.14);
+  background: rgba(var(--paper-rgb), 0.5);
+  color: var(--pro-muted);
+}
+
+.pro-cabinet-nav-client-row.is-ghost .pro-cabinet-nav-client-name,
+.pro-cabinet-nav-client-row.is-ghost .pro-cabinet-nav-client-meta-text {
+  color: var(--pro-muted);
+}
+
+.pro-cabinet-nav-client-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--tile-accent), 0.2);
+  background: rgba(var(--tile-accent), 0.16);
+  color: var(--pro-ink);
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pro-cabinet-nav-client-row.is-ghost .pro-cabinet-nav-client-avatar {
+  border-color: rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--shadow-rgb), 0.12);
+  color: var(--muted);
+}
+
+.pro-cabinet-nav-client-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pro-cabinet-nav-client-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pro-cabinet-nav-client-meta-text {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--pro-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pro-cabinet-nav-client-badge {
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--paper-rgb), 0.7);
+  flex-shrink: 0;
+}
+
+.pro-cabinet-nav-client-badge.is-repeat {
+  color: rgb(var(--tile-accent));
+  border-color: rgba(var(--tile-accent), 0.3);
+  background: rgba(var(--tile-accent), 0.12);
+}
+
+.pro-cabinet-nav-client-badge.is-new {
+  color: var(--pro-ink);
+  border-color: rgba(var(--tile-accent), 0.2);
+  background: rgba(var(--tile-accent), 0.08);
+}
+
+.pro-cabinet-nav-client-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pro-cabinet-nav-client-meter {
+  --repeat-share: 0;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(var(--tile-accent), 0.18);
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(var(--tile-accent), 0.16);
+}
+
+.pro-cabinet-nav-client-meter::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: calc(var(--repeat-share) * 1%);
+  background: linear-gradient(
+    90deg,
+    rgba(var(--tile-accent), 0.9),
+    rgba(var(--tile-accent), 0.4)
+  );
+}
+
+.pro-cabinet-nav-client-meter.is-empty {
+  background: rgba(var(--shadow-rgb), 0.12);
+  box-shadow: inset 0 0 0 1px rgba(var(--shadow-rgb), 0.16);
+}
+
+.pro-cabinet-nav-client-meter.is-empty::before {
+  display: none;
+}
+
+.pro-cabinet-nav-client-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-cabinet-nav-client-meta span {
+  white-space: nowrap;
+}
+
+.pro-cabinet-nav-client-meta .is-muted {
+  color: var(--pro-muted);
+}
+
+.pro-cabinet-nav-card.is-clients.animate .pro-cabinet-nav-avatars .pro-cabinet-nav-avatar {
+  animation: client-avatar-pop 0.45s ease both;
+  animation-delay: 0.3s;
+}
+
+.pro-cabinet-nav-card.is-clients.animate
+  .pro-cabinet-nav-avatars
+  .pro-cabinet-nav-avatar:nth-child(2) {
+  animation-delay: 0.36s;
+}
+
+.pro-cabinet-nav-card.is-clients.animate
+  .pro-cabinet-nav-avatars
+  .pro-cabinet-nav-avatar:nth-child(3) {
+  animation-delay: 0.42s;
+}
+
+.pro-cabinet-nav-card.is-clients.animate .pro-cabinet-nav-client-row {
+  animation: client-row-rise 0.5s ease both;
+  animation-delay: 0.35s;
+}
+
+.pro-cabinet-nav-card.is-clients.animate
+  .pro-cabinet-nav-client-row:nth-child(2) {
+  animation-delay: 0.46s;
+}
+
+.pro-cabinet-nav-card.is-clients.animate .pro-cabinet-nav-client-meter::before {
+  animation: client-meter-fill 0.8s ease 0.32s both;
+}
+
+@keyframes client-avatar-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes client-row-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes client-meter-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: calc(var(--repeat-share) * 1%);
+  }
+}
+
 .pro-cabinet-nav-spark {
   display: flex;
   align-items: flex-end;
@@ -16896,6 +17162,12 @@ h2 {
   }
 
   .pro-avatar.is-loading::after {
+    animation: none;
+  }
+
+  .pro-cabinet-nav-card.is-clients .pro-cabinet-nav-client-row,
+  .pro-cabinet-nav-card.is-clients .pro-cabinet-nav-client-meter::before,
+  .pro-cabinet-nav-card.is-clients .pro-cabinet-nav-avatars .pro-cabinet-nav-avatar {
     animation: none;
   }
 
