@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import {
   IconChat,
   IconClock,
@@ -178,6 +185,42 @@ const buildReviewerName = (review: MasterReview) => {
   return 'Клиент'
 }
 
+const buildFollowerName = (follower: MasterFollower) => {
+  const profileName = follower.displayName?.trim()
+  if (profileName) return profileName
+  const name = [follower.firstName, follower.lastName].filter(Boolean).join(' ').trim()
+  if (name) return name
+  if (follower.username) return `@${follower.username}`
+  return 'Подписчик'
+}
+
+const buildFollowerHandle = (follower: MasterFollower, name: string) => {
+  const handle = follower.username?.trim()
+  if (!handle) return ''
+  const normalizedName = name.trim().toLowerCase()
+  if (normalizedName === `@${handle.toLowerCase()}`) return ''
+  return `@${handle}`
+}
+
+const getNameInitials = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return 'К'
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  const letters = parts.slice(0, 2).map((part) => part[0] ?? '')
+  const joined = letters.join('').toUpperCase()
+  if (joined) return joined
+  return normalized.slice(0, 2).toUpperCase()
+}
+
+const formatFollowerDate = (value: string) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 const buildStars = (value: number) => {
   const clamped = Math.max(0, Math.min(5, Math.round(value)))
   return Array.from({ length: 5 }, (_, index) => (index < clamped ? '★' : '☆')).join(
@@ -206,6 +249,19 @@ const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
 const PORTFOLIO_PREVIEW_LIMIT = 4
 
 type MasterProfileTabId = 'overview' | 'portfolio' | 'schedule' | 'reviews'
+type StatId = 'works' | 'rating' | 'reviews' | 'followers'
+
+type MasterFollower = {
+  userId: string
+  firstName?: string | null
+  lastName?: string | null
+  username?: string | null
+  displayName?: string | null
+  avatarUrl?: string | null
+  followedAt?: string | null
+  updatedAt?: string | null
+  isPro?: boolean
+}
 
 export const ClientMasterProfileScreen = ({
   apiBase,
@@ -230,6 +286,15 @@ export const ClientMasterProfileScreen = ({
     useState<MasterReviewSummary | null>(null)
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
+  const [activeStat, setActiveStat] = useState<StatId | null>(null)
+  const [pendingStatScroll, setPendingStatScroll] = useState<StatId | null>(null)
+  const [isFollowersOpen, setIsFollowersOpen] = useState(false)
+  const [followers, setFollowers] = useState<MasterFollower[]>([])
+  const [followersTotal, setFollowersTotal] = useState(0)
+  const [followersQuery, setFollowersQuery] = useState('')
+  const [followersQueryDebounced, setFollowersQueryDebounced] = useState('')
+  const [followersError, setFollowersError] = useState('')
+  const [isFollowersLoading, setIsFollowersLoading] = useState(false)
   const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
   const [isCertificatesExpanded, setIsCertificatesExpanded] = useState(false)
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
@@ -244,6 +309,9 @@ export const ClientMasterProfileScreen = ({
   const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<MasterProfileTabId>('overview')
   const scheduleInfoRef = useRef<HTMLDivElement | null>(null)
+  const portfolioPanelRef = useRef<HTMLElement | null>(null)
+  const reviewsSectionRef = useRef<HTMLElement | null>(null)
+  const followersRequestIdRef = useRef(0)
 
   useEffect(() => {
     if (!masterId) return
@@ -344,6 +412,94 @@ export const ClientMasterProfileScreen = ({
     }
   }, [apiBase, masterId])
 
+  const loadFollowers = useCallback(
+    async ({ offset, append }: { offset: number; append: boolean }) => {
+      if (!masterId) return
+      const requestId = (followersRequestIdRef.current += 1)
+      setIsFollowersLoading(true)
+      setFollowersError('')
+
+      try {
+        const query = followersQueryDebounced.trim()
+        const params = new URLSearchParams()
+        params.set('offset', String(offset))
+        params.set('limit', '24')
+        if (query) {
+          params.set('q', query)
+        }
+        const response = await fetch(
+          `${apiBase}/api/masters/${encodeURIComponent(masterId)}/followers?${params.toString()}`
+        )
+        if (!response.ok) {
+          throw new Error('Load followers failed')
+        }
+        const data = (await response.json()) as {
+          total?: number
+          followers?: MasterFollower[]
+        }
+        if (followersRequestIdRef.current !== requestId) return
+        const nextFollowers = Array.isArray(data.followers) ? data.followers : []
+        const nextTotal =
+          typeof data.total === 'number' ? data.total : nextFollowers.length
+        setFollowersTotal(nextTotal)
+        setFollowers((current) =>
+          append ? [...current, ...nextFollowers] : nextFollowers
+        )
+      } catch (error) {
+        if (followersRequestIdRef.current === requestId) {
+          setFollowersError('Не удалось загрузить подписчиков.')
+        }
+      } finally {
+        if (followersRequestIdRef.current === requestId) {
+          setIsFollowersLoading(false)
+        }
+      }
+    },
+    [apiBase, followersQueryDebounced, masterId]
+  )
+
+  const openFollowersSheet = () => {
+    setIsFollowersOpen(true)
+  }
+
+  const closeFollowersSheet = () => {
+    setIsFollowersOpen(false)
+  }
+
+  const handleStatTap = (statId: StatId) => {
+    setActiveStat(statId)
+    if (statId === 'followers') {
+      openFollowersSheet()
+      return
+    }
+    if (statId === 'works') {
+      setActiveTab('portfolio')
+      setPendingStatScroll(statId)
+      return
+    }
+    setActiveTab('reviews')
+    setPendingStatScroll(statId)
+  }
+
+  const getStatAriaLabel = (stat: { id: StatId; label: string; value: string }) => {
+    switch (stat.id) {
+      case 'followers':
+        return `Открыть список подписчиков: ${stat.value}`
+      case 'works':
+        return `Портфолио: ${stat.value}`
+      case 'rating':
+        return `Рейтинг: ${stat.value}`
+      case 'reviews':
+      default:
+        return `Отзывы: ${stat.value}`
+    }
+  }
+
+  const handleFollowersLoadMore = () => {
+    if (isFollowersLoading) return
+    loadFollowers({ offset: followers.length, append: true })
+  }
+
   useEffect(() => {
     setIsPortfolioExpanded(false)
     setIsCertificatesExpanded(false)
@@ -351,7 +507,71 @@ export const ClientMasterProfileScreen = ({
     setCertificateLightboxIndex(null)
     setIsScheduleInfoOpen(false)
     setActiveTab('overview')
+    setPendingStatScroll(null)
+    setActiveStat(null)
+    setIsFollowersOpen(false)
+    setFollowers([])
+    setFollowersTotal(0)
+    setFollowersQuery('')
+    setFollowersQueryDebounced('')
+    setFollowersError('')
   }, [masterId])
+
+  useEffect(() => {
+    if (!activeStat) return
+    const timer = window.setTimeout(() => {
+      setActiveStat(null)
+    }, 360)
+    return () => window.clearTimeout(timer)
+  }, [activeStat])
+
+  useEffect(() => {
+    if (!pendingStatScroll) return
+    if (pendingStatScroll === 'works' && activeTab === 'portfolio') {
+      portfolioPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+      setPendingStatScroll(null)
+      return
+    }
+    if (
+      (pendingStatScroll === 'rating' || pendingStatScroll === 'reviews') &&
+      activeTab === 'reviews'
+    ) {
+      reviewsSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+      setPendingStatScroll(null)
+    }
+  }, [activeTab, pendingStatScroll])
+
+  useEffect(() => {
+    const trimmed = followersQuery.trim()
+    const timer = window.setTimeout(() => {
+      setFollowersQueryDebounced(trimmed)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [followersQuery])
+
+  useEffect(() => {
+    setFollowersTotal((current) => (current > 0 ? current : followersCount))
+  }, [followersCount])
+
+  useEffect(() => {
+    if (!isFollowersOpen) return
+    loadFollowers({ offset: 0, append: false })
+  }, [followersQueryDebounced, isFollowersOpen, loadFollowers])
+
+  useEffect(() => {
+    if (!isFollowersOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isFollowersOpen])
 
   useEffect(() => {
     if (!isScheduleInfoOpen) return
@@ -418,7 +638,6 @@ export const ClientMasterProfileScreen = ({
   const initials = getInitials(displayName)
   const aboutValue = profile?.about?.trim() || ''
   const aboutText = aboutValue || 'Статус пока не добавлен.'
-  const primaryCategory = categoryLabels[0]
   const reviewCount = reviewSummary?.count ?? 0
   const reviewAverage = reviewSummary?.average ?? 0
   const reviewDistribution = reviewSummary?.distribution ?? []
@@ -429,14 +648,30 @@ export const ClientMasterProfileScreen = ({
       ? Math.max(0, Math.round(profile.followersCount))
       : 0
   const followersValue = followersCount.toLocaleString('ru-RU')
+  const followersQueryValue = followersQuery.trim()
+  const followersQueryFetch = followersQueryDebounced
+  const followersTotalLabel = formatCount(
+    followersTotal,
+    'подписчик',
+    'подписчика',
+    'подписчиков'
+  )
+  const followersSummaryLabel = followersQueryFetch
+    ? `Найдено: ${followersTotalLabel}`
+    : `Всего: ${followersTotalLabel}`
+  const followersHasMore = followers.length < followersTotal
+  const followersEmptyLabel = followersQueryFetch
+    ? 'Никого не нашли.'
+    : 'Пока нет подписчиков.'
+  const followersInitialLoading = isFollowersLoading && followers.length === 0
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
   const profileStats = [
-    { label: 'Работы', value: String(portfolioCount) },
-    { label: 'Рейтинг', value: reviewAverageLabel },
-    { label: 'Отзывы', value: String(reviewCount) },
-    { label: 'Подписчики', value: followersValue },
-  ]
+    { id: 'works', label: 'Работы', value: String(portfolioCount) },
+    { id: 'rating', label: 'Рейтинг', value: reviewAverageLabel },
+    { id: 'reviews', label: 'Отзывы', value: String(reviewCount) },
+    { id: 'followers', label: 'Подписчики', value: followersValue },
+  ] satisfies { id: StatId; label: string; value: string }[]
   const priceLabel = formatPriceRange(
     profile?.priceFrom ?? null,
     profile?.priceTo ?? null
@@ -680,36 +915,30 @@ export const ClientMasterProfileScreen = ({
   return (
     <div className="screen screen--client screen--client-master-profile">
       <div className="pro-shell pro-shell--ig">
-        <header className="master-profile-header">
-          <button
-            className="pro-back"
-            type="button"
-            onClick={onBack}
-            aria-label="Назад"
-          >
-            ←
-          </button>
-          <div className="master-profile-context">
-            <span className="master-profile-context-kicker">Профиль мастера</span>
-            <span className="master-profile-context-title">{primaryCategory}</span>
-          </div>
-          <button
-            className={`master-profile-like${isFavorite ? ' is-active' : ''}`}
-            type="button"
-            onClick={() => onToggleFavorite(favoritePayload)}
-            aria-label={followAriaLabel}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 20.2s-6.4-3.7-8.6-7.4c-1.6-2.7-0.8-6.1 2-7.2 2.1-0.9 4.6-0.1 6.6 1.8 2-1.9 4.5-2.7 6.6-1.8 2.8 1.1 3.6 4.5 2 7.2-2.2 3.7-8.6 7.4-8.6 7.4Z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </header>
+        <button
+          className="pro-back master-profile-back"
+          type="button"
+          onClick={onBack}
+          aria-label="Назад"
+        >
+          ←
+        </button>
+        <button
+          className={`master-profile-like${isFavorite ? ' is-active' : ''}`}
+          type="button"
+          onClick={() => onToggleFavorite(favoritePayload)}
+          aria-label={followAriaLabel}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 20.2s-6.4-3.7-8.6-7.4c-1.6-2.7-0.8-6.1 2-7.2 2.1-0.9 4.6-0.1 6.6 1.8 2-1.9 4.5-2.7 6.6-1.8 2.8 1.1 3.6 4.5 2 7.2-2.2 3.7-8.6 7.4-8.6 7.4Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
 
         {loadError && <p className="pro-error">{loadError}</p>}
         {isLoading ? (
@@ -750,12 +979,21 @@ export const ClientMasterProfileScreen = ({
               </div>
               <div className="pro-profile-ig-stats">
                 {profileStats.map((stat) => (
-                  <div className="pro-profile-ig-stat" key={stat.label}>
+                  <button
+                    className={`pro-profile-ig-stat pro-profile-ig-stat-button${
+                      activeStat === stat.id ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    key={stat.id}
+                    onClick={() => handleStatTap(stat.id)}
+                    aria-label={getStatAriaLabel(stat)}
+                    aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
+                  >
                     <span className="pro-profile-ig-stat-value">{stat.value}</span>
                     <span className="pro-profile-ig-stat-label">
                       {stat.label}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -1010,7 +1248,10 @@ export const ClientMasterProfileScreen = ({
               )}
 
               {activeTab === 'portfolio' && (
-                <section className="pro-profile-portfolio-panel animate delay-2">
+                <section
+                  className="pro-profile-portfolio-panel animate delay-2"
+                  ref={portfolioPanelRef}
+                >
                   <div className="pro-profile-portfolio-panel-head">
                     <div className="pro-profile-portfolio-panel-controls">
                       <span className="pro-profile-portfolio-panel-count">
@@ -1209,7 +1450,10 @@ export const ClientMasterProfileScreen = ({
               )}
 
               {activeTab === 'reviews' && (
-                <section className="pro-profile-reviews animate delay-3">
+                <section
+                  className="pro-profile-reviews animate delay-3"
+                  ref={reviewsSectionRef}
+                >
                   <div className="pro-profile-reviews-head">
                     <div>
                       <p className="pro-profile-reviews-kicker">Отзывы</p>
@@ -1325,6 +1569,145 @@ export const ClientMasterProfileScreen = ({
           </>
         ) : null}
       </div>
+
+      {isFollowersOpen && (
+        <div
+          className="pro-portfolio-sheet-overlay pro-followers-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="client-followers-title"
+          onClick={closeFollowersSheet}
+        >
+          <div
+            className="pro-portfolio-sheet pro-followers-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-portfolio-sheet-handle" aria-hidden="true" />
+            <div className="pro-followers-sheet-head">
+              <div className="pro-followers-sheet-title-block">
+                <p className="pro-followers-sheet-kicker">Аудитория</p>
+                <h3 className="pro-followers-sheet-title" id="client-followers-title">
+                  Подписчики
+                </h3>
+                <p className="pro-followers-sheet-subtitle">
+                  {followersSummaryLabel}
+                </p>
+              </div>
+              <button
+                className="pro-followers-sheet-close"
+                type="button"
+                onClick={closeFollowersSheet}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="pro-followers-sheet-search">
+              <input
+                className="pro-input pro-followers-search-input"
+                type="search"
+                placeholder="Поиск по имени или @username"
+                value={followersQuery}
+                onChange={(event) => setFollowersQuery(event.target.value)}
+                aria-label="Поиск подписчиков"
+              />
+              {followersQueryValue && (
+                <button
+                  className="pro-followers-sheet-clear"
+                  type="button"
+                  onClick={() => setFollowersQuery('')}
+                >
+                  Сбросить
+                </button>
+              )}
+            </div>
+            {followersError && <p className="pro-error">{followersError}</p>}
+            <div
+              className="pro-followers-sheet-list"
+              role="list"
+              aria-busy={isFollowersLoading}
+            >
+              {followersInitialLoading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    className="pro-followers-card is-skeleton"
+                    key={`followers-skeleton-${index}`}
+                    role="listitem"
+                    aria-hidden="true"
+                  >
+                    <div className="pro-followers-avatar" />
+                    <div className="pro-followers-info">
+                      <span className="pro-followers-name">Загрузка</span>
+                      <span className="pro-followers-username">Загрузка</span>
+                    </div>
+                  </div>
+                ))
+              ) : followers.length > 0 ? (
+                followers.map((follower) => {
+                  const followerName = buildFollowerName(follower)
+                  const followerHandle = buildFollowerHandle(follower, followerName)
+                  const initialsSource = followerName.startsWith('@')
+                    ? followerName.slice(1)
+                    : followerName
+                  const followerInitials = getNameInitials(initialsSource)
+                  const followerSince = follower.followedAt
+                    ? formatFollowerDate(follower.followedAt)
+                    : ''
+
+                  return (
+                    <div
+                      className="pro-followers-card"
+                      key={follower.userId}
+                      role="listitem"
+                    >
+                      <div className="pro-followers-avatar" aria-hidden="true">
+                        {follower.avatarUrl ? (
+                          <img src={follower.avatarUrl} alt="" />
+                        ) : (
+                          <span>{followerInitials}</span>
+                        )}
+                      </div>
+                      <div className="pro-followers-info">
+                        <div className="pro-followers-name-row">
+                          <span className="pro-followers-name">
+                            {followerName}
+                          </span>
+                          {follower.isPro && (
+                            <span className="pro-followers-badge">Мастер</span>
+                          )}
+                        </div>
+                        <div className="pro-followers-meta">
+                          {followerHandle && (
+                            <span className="pro-followers-username">
+                              {followerHandle}
+                            </span>
+                          )}
+                          {followerSince && (
+                            <span className="pro-followers-since">
+                              с {followerSince}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="pro-followers-empty">{followersEmptyLabel}</p>
+              )}
+            </div>
+            {followersHasMore && !followersInitialLoading && (
+              <button
+                className="pro-followers-sheet-load"
+                type="button"
+                onClick={handleFollowersLoadMore}
+                disabled={isFollowersLoading}
+              >
+                {isFollowersLoading ? 'Загружаем...' : 'Показать еще'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {portfolioLightboxItem && (
         <div

@@ -15708,7 +15708,10 @@ h2 {
 .master-profile-like {
   appearance: none;
   -webkit-appearance: none;
-  margin-left: auto;
+  position: absolute;
+  top: calc(var(--safe-top) + var(--tg-top-offset) + 8px);
+  right: var(--pro-pad-x, 18px);
+  z-index: 6;
   width: 40px;
   height: 40px;
   border-radius: 14px;
@@ -15719,6 +15722,13 @@ h2 {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.master-profile-back {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--tg-top-offset) + 8px);
+  left: var(--pro-pad-x, 18px);
+  z-index: 6;
 }
 
 .master-profile-like svg {
@@ -17377,7 +17387,21 @@ h2 {
 
 
   .pro-profile-ig-actions {
-    grid-template-columns: minmax(0, 1fr);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0 4px;
+    gap: 6px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pro-profile-ig-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pro-profile-ig-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .pro-profile-editor-tabs {
