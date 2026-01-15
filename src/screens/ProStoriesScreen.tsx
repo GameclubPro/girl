@@ -37,6 +37,7 @@ type ProStoriesScreenProps = {
   onViewRequests: () => void
   onViewChats: () => void
   onViewProfile: () => void
+  activeNav?: 'cabinet' | 'profile'
 }
 
 export const ProStoriesScreen = ({
@@ -47,6 +48,7 @@ export const ProStoriesScreen = ({
   onViewRequests,
   onViewChats,
   onViewProfile,
+  activeNav = 'cabinet',
 }: ProStoriesScreenProps) => {
   const [stories, setStories] = useState<StoryItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -407,7 +409,7 @@ export const ProStoriesScreen = ({
       </div>
 
       <ProBottomNav
-        active="cabinet"
+        active={activeNav}
         onCabinet={onBack}
         onRequests={onViewRequests}
         onChats={onViewChats}

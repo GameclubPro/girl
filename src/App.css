@@ -7518,6 +7518,30 @@
   flex-shrink: 0;
 }
 
+.pro-profile-ig-avatar-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(
+    160deg,
+    rgba(var(--accent-rgb), 0.95),
+    rgba(var(--accent-rgb), 0.45)
+  );
+  border: 2px solid rgba(var(--paper-rgb), 0.95);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.2);
+  pointer-events: none;
+}
+
 .pro-profile-ig-avatar::before {
   content: '';
   position: absolute;
@@ -9332,6 +9356,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.pro-portfolio-sheet-action.is-story {
+  background: linear-gradient(
+    150deg,
+    rgba(var(--accent-rgb), 0.35),
+    rgba(var(--paper-rgb), 0.96)
+  );
+  color: var(--accent-strong);
+  box-shadow: 0 12px 16px rgba(var(--accent-rgb), 0.16);
 }
 
 .pro-portfolio-sheet-action.is-danger {
@@ -17340,6 +17374,14 @@ h2 {
     width: 108px;
     height: 108px;
     border-radius: 28px;
+  }
+
+  .pro-profile-ig-avatar-badge {
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
+    right: 6px;
+    bottom: 6px;
   }
 
   .pro-profile-ig-stats {

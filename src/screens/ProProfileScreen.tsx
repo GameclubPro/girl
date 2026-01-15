@@ -41,6 +41,7 @@ type ProProfileScreenProps = {
   onBack: () => void
   onViewRequests: () => void
   onViewChats: () => void
+  onViewStories: () => void
   focusSection?: ProProfileSection | null
   initialPortfolioView?: 'portfolio' | 'showcase'
   onBackHandlerChange?: ((handler: (() => boolean) | null) => void) | undefined
@@ -284,6 +285,7 @@ export const ProProfileScreen = ({
   onBack,
   onViewRequests,
   onViewChats,
+  onViewStories,
   focusSection,
   initialPortfolioView,
   onBackHandlerChange,
@@ -348,6 +350,7 @@ export const ProProfileScreen = ({
   const [reviewsError, setReviewsError] = useState('')
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
   const [isCoverUploading, setIsCoverUploading] = useState(false)
+  const [isAvatarActionsOpen, setIsAvatarActionsOpen] = useState(false)
   const [mediaError, setMediaError] = useState('')
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
     number | null
@@ -582,6 +585,7 @@ export const ProProfileScreen = ({
   const certificatesActionLabel = certificateCount > 0 ? 'Редактировать' : 'Добавить'
   const showCertificatesEditAction = certificateCount === 0 || isCertificatesExpanded
   const certificatesListId = `pro-profile-certificates-list-${userId}`
+  const avatarActionsId = 'pro-profile-avatar-actions'
   const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
   const showcaseCountLabel = `${showcaseCount} из ${MAX_SHOWCASE_ITEMS}`
   const portfolioPanelCountLabel =
@@ -816,6 +820,13 @@ export const ProProfileScreen = ({
     if (!portfolioItems[index]) return
     setPortfolioError('')
     setPortfolioQuickActionIndex(index)
+  }
+  const openAvatarActions = () => {
+    if (isAvatarUploading) return
+    setIsAvatarActionsOpen(true)
+  }
+  const closeAvatarActions = () => {
+    setIsAvatarActionsOpen(false)
   }
   const openMediaEditor = () => {
     if (isAvatarUploading || isCoverUploading) return
@@ -1059,6 +1070,12 @@ export const ProProfileScreen = ({
       document.body.style.overflow = previousOverflow
     }
   }, [isFollowersOpen])
+
+  useEffect(() => {
+    if (editingSection) {
+      setIsAvatarActionsOpen(false)
+    }
+  }, [editingSection])
 
   useEffect(() => {
     editingSectionRef.current = editingSection
@@ -2625,12 +2642,15 @@ export const ProProfileScreen = ({
               aria-disabled={isAvatarUploading}
               role="button"
               tabIndex={0}
-              aria-label="Открыть редактор аватара"
-              onClick={openMediaEditor}
+              aria-label="Открыть действия профиля"
+              aria-haspopup="dialog"
+              aria-expanded={isAvatarActionsOpen}
+              aria-controls={avatarActionsId}
+              onClick={openAvatarActions}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
-                  openMediaEditor()
+                  openAvatarActions()
                 }
               }}
             >
@@ -2639,6 +2659,9 @@ export const ProProfileScreen = ({
               ) : (
                 <span aria-hidden="true">{profileInitials}</span>
               )}
+              <span className="pro-profile-ig-avatar-badge" aria-hidden="true">
+                +
+              </span>
               <input
                 ref={avatarInputRef}
                 className="pro-file-input"
@@ -3895,6 +3918,62 @@ export const ProProfileScreen = ({
                 {isFollowersLoading ? 'Загружаем...' : 'Показать еще'}
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {isAvatarActionsOpen && (
+        <div
+          className="pro-portfolio-sheet-overlay pro-profile-avatar-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pro-profile-avatar-sheet-title"
+          onClick={closeAvatarActions}
+        >
+          <div
+            className="pro-portfolio-sheet pro-profile-avatar-sheet"
+            id={avatarActionsId}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-portfolio-sheet-handle" aria-hidden="true" />
+            <div className="pro-portfolio-sheet-head">
+              <p className="pro-portfolio-sheet-subtitle">Профиль</p>
+              <h3
+                className="pro-portfolio-sheet-title"
+                id="pro-profile-avatar-sheet-title"
+              >
+                Истории и фото
+              </h3>
+            </div>
+            <div className="pro-portfolio-sheet-actions is-stacked">
+              <button
+                className="pro-portfolio-sheet-action is-story"
+                type="button"
+                onClick={() => {
+                  closeAvatarActions()
+                  onViewStories()
+                }}
+              >
+                + Добавить историю
+              </button>
+              <button
+                className="pro-portfolio-sheet-action"
+                type="button"
+                onClick={() => {
+                  closeAvatarActions()
+                  openMediaEditor()
+                }}
+              >
+                Редактировать фото профиля
+              </button>
+            </div>
+            <button
+              className="pro-portfolio-sheet-cancel"
+              type="button"
+              onClick={closeAvatarActions}
+            >
+              Закрыть
+            </button>
           </div>
         </div>
       )}

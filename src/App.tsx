@@ -120,6 +120,9 @@ function App() {
   const [proProfilePortfolioView, setProProfilePortfolioView] = useState<
     'portfolio' | 'showcase' | null
   >(null)
+  const [proStoriesReturnView, setProStoriesReturnView] = useState<
+    'pro-cabinet' | 'pro-profile'
+  >('pro-cabinet')
   const [address, setAddress] = useState('')
   const [telegramUser] = useState(() => getTelegramUser())
   const [userId] = useState(() => telegramUser?.id?.toString() ?? 'local-dev')
@@ -817,6 +820,14 @@ function App() {
     []
   )
 
+  const openProStories = useCallback(
+    (returnView: 'pro-cabinet' | 'pro-profile') => {
+      setProStoriesReturnView(returnView)
+      setView('pro-stories')
+    },
+    []
+  )
+
   const openChatList = useCallback(() => {
     setSelectedChatId(null)
     setChatReturnView(null)
@@ -1254,6 +1265,7 @@ function App() {
         }}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
+        onViewStories={() => openProStories('pro-profile')}
         focusSection={proProfileSection}
         initialPortfolioView={proProfilePortfolioView ?? undefined}
         onBackHandlerChange={registerProProfileBackHandler}
@@ -1345,10 +1357,11 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onBack={() => setView('pro-cabinet')}
+        onBack={() => setView(proStoriesReturnView)}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onViewProfile={() => openProProfile()}
+        activeNav={proStoriesReturnView === 'pro-profile' ? 'profile' : 'cabinet'}
       />
     )
   }
@@ -1368,7 +1381,7 @@ function App() {
         onOpenShowcase={() =>
           openProProfile({ section: 'portfolio', portfolioView: 'showcase' })
         }
-        onOpenStories={() => setView('pro-stories')}
+        onOpenStories={() => openProStories('pro-cabinet')}
       />
     )
   }
