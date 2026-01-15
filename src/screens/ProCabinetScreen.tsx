@@ -249,6 +249,11 @@ export const ProCabinetScreen = ({
     () => getInitials(profileDisplayName || 'Мастер'),
     [profileDisplayName]
   )
+  const tapHint = (
+    <span className="pro-cabinet-nav-hint" aria-hidden="true">
+      <span className="pro-cabinet-nav-hint-arrow" />
+    </span>
+  )
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -259,6 +264,7 @@ export const ProCabinetScreen = ({
             type="button"
             onClick={onOpenAnalytics}
           >
+            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconDashboard />
@@ -304,6 +310,7 @@ export const ProCabinetScreen = ({
             type="button"
             onClick={onOpenCalendar}
           >
+            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconCalendar />
@@ -347,6 +354,7 @@ export const ProCabinetScreen = ({
             type="button"
             onClick={onOpenClients}
           >
+            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconUsers />
@@ -420,6 +428,7 @@ export const ProCabinetScreen = ({
             type="button"
             onClick={onOpenCampaigns}
           >
+            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconChat />
@@ -462,6 +471,7 @@ export const ProCabinetScreen = ({
             type="button"
             onClick={onOpenStories}
           >
+            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconStories />
@@ -494,6 +504,7 @@ export const ProCabinetScreen = ({
             type="button"
             onClick={onOpenShowcase}
           >
+            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconShowcase />
