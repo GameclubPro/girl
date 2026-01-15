@@ -226,12 +226,6 @@ export const ProCabinetScreen = ({
     () => bookingStats.clientSummaries.slice(0, 2),
     [bookingStats.clientSummaries]
   )
-  const activeWeekClients = useMemo(() => {
-    const since = Date.now() - 7 * DAY_MS
-    return bookingStats.clientSummaries.filter(
-      (client) => (client.lastSeenTime ?? 0) >= since
-    ).length
-  }, [bookingStats.clientSummaries])
   const clientRows = clientHighlights.length > 0 ? clientHighlights : [null, null]
   const totalClients = bookingStats.uniqueClients
   const repeatClients = bookingStats.repeatClients
@@ -252,14 +246,8 @@ export const ProCabinetScreen = ({
   const campaignMeter = campaignAudience
     ? Math.min(100, Math.max(12, Math.round(campaignRepeatRate * 100)))
     : 0
-  const showcasePreviewFallback = useMemo<Array<PortfolioItem | null>>(
-    () => new Array(4).fill(null),
-    []
-  )
   const showcaseTiles: Array<PortfolioItem | null> =
-    showcasePreview.length > 0
-      ? [...showcasePreview, ...showcasePreviewFallback].slice(0, 4)
-      : showcasePreviewFallback
+    showcasePreview.length > 0 ? showcasePreview : [null]
   const showcaseMetaLabel =
     showcaseTotal > 0 ? `${showcaseTotal} фото` : 'Добавьте фото'
   const profileInitials = useMemo(
@@ -385,24 +373,6 @@ export const ProCabinetScreen = ({
               </div>
             </div>
             <div className="pro-cabinet-nav-preview is-clients-preview">
-              <div className="pro-cabinet-nav-client-top">
-                <div className="pro-cabinet-nav-client-activity">
-                  <span className="pro-cabinet-nav-client-activity-value">
-                    {activeWeekClients}
-                  </span>
-                  <span className="pro-cabinet-nav-client-activity-label">
-                    Активные 7д
-                  </span>
-                </div>
-                <div className="pro-cabinet-nav-client-count">
-                  <span className="pro-cabinet-nav-client-count-value">
-                    {totalClients}
-                  </span>
-                  <span className="pro-cabinet-nav-client-count-label">
-                    клиентов
-                  </span>
-                </div>
-              </div>
               <div className="pro-cabinet-nav-client-list">
                 {clientRows.map((client, index) => {
                   const isGhost = !client
