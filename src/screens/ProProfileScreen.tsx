@@ -822,7 +822,7 @@ export const ProProfileScreen = ({
     setPortfolioQuickActionIndex(index)
   }
   const openAvatarActions = () => {
-    if (isAvatarUploading) return
+    if (isAvatarUploading || isCoverUploading || editingSection) return
     setIsAvatarActionsOpen(true)
   }
   const closeAvatarActions = () => {
