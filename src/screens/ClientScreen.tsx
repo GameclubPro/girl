@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   IconChat,
   IconHome,
@@ -160,7 +160,7 @@ export const ClientScreen = ({
     }
   }, [apiBase, userId])
 
-  const showcaseItems = useMemo(() => {
+  const showcaseItems = useMemo<ShowcaseMedia[]>(() => {
     const pool = activeCategoryId
       ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
       : showcasePool
