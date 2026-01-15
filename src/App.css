@@ -14216,7 +14216,7 @@ h2 {
 
 .client-topbar--floating {
   position: fixed;
-  top: calc(var(--safe-top) + var(--tg-top-offset) - 8px);
+  top: calc(var(--safe-top) + var(--tg-top-offset) - 16px);
   left: 50%;
   transform: translateX(-50%);
   width: 100vw;
