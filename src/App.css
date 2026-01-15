@@ -22,8 +22,8 @@
 .screen--client {
   background: var(--surface);
   --client-pad-x: 18px;
-  --client-top-offset: 6px;
-  padding: calc(10px + var(--safe-top) + var(--tg-top-offset) + var(--client-top-offset))
+  --client-top-offset: -4px;
+  padding: calc(8px + var(--safe-top) + var(--tg-top-offset) + var(--client-top-offset))
     var(--client-pad-x)
     calc(120px + var(--safe-bottom));
 }
