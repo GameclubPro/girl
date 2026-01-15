@@ -12977,6 +12977,10 @@ h2 {
   gap: 11px;
 }
 
+.client-shell--home {
+  padding-top: clamp(18px, 5.2vw, 26px);
+}
+
 .client-profile-shell {
   gap: 14px;
 }
