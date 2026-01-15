@@ -7846,7 +7846,7 @@
 
 .pro-profile-certificates-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
@@ -7861,7 +7861,7 @@
 }
 
 .pro-profile-certificates-title {
-  margin: 2px 0 0;
+  margin: 0;
   font-family: var(--font-title);
   font-size: 15px;
   font-weight: 700;
@@ -7870,17 +7870,19 @@
 
 .pro-profile-certificates-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: flex-end;
+  justify-content: flex-end;
   gap: 6px;
 }
 
 .pro-profile-certificates-count {
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 9px;
+  padding: 3px 8px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--pro-muted);
   border: 1px solid rgba(var(--shadow-rgb), 0.12);
@@ -8080,7 +8082,7 @@
 }
 
 .pro-profile-certificates.is-client .pro-profile-certificates-actions {
-  align-items: flex-end;
+  align-items: center;
 }
 
 

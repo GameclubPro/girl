@@ -579,6 +579,7 @@ export const ProProfileScreen = ({
     )
   }
   const certificatesActionLabel = certificateCount > 0 ? 'Редактировать' : 'Добавить'
+  const showCertificatesEditAction = certificateCount === 0 || isCertificatesExpanded
   const certificatesListId = `pro-profile-certificates-list-${userId}`
   const portfolioCountLabel = `${portfolioCount} из ${MAX_PORTFOLIO_ITEMS}`
   const showcaseCountLabel = `${showcaseCount} из ${MAX_SHOWCASE_ITEMS}`
@@ -2737,13 +2738,15 @@ export const ProProfileScreen = ({
                       {certificatesToggleLabel}
                     </button>
                   )}
-                  <button
-                    className="pro-profile-certificates-action"
-                    type="button"
-                    onClick={() => openEditor('certificates')}
-                  >
-                    {certificatesActionLabel}
-                  </button>
+                  {showCertificatesEditAction && (
+                    <button
+                      className="pro-profile-certificates-action"
+                      type="button"
+                      onClick={() => openEditor('certificates')}
+                    >
+                      {certificatesActionLabel}
+                    </button>
+                  )}
                 </div>
               </div>
               {certificateItems.length > 0 ? (
