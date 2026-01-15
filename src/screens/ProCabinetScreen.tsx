@@ -4,6 +4,7 @@ import { ProBottomNav } from '../components/ProBottomNav'
 import {
   IconCalendar,
   IconChat,
+  IconChevronRight,
   IconDashboard,
   IconShowcase,
   IconStories,
@@ -249,6 +250,12 @@ export const ProCabinetScreen = ({
     () => getInitials(profileDisplayName || 'Мастер'),
     [profileDisplayName]
   )
+  const openAction = (
+    <span className="pro-cabinet-nav-action" aria-hidden="true">
+      <span className="pro-cabinet-nav-action-label">Открыть</span>
+      <IconChevronRight />
+    </span>
+  )
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -272,6 +279,7 @@ export const ProCabinetScreen = ({
                     : 'Пока нет заявок'}
                 </span>
               </div>
+              {openAction}
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-spark" aria-hidden="true">
@@ -315,6 +323,7 @@ export const ProCabinetScreen = ({
                   Ближайшая: {nextBookingLabel}
                 </span>
               </div>
+              {openAction}
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-week" aria-hidden="true">
@@ -360,6 +369,7 @@ export const ProCabinetScreen = ({
                     : 'Пока нет клиентов'}
                 </span>
               </div>
+              {openAction}
             </div>
             <div className="pro-cabinet-nav-preview is-clients-preview">
               <div className="pro-cabinet-nav-client-list">
@@ -433,6 +443,7 @@ export const ProCabinetScreen = ({
                     : 'Пока нет аудитории'}
                 </span>
               </div>
+              {openAction}
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-meter" aria-hidden="true">
@@ -473,6 +484,7 @@ export const ProCabinetScreen = ({
                   24 часа на показ
                 </span>
               </div>
+              {openAction}
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-stories">
@@ -505,6 +517,7 @@ export const ProCabinetScreen = ({
                   Добавьте новые работы
                 </span>
               </div>
+              {openAction}
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-mosaic" aria-hidden="true">
