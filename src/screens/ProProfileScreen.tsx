@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
+import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
   IconClock,
@@ -261,8 +262,11 @@ type MasterFollower = {
 }
 
 type StatId = 'works' | 'rating' | 'reviews' | 'followers'
+type CropperKind = 'avatar' | 'cover'
+type CropperState = { kind: CropperKind; src: string }
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
+const MAX_MEDIA_INPUT_BYTES = 12 * 1024 * 1024
 const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
 const MAX_CERTIFICATES = 12
@@ -351,6 +355,7 @@ export const ProProfileScreen = ({
   const [isAvatarUploading, setIsAvatarUploading] = useState(false)
   const [isCoverUploading, setIsCoverUploading] = useState(false)
   const [isAvatarActionsOpen, setIsAvatarActionsOpen] = useState(false)
+  const [cropperState, setCropperState] = useState<CropperState | null>(null)
   const [mediaError, setMediaError] = useState('')
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
     number | null
@@ -397,6 +402,8 @@ export const ProProfileScreen = ({
   const certificateLightboxIndexRef = useRef<number | null>(null)
   const portfolioFocusIndexRef = useRef<number | null>(null)
   const showcaseFocusIndexRef = useRef<number | null>(null)
+  const cropperStateRef = useRef<CropperState | null>(null)
+  const avatarActionsOpenRef = useRef(false)
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
   const reviewsSectionRef = useRef<HTMLElement | null>(null)
   const portfolioAutosaveTimerRef = useRef<number | null>(null)
@@ -731,6 +738,8 @@ export const ProProfileScreen = ({
     showcaseFocusIndex !== null ||
     isPortfolioPickerOpen ||
     portfolioQuickActionIndex !== null
+  const isCropperUploading =
+    cropperState?.kind === 'avatar' ? isAvatarUploading : isCoverUploading
   const focusItem =
     portfolioFocusIndex !== null ? portfolioItems[portfolioFocusIndex] ?? null : null
   const focusPoint = resolvePortfolioFocus(focusItem)
@@ -822,11 +831,17 @@ export const ProProfileScreen = ({
     setPortfolioQuickActionIndex(index)
   }
   const openAvatarActions = () => {
-    if (isAvatarUploading || isCoverUploading || editingSection) return
+    if (isAvatarUploading || isCoverUploading || editingSection || cropperState) {
+      return
+    }
     setIsAvatarActionsOpen(true)
   }
   const closeAvatarActions = () => {
     setIsAvatarActionsOpen(false)
+  }
+  const closeCropper = () => {
+    if (isAvatarUploading || isCoverUploading) return
+    setCropperState(null)
   }
   const openMediaEditor = () => {
     if (isAvatarUploading || isCoverUploading) return
@@ -1078,6 +1093,20 @@ export const ProProfileScreen = ({
   }, [editingSection])
 
   useEffect(() => {
+    if (cropperState) {
+      setIsAvatarActionsOpen(false)
+    }
+  }, [cropperState])
+
+  useEffect(() => {
+    cropperStateRef.current = cropperState
+  }, [cropperState])
+
+  useEffect(() => {
+    avatarActionsOpenRef.current = isAvatarActionsOpen
+  }, [isAvatarActionsOpen])
+
+  useEffect(() => {
     editingSectionRef.current = editingSection
   }, [editingSection])
 
@@ -1100,6 +1129,14 @@ export const ProProfileScreen = ({
   useEffect(() => {
     if (!onBackHandlerChange) return
     const handler = () => {
+      if (cropperStateRef.current) {
+        closeCropper()
+        return true
+      }
+      if (avatarActionsOpenRef.current) {
+        closeAvatarActions()
+        return true
+      }
       if (isFollowersOpen) {
         closeFollowersSheet()
         return true
@@ -1171,6 +1208,15 @@ export const ProProfileScreen = ({
       document.body.style.overflow = previousOverflow
     }
   }, [editingSection])
+
+  useEffect(() => {
+    if (!cropperState) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [cropperState])
 
   useEffect(() => {
     if (!isPortfolioOverlayOpen) return
@@ -1723,19 +1769,8 @@ export const ProProfileScreen = ({
     )
   }
 
-  const readImageFile = (file: File, onLoad: (dataUrl: string) => void) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      if (result) {
-        onLoad(result)
-      }
-    }
-    reader.readAsDataURL(file)
-  }
-
   const uploadMedia = async (kind: 'avatar' | 'cover', dataUrl: string) => {
-    if (!userId) return
+    if (!userId) return false
     setMediaError('')
     if (kind === 'avatar') {
       setIsAvatarUploading(true)
@@ -1774,10 +1809,12 @@ export const ProProfileScreen = ({
       } else {
         setCoverUrl(payload.coverUrl ?? '')
       }
+      return true
     } catch (error) {
       setMediaError(
         error instanceof Error ? error.message : 'Не удалось загрузить изображение.'
       )
+      return false
     } finally {
       if (kind === 'avatar') {
         setIsAvatarUploading(false)
@@ -1787,7 +1824,18 @@ export const ProProfileScreen = ({
     }
   }
 
-  const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const openMediaCropper = async (kind: CropperKind, file: File) => {
+    setMediaError('')
+    setIsAvatarActionsOpen(false)
+    try {
+      const dataUrl = await readImageFileAsync(file)
+      setCropperState({ kind, src: dataUrl })
+    } catch (error) {
+      setMediaError('Не удалось прочитать файл.')
+    }
+  }
+
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     setMediaError('')
@@ -1796,16 +1844,16 @@ export const ProProfileScreen = ({
       event.target.value = ''
       return
     }
-    if (file.size > MAX_MEDIA_BYTES) {
-      setMediaError('Файл слишком большой. Максимум 3 МБ.')
+    if (file.size > MAX_MEDIA_INPUT_BYTES) {
+      setMediaError('Файл слишком большой. Максимум 12 МБ.')
       event.target.value = ''
       return
     }
-    readImageFile(file, (dataUrl) => uploadMedia('avatar', dataUrl))
+    await openMediaCropper('avatar', file)
     event.target.value = ''
   }
 
-  const handleCoverChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleCoverChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     setMediaError('')
@@ -1814,22 +1862,31 @@ export const ProProfileScreen = ({
       event.target.value = ''
       return
     }
-    if (file.size > MAX_MEDIA_BYTES) {
-      setMediaError('Файл слишком большой. Максимум 3 МБ.')
+    if (file.size > MAX_MEDIA_INPUT_BYTES) {
+      setMediaError('Файл слишком большой. Максимум 12 МБ.')
       event.target.value = ''
       return
     }
-    readImageFile(file, (dataUrl) => uploadMedia('cover', dataUrl))
+    await openMediaCropper('cover', file)
     event.target.value = ''
+  }
+
+  const handleCropperConfirm = async (dataUrl: string) => {
+    if (!cropperState) return false
+    const ok = await uploadMedia(cropperState.kind, dataUrl)
+    if (ok) {
+      setCropperState(null)
+    }
+    return ok
   }
 
   const handleAvatarSelect = () => {
-    if (isAvatarUploading) return
+    if (isAvatarUploading || cropperState) return
     avatarInputRef.current?.click()
   }
 
   const handleCoverSelect = () => {
-    if (isCoverUploading) return
+    if (isCoverUploading || cropperState) return
     coverInputRef.current?.click()
   }
 
@@ -3976,6 +4033,18 @@ export const ProProfileScreen = ({
             </button>
           </div>
         </div>
+      )}
+
+      {cropperState && (
+        <MediaCropper
+          src={cropperState.src}
+          kind={cropperState.kind}
+          maxBytes={MAX_MEDIA_BYTES}
+          isBusy={isCropperUploading}
+          error={mediaError}
+          onCancel={closeCropper}
+          onConfirm={handleCropperConfirm}
+        />
       )}
 
       {editingSection && (
