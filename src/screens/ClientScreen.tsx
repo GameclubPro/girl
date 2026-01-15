@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconChat,
   IconHome,
@@ -41,6 +41,28 @@ const shuffleItems = <T,>(items: T[]) => {
   return result
 }
 
+const parseLength = (value: string) => {
+  const parsed = Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const buildShowcaseUrl = (url: string, width: number) => {
+  if (!url || url.startsWith('data:')) return url
+  const [base, hash] = url.split('#')
+  const [path, query = ''] = base.split('?')
+  const params = new URLSearchParams(query)
+  params.set('w', String(width))
+  const next = `${path}?${params.toString()}`
+  return hash ? `${next}#${hash}` : next
+}
+
+const buildShowcaseSrcSet = (url: string, widths: number[] | null) => {
+  if (!widths || widths.length === 0 || url.startsWith('data:')) {
+    return undefined
+  }
+  return widths.map((width) => `${buildShowcaseUrl(url, width)} ${width}w`).join(', ')
+}
+
 export const ClientScreen = ({
   apiBase,
   userId,
@@ -79,6 +101,8 @@ export const ClientScreen = ({
     null
   )
   const [activeStoryIndex, setActiveStoryIndex] = useState(0)
+  const showcaseGalleryRef = useRef<HTMLDivElement | null>(null)
+  const [showcaseTileWidth, setShowcaseTileWidth] = useState<number | null>(null)
   const requestCategoryLabel =
     (requestCategoryId ? categoryLabelOverrides[requestCategoryId] : '') ??
     categoryItems.find((item) => item.id === requestCategoryId)?.label ??
@@ -160,6 +184,31 @@ export const ClientScreen = ({
     }
   }, [apiBase, userId])
 
+  useEffect(() => {
+    const gallery = showcaseGalleryRef.current
+    if (!gallery || typeof ResizeObserver === 'undefined') return
+
+    const updateSize = () => {
+      const rect = gallery.getBoundingClientRect()
+      if (!rect.width) return
+      const styles = window.getComputedStyle(gallery)
+      const paddingX =
+        parseLength(styles.paddingLeft) + parseLength(styles.paddingRight)
+      const borderX =
+        parseLength(styles.borderLeftWidth) + parseLength(styles.borderRightWidth)
+      const columnGap = parseLength(styles.columnGap)
+      const gapValue = columnGap > 0 ? columnGap : parseLength(styles.gap)
+      const contentWidth = rect.width - paddingX - borderX
+      const next = Math.max(1, Math.round((contentWidth - gapValue) / 2))
+      setShowcaseTileWidth((current) => (current === next ? current : next))
+    }
+
+    updateSize()
+    const observer = new ResizeObserver(() => updateSize())
+    observer.observe(gallery)
+    return () => observer.disconnect()
+  }, [])
+
   const showcaseItems = useMemo<ShowcaseMedia[]>(() => {
     const pool = activeCategoryId
       ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
@@ -190,6 +239,17 @@ export const ClientScreen = ({
       return fallback ?? shuffled[index % shuffled.length]
     })
   }, [activeCategoryId, showcasePool])
+
+  const showcaseResolutions = useMemo(() => {
+    if (!showcaseTileWidth) return null
+    const base = Math.max(1, Math.round(showcaseTileWidth))
+    return [base, base * 2, base * 3]
+  }, [showcaseTileWidth])
+
+  const showcaseSizes = showcaseTileWidth ? `${showcaseTileWidth}px` : undefined
+  const showcaseTileHeight = showcaseTileWidth
+    ? Math.round(showcaseTileWidth * 0.75)
+    : undefined
 
   const formatStoryRole = (categories: string[] | undefined) => {
     const primary = categories?.[0]
@@ -261,7 +321,11 @@ export const ClientScreen = ({
                 Смотреть &gt;
               </button>
             </div>
-            <div className="client-showcase-gallery" aria-label="Витрина работ">
+            <div
+              className="client-showcase-gallery"
+              ref={showcaseGalleryRef}
+              aria-label="Витрина работ"
+            >
               {showcaseItems.length > 0 ? (
                 showcaseItems.map((item, index) => (
                   <span
@@ -273,6 +337,11 @@ export const ClientScreen = ({
                       src={item.url}
                       alt=""
                       loading="lazy"
+                      decoding="async"
+                      srcSet={buildShowcaseSrcSet(item.url, showcaseResolutions)}
+                      sizes={showcaseSizes}
+                      width={showcaseTileWidth ?? undefined}
+                      height={showcaseTileHeight ?? undefined}
                       style={{
                         objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
                       }}
