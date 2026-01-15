@@ -81,7 +81,7 @@ const formatReviewCount = (value: number) =>
 const formatCertificateCount = (value: number) =>
   formatCount(value, 'сертификат', 'сертификата', 'сертификатов')
 
-const CERTIFICATE_RATIO_MIN = 3 / 4
+const CERTIFICATE_RATIO_MIN = 4 / 5
 const CERTIFICATE_RATIO_MAX = 4 / 3
 const clampCertificateRatio = (value: number) =>
   Math.min(CERTIFICATE_RATIO_MAX, Math.max(CERTIFICATE_RATIO_MIN, value))
