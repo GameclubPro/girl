@@ -204,6 +204,7 @@ const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
 }
 
 const PORTFOLIO_PREVIEW_LIMIT = 4
+const CERTIFICATE_PREVIEW_LIMIT = 3
 
 type MasterProfileTabId = 'overview' | 'portfolio' | 'schedule' | 'reviews'
 
@@ -231,6 +232,7 @@ export const ClientMasterProfileScreen = ({
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
   const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
+  const [isCertificatesExpanded, setIsCertificatesExpanded] = useState(false)
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
     number | null
   >(null)
@@ -345,7 +347,9 @@ export const ClientMasterProfileScreen = ({
 
   useEffect(() => {
     setIsPortfolioExpanded(false)
+    setIsCertificatesExpanded(false)
     setPortfolioLightboxIndex(null)
+    setCertificateLightboxIndex(null)
     setIsScheduleInfoOpen(false)
     setActiveTab('overview')
   }, [masterId])
@@ -562,6 +566,19 @@ export const ClientMasterProfileScreen = ({
   const certificateCount = certificateItems.length
   const certificateCountLabel =
     certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
+  const hasCertificatesOverflow = certificateCount > CERTIFICATE_PREVIEW_LIMIT
+  const isCertificatesExpandedView = hasCertificatesOverflow && isCertificatesExpanded
+  const isCertificatesCollapsed = hasCertificatesOverflow && !isCertificatesExpanded
+  const visibleCertificateItems = isCertificatesCollapsed
+    ? certificateItems.slice(0, CERTIFICATE_PREVIEW_LIMIT)
+    : certificateItems
+  const remainingCertificateCount = hasCertificatesOverflow
+    ? certificateCount - CERTIFICATE_PREVIEW_LIMIT
+    : 0
+  const remainingCertificateLabel =
+    remainingCertificateCount > 0 ? formatCertificateCount(remainingCertificateCount) : ''
+  const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Все сертификаты'
+  const certificatesListId = `client-master-certificates-list-${masterId}`
   const handleCertificateImageLoad = (
     certificateId: string,
     image: HTMLImageElement
@@ -880,11 +897,34 @@ export const ClientMasterProfileScreen = ({
                         <span className="pro-profile-certificates-count">
                           {certificateCountLabel}
                         </span>
+                        {hasCertificatesOverflow && (
+                          <button
+                            className="pro-profile-certificates-action is-toggle"
+                            type="button"
+                            onClick={() =>
+                              setIsCertificatesExpanded((current) => !current)
+                            }
+                            aria-expanded={isCertificatesExpanded}
+                            aria-controls={certificatesListId}
+                          >
+                            {certificatesToggleLabel}
+                          </button>
+                        )}
                       </div>
                     </div>
                     {certificateItems.length > 0 ? (
-                      <div className="pro-profile-certificates-list" role="list">
-                        {certificateItems.map((certificate, index) => {
+                      <div
+                        className={`pro-profile-certificates-list${
+                          isCertificatesExpandedView
+                            ? ' is-expanded'
+                            : isCertificatesCollapsed
+                              ? ' is-collapsed'
+                              : ''
+                        }`}
+                        role="list"
+                        id={certificatesListId}
+                      >
+                        {visibleCertificateItems.map((certificate, index) => {
                           const meta = buildCertificateMeta(certificate)
                           const title = certificate.title?.trim() || 'Сертификат'
                           const certificateStyle = certificateRatios[certificate.id]
@@ -938,6 +978,22 @@ export const ClientMasterProfileScreen = ({
                             </button>
                           )
                         })}
+                        {isCertificatesCollapsed && remainingCertificateCount > 0 && (
+                          <button
+                            className="pro-profile-certificate-card is-more"
+                            type="button"
+                            onClick={() => setIsCertificatesExpanded(true)}
+                            role="listitem"
+                            aria-label={`Показать еще ${remainingCertificateLabel}`}
+                          >
+                            <span className="pro-profile-certificate-more-count">
+                              +{remainingCertificateCount}
+                            </span>
+                            <span className="pro-profile-certificate-more-label">
+                              Еще {remainingCertificateLabel}
+                            </span>
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="pro-profile-certificates-empty">
