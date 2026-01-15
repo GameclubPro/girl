@@ -230,10 +230,10 @@ export const ClientScreen = ({
 
   return (
     <div className="screen screen--client">
+      <header className="client-topbar client-topbar--floating">
+        <div className="client-brand">KIVEN</div>
+      </header>
       <div className="client-shell">
-        <header className="client-topbar">
-          <div className="client-brand">KIVEN</div>
-        </header>
         {activeCategoryId && activeCategoryLabel && (
           <button
             className="client-category-indicator"

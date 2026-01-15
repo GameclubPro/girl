@@ -22,8 +22,8 @@
 .screen--client {
   background: var(--surface);
   --client-pad-x: 18px;
-  --client-top-offset: -12px;
-  padding: calc(6px + var(--safe-top) + var(--tg-top-offset) + var(--client-top-offset))
+  --client-top-offset: 6px;
+  padding: calc(10px + var(--safe-top) + var(--tg-top-offset) + var(--client-top-offset))
     var(--client-pad-x)
     calc(120px + var(--safe-bottom));
 }
@@ -14212,6 +14212,15 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 12px;
+}
+
+.client-topbar--floating {
+  position: fixed;
+  top: calc(var(--safe-top) + var(--tg-top-offset) + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  z-index: 12;
 }
 
 .client-brand {
