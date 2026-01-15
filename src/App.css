@@ -7934,28 +7934,29 @@
   align-items: stretch;
   justify-content: start;
   align-content: start;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  padding-bottom: 0;
+  pointer-events: none;
+  transition:
+    max-height 0.28s ease,
+    opacity 0.2s ease,
+    transform 0.28s ease;
 }
 
 .pro-profile-certificates-list.is-expanded {
-  grid-auto-flow: row;
-  grid-auto-columns: auto;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  overflow: visible;
-  padding-bottom: 0;
-  scroll-snap-type: none;
-  animation: certificates-expand 0.25s ease;
-}
-
-.pro-profile-certificates-list.is-expanded .pro-profile-certificate-card {
-  scroll-snap-align: unset;
-}
-
-.pro-profile-certificates-list.is-collapsed {
+  max-height: 260px;
+  opacity: 1;
+  transform: translateY(0);
+  padding-top: 2px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  pointer-events: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
   -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 92%, transparent 100%);
   mask-image: linear-gradient(90deg, #000 0%, #000 92%, transparent 100%);
 }
@@ -7982,26 +7983,6 @@
   cursor: pointer;
   box-shadow: 0 10px 14px rgba(var(--shadow-rgb), 0.1);
   scroll-snap-align: start;
-}
-
-.pro-profile-certificate-card.is-more {
-  border-style: dashed;
-  border-color: rgba(var(--accent-rgb), 0.35);
-  background: linear-gradient(
-    160deg,
-    rgba(var(--accent-rgb), 0.12),
-    rgba(var(--paper-rgb), 0.98)
-  );
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 6px;
-  padding: 10px;
-  box-shadow:
-    0 10px 14px rgba(var(--accent-rgb), 0.12),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
 }
 
 .pro-profile-certificate-card:active {
@@ -8037,20 +8018,6 @@
   color: var(--pro-muted);
 }
 
-.pro-profile-certificate-more-count {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--accent-strong);
-  line-height: 1;
-}
-
-.pro-profile-certificate-more-label {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--pro-muted);
-  line-height: 1.3;
-}
-
 .pro-profile-certificate-info {
   display: flex;
   flex-direction: column;
@@ -8077,20 +8044,9 @@
   text-overflow: ellipsis;
 }
 
-@keyframes certificates-expand {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .pro-profile-certificates-list.is-expanded {
-    animation: none;
+  .pro-profile-certificates-list {
+    transition: none;
   }
 }
 
@@ -8100,20 +8056,8 @@
     gap: 6px;
   }
 
-  .pro-profile-certificates-list.is-expanded {
-    gap: 8px;
-  }
-
   .pro-profile-certificate-card {
     padding: 5px;
-  }
-
-  .pro-profile-certificate-more-count {
-    font-size: 16px;
-  }
-
-  .pro-profile-certificate-more-label {
-    font-size: 8px;
   }
 
   .pro-profile-certificate-title {

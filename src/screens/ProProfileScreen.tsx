@@ -265,7 +265,6 @@ const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const MAX_PORTFOLIO_ITEMS = 30
 const MAX_SHOWCASE_ITEMS = 6
 const MAX_CERTIFICATES = 12
-const CERTIFICATE_PREVIEW_LIMIT = 3
 const PORTFOLIO_ROW_LIMIT = 4
 const FOLLOWERS_PAGE_SIZE = 24
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
@@ -566,18 +565,7 @@ export const ProProfileScreen = ({
   const certificateCount = certificateItems.length
   const certificateCountLabel =
     certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
-  const hasCertificatesOverflow = certificateCount > CERTIFICATE_PREVIEW_LIMIT
-  const isCertificatesExpandedView = hasCertificatesOverflow && isCertificatesExpanded
-  const isCertificatesCollapsed = hasCertificatesOverflow && !isCertificatesExpanded
-  const visibleCertificateItems = isCertificatesCollapsed
-    ? certificateItems.slice(0, CERTIFICATE_PREVIEW_LIMIT)
-    : certificateItems
-  const remainingCertificateCount = hasCertificatesOverflow
-    ? certificateCount - CERTIFICATE_PREVIEW_LIMIT
-    : 0
-  const remainingCertificateLabel =
-    remainingCertificateCount > 0 ? formatCertificateCount(remainingCertificateCount) : ''
-  const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Все сертификаты'
+  const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Показать'
   const handleCertificateImageLoad = (
     certificateId: string,
     image: HTMLImageElement
@@ -2738,7 +2726,7 @@ export const ProProfileScreen = ({
                   <span className="pro-profile-certificates-count">
                     {certificateCountLabel}
                   </span>
-                  {hasCertificatesOverflow && (
+                  {certificateItems.length > 0 && (
                     <button
                       className="pro-profile-certificates-action is-toggle"
                       type="button"
@@ -2761,16 +2749,13 @@ export const ProProfileScreen = ({
               {certificateItems.length > 0 ? (
                 <div
                   className={`pro-profile-certificates-list${
-                    isCertificatesExpandedView
-                      ? ' is-expanded'
-                      : isCertificatesCollapsed
-                        ? ' is-collapsed'
-                        : ''
+                    isCertificatesExpanded ? ' is-expanded' : ''
                   }`}
                   role="list"
                   id={certificatesListId}
+                  aria-hidden={!isCertificatesExpanded}
                 >
-                  {visibleCertificateItems.map((certificate, index) => {
+                  {certificateItems.map((certificate, index) => {
                     const meta = buildCertificateMeta(certificate)
                     const title = certificate.title?.trim() || 'Сертификат'
                     const certificateStyle = certificateRatios[certificate.id]
@@ -2824,22 +2809,6 @@ export const ProProfileScreen = ({
                       </button>
                     )
                   })}
-                  {isCertificatesCollapsed && remainingCertificateCount > 0 && (
-                    <button
-                      className="pro-profile-certificate-card is-more"
-                      type="button"
-                      onClick={() => setIsCertificatesExpanded(true)}
-                      role="listitem"
-                      aria-label={`Показать еще ${remainingCertificateLabel}`}
-                    >
-                      <span className="pro-profile-certificate-more-count">
-                        +{remainingCertificateCount}
-                      </span>
-                      <span className="pro-profile-certificate-more-label">
-                        Еще {remainingCertificateLabel}
-                      </span>
-                    </button>
-                  )}
                 </div>
               ) : (
                 <div className="pro-profile-certificates-empty">
