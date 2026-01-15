@@ -25,15 +25,6 @@
   --client-top-offset: 6px;
   --client-section-gap: 10px;
   --client-section-stack-gap: 12px;
-  --client-section-pad: 14px;
-  --client-section-radius: 22px;
-  --client-section-border: rgba(var(--shadow-rgb), 0.12);
-  --client-section-surface: linear-gradient(
-    150deg,
-    rgba(var(--paper-rgb), 0.98) 0%,
-    rgba(var(--surface-muted-rgb), 0.92) 100%
-  );
-  --client-section-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.12);
   padding: calc(10px + var(--safe-top) + var(--tg-top-offset) + var(--client-top-offset))
     var(--client-pad-x)
     calc(120px + var(--safe-bottom));
@@ -14362,23 +14353,6 @@ h2 {
   gap: var(--client-section-gap);
   min-width: 0;
   position: relative;
-}
-
-.client-section--panel {
-  padding: var(--client-section-pad);
-  border-radius: var(--client-section-radius);
-  background: var(--client-section-surface);
-  border: 1px solid var(--client-section-border);
-  box-shadow: var(--client-section-shadow);
-}
-
-.client-section--panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
-  pointer-events: none;
 }
 
 .client-category-bar {
