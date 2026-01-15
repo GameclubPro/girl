@@ -390,6 +390,27 @@ export const IconShowcase = () => (
   </svg>
 )
 
+export const IconStories = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="12"
+      r="7.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <circle
+      cx="12"
+      cy="12"
+      r="3.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+  </svg>
+)
+
 export const IconCity = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <rect

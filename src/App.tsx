@@ -20,6 +20,7 @@ import { ProClientsScreen } from './screens/ProClientsScreen'
 import { ProProfileScreen } from './screens/ProProfileScreen'
 import { ProRequestsScreen } from './screens/ProRequestsScreen'
 import { ProRemindersScreen } from './screens/ProRemindersScreen'
+import { ProStoriesScreen } from './screens/ProStoriesScreen'
 import { RequestScreen } from './screens/RequestScreen'
 import { StartScreen } from './screens/StartScreen'
 import { categoryItems } from './data/clientData'
@@ -110,6 +111,7 @@ function App() {
     | 'pro-clients'
     | 'pro-campaigns'
     | 'pro-reminders'
+    | 'pro-stories'
     | 'pro-requests'
   >('start')
   const [role, setRole] = useState<Role>('client')
@@ -646,7 +648,8 @@ function App() {
       view === 'pro-analytics' ||
       view === 'pro-clients' ||
       view === 'pro-campaigns' ||
-      view === 'pro-reminders'
+      view === 'pro-reminders' ||
+      view === 'pro-stories'
 
     const handleBack = () => {
       switch (view) {
@@ -699,6 +702,7 @@ function App() {
         case 'pro-clients':
         case 'pro-campaigns':
         case 'pro-reminders':
+        case 'pro-stories':
           setView('pro-cabinet')
           break
         case 'pro-cabinet':
@@ -919,6 +923,7 @@ function App() {
     return (
       <ClientScreen
         apiBase={apiBase}
+        userId={userId}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onViewShowcase={() => setView('client-gallery')}
@@ -932,6 +937,10 @@ function App() {
         }}
         onViewRequests={(tab) => openRequests(tab)}
         onViewProfile={() => setView('client-profile')}
+        onViewMasterProfile={(masterId) => {
+          setSelectedMasterId(masterId)
+          setView('client-master-profile')
+        }}
       />
     )
   }
@@ -1330,6 +1339,20 @@ function App() {
     )
   }
 
+  if (view === 'pro-stories') {
+    return (
+      <ProStoriesScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        onBack={() => setView('pro-cabinet')}
+        onViewRequests={() => openProRequests()}
+        onViewChats={openChatList}
+        onViewProfile={() => openProProfile()}
+      />
+    )
+  }
+
   if (view === 'pro-cabinet') {
     return (
       <ProCabinetScreen
@@ -1346,6 +1369,7 @@ function App() {
         onOpenShowcase={() =>
           openProProfile({ section: 'portfolio', portfolioView: 'showcase' })
         }
+        onOpenStories={() => setView('pro-stories')}
       />
     )
   }

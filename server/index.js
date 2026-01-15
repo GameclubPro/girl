@@ -14,6 +14,11 @@ const port = Number(process.env.API_PORT ?? process.env.PORT ?? 4000)
 const corsOrigin = process.env.CORS_ORIGIN ?? '*'
 const uploadsRoot = path.join(process.cwd(), 'uploads')
 const MAX_UPLOAD_BYTES = 6 * 1024 * 1024
+const STORY_DEFAULT_TTL_HOURS = 24
+const STORY_MIN_TTL_HOURS = 1
+const STORY_MAX_TTL_HOURS = 72
+const STORY_MAX_ACTIVE = 30
+const STORY_CAPTION_LIMIT = 200
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const REQUEST_INITIAL_BATCH_SIZE = 15
 const REQUEST_EXPANDED_BATCH_SIZE = 20
@@ -63,6 +68,15 @@ const normalizeText = (value) => {
   return value.trim()
 }
 
+const normalizeStoryCaption = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  if (normalized.length > STORY_CAPTION_LIMIT) {
+    return normalized.slice(0, STORY_CAPTION_LIMIT)
+  }
+  return normalized
+}
+
 const normalizeStringArray = (value) => {
   if (!Array.isArray(value)) return []
   return value
@@ -78,6 +92,12 @@ const parseOptionalInt = (value) => {
   if (!normalized) return null
   const parsed = Number(normalized)
   return Number.isInteger(parsed) ? parsed : null
+}
+
+const clampStoryHours = (value) => {
+  const parsed = parseOptionalInt(value)
+  if (!parsed) return STORY_DEFAULT_TTL_HOURS
+  return Math.min(STORY_MAX_TTL_HOURS, Math.max(STORY_MIN_TTL_HOURS, parsed))
 }
 
 const parseOptionalFloat = (value) => {
@@ -313,6 +333,14 @@ const buildCertificateUploadPath = (safeUserId, mime) => {
   return { relativePath, absolutePath }
 }
 
+const buildStoryUploadPath = (safeUserId, mime) => {
+  const ext = getImageExtension(mime)
+  const filename = `story-${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`
+  const relativePath = path.posix.join('masters', safeUserId, 'stories', filename)
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  return { relativePath, absolutePath }
+}
+
 const normalizeUploadPath = (value) => {
   const normalized = normalizeText(value)
   if (!normalized) return ''
@@ -401,6 +429,15 @@ const isSafeRequestUploadPath = (safeUserId, relativePath) => {
   if (!relativePath.startsWith(prefix)) return false
   const absolutePath = path.join(uploadsRoot, relativePath)
   const safeBase = path.join(uploadsRoot, 'requests', safeUserId)
+  return path.normalize(absolutePath).startsWith(safeBase)
+}
+
+const isSafeStoryUploadPath = (safeUserId, relativePath) => {
+  if (!relativePath || relativePath.includes('..')) return false
+  const prefix = `masters/${safeUserId}/stories/`
+  if (!relativePath.startsWith(prefix)) return false
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  const safeBase = path.join(uploadsRoot, 'masters', safeUserId, 'stories')
   return path.normalize(absolutePath).startsWith(safeBase)
 }
 
@@ -1451,6 +1488,42 @@ const ensureSchema = async () => {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS master_profile_views_date_idx
     ON master_profile_views (master_id, view_date);
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_stories (
+      id SERIAL PRIMARY KEY,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      media_path TEXT NOT NULL,
+      media_type TEXT NOT NULL DEFAULT 'image',
+      caption TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_stories_master_idx
+    ON master_stories (master_id, created_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_stories_expiry_idx
+    ON master_stories (expires_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_story_views (
+      story_id INTEGER NOT NULL REFERENCES master_stories(id) ON DELETE CASCADE,
+      viewer_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (story_id, viewer_id)
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_story_views_viewer_idx
+    ON master_story_views (viewer_id);
   `)
 
   await pool.query(`
@@ -2643,6 +2716,324 @@ app.get('/api/masters/:userId/followers', async (req, res) => {
   }
 })
 
+app.get('/api/masters/:userId/stories', async (req, res) => {
+  const normalizedUserId = normalizeText(req.params.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          s.id,
+          s.media_path AS "mediaPath",
+          s.media_type AS "mediaType",
+          s.caption,
+          s.created_at AS "createdAt",
+          s.expires_at AS "expiresAt",
+          COUNT(v.viewer_id)::int AS "viewsCount"
+        FROM master_stories s
+        LEFT JOIN master_story_views v ON v.story_id = s.id
+        WHERE s.master_id = $1
+          AND s.expires_at > NOW()
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+      `,
+      [normalizedUserId]
+    )
+
+    const stories = result.rows.map((row) => ({
+      id: row.id,
+      mediaUrl: resolvePublicUrl(req, row.mediaPath),
+      mediaType: row.mediaType,
+      caption: row.caption ?? null,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+      viewsCount: Number(row.viewsCount) || 0,
+    }))
+
+    res.json(stories)
+  } catch (error) {
+    console.error('GET /api/masters/:userId/stories failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/:userId/stories', async (req, res) => {
+  const normalizedUserId = normalizeText(req.params.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const mediaUrl = normalizeText(
+    req.body?.mediaUrl ?? req.body?.url ?? req.body?.mediaPath
+  )
+  if (!mediaUrl) {
+    res.status(400).json({ error: 'media_required' })
+    return
+  }
+  const normalizedMediaPath = normalizeUploadPath(mediaUrl)
+  if (!normalizedMediaPath) {
+    res.status(400).json({ error: 'media_required' })
+    return
+  }
+  const safeUserId = sanitizePathSegment(normalizedUserId)
+  if (!isSafeStoryUploadPath(safeUserId, normalizedMediaPath)) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+
+  const caption = normalizeStoryCaption(req.body?.caption)
+  const expiresInHours = clampStoryHours(req.body?.expiresInHours)
+  const expiresAt = addMinutes(new Date(), expiresInHours * 60)
+
+  try {
+    const profileResult = await pool.query(
+      `
+        SELECT user_id
+        FROM master_profiles
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    if (profileResult.rows.length === 0) {
+      res.status(404).json({ error: 'profile_not_found' })
+      return
+    }
+
+    const countResult = await pool.query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM master_stories
+        WHERE master_id = $1
+          AND expires_at > NOW()
+      `,
+      [normalizedUserId]
+    )
+    const total = countResult.rows[0]?.total ?? 0
+    if (total >= STORY_MAX_ACTIVE) {
+      res.status(409).json({ error: 'story_limit_reached' })
+      return
+    }
+
+    const insertResult = await pool.query(
+      `
+        INSERT INTO master_stories (master_id, media_path, media_type, caption, expires_at)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, created_at AS "createdAt", expires_at AS "expiresAt"
+      `,
+      [normalizedUserId, normalizedMediaPath, 'image', caption, expiresAt]
+    )
+
+    const row = insertResult.rows[0]
+    res.json({
+      ok: true,
+      id: row?.id ?? null,
+      createdAt: row?.createdAt ?? null,
+      expiresAt: row?.expiresAt ?? null,
+    })
+  } catch (error) {
+    console.error('POST /api/masters/:userId/stories failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.delete('/api/masters/:userId/stories/:storyId', async (req, res) => {
+  const normalizedUserId = normalizeText(req.params.userId)
+  const storyId = parseOptionalInt(req.params.storyId)
+  if (!normalizedUserId || !storyId) {
+    res.status(400).json({ error: 'storyId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        DELETE FROM master_stories
+        WHERE id = $1 AND master_id = $2
+        RETURNING media_path AS "mediaPath"
+      `,
+      [storyId, normalizedUserId]
+    )
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const mediaPath = normalizeUploadPath(result.rows[0]?.mediaPath)
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    if (mediaPath && isSafeStoryUploadPath(safeUserId, mediaPath)) {
+      const absolutePath = path.join(uploadsRoot, mediaPath)
+      fs.unlink(absolutePath).catch(() => {})
+    }
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('DELETE /api/masters/:userId/stories/:storyId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/stories', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          s.id,
+          s.master_id AS "masterId",
+          s.media_path AS "mediaPath",
+          s.media_type AS "mediaType",
+          s.caption,
+          s.created_at AS "createdAt",
+          s.expires_at AS "expiresAt",
+          mp.display_name AS "displayName",
+          mp.avatar_path AS "avatarPath",
+          mp.categories,
+          mp.updated_at AS "updatedAt",
+          CASE WHEN v.story_id IS NULL THEN false ELSE true END AS "isSeen"
+        FROM master_followers mf
+        JOIN master_stories s ON s.master_id = mf.master_id
+        LEFT JOIN master_profiles mp ON mp.user_id = s.master_id
+        LEFT JOIN master_story_views v
+          ON v.story_id = s.id AND v.viewer_id = $1
+        WHERE mf.follower_id = $1
+          AND s.expires_at > NOW()
+        ORDER BY s.created_at DESC
+      `,
+      [normalizedUserId]
+    )
+
+    const grouped = new Map()
+    result.rows.forEach((row) => {
+      const masterId = row.masterId
+      if (!masterId) return
+      const existing = grouped.get(masterId)
+      const item = {
+        id: row.id,
+        mediaUrl: resolvePublicUrl(req, row.mediaPath),
+        mediaType: row.mediaType,
+        caption: row.caption ?? null,
+        createdAt: row.createdAt,
+        expiresAt: row.expiresAt,
+        isSeen: Boolean(row.isSeen),
+      }
+      if (!existing) {
+        grouped.set(masterId, {
+          masterId,
+          masterName: row.displayName?.trim() || 'Мастер',
+          masterAvatarUrl: buildPublicUrl(req, row.avatarPath),
+          categories: Array.isArray(row.categories) ? row.categories : [],
+          updatedAt: row.updatedAt ?? null,
+          latestStoryAt: row.createdAt,
+          items: [item],
+        })
+      } else {
+        existing.items.push(item)
+        if (
+          row.createdAt &&
+          (!existing.latestStoryAt ||
+            new Date(row.createdAt).getTime() >
+              new Date(existing.latestStoryAt).getTime())
+        ) {
+          existing.latestStoryAt = row.createdAt
+        }
+      }
+    })
+
+    const payload = Array.from(grouped.values()).map((group) => {
+      const sortedItems = group.items
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
+      const unseenCount = sortedItems.filter((item) => !item.isSeen).length
+      return {
+        ...group,
+        items: sortedItems,
+        unseenCount,
+        hasUnseen: unseenCount > 0,
+      }
+    })
+
+    payload.sort((a, b) => {
+      if (a.hasUnseen !== b.hasUnseen) {
+        return a.hasUnseen ? -1 : 1
+      }
+      return (
+        new Date(b.latestStoryAt ?? 0).getTime() -
+        new Date(a.latestStoryAt ?? 0).getTime()
+      )
+    })
+
+    res.json(payload)
+  } catch (error) {
+    console.error('GET /api/stories failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/stories/:storyId/view', async (req, res) => {
+  const storyId = parseOptionalInt(req.params.storyId)
+  const viewerId = normalizeText(req.body?.userId ?? req.body?.viewerId)
+  if (!storyId || !viewerId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const storyResult = await pool.query(
+      `
+        SELECT master_id AS "masterId", expires_at AS "expiresAt"
+        FROM master_stories
+        WHERE id = $1
+      `,
+      [storyId]
+    )
+
+    if (storyResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    const story = storyResult.rows[0]
+    if (story.masterId === viewerId) {
+      res.json({ ok: true, skipped: 'self' })
+      return
+    }
+    const expiresAt = story.expiresAt ? new Date(story.expiresAt) : null
+    if (expiresAt && expiresAt.getTime() <= Date.now()) {
+      res.json({ ok: true, skipped: 'expired' })
+      return
+    }
+
+    await pool.query(
+      `
+        INSERT INTO master_story_views (story_id, viewer_id)
+        VALUES ($1, $2)
+        ON CONFLICT DO NOTHING
+      `,
+      [storyId, viewerId]
+    )
+
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/stories/:storyId/view failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.post('/api/masters/media', async (req, res) => {
   const { userId, kind, dataUrl } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
@@ -2765,6 +3156,45 @@ app.post('/api/masters/portfolio', async (req, res) => {
     res.json({ ok: true, url: buildPublicUrl(req, relativePath), path: relativePath })
   } catch (error) {
     console.error('POST /api/masters/portfolio failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/stories/media', async (req, res) => {
+  const { userId, dataUrl } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  const parsed = parseImageDataUrl(dataUrl)
+  if (!parsed) {
+    res.status(400).json({ error: 'invalid_image' })
+    return
+  }
+
+  if (parsed.buffer.length > MAX_UPLOAD_BYTES) {
+    res.status(413).json({ error: 'image_too_large' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+
+    const safeUserId = sanitizePathSegment(normalizedUserId)
+    const { relativePath, absolutePath } = buildStoryUploadPath(
+      safeUserId,
+      parsed.mime
+    )
+
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true })
+    await fs.writeFile(absolutePath, parsed.buffer)
+
+    res.json({ ok: true, url: buildPublicUrl(req, relativePath), path: relativePath })
+  } catch (error) {
+    console.error('POST /api/masters/stories/media failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

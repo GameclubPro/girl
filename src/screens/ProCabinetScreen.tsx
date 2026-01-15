@@ -7,6 +7,7 @@ import {
   IconChat,
   IconDashboard,
   IconShowcase,
+  IconStories,
   IconUsers,
 } from '../components/icons'
 import { useProCabinetData, type ClientSummary } from '../hooks/useProCabinetData'
@@ -114,6 +115,7 @@ type ProCabinetScreenProps = {
   onOpenReminders: () => void
   onOpenCalendar: () => void
   onOpenShowcase: () => void
+  onOpenStories: () => void
 }
 
 export const ProCabinetScreen = ({
@@ -128,6 +130,7 @@ export const ProCabinetScreen = ({
   onOpenReminders,
   onOpenCalendar,
   onOpenShowcase,
+  onOpenStories,
 }: ProCabinetScreenProps) => {
   const { requestStats, bookingStats, bookings } = useProCabinetData(
     apiBase,
@@ -502,7 +505,33 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-campaigns animate delay-5"
+            className="pro-cabinet-nav-card is-stories animate delay-5"
+            type="button"
+            onClick={onOpenStories}
+          >
+            <div className="pro-cabinet-nav-head">
+              <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                <IconStories />
+              </span>
+              <div className="pro-cabinet-nav-info">
+                <span className="pro-cabinet-nav-kicker">Контент</span>
+                <span className="pro-cabinet-nav-title">Истории</span>
+                <span className="pro-cabinet-nav-subtitle">
+                  24 часа на показ
+                </span>
+              </div>
+            </div>
+            <div className="pro-cabinet-nav-preview">
+              <div className="pro-cabinet-nav-stories">
+                <span className="pro-cabinet-nav-stories-badge">NEW</span>
+                <p className="pro-cabinet-nav-stories-text">
+                  Делитесь работами и акциями в формате сторис.
+                </p>
+              </div>
+            </div>
+          </button>
+          <button
+            className="pro-cabinet-nav-card is-campaigns animate delay-6"
             type="button"
             onClick={onOpenCampaigns}
           >
@@ -544,7 +573,7 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-reminders animate delay-6"
+            className="pro-cabinet-nav-card is-reminders animate delay-7"
             type="button"
             onClick={onOpenReminders}
           >

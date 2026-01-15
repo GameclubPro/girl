@@ -6,8 +6,9 @@ import {
   IconUser,
   IconUsers,
 } from '../components/icons'
-import { categoryItems, popularItems, storyItems } from '../data/clientData'
-import type { MasterProfile } from '../types/app'
+import { StoryViewer } from '../components/StoryViewer'
+import { categoryItems, popularItems } from '../data/clientData'
+import type { MasterProfile, StoryGroup } from '../types/app'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
 const categoryLabelOverrides: Record<string, string> = {
@@ -42,6 +43,7 @@ const shuffleItems = <T,>(items: T[]) => {
 
 export const ClientScreen = ({
   apiBase,
+  userId,
   activeCategoryId,
   onCategoryChange,
   onViewShowcase,
@@ -50,8 +52,10 @@ export const ClientScreen = ({
   onCreateRequest,
   onViewRequests,
   onViewProfile,
+  onViewMasterProfile,
 }: {
   apiBase: string
+  userId: string
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onViewShowcase: () => void
@@ -60,6 +64,7 @@ export const ClientScreen = ({
   onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewProfile: () => void
+  onViewMasterProfile: (masterId: string) => void
 }) => {
   const activeCategoryLabel =
     (activeCategoryId ? categoryLabelOverrides[activeCategoryId] : '') ??
@@ -67,6 +72,13 @@ export const ClientScreen = ({
     ''
   const [requestCategoryId, setRequestCategoryId] = useState<string | null>(null)
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
+  const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([])
+  const [isStoriesLoading, setIsStoriesLoading] = useState(false)
+  const [storiesError, setStoriesError] = useState('')
+  const [activeStoryGroupIndex, setActiveStoryGroupIndex] = useState<number | null>(
+    null
+  )
+  const [activeStoryIndex, setActiveStoryIndex] = useState(0)
   const requestCategoryLabel =
     (requestCategoryId ? categoryLabelOverrides[requestCategoryId] : '') ??
     categoryItems.find((item) => item.id === requestCategoryId)?.label ??
@@ -116,6 +128,43 @@ export const ClientScreen = ({
     }
   }, [apiBase])
 
+  useEffect(() => {
+    let cancelled = false
+    if (!userId) return
+
+    const loadStories = async () => {
+      setIsStoriesLoading(true)
+      setStoriesError('')
+      try {
+        const response = await fetch(
+          `${apiBase}/api/stories?userId=${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load stories failed')
+        }
+        const data = (await response.json()) as StoryGroup[]
+        if (!cancelled) {
+          setStoryGroups(Array.isArray(data) ? data : [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStoriesError('Не удалось загрузить истории.')
+          setStoryGroups([])
+        }
+      } finally {
+        if (!cancelled) {
+          setIsStoriesLoading(false)
+        }
+      }
+    }
+
+    void loadStories()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
+
   const showcaseItems = useMemo(() => {
     const pool = activeCategoryId
       ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
@@ -146,6 +195,43 @@ export const ClientScreen = ({
       return fallback ?? shuffled[index % shuffled.length]
     })
   }, [activeCategoryId, showcasePool])
+
+  const formatStoryRole = (categories: string[] | undefined) => {
+    const primary = categories?.[0]
+    if (!primary) return 'Мастер'
+    return categoryLabelOverrides[primary] ??
+      categoryItems.find((item) => item.id === primary)?.label ??
+      'Мастер'
+  }
+
+  const handleStorySeen = async (storyId: number, masterId: string) => {
+    setStoryGroups((current) =>
+      current.map((group) => {
+        if (group.masterId !== masterId) return group
+        const items = group.items.map((item) =>
+          item.id === storyId ? { ...item, isSeen: true } : item
+        )
+        const unseenCount = items.filter((item) => !item.isSeen).length
+        return { ...group, items, unseenCount, hasUnseen: unseenCount > 0 }
+      })
+    )
+
+    try {
+      await fetch(`${apiBase}/api/stories/${storyId}/view`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+    } catch (error) {
+      // ignore view sync errors
+    }
+  }
+
+  const handleStoryAction = (masterId: string) => {
+    setActiveStoryGroupIndex(null)
+    setActiveStoryIndex(0)
+    onViewMasterProfile(masterId)
+  }
 
   return (
     <div className="screen screen--client">
@@ -209,17 +295,65 @@ export const ClientScreen = ({
           <div className="section-header">
             <h3>Сторис от мастеров</h3>
           </div>
-          <div className="client-stories" role="list">
-            {storyItems.map((story) => (
-              <article className="client-story-card" key={story.id} role="listitem">
-                <span className="client-story-avatar" aria-hidden="true">
-                  <img src={story.avatar} alt="" loading="lazy" />
-                </span>
-                <span className="client-story-name">{story.name}</span>
-                <span className="client-story-role">{story.specialty}</span>
-              </article>
-            ))}
-          </div>
+          {isStoriesLoading ? (
+            <div className="client-stories client-stories--skeleton" role="list">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div className="client-story-card is-skeleton" key={index} role="listitem">
+                  <span className="client-story-avatar" aria-hidden="true" />
+                  <span className="client-story-name" />
+                  <span className="client-story-role" />
+                </div>
+              ))}
+            </div>
+          ) : storyGroups.length > 0 ? (
+            <div className="client-stories" role="list">
+              {storyGroups.map((group, index) => {
+                const roleLabel = formatStoryRole(group.categories)
+                const unseenCount = group.unseenCount ?? 0
+                const hasUnseen = group.hasUnseen ?? unseenCount > 0
+                const firstUnseenIndex = group.items.findIndex((item) => !item.isSeen)
+                const startIndex = firstUnseenIndex >= 0 ? firstUnseenIndex : 0
+                const masterInitial = group.masterName.trim().slice(0, 1) || 'М'
+                return (
+                  <button
+                    className={`client-story-card${hasUnseen ? '' : ' is-seen'}`}
+                    key={group.masterId}
+                    role="listitem"
+                    type="button"
+                    onClick={() => {
+                      setActiveStoryIndex(startIndex)
+                      setActiveStoryGroupIndex(index)
+                    }}
+                    aria-label={`Истории мастера ${group.masterName}`}
+                  >
+                    <span className="client-story-ring" aria-hidden="true">
+                      <span className="client-story-avatar">
+                        {group.masterAvatarUrl ? (
+                          <img src={group.masterAvatarUrl} alt="" loading="lazy" />
+                        ) : (
+                          <span>{masterInitial}</span>
+                        )}
+                      </span>
+                    </span>
+                    <span className="client-story-name">{group.masterName}</span>
+                    <span className="client-story-role">{roleLabel}</span>
+                    {unseenCount > 1 && (
+                      <span className="client-story-badge" aria-hidden="true">
+                        +{Math.min(unseenCount - 1, 9)}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="client-stories-empty">
+              <p>{storiesError || 'Подпишитесь на мастеров, чтобы видеть их истории.'}</p>
+              <button className="client-stories-cta" type="button" onClick={onViewMasters}>
+                Открыть мастеров
+              </button>
+            </div>
+          )}
         </section>
 
         <section className="client-section">
@@ -347,6 +481,20 @@ export const ClientScreen = ({
           Профиль
         </button>
       </nav>
+      {activeStoryGroupIndex !== null && storyGroups[activeStoryGroupIndex] && (
+        <StoryViewer
+          groups={storyGroups}
+          initialGroupIndex={activeStoryGroupIndex}
+          initialStoryIndex={activeStoryIndex}
+          onClose={() => {
+            setActiveStoryGroupIndex(null)
+            setActiveStoryIndex(0)
+          }}
+          onSeen={handleStorySeen}
+          actionLabel="Профиль мастера"
+          onAction={handleStoryAction}
+        />
+      )}
     </div>
   )
 }

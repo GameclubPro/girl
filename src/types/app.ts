@@ -71,6 +71,29 @@ export type MasterProfile = {
   followersCount?: number | null
 }
 
+export type StoryItem = {
+  id: number
+  mediaUrl: string | null
+  mediaType: 'image' | 'video'
+  caption?: string | null
+  createdAt: string
+  expiresAt: string
+  isSeen?: boolean
+  viewsCount?: number
+}
+
+export type StoryGroup = {
+  masterId: string
+  masterName: string
+  masterAvatarUrl?: string | null
+  categories?: string[]
+  updatedAt?: string | null
+  latestStoryAt?: string | null
+  unseenCount?: number
+  hasUnseen?: boolean
+  items: StoryItem[]
+}
+
 export type MasterReview = {
   id: number
   rating: number
