@@ -1,4 +1,10 @@
-import type { PopularItem } from './data/clientData'
+// Draft: client-popular section (archived for later reuse).
+type PopularItem = {
+  id: string
+  image: string
+  label: string
+  categoryId: string
+}
 
 type ClientPopularDraftProps = {
   items: PopularItem[]

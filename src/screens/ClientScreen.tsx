@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   IconChat,
   IconHome,
@@ -7,8 +7,7 @@ import {
   IconUsers,
 } from '../components/icons'
 import { StoryViewer } from '../components/StoryViewer'
-import { categoryItems, popularItems } from '../data/clientData'
-import { ClientPopularDraft } from '../ClientPopularDraft'
+import { categoryItems } from '../data/clientData'
 import type { MasterProfile, StoryGroup } from '../types/app'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
@@ -84,11 +83,6 @@ export const ClientScreen = ({
     (requestCategoryId ? categoryLabelOverrides[requestCategoryId] : '') ??
     categoryItems.find((item) => item.id === requestCategoryId)?.label ??
     ''
-  const visiblePopularItems = useMemo(() => {
-    if (!activeCategoryId) return popularItems
-    return popularItems.filter((item) => item.categoryId === activeCategoryId)
-  }, [activeCategoryId])
-
   useEffect(() => {
     let cancelled = false
 
@@ -408,10 +402,6 @@ export const ClientScreen = ({
           </button>
         </section>
 
-        <ClientPopularDraft
-          items={visiblePopularItems}
-          onSelect={onCategoryChange}
-        />
       </div>
 
       <nav className="bottom-nav" aria-label="Навигация">

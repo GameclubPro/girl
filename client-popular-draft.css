@@ -1,0 +1,120 @@
+/* Draft styles for client-popular section. */
+.popular-section.is-draft .section-header {
+  gap: 10px;
+}
+
+.popular-draft-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--warning-rgb), 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--warning-rgb), 0.18),
+    rgba(var(--paper-rgb), 0.92)
+  );
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.popular-carousel {
+  width: 100vw;
+  margin: 0 calc(50% - 50vw);
+}
+
+.popular-track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 6px 18px 10px;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 18px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.popular-track::-webkit-scrollbar {
+  display: none;
+}
+
+.popular-empty {
+  margin: 0;
+  padding: 8px 18px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.popular-card {
+  --popular-text-height: clamp(56px, 14vw, 64px);
+  --popular-image-height: calc(var(--popular-text-height) * 1.08);
+  --popular-label-height: calc(var(--popular-text-height) * 0.945);
+  flex: 0 0 clamp(138px, 36.8vw, 184px);
+  border: 1px solid var(--border);
+  background: rgba(var(--paper-rgb), 0.75);
+  border-radius: 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.16);
+  cursor: pointer;
+  scroll-snap-align: start;
+  overflow: hidden;
+}
+
+.popular-media {
+  flex: 0 0 var(--popular-image-height);
+  width: 100%;
+  background: transparent;
+}
+
+.popular-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.popular-label {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--popular-label-height);
+  padding: 1px 6px;
+  background: linear-gradient(180deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
+  font-family: var(--font-popular);
+  font-size: clamp(14px, 4.1vw, 17px);
+  font-weight: 400;
+  font-synthesis: weight;
+  letter-spacing: 0.2px;
+  line-height: 1.1;
+  text-shadow:
+    -0.15px 0 currentColor,
+    0.15px 0 currentColor,
+    0 0.15px currentColor,
+    0 -0.15px currentColor;
+  word-break: break-word;
+  hyphens: auto;
+  text-wrap: balance;
+}
+
+.popular-label--short {
+  font-size: clamp(15px, 4.8vw, 19px);
+}
+
+@media (max-width: 420px) {
+  .popular-track {
+    padding: 6px 10px 10px;
+  }
+}
