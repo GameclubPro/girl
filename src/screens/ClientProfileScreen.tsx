@@ -170,6 +170,7 @@ export const ClientProfileScreen = ({
   onViewRequests,
   onViewChats,
   onCreateRequest,
+  onOpenSupport,
   onCreateBooking,
   onEditAddress,
   onViewMasterProfile,
