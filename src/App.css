@@ -2432,12 +2432,14 @@
 
 .pro-cabinet-nav-stories {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   padding: 10px 12px;
   border-radius: 16px;
   background: rgba(var(--tile-accent), 0.12);
   border: 1px solid rgba(var(--tile-accent), 0.18);
   color: var(--pro-ink);
+  align-items: center;
+  justify-items: start;
 }
 
 .pro-cabinet-nav-stories-badge {
@@ -2457,6 +2459,49 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--pro-muted);
+}
+
+.pro-cabinet-nav-story-ring {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(
+    from 120deg,
+    rgba(var(--tile-accent), 0.95),
+    rgba(var(--tile-accent), 0.55),
+    rgba(var(--shadow-rgb), 0.12),
+    rgba(var(--tile-accent), 0.95)
+  );
+  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.2);
+}
+
+.pro-cabinet-nav-story-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(var(--paper-rgb), 0.96);
+  border: 2px solid rgba(var(--paper-rgb), 0.9);
+  color: var(--pro-ink);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pro-cabinet-nav-story-avatar span {
+  font-size: 12px;
+}
+
+.pro-cabinet-nav-story-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .pro-cabinet-nav-client-top {
@@ -2513,15 +2558,18 @@
 .pro-cabinet-nav-client-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .pro-cabinet-nav-client-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 12px;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 10px;
   border: 1px solid rgba(var(--tile-accent), 0.14);
   background: rgba(var(--paper-rgb), 0.7);
   overflow: hidden;
@@ -2539,13 +2587,13 @@
 }
 
 .pro-cabinet-nav-client-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   border: 1px solid rgba(var(--tile-accent), 0.2);
   background: rgba(var(--tile-accent), 0.16);
   color: var(--pro-ink);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -2568,7 +2616,7 @@
 }
 
 .pro-cabinet-nav-client-name {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--pro-ink);
   white-space: nowrap;
@@ -2577,7 +2625,7 @@
 }
 
 .pro-cabinet-nav-client-meta-text {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   color: var(--pro-muted);
   white-space: nowrap;
@@ -2587,8 +2635,8 @@
 
 .pro-cabinet-nav-client-badge {
   border-radius: 999px;
-  padding: 2px 6px;
-  font-size: 8px;
+  padding: 2px 5px;
+  font-size: 7px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;

@@ -135,6 +135,8 @@ export const ProCabinetScreen = ({
   )
   const [showcasePreview, setShowcasePreview] = useState<PortfolioItem[]>([])
   const [showcaseTotal, setShowcaseTotal] = useState(0)
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null)
+  const [profileDisplayName, setProfileDisplayName] = useState('')
 
   useEffect(() => {
     if (!userId) return
@@ -157,14 +159,18 @@ export const ProCabinetScreen = ({
         const imageItems = previewSource.filter((item) => isImageUrl(item.url))
         const previewItems = (imageItems.length > 0 ? imageItems : previewSource).slice(
           0,
-          4
+          2
         )
         setShowcasePreview(previewItems)
         setShowcaseTotal(previewSource.length)
+        setProfileAvatarUrl(data.avatarUrl ?? null)
+        setProfileDisplayName(data.displayName ?? '')
       } catch (error) {
         if (!cancelled) {
           setShowcasePreview([])
           setShowcaseTotal(0)
+          setProfileAvatarUrl(null)
+          setProfileDisplayName('')
         }
       }
     }
@@ -251,9 +257,15 @@ export const ProCabinetScreen = ({
     []
   )
   const showcaseTiles: Array<PortfolioItem | null> =
-    showcasePreview.length > 0 ? showcasePreview : showcasePreviewFallback
+    showcasePreview.length > 0
+      ? [...showcasePreview, ...showcasePreviewFallback].slice(0, 4)
+      : showcasePreviewFallback
   const showcaseMetaLabel =
     showcaseTotal > 0 ? `${showcaseTotal} фото` : 'Добавьте фото'
+  const profileInitials = useMemo(
+    () => getInitials(profileDisplayName || 'Мастер'),
+    [profileDisplayName]
+  )
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -506,9 +518,15 @@ export const ProCabinetScreen = ({
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-stories">
                 <span className="pro-cabinet-nav-stories-badge">NEW</span>
-                <p className="pro-cabinet-nav-stories-text">
-                  Делитесь работами и акциями в формате сторис.
-                </p>
+                <span className="pro-cabinet-nav-story-ring" aria-hidden="true">
+                  <span className="pro-cabinet-nav-story-avatar">
+                    {profileAvatarUrl ? (
+                      <img src={profileAvatarUrl} alt="" loading="lazy" />
+                    ) : (
+                      <span>{profileInitials}</span>
+                    )}
+                  </span>
+                </span>
               </div>
             </div>
           </button>
