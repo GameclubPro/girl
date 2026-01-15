@@ -233,7 +233,7 @@ export const ClientScreen = ({
       <header className="client-topbar client-topbar--floating">
         <div className="client-brand">KIVEN</div>
       </header>
-      <div className="client-shell client-shell--home">
+      <div className="client-shell">
         {activeCategoryId && activeCategoryLabel && (
           <button
             className="client-category-indicator"
