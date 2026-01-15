@@ -100,6 +100,29 @@ const sortMessages = (items: LocalChatMessage[]) => {
   })
 }
 
+const supportTopics = [
+  {
+    id: 'booking',
+    label: 'Запись и расписание',
+    template: 'Нужна помощь с записью: ',
+  },
+  {
+    id: 'payment',
+    label: 'Оплата',
+    template: 'Вопрос по оплате: ',
+  },
+  {
+    id: 'profile',
+    label: 'Профиль и услуги',
+    template: 'Не получается обновить профиль: ',
+  },
+  {
+    id: 'other',
+    label: 'Другое',
+    template: 'Опишите ситуацию: ',
+  },
+]
+
 export const ChatThreadScreen = ({
   apiBase,
   userId,
@@ -130,6 +153,7 @@ export const ChatThreadScreen = ({
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null)
   const composerRef = useRef<HTMLDivElement | null>(null)
   const hasMoreRef = useRef(true)
   const isLoadingMoreRef = useRef(false)
@@ -155,10 +179,14 @@ export const ChatThreadScreen = ({
   const counterpart = detail?.counterpart
   const request = detail?.request
   const booking = detail?.booking
-  const isBookingChat = detail?.chat?.contextType === 'booking'
-  const headerSubtitle = isBookingChat
-    ? booking?.serviceName ?? 'Запись подтверждена'
-    : request?.serviceName ?? 'Переговоры по заявке'
+  const contextType = detail?.chat?.contextType ?? null
+  const isSupportChat = contextType === 'support'
+  const isBookingChat = contextType === 'booking'
+  const headerSubtitle = isSupportChat
+    ? 'Команда поддержки KIVEN'
+    : isBookingChat
+      ? booking?.serviceName ?? 'Запись подтверждена'
+      : request?.serviceName ?? 'Переговоры по заявке'
   const bookingStatusLabel =
     booking?.status === 'confirmed' ? 'Подтверждено' : 'Запись'
   const bookingTimeLabel = booking?.scheduledAt
@@ -991,6 +1019,22 @@ export const ChatThreadScreen = ({
     window.setTimeout(() => scrollToBottom('auto'), 120)
   }
 
+  const handleSupportTopic = (template: string) => {
+    if (sendError) {
+      setSendError('')
+    }
+    setComposerText((current) =>
+      current.trim() ? `${current.trim()}\n${template}` : template
+    )
+    requestAnimationFrame(() => {
+      const input = composerInputRef.current
+      if (!input) return
+      input.focus()
+      const length = input.value.length
+      input.setSelectionRange(length, length)
+    })
+  }
+
   const onLoadMore = () => {
     const oldestId = messages[0]?.id
     if (oldestId && oldestId > 0) {
@@ -1033,7 +1077,33 @@ export const ChatThreadScreen = ({
           </div>
         </header>
 
-        {request ? (
+        {isSupportChat ? (
+          <section className="chat-support-intro">
+            <div className="chat-support-intro-top">
+              <span className="chat-support-intro-title">Мы рядом</span>
+              <span className={`chat-support-intro-pill ${connectionTone}`}>
+                {connectionLabel}
+              </span>
+            </div>
+            <p className="chat-support-intro-text">
+              Опишите вопрос и приложите фото или скриншот — команда поддержки
+              подключится сразу.
+            </p>
+            <div className="chat-support-topics" role="list">
+              {supportTopics.map((topic) => (
+                <button
+                  className="chat-support-topic"
+                  type="button"
+                  key={topic.id}
+                  role="listitem"
+                  onClick={() => handleSupportTopic(topic.template)}
+                >
+                  {topic.label}
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : request ? (
           <section className="chat-request-card">
             <div className="chat-request-top">
               <span className="chat-request-title">{request.serviceName}</span>
@@ -1232,7 +1302,7 @@ export const ChatThreadScreen = ({
       </div>
 
       <div className="chat-composer" ref={composerRef}>
-        {quickMode && (
+        {!isSupportChat && quickMode && (
           <div className="chat-quick-panel">
             {quickMode === 'price' && (
               <>
@@ -1296,31 +1366,35 @@ export const ChatThreadScreen = ({
           </div>
         )}
 
-        <div className="chat-actions">
-          <button
-            className={`chat-action${quickMode === 'price' ? ' is-active' : ''}`}
-            type="button"
-            onClick={() => setQuickMode(quickMode === 'price' ? null : 'price')}
-          >
-            Цена
-          </button>
-          <button
-            className={`chat-action${quickMode === 'time' ? ' is-active' : ''}`}
-            type="button"
-            onClick={() => setQuickMode(quickMode === 'time' ? null : 'time')}
-          >
-            Время
-          </button>
-          <button
-            className={`chat-action${quickMode === 'location' ? ' is-active' : ''}`}
-            type="button"
-            onClick={() =>
-              setQuickMode(quickMode === 'location' ? null : 'location')
-            }
-          >
-            Место
-          </button>
-        </div>
+        {!isSupportChat && (
+          <div className="chat-actions">
+            <button
+              className={`chat-action${quickMode === 'price' ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => setQuickMode(quickMode === 'price' ? null : 'price')}
+            >
+              Цена
+            </button>
+            <button
+              className={`chat-action${quickMode === 'time' ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => setQuickMode(quickMode === 'time' ? null : 'time')}
+            >
+              Время
+            </button>
+            <button
+              className={`chat-action${
+                quickMode === 'location' ? ' is-active' : ''
+              }`}
+              type="button"
+              onClick={() =>
+                setQuickMode(quickMode === 'location' ? null : 'location')
+              }
+            >
+              Место
+            </button>
+          </div>
+        )}
 
         <div className="chat-input-row">
           <button
@@ -1339,9 +1413,12 @@ export const ChatThreadScreen = ({
             onChange={handleFileChange}
           />
           <textarea
+            ref={composerInputRef}
             className="chat-input"
             rows={1}
-            placeholder="Напишите сообщение"
+            placeholder={
+              isSupportChat ? 'Опишите вопрос для поддержки' : 'Напишите сообщение'
+            }
             value={composerText}
             onChange={handleComposerChange}
             onFocus={handleComposerFocus}

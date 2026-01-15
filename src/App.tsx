@@ -179,6 +179,8 @@ function App() {
   const [favorites, setFavorites] = useState<FavoriteMaster[]>(() =>
     loadFavorites()
   )
+  const [supportChatId, setSupportChatId] = useState<number | null>(null)
+  const supportChatPromiseRef = useRef<Promise<number | null> | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
   const clientName =
@@ -843,6 +845,52 @@ function App() {
     []
   )
 
+  const ensureSupportChat = useCallback(async () => {
+    if (!userId) return null
+    if (supportChatId) return supportChatId
+    if (supportChatPromiseRef.current) {
+      return supportChatPromiseRef.current
+    }
+
+    const promise = (async () => {
+      try {
+        const response = await fetch(`${apiBase}/api/support/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        })
+        if (!response.ok) {
+          throw new Error('Support chat failed')
+        }
+        const data = (await response.json()) as { chatId?: number | null }
+        const chatId = typeof data.chatId === 'number' ? data.chatId : null
+        if (chatId) {
+          setSupportChatId(chatId)
+        }
+        return chatId
+      } catch (error) {
+        console.error('Failed to create support chat:', error)
+        return null
+      } finally {
+        supportChatPromiseRef.current = null
+      }
+    })()
+
+    supportChatPromiseRef.current = promise
+    return promise
+  }, [apiBase, supportChatId, userId])
+
+  const openSupportChat = useCallback(
+    async (returnView: ChatReturnView) => {
+      const chatId = await ensureSupportChat()
+      if (!chatId) return
+      setSelectedChatId(chatId)
+      setChatReturnView(returnView)
+      setView('chat-thread')
+    },
+    [ensureSupportChat]
+  )
+
   const syncFollowWithFavorite = useCallback(
     async (favorite: Omit<FavoriteMaster, 'savedAt'>, shouldFollow: boolean) => {
       if (!userId || !favorite.masterId) return
@@ -970,6 +1018,7 @@ function App() {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           setView('request')
         }}
+        onOpenSupport={() => void openSupportChat('client-profile')}
         onCreateBooking={(payload) =>
           openBooking(payload.masterId, {
             photoUrls: payload.photoUrls ?? [],
@@ -1138,6 +1187,7 @@ function App() {
         userId={userId}
         role={role}
         onOpenChat={(chatId) => openChatThread(chatId, 'chats')}
+        onOpenSupport={() => void openSupportChat('chats')}
         onViewHome={() => setView('client')}
         onViewMasters={() => setView('client-showcase')}
         onViewRequests={() =>
@@ -1374,6 +1424,7 @@ function App() {
         onEditProfile={(section) => openProProfile({ section: section ?? null })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
+        onOpenSupport={() => void openSupportChat('pro-cabinet')}
         onOpenAnalytics={() => setView('pro-analytics')}
         onOpenClients={() => setView('pro-clients')}
         onOpenCampaigns={() => setView('pro-campaigns')}

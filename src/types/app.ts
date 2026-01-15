@@ -201,7 +201,7 @@ export type RequestResponse = {
   chatId?: number | null
 }
 
-export type ChatContextType = 'request' | 'booking'
+export type ChatContextType = 'request' | 'booking' | 'support'
 
 export type ChatMessage = {
   id: number

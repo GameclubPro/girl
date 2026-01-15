@@ -29,6 +29,17 @@ const CHAT_MESSAGE_DEFAULT_LIMIT = 30
 const CHAT_MESSAGE_MAX_LIMIT = 80
 const CHAT_STREAM_PATH = '/api/chats/stream'
 const MAX_CERTIFICATES = 12
+const SUPPORT_AGENT_IDS = Array.from(
+  new Set(
+    (process.env.SUPPORT_AGENT_IDS ?? '5510721194,7226796630')
+      .split(/[,\s]+/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )
+)
+const SUPPORT_CONTEXT_ID = 1
+const SUPPORT_WELCOME_MESSAGE =
+  'Здравствуйте! Это поддержка KIVEN. Опишите ситуацию, добавьте номер заявки/записи (если есть) и приложите фото или скриншот.'
 const chatMessageTypes = new Set([
   'text',
   'image',
@@ -945,6 +956,137 @@ const createChatForBooking = async ({
             WHERE chat_id = $1
           `,
           [chatId, actorId ?? clientId, messageId]
+        )
+      }
+    }
+
+    await pool.query('COMMIT')
+    return {
+      chatId,
+      isNew,
+      systemMessageId,
+      systemMessageCreatedAt,
+      systemMessage,
+    }
+  } catch (error) {
+    await pool.query('ROLLBACK')
+    throw error
+  }
+}
+
+const createSupportChat = async ({ userId }) => {
+  if (SUPPORT_AGENT_IDS.length === 0) {
+    throw new Error('support_agents_missing')
+  }
+  const supportMembers = SUPPORT_AGENT_IDS.filter((id) => id !== userId)
+  const primarySupportId = supportMembers[0] ?? SUPPORT_AGENT_IDS[0]
+  const uniqueSupportMembers = Array.from(new Set(supportMembers))
+  const uniqueUserIds = Array.from(
+    new Set([userId, primarySupportId, ...uniqueSupportMembers].filter(Boolean))
+  )
+
+  await Promise.all(uniqueUserIds.map((id) => ensureUser(id)))
+
+  await pool.query('BEGIN')
+  try {
+    const insertResult = await pool.query(
+      `
+        INSERT INTO chats (
+          context_type,
+          context_id,
+          client_id,
+          master_id,
+          status
+        )
+        VALUES ('support', $1, $2, $3, 'active')
+        ON CONFLICT (context_type, context_id, client_id, master_id)
+        DO UPDATE SET updated_at = NOW()
+        RETURNING id, (xmax = 0) AS "isNew"
+      `,
+      [SUPPORT_CONTEXT_ID, userId, primarySupportId]
+    )
+
+    const chatId = insertResult.rows[0]?.id ?? null
+    const isNew = Boolean(insertResult.rows[0]?.isNew)
+    if (!chatId) {
+      await pool.query('ROLLBACK')
+      return null
+    }
+
+    await pool.query(
+      `
+        INSERT INTO chat_members (chat_id, user_id, role)
+        VALUES ($1, $2, 'client')
+        ON CONFLICT (chat_id, user_id) DO NOTHING
+      `,
+      [chatId, userId]
+    )
+
+    for (const supportId of uniqueSupportMembers) {
+      await pool.query(
+        `
+          INSERT INTO chat_members (chat_id, user_id, role)
+          VALUES ($1, $2, 'master')
+          ON CONFLICT (chat_id, user_id) DO NOTHING
+        `,
+        [chatId, supportId]
+      )
+    }
+
+    let systemMessageId = null
+    let systemMessageCreatedAt = null
+    let systemMessage = null
+
+    if (isNew) {
+      const body = SUPPORT_WELCOME_MESSAGE
+      const meta = { event: 'support_welcome' }
+      const messageResult = await pool.query(
+        `
+          INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
+          VALUES ($1, NULL, 'system', $2, $3)
+          RETURNING id, created_at AS "createdAt"
+        `,
+        [chatId, body, meta]
+      )
+      const messageId = messageResult.rows[0]?.id ?? null
+      systemMessageId = messageId
+      systemMessageCreatedAt = messageResult.rows[0]?.createdAt ?? null
+      if (messageId) {
+        systemMessage = {
+          id: messageId,
+          chatId,
+          senderId: null,
+          type: 'system',
+          body,
+          meta,
+          attachmentUrl: null,
+          createdAt: systemMessageCreatedAt,
+        }
+        await pool.query(
+          `
+            UPDATE chats
+            SET last_message_id = $2,
+                last_message_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [chatId, messageId]
+        )
+        await pool.query(
+          `
+            UPDATE chat_members
+            SET unread_count = CASE
+                  WHEN user_id = $2 THEN 0
+                  ELSE unread_count + 1
+                END,
+                last_read_message_id = CASE
+                  WHEN user_id = $2 THEN $3
+                  ELSE last_read_message_id
+                END,
+                updated_at = NOW()
+            WHERE chat_id = $1
+          `,
+          [chatId, userId, messageId]
         )
       }
     }
@@ -5607,6 +5749,55 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
   }
 })
 
+app.post('/api/support/chat', async (req, res) => {
+  const { userId } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (SUPPORT_AGENT_IDS.length === 0) {
+    res.status(503).json({ error: 'support_unavailable' })
+    return
+  }
+
+  try {
+    const chatPayload = await createSupportChat({ userId: normalizedUserId })
+    if (!chatPayload?.chatId) {
+      res.status(500).json({ error: 'support_chat_failed' })
+      return
+    }
+
+    if (chatPayload.isNew) {
+      void notifyChatMembers(chatPayload.chatId, {
+        type: 'chat:created',
+        chatId: chatPayload.chatId,
+        contextType: 'support',
+      })
+      if (chatPayload.systemMessage) {
+        void notifyChatMembers(chatPayload.chatId, {
+          type: 'message:new',
+          chatId: chatPayload.chatId,
+          message: chatPayload.systemMessage,
+        })
+      } else if (chatPayload.systemMessageId) {
+        void notifyChatMembers(chatPayload.chatId, {
+          type: 'message:new',
+          chatId: chatPayload.chatId,
+          messageId: chatPayload.systemMessageId,
+        })
+      }
+    }
+
+    res.json({ chatId: chatPayload.chatId, isNew: chatPayload.isNew })
+  } catch (error) {
+    console.error('POST /api/support/chat failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.get('/api/chats', async (req, res) => {
   const normalizedUserId = normalizeText(req.query.userId)
 
@@ -5668,17 +5859,28 @@ app.get('/api/chats', async (req, res) => {
 
     const payload = result.rows.map((row) => {
       const isClient = row.clientId === normalizedUserId
-      const counterpartName = isClient
-        ? row.masterName || 'Мастер'
-        : formatUserDisplayName(
-            row.clientFirstName,
-            row.clientLastName,
-            row.clientUsername,
-            'Клиент'
-          )
-      const counterpartAvatarUrl = isClient
-        ? buildPublicUrl(req, row.masterAvatarPath)
-        : null
+      const isSupportChat = row.contextType === 'support'
+      const counterpartName = isSupportChat
+        ? isClient
+          ? 'Поддержка'
+          : formatUserDisplayName(
+              row.clientFirstName,
+              row.clientLastName,
+              row.clientUsername,
+              'Клиент'
+            )
+        : isClient
+          ? row.masterName || 'Мастер'
+          : formatUserDisplayName(
+              row.clientFirstName,
+              row.clientLastName,
+              row.clientUsername,
+              'Клиент'
+            )
+      const counterpartAvatarUrl =
+        isSupportChat || !isClient
+          ? null
+          : buildPublicUrl(req, row.masterAvatarPath)
       const lastMessageText =
         row.lastMessageBody ||
         (row.lastMessageType === 'image'
@@ -5825,14 +6027,24 @@ app.get('/api/chats/:id', async (req, res) => {
       counterpartReadResult.rows[0]?.lastReadMessageId ?? null
 
     const isClient = row.clientId === normalizedUserId
-    const counterpartName = isClient
-      ? row.masterName || 'Мастер'
-      : formatUserDisplayName(
-          row.clientFirstName,
-          row.clientLastName,
-          row.clientUsername,
-          'Клиент'
-        )
+    const isSupportChat = row.contextType === 'support'
+    const counterpartName = isSupportChat
+      ? isClient
+        ? 'Поддержка'
+        : formatUserDisplayName(
+            row.clientFirstName,
+            row.clientLastName,
+            row.clientUsername,
+            'Клиент'
+          )
+      : isClient
+        ? row.masterName || 'Мастер'
+        : formatUserDisplayName(
+            row.clientFirstName,
+            row.clientLastName,
+            row.clientUsername,
+            'Клиент'
+          )
 
     res.json({
       chat: {
@@ -5853,7 +6065,10 @@ app.get('/api/chats/:id', async (req, res) => {
         id: isClient ? row.masterId : row.clientId,
         role: isClient ? 'master' : 'client',
         name: counterpartName,
-        avatarUrl: isClient ? buildPublicUrl(req, row.masterAvatarPath) : null,
+        avatarUrl:
+          isSupportChat || !isClient
+            ? null
+            : buildPublicUrl(req, row.masterAvatarPath),
       },
       request: row.requestId
         ? {

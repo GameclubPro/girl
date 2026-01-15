@@ -193,6 +193,45 @@ export const IconChat = () => (
   </svg>
 )
 
+export const IconSupport = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M4 12a8 8 0 0 1 16 0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+    <rect
+      x="3"
+      y="11.6"
+      width="4"
+      height="7"
+      rx="1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="17"
+      y="11.6"
+      width="4"
+      height="7"
+      rx="1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M12 18.6h3.6a2.4 2.4 0 0 0 2.4-2.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
 export const IconEdit = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path

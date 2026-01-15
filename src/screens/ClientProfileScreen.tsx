@@ -23,6 +23,7 @@ type ClientProfileScreenProps = {
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewChats: () => void
   onCreateRequest: () => void
+  onOpenSupport: () => void
   onCreateBooking: (payload: {
     masterId: string
     categoryId?: string | null
@@ -911,6 +912,13 @@ export const ClientProfileScreen = ({
                         onClick={() => onViewRequests('bookings')}
                       >
                         Мои записи
+                      </button>
+                      <button
+                        className="client-profile-shortcut is-wide"
+                        type="button"
+                        onClick={onOpenSupport}
+                      >
+                        Поддержка в чате
                       </button>
                     </div>
                   </div>

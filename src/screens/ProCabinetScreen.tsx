@@ -7,6 +7,7 @@ import {
   IconDashboard,
   IconShowcase,
   IconStories,
+  IconSupport,
   IconUsers,
 } from '../components/icons'
 import { useProCabinetData, type ClientSummary } from '../hooks/useProCabinetData'
@@ -114,6 +115,7 @@ type ProCabinetScreenProps = {
   onOpenCalendar: () => void
   onOpenShowcase: () => void
   onOpenStories: () => void
+  onOpenSupport: () => void
 }
 
 export const ProCabinetScreen = ({
@@ -128,6 +130,7 @@ export const ProCabinetScreen = ({
   onOpenCalendar,
   onOpenShowcase,
   onOpenStories,
+  onOpenSupport,
 }: ProCabinetScreenProps) => {
   const { requestStats, bookingStats, bookings } = useProCabinetData(
     apiBase,
@@ -550,6 +553,33 @@ export const ProCabinetScreen = ({
                     </span>
                   )
                 })}
+              </div>
+            </div>
+          </button>
+          <button
+            className="pro-cabinet-nav-card is-support animate delay-7"
+            type="button"
+            onClick={onOpenSupport}
+          >
+            {tapHint}
+            <div className="pro-cabinet-nav-head">
+              <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                <IconSupport />
+              </span>
+              <div className="pro-cabinet-nav-info">
+                <span className="pro-cabinet-nav-kicker">Сервис</span>
+                <span className="pro-cabinet-nav-title">Поддержка</span>
+                <span className="pro-cabinet-nav-subtitle">
+                  Ответим в чате
+                </span>
+              </div>
+            </div>
+            <div className="pro-cabinet-nav-preview">
+              <div className="pro-cabinet-nav-support">
+                <span className="pro-cabinet-nav-support-pill">24/7</span>
+                <span className="pro-cabinet-nav-support-text">
+                  Поможем с записью, оплатой и профилем.
+                </span>
               </div>
             </div>
           </button>

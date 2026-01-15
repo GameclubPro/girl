@@ -3,6 +3,7 @@ import {
   IconChat,
   IconHome,
   IconList,
+  IconSupport,
   IconUser,
   IconUsers,
 } from '../components/icons'
@@ -17,12 +18,15 @@ type ChatListScreenProps = {
   userId: string
   role: 'client' | 'pro'
   onOpenChat: (chatId: number) => void
+  onOpenSupport?: () => void
   onViewHome?: () => void
   onViewMasters?: () => void
   onViewRequests?: () => void
   onViewProfile?: () => void
   onViewCabinet?: () => void
 }
+
+const SUPPORT_AGENT_IDS = new Set(['5510721194', '7226796630'])
 
 const formatChatTimestamp = (value?: string | null) => {
   if (!value) return ''
@@ -74,6 +78,7 @@ export const ChatListScreen = ({
   userId,
   role,
   onOpenChat,
+  onOpenSupport,
   onViewHome,
   onViewMasters,
   onViewRequests,
@@ -92,6 +97,7 @@ export const ChatListScreen = ({
   const loadAbortRef = useRef<AbortController | null>(null)
   const loadRequestIdRef = useRef(0)
   const listUpdateTokenRef = useRef(0)
+  const isSupportAgent = SUPPORT_AGENT_IDS.has(userId)
 
   const connectionLabel =
     streamStatus === 'connected'
@@ -120,6 +126,19 @@ export const ChatListScreen = ({
     [items]
   )
 
+  const supportChat = useMemo(
+    () => confirmedItems.find((item) => item.contextType === 'support') ?? null,
+    [confirmedItems]
+  )
+
+  const regularItems = useMemo(
+    () =>
+      isSupportAgent
+        ? confirmedItems
+        : confirmedItems.filter((item) => item.contextType !== 'support'),
+    [confirmedItems, isSupportAgent]
+  )
+
   const totalUnread = useMemo(
     () => confirmedItems.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
     [confirmedItems]
@@ -128,19 +147,26 @@ export const ChatListScreen = ({
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     const byQuery = query
-      ? confirmedItems.filter((item) => {
+      ? regularItems.filter((item) => {
           const serviceName =
             item.request?.serviceName || item.booking?.serviceName || ''
           const haystack = `${item.counterpart.name} ${serviceName}`.toLowerCase()
           return haystack.includes(query)
         })
-      : confirmedItems
+      : regularItems
 
     if (filter === 'unread') {
       return byQuery.filter((item) => (item.unreadCount ?? 0) > 0)
     }
     return byQuery
-  }, [confirmedItems, filter, searchQuery])
+  }, [filter, regularItems, searchQuery])
+
+  const supportPreview = supportChat
+    ? getMessagePreview(supportChat.lastMessage) || 'Откройте чат поддержки'
+    : 'Ответим по записи, оплате и сервису'
+  const supportTime = formatChatTimestamp(supportChat?.lastMessage?.createdAt ?? null)
+  const supportUnread = supportChat?.unreadCount ?? 0
+  const hasRegularChats = regularItems.length > 0
 
   const loadChats = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -332,6 +358,36 @@ export const ChatListScreen = ({
           </div>
         </header>
 
+        {!isSupportAgent && onOpenSupport && (
+          <button
+            className={`chat-support-card${supportUnread > 0 ? ' is-unread' : ''}`}
+            type="button"
+            onClick={onOpenSupport}
+          >
+            <span className="chat-support-avatar" aria-hidden="true">
+              <IconSupport />
+            </span>
+            <span className="chat-support-main">
+              <span className="chat-support-top">
+                <span className="chat-support-title">Поддержка KIVEN</span>
+                {supportTime && (
+                  <span className="chat-support-time">{supportTime}</span>
+                )}
+              </span>
+              <span className="chat-support-subtitle">
+                Ответим в чате клиентам и мастерам
+              </span>
+              <span className="chat-support-preview">{supportPreview}</span>
+            </span>
+            <span className="chat-support-meta">
+              <span className="chat-support-pill">24/7</span>
+              {supportUnread > 0 && (
+                <span className="chat-unread">{supportUnread}</span>
+              )}
+            </span>
+          </button>
+        )}
+
         <div className="chat-filters" role="tablist" aria-label="Фильтры">
           <button
             className={`chat-filter${filter === 'all' ? ' is-active' : ''}`}
@@ -407,15 +463,15 @@ export const ChatListScreen = ({
             ))}
           </div>
         )}
-        {!isLoading && !loadError && confirmedItems.length === 0 && (
+        {!isLoading && !loadError && !hasRegularChats && (
           <div className="chat-empty">
             <div className="chat-empty-icon">
               <IconChat />
             </div>
             <h2>Чаты появятся после подтверждения</h2>
             <p>
-              После подтверждения заявки или записи диалог станет доступен
-              здесь.
+              Поддержка доступна всегда, а остальные чаты появятся после
+              подтверждения заявки или записи.
             </p>
             {onViewRequests && (
               <div className="chat-empty-actions">
@@ -432,7 +488,7 @@ export const ChatListScreen = ({
         )}
         {!isLoading &&
           !loadError &&
-          confirmedItems.length > 0 &&
+          hasRegularChats &&
           filteredItems.length === 0 && (
             <div className="chat-empty is-compact">
               <h2>Ничего не найдено</h2>
@@ -443,11 +499,20 @@ export const ChatListScreen = ({
         <div className="chat-list" role="list">
           {filteredItems.map((chat) => {
             const counterpart = chat.counterpart
-            const serviceName =
-              chat.request?.serviceName || chat.booking?.serviceName || 'Диалог'
-            const contextLabel = chat.contextType === 'booking' ? 'Запись' : 'Заявка'
-            const statusLabel =
-              chat.contextType === 'booking' ? 'Подтверждено' : 'Согласовано'
+            const isSupportChat = chat.contextType === 'support'
+            const serviceName = isSupportChat
+              ? 'Поддержка'
+              : chat.request?.serviceName || chat.booking?.serviceName || 'Диалог'
+            const contextLabel = isSupportChat
+              ? 'Поддержка'
+              : chat.contextType === 'booking'
+                ? 'Запись'
+                : 'Заявка'
+            const statusLabel = isSupportChat
+              ? 'На связи'
+              : chat.contextType === 'booking'
+                ? 'Подтверждено'
+                : 'Согласовано'
             const lastMessage = chat.lastMessage
             const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
             const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
@@ -455,7 +520,9 @@ export const ChatListScreen = ({
 
             return (
               <button
-                className={`chat-card${unreadCount > 0 ? ' is-unread' : ''}`}
+                className={`chat-card${
+                  unreadCount > 0 ? ' is-unread' : ''
+                }${isSupportChat ? ' is-support' : ''}`}
                 key={chat.id}
                 type="button"
                 role="listitem"
