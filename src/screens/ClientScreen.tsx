@@ -351,7 +351,7 @@ export const ClientScreen = ({
           )}
         </section>
 
-        <section className="client-section">
+        <section className="client-section client-section--panel">
           <div className="category-grid">
             {categoryItems.map((item) => {
               const isSelected = item.id === requestCategoryId
