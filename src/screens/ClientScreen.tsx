@@ -6,6 +6,7 @@ import {
   IconUser,
   IconUsers,
 } from '../components/icons'
+import { CollectionCarousel } from '../components/CollectionCarousel'
 import { StoryViewer } from '../components/StoryViewer'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, StoryGroup } from '../types/app'
@@ -66,9 +67,9 @@ export const ClientScreen = ({
   onViewProfile: () => void
   onViewMasterProfile: (masterId: string) => void
 }) => {
-  const activeCategoryLabel =
-    (activeCategoryId ? categoryLabelOverrides[activeCategoryId] : '') ??
-    categoryItems.find((item) => item.id === activeCategoryId)?.label ??
+  const resolveCategoryLabel = (categoryId: string | null) =>
+    (categoryId ? categoryLabelOverrides[categoryId] : '') ??
+    categoryItems.find((item) => item.id === categoryId)?.label ??
     ''
   const [requestCategoryId, setRequestCategoryId] = useState<string | null>(null)
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
@@ -79,10 +80,17 @@ export const ClientScreen = ({
     null
   )
   const [activeStoryIndex, setActiveStoryIndex] = useState(0)
-  const requestCategoryLabel =
-    (requestCategoryId ? categoryLabelOverrides[requestCategoryId] : '') ??
-    categoryItems.find((item) => item.id === requestCategoryId)?.label ??
-    ''
+  const selectedCategoryId = requestCategoryId ?? activeCategoryId
+  const selectedCategoryLabel = resolveCategoryLabel(selectedCategoryId)
+  const triggerHaptic = (type: 'selection' | 'light' | 'medium') => {
+    const haptic = window.Telegram?.WebApp?.HapticFeedback
+    if (!haptic) return
+    if (type === 'selection') {
+      haptic.selectionChanged?.()
+      return
+    }
+    haptic.impactOccurred?.(type)
+  }
   useEffect(() => {
     let cancelled = false
 
@@ -228,67 +236,214 @@ export const ClientScreen = ({
     onViewMasterProfile(masterId)
   }
 
+  const handleIntentSelect = (categoryId: string) => {
+    triggerHaptic('selection')
+    const nextCategory = selectedCategoryId === categoryId ? null : categoryId
+    setRequestCategoryId(nextCategory)
+    onCategoryChange(nextCategory)
+  }
+
+  const handleCategoryClear = () => {
+    triggerHaptic('light')
+    setRequestCategoryId(null)
+    onCategoryChange(null)
+  }
+
+  const handleCreateRequest = () => {
+    triggerHaptic('medium')
+    onCreateRequest(selectedCategoryId ?? null)
+  }
+
+  const handleViewShowcase = () => {
+    triggerHaptic('light')
+    onViewShowcase()
+  }
+
+  const handleViewMasters = () => {
+    triggerHaptic('light')
+    onViewMasters()
+  }
+
+  const handleViewChats = () => {
+    triggerHaptic('light')
+    onViewChats()
+  }
+
+  const handleViewRequests = () => {
+    triggerHaptic('light')
+    onViewRequests()
+  }
+
+  const handleViewProfile = () => {
+    triggerHaptic('light')
+    onViewProfile()
+  }
+
   return (
-    <div className="screen screen--client">
+    <div className="screen screen--client screen--client-home">
       <header className="client-topbar client-topbar--floating">
         <div className="client-brand">KIVEN</div>
       </header>
-      <div className="client-shell">
-        {activeCategoryId && activeCategoryLabel && (
-          <button
-            className="client-category-indicator"
-            type="button"
-            onClick={() => onCategoryChange(null)}
-            aria-label="Сбросить категорию"
-          >
-            Категория: <strong>{activeCategoryLabel}</strong>
-            <span className="client-category-indicator-close" aria-hidden="true">
-              ×
-            </span>
-          </button>
-        )}
-
-        <section className="client-section">
-          <div className="client-showcase-card">
-            <div className="client-showcase-content">
-              <span className="client-showcase-badge">✨ Вдохновение</span>
-              <h2 className="client-showcase-title">Витрина работ</h2>
-              <button
-                className="client-showcase-cta"
-                type="button"
-                onClick={onViewShowcase}
+      <div className="client-shell client-home-shell">
+        <section className="client-home-hero animate delay-1">
+          <div className="client-home-hero-card">
+            <div className="client-home-hero-text">
+              <span className="client-home-hero-kicker">KIVEN / 2026</span>
+              <h1 className="client-home-hero-title">Идеальный образ — сегодня.</h1>
+              <p className="client-home-hero-subtitle">
+                Подберём мастера рядом, покажем портфолио и свободное время за
+                пару касаний.
+              </p>
+              <div className="client-home-hero-actions">
+                <button
+                  className="client-home-hero-action is-primary"
+                  type="button"
+                  onClick={handleCreateRequest}
+                  disabled={!selectedCategoryId}
+                >
+                  Создать заявку
+                </button>
+                <button
+                  className="client-home-hero-action is-ghost"
+                  type="button"
+                  onClick={handleViewShowcase}
+                >
+                  Витрина работ
+                </button>
+              </div>
+              <span
+                className={`client-home-hero-tag${
+                  selectedCategoryLabel ? '' : ' is-muted'
+                }`}
               >
-                Смотреть &gt;
-              </button>
+                {selectedCategoryLabel
+                  ? `Сейчас: ${selectedCategoryLabel}`
+                  : 'Выберите направление ниже'}
+              </span>
             </div>
-            <div className="client-showcase-gallery" aria-label="Витрина работ">
+            <div className="client-home-hero-media" aria-hidden="true">
               {showcaseItems.length > 0 ? (
-                showcaseItems.map((item, index) => (
-                  <span
-                    className="client-showcase-photo"
-                    key={`${item.id}-${index}`}
-                    style={{ gridArea: showcaseAreas[index % showcaseAreas.length] }}
-                  >
-                    <img
-                      src={item.url}
-                      alt=""
-                      loading="lazy"
-                      style={{
-                        objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
-                      }}
-                    />
-                  </span>
-                ))
+                <div className="client-home-hero-gallery">
+                  {showcaseItems.slice(0, showcaseAreas.length).map((item, index) => (
+                    <span
+                      className="client-home-hero-tile"
+                      key={`${item.id}-${index}`}
+                      style={{ gridArea: showcaseAreas[index % showcaseAreas.length] }}
+                    >
+                      <img
+                        src={item.url}
+                        alt=""
+                        loading="lazy"
+                        style={{
+                          objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
+                        }}
+                      />
+                    </span>
+                  ))}
+                </div>
               ) : (
-                <span className="client-showcase-empty">Пока нет работ</span>
+                <div className="client-home-hero-fallback">Пока нет работ</div>
               )}
             </div>
           </div>
         </section>
 
-        <section className="client-section client-section--stories">
-          <div className="section-header">
-            <h3>Сторис от мастеров</h3>
+        <section className="client-home-panel client-home-intents animate delay-2">
+          <div className="client-home-section-head">
+            <div>
+              <p className="client-home-section-kicker">Направления</p>
+              <h3 className="client-home-section-title">Что нужно сегодня?</h3>
+            </div>
+            {selectedCategoryId && (
+              <button
+                className="client-home-section-action"
+                type="button"
+                onClick={handleCategoryClear}
+              >
+                Сбросить
+              </button>
+            )}
+          </div>
+          <div className="client-home-intent-track" role="list">
+            {categoryItems.map((item) => {
+              const isSelected = item.id === selectedCategoryId
+              return (
+                <button
+                  className={`client-home-intent${isSelected ? ' is-active' : ''}`}
+                  type="button"
+                  key={item.id}
+                  role="listitem"
+                  aria-pressed={isSelected}
+                  onClick={() => handleIntentSelect(item.id)}
+                >
+                  <span className="client-home-intent-icon" aria-hidden="true">
+                    <img src={item.icon} alt="" aria-hidden="true" />
+                  </span>
+                  <span className="client-home-intent-label">
+                    {categoryLabelOverrides[item.id] ?? item.label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="client-home-intent-footer">
+            <p
+              className={`client-home-intent-summary${
+                selectedCategoryLabel ? '' : ' is-muted'
+              }`}
+            >
+              {selectedCategoryLabel
+                ? `Выбрано: ${selectedCategoryLabel}`
+                : 'Выберите направление, чтобы создать заявку.'}
+            </p>
+            <button
+              className="client-home-intent-cta"
+              type="button"
+              onClick={handleCreateRequest}
+              disabled={!selectedCategoryId}
+            >
+              Создать заявку
+            </button>
+          </div>
+          <button
+            className="client-home-intent-link"
+            type="button"
+            onClick={handleViewMasters}
+          >
+            Смотреть всех мастеров
+          </button>
+        </section>
+
+        <section className="client-section client-home-panel client-home-collections animate delay-3">
+          <div className="client-home-section-head">
+            <div>
+              <p className="client-home-section-kicker">Коллекции</p>
+              <h3 className="client-home-section-title">Подборки дня</h3>
+            </div>
+            <button
+              className="client-home-section-action"
+              type="button"
+              onClick={handleViewMasters}
+            >
+              Все
+            </button>
+          </div>
+          <CollectionCarousel />
+        </section>
+
+        <section className="client-section client-section--stories client-home-panel animate delay-4">
+          <div className="client-home-section-head">
+            <div>
+              <p className="client-home-section-kicker">Сторис</p>
+              <h3 className="client-home-section-title">Мастера рядом</h3>
+            </div>
+            <button
+              className="client-home-section-action"
+              type="button"
+              onClick={handleViewMasters}
+            >
+              Все
+            </button>
           </div>
           {isStoriesLoading ? (
             <div className="client-stories client-stories--skeleton" role="list">
@@ -316,6 +471,7 @@ export const ClientScreen = ({
                     role="listitem"
                     type="button"
                     onClick={() => {
+                      triggerHaptic('light')
                       setActiveStoryIndex(startIndex)
                       setActiveStoryGroupIndex(index)
                     }}
@@ -344,64 +500,16 @@ export const ClientScreen = ({
           ) : (
             <div className="client-stories-empty">
               <p>{storiesError || 'Подпишитесь на мастеров, чтобы видеть их истории.'}</p>
-              <button className="client-stories-cta" type="button" onClick={onViewMasters}>
+              <button
+                className="client-stories-cta"
+                type="button"
+                onClick={handleViewMasters}
+              >
                 Открыть мастеров
               </button>
             </div>
           )}
         </section>
-
-        <section className="client-section">
-          <div className="category-grid">
-            {categoryItems.map((item) => {
-              const isSelected = item.id === requestCategoryId
-
-              return (
-                <button
-                  className={`category-card${isSelected ? ' is-selected' : ''}`}
-                  type="button"
-                  key={item.id}
-                  aria-pressed={isSelected}
-                  onClick={() =>
-                    setRequestCategoryId((prev) =>
-                      prev === item.id ? null : item.id
-                    )
-                  }
-                >
-                  <span className="category-left">
-                    <span className="category-icon" aria-hidden="true">
-                      <img
-                        className="category-icon-image"
-                        src={item.icon}
-                        alt=""
-                        aria-hidden="true"
-                      />
-                    </span>
-                    {categoryLabelOverrides[item.id] ?? item.label}
-                  </span>
-                  <span className="category-arrow">›</span>
-                </button>
-              )
-            })}
-          </div>
-          <p className="category-helper">
-            {requestCategoryLabel
-              ? `Выбрана категория: ${requestCategoryLabel}`
-              : 'Выберите категорию, чтобы создать заявку'}
-          </p>
-          <button
-            className="cta cta--primary cta--wide"
-            type="button"
-            onClick={() => onCreateRequest(requestCategoryId)}
-            disabled={!requestCategoryId}
-          >
-            <span className="cta-icon" aria-hidden="true">
-              +
-            </span>
-            Создать заявку
-          </button>
-        </section>
-
       </div>
 
       <nav className="bottom-nav" aria-label="Навигация">
@@ -411,25 +519,25 @@ export const ClientScreen = ({
           </span>
           Главная
         </button>
-        <button className="nav-item" type="button" onClick={onViewMasters}>
+        <button className="nav-item" type="button" onClick={handleViewMasters}>
           <span className="nav-icon" aria-hidden="true">
             <IconUsers />
           </span>
           Мастера
         </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
+        <button className="nav-item" type="button" onClick={handleViewChats}>
           <span className="nav-icon" aria-hidden="true">
             <IconChat />
           </span>
           Чаты
         </button>
-        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
+        <button className="nav-item" type="button" onClick={handleViewRequests}>
           <span className="nav-icon" aria-hidden="true">
             <IconList />
           </span>
           Мои заявки
         </button>
-        <button className="nav-item" type="button" onClick={onViewProfile}>
+        <button className="nav-item" type="button" onClick={handleViewProfile}>
           <span className="nav-icon" aria-hidden="true">
             <IconUser />
           </span>
