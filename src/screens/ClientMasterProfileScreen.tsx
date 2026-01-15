@@ -186,8 +186,8 @@ const buildStars = (value: number) => {
 }
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
-const CERTIFICATE_RATIO_MIN = 0.8
-const CERTIFICATE_RATIO_MAX = 1.6
+const CERTIFICATE_RATIO_MIN = 3 / 4
+const CERTIFICATE_RATIO_MAX = 4 / 3
 const clampCertificateRatio = (value: number) =>
   Math.min(CERTIFICATE_RATIO_MAX, Math.max(CERTIFICATE_RATIO_MIN, value))
 
