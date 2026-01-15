@@ -8,6 +8,7 @@ import {
 } from '../components/icons'
 import { StoryViewer } from '../components/StoryViewer'
 import { categoryItems, popularItems } from '../data/clientData'
+import { ClientPopularDraft } from '../ClientPopularDraft'
 import type { MasterProfile, StoryGroup } from '../types/app'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
@@ -407,46 +408,10 @@ export const ClientScreen = ({
           </button>
         </section>
 
-        <section className="client-section" id="client-popular">
-          <div className="section-header">
-            <h3>Популярное сегодня</h3>
-          </div>
-          <div
-            className="popular-carousel"
-            role="region"
-            aria-label="Популярное сегодня"
-          >
-            {visiblePopularItems.length > 0 ? (
-              <div className="popular-track" role="list">
-                {visiblePopularItems.map((item) => {
-                  const labelClassName =
-                    item.label.length <= 8
-                      ? 'popular-label popular-label--short'
-                      : 'popular-label'
-
-                  return (
-                    <button
-                      className="popular-card"
-                      type="button"
-                      key={item.id}
-                      role="listitem"
-                      onClick={() => onCategoryChange(item.categoryId)}
-                    >
-                      <span className="popular-media" aria-hidden="true">
-                        <img className="popular-image" src={item.image} alt="" />
-                      </span>
-                      <span className={labelClassName}>{item.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="popular-empty">
-                В этой категории пока нет популярных работ.
-              </p>
-            )}
-          </div>
-        </section>
+        <ClientPopularDraft
+          items={visiblePopularItems}
+          onSelect={onCategoryChange}
+        />
       </div>
 
       <nav className="bottom-nav" aria-label="Навигация">
