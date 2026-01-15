@@ -134,7 +134,6 @@ export const ProCabinetScreen = ({
     userId
   )
   const [showcasePreview, setShowcasePreview] = useState<PortfolioItem[]>([])
-  const [showcaseTotal, setShowcaseTotal] = useState(0)
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null)
   const [profileDisplayName, setProfileDisplayName] = useState('')
 
@@ -162,13 +161,11 @@ export const ProCabinetScreen = ({
           2
         )
         setShowcasePreview(previewItems)
-        setShowcaseTotal(previewSource.length)
         setProfileAvatarUrl(data.avatarUrl ?? null)
         setProfileDisplayName(data.displayName ?? '')
       } catch (error) {
         if (!cancelled) {
           setShowcasePreview([])
-          setShowcaseTotal(0)
           setProfileAvatarUrl(null)
           setProfileDisplayName('')
         }
@@ -248,8 +245,6 @@ export const ProCabinetScreen = ({
     : 0
   const showcaseTiles: Array<PortfolioItem | null> =
     showcasePreview.length > 0 ? showcasePreview : [null]
-  const showcaseMetaLabel =
-    showcaseTotal > 0 ? `${showcaseTotal} фото` : 'Добавьте фото'
   const profileInitials = useMemo(
     () => getInitials(profileDisplayName || 'Мастер'),
     [profileDisplayName]
@@ -294,12 +289,6 @@ export const ProCabinetScreen = ({
                     {requestStats.open}
                   </span>
                   <span className="pro-cabinet-nav-stat-label">Открытые</span>
-                </div>
-                <div className="pro-cabinet-nav-stat">
-                  <span className="pro-cabinet-nav-stat-value">
-                    {requestStats.responses}
-                  </span>
-                  <span className="pro-cabinet-nav-stat-label">Ответы</span>
                 </div>
                 <div className="pro-cabinet-nav-stat">
                   <span className="pro-cabinet-nav-stat-value">
@@ -551,9 +540,6 @@ export const ProCabinetScreen = ({
                   )
                 })}
               </div>
-              <p className="pro-cabinet-nav-meta">
-                {showcaseMetaLabel} · обновляйте витрину
-              </p>
             </div>
           </button>
         </div>

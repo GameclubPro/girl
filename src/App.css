@@ -2413,13 +2413,6 @@
   color: var(--pro-muted);
 }
 
-.pro-cabinet-nav-meta {
-  margin: 0;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--pro-muted);
-}
-
 .pro-cabinet-nav-preview {
   display: flex;
   flex-direction: column;
