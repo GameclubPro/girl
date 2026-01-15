@@ -566,6 +566,7 @@ export const ClientMasterProfileScreen = ({
   const certificateCountLabel =
     certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
   const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Показать'
+  const isCertificatesCollapsed = certificateCount > 0 && !isCertificatesExpanded
   const certificatesListId = `client-master-certificates-list-${masterId}`
   const handleCertificateImageLoad = (
     certificateId: string,
@@ -873,9 +874,17 @@ export const ClientMasterProfileScreen = ({
                       </div>
                     ))}
                   </div>
-                  <div className="pro-profile-certificates is-client">
+                  <div
+                    className={`pro-profile-certificates is-client${
+                      isCertificatesCollapsed
+                        ? ' is-collapsed'
+                        : isCertificatesExpanded
+                          ? ' is-expanded'
+                          : ''
+                    }`}
+                  >
                     <div className="pro-profile-certificates-head">
-                      <div>
+                      <div className="pro-profile-certificates-summary">
                         <p className="pro-profile-certificates-kicker">Квалификация</p>
                         <h3 className="pro-profile-certificates-title">
                           Сертификаты

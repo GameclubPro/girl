@@ -566,6 +566,7 @@ export const ProProfileScreen = ({
   const certificateCountLabel =
     certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
   const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Показать'
+  const isCertificatesCollapsed = certificateCount > 0 && !isCertificatesExpanded
   const handleCertificateImageLoad = (
     certificateId: string,
     image: HTMLImageElement
@@ -2717,9 +2718,17 @@ export const ProProfileScreen = ({
                 ))}
               </div>
             </div>
-            <div className="pro-profile-certificates">
+            <div
+              className={`pro-profile-certificates${
+                isCertificatesCollapsed
+                  ? ' is-collapsed'
+                  : isCertificatesExpanded
+                    ? ' is-expanded'
+                    : ''
+              }`}
+            >
               <div className="pro-profile-certificates-head">
-                <div>
+                <div className="pro-profile-certificates-summary">
                   <p className="pro-profile-certificates-kicker">Доверие</p>
                   <h3 className="pro-profile-certificates-title">Сертификаты</h3>
                 </div>
