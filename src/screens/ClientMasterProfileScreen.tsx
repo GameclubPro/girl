@@ -556,10 +556,6 @@ export const ClientMasterProfileScreen = ({
   }, [followersQuery])
 
   useEffect(() => {
-    setFollowersTotal((current) => (current > 0 ? current : followersCount))
-  }, [followersCount])
-
-  useEffect(() => {
     if (!isFollowersOpen) return
     loadFollowers({ offset: 0, append: false })
   }, [followersQueryDebounced, isFollowersOpen, loadFollowers])
@@ -664,6 +660,11 @@ export const ClientMasterProfileScreen = ({
     ? 'Никого не нашли.'
     : 'Пока нет подписчиков.'
   const followersInitialLoading = isFollowersLoading && followers.length === 0
+
+  useEffect(() => {
+    setFollowersTotal((current) => (current > 0 ? current : followersCount))
+  }, [followersCount])
+
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
   const profileStats = [
