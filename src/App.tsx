@@ -1364,7 +1364,6 @@ function App() {
         onOpenAnalytics={() => setView('pro-analytics')}
         onOpenClients={() => setView('pro-clients')}
         onOpenCampaigns={() => setView('pro-campaigns')}
-        onOpenReminders={() => setView('pro-reminders')}
         onOpenCalendar={() => openProRequests('bookings')}
         onOpenShowcase={() =>
           openProProfile({ section: 'portfolio', portfolioView: 'showcase' })

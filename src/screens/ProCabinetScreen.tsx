@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
-  IconBell,
   IconCalendar,
   IconChat,
   IconDashboard,
@@ -112,7 +111,6 @@ type ProCabinetScreenProps = {
   onOpenAnalytics: () => void
   onOpenClients: () => void
   onOpenCampaigns: () => void
-  onOpenReminders: () => void
   onOpenCalendar: () => void
   onOpenShowcase: () => void
   onOpenStories: () => void
@@ -127,7 +125,6 @@ export const ProCabinetScreen = ({
   onOpenAnalytics,
   onOpenClients,
   onOpenCampaigns,
-  onOpenReminders,
   onOpenCalendar,
   onOpenShowcase,
   onOpenStories,
@@ -249,7 +246,6 @@ export const ProCabinetScreen = ({
   const campaignMeter = campaignAudience
     ? Math.min(100, Math.max(12, Math.round(campaignRepeatRate * 100)))
     : 0
-  const todayBookings = calendarPreview[0]?.count ?? 0
   const showcasePreviewFallback = useMemo<Array<PortfolioItem | null>>(
     () => new Array(4).fill(null),
     []
@@ -449,7 +445,75 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-showcase animate delay-4"
+            className="pro-cabinet-nav-card is-campaigns animate delay-4"
+            type="button"
+            onClick={onOpenCampaigns}
+          >
+            <div className="pro-cabinet-nav-head">
+              <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                <IconChat />
+              </span>
+              <div className="pro-cabinet-nav-info">
+                <span className="pro-cabinet-nav-kicker">Продажи</span>
+                <span className="pro-cabinet-nav-title">Рассылка</span>
+                <span className="pro-cabinet-nav-subtitle">
+                  {campaignAudience > 0
+                    ? `Аудитория: ${campaignAudience}`
+                    : 'Пока нет аудитории'}
+                </span>
+              </div>
+            </div>
+            <div className="pro-cabinet-nav-preview">
+              <div className="pro-cabinet-nav-meter" aria-hidden="true">
+                <span
+                  className="pro-cabinet-nav-meter-fill"
+                  style={{ '--meter': campaignMeter } as CSSProperties}
+                />
+              </div>
+              <div className="pro-cabinet-nav-stats">
+                <div className="pro-cabinet-nav-stat">
+                  <span className="pro-cabinet-nav-stat-value">
+                    {bookingStats.uniqueClients}
+                  </span>
+                  <span className="pro-cabinet-nav-stat-label">Контакты</span>
+                </div>
+                <div className="pro-cabinet-nav-stat">
+                  <span className="pro-cabinet-nav-stat-value">
+                    {bookingStats.repeatClients}
+                  </span>
+                  <span className="pro-cabinet-nav-stat-label">Лояльные</span>
+                </div>
+              </div>
+            </div>
+          </button>
+          <button
+            className="pro-cabinet-nav-card is-stories animate delay-5"
+            type="button"
+            onClick={onOpenStories}
+          >
+            <div className="pro-cabinet-nav-head">
+              <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                <IconStories />
+              </span>
+              <div className="pro-cabinet-nav-info">
+                <span className="pro-cabinet-nav-kicker">Контент</span>
+                <span className="pro-cabinet-nav-title">Истории</span>
+                <span className="pro-cabinet-nav-subtitle">
+                  24 часа на показ
+                </span>
+              </div>
+            </div>
+            <div className="pro-cabinet-nav-preview">
+              <div className="pro-cabinet-nav-stories">
+                <span className="pro-cabinet-nav-stories-badge">NEW</span>
+                <p className="pro-cabinet-nav-stories-text">
+                  Делитесь работами и акциями в формате сторис.
+                </p>
+              </div>
+            </div>
+          </button>
+          <button
+            className="pro-cabinet-nav-card is-showcase animate delay-6"
             type="button"
             onClick={onOpenShowcase}
           >
@@ -501,105 +565,6 @@ export const ProCabinetScreen = ({
               </div>
               <p className="pro-cabinet-nav-meta">
                 {showcaseMetaLabel} · обновляйте витрину
-              </p>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-stories animate delay-5"
-            type="button"
-            onClick={onOpenStories}
-          >
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconStories />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Контент</span>
-                <span className="pro-cabinet-nav-title">Истории</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  24 часа на показ
-                </span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-stories">
-                <span className="pro-cabinet-nav-stories-badge">NEW</span>
-                <p className="pro-cabinet-nav-stories-text">
-                  Делитесь работами и акциями в формате сторис.
-                </p>
-              </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-campaigns animate delay-6"
-            type="button"
-            onClick={onOpenCampaigns}
-          >
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconChat />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Продажи</span>
-                <span className="pro-cabinet-nav-title">Рассылка</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  {campaignAudience > 0
-                    ? `Аудитория: ${campaignAudience}`
-                    : 'Пока нет аудитории'}
-                </span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-meter" aria-hidden="true">
-                <span
-                  className="pro-cabinet-nav-meter-fill"
-                  style={{ '--meter': campaignMeter } as CSSProperties}
-                />
-              </div>
-              <div className="pro-cabinet-nav-stats">
-                <div className="pro-cabinet-nav-stat">
-                  <span className="pro-cabinet-nav-stat-value">
-                    {bookingStats.uniqueClients}
-                  </span>
-                  <span className="pro-cabinet-nav-stat-label">Контакты</span>
-                </div>
-                <div className="pro-cabinet-nav-stat">
-                  <span className="pro-cabinet-nav-stat-value">
-                    {bookingStats.repeatClients}
-                  </span>
-                  <span className="pro-cabinet-nav-stat-label">Лояльные</span>
-                </div>
-              </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-reminders animate delay-7"
-            type="button"
-            onClick={onOpenReminders}
-          >
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconBell />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Сервис</span>
-                <span className="pro-cabinet-nav-title">Напоминания</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  Следующее: {nextBookingLabel}
-                </span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-pills">
-                <span className="pro-cabinet-nav-pill">
-                  Сегодня {todayBookings}
-                </span>
-                <span className="pro-cabinet-nav-pill is-ghost">
-                  На неделе {bookingStats.upcomingWeek}
-                </span>
-              </div>
-              <p className="pro-cabinet-nav-meta">
-                Открытых заявок: {requestStats.open}
               </p>
             </div>
           </button>
