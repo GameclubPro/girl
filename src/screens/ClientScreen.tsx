@@ -445,13 +445,7 @@ export const ClientScreen = ({
                       aria-hidden="true"
                     />
                   </span>
-                  <span
-                    className={`category-label${
-                      item.id === 'brows-lashes' ? ' is-brows-lashes' : ''
-                    }`}
-                  >
-                    {categoryLabel}
-                  </span>
+                  <span className="category-label">{categoryLabel}</span>
                 </button>
               )
             })}
