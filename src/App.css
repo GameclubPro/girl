@@ -16876,6 +16876,13 @@ h2 {
   font-weight: 800;
   color: var(--ink);
   line-height: 1.15;
+  text-align: center;
+}
+
+.category-label.is-brows-lashes {
+  font-size: 13px;
+  line-height: 1.1;
+  transform: translateY(-2px);
 }
 
 .bottom-nav {
