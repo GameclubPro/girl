@@ -16861,22 +16861,19 @@ h2 {
 }
 
 .category-icon {
-  width: clamp(44px, 14vw, 56px);
-  height: clamp(44px, 14vw, 56px);
-  border-radius: 12px;
-  background: rgba(var(--paper-rgb), 0.72);
+  width: clamp(58px, 18vw, 74px);
+  height: clamp(58px, 18vw, 74px);
+  border-radius: 0;
+  background: transparent;
   display: grid;
   place-items: center;
   overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.75),
-    0 8px 14px rgba(var(--shadow-rgb), 0.12);
-  transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+  transition: transform 0.22s ease;
 }
 
 .category-icon-image {
-  width: 80%;
-  height: 80%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -16885,14 +16882,6 @@ h2 {
   font-weight: 800;
   color: var(--ink);
   line-height: 1.2;
-}
-
-.category-card.is-selected .category-icon {
-  transform: scale(1.01);
-  background: rgba(var(--accent-rgb), 0.12);
-  box-shadow:
-    inset 0 0 0 1px rgba(var(--accent-rgb), 0.3),
-    0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
 
 .bottom-nav {
