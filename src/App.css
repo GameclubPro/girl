@@ -15948,6 +15948,10 @@ h2 {
   font-size: 9px;
 }
 
+.screen--client-master-profile .pro-profile-schedule-panel {
+  z-index: 6;
+}
+
 .screen--client-master-profile .master-profile-tabs {
   display: flex;
   gap: 8px;
