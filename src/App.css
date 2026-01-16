@@ -16815,12 +16815,16 @@ h2 {
     radial-gradient(120% 140% at 100% 0%, rgba(var(--shadow-rgb), 0.08), transparent 62%),
     linear-gradient(150deg, rgba(var(--paper-rgb), 0.98), rgba(var(--surface-muted-rgb), 0.9));
   border-radius: 18px;
-  padding: 6px;
+  padding: 6px 6px 8px;
   display: grid;
-  place-items: center;
+  grid-template-rows: 1fr auto;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
   aspect-ratio: 1 / 1;
   position: relative;
   overflow: hidden;
+  text-align: center;
   color: var(--ink);
   cursor: pointer;
   box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.12);
@@ -16882,6 +16886,13 @@ h2 {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.category-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
 }
 
 .category-card.is-selected .category-icon {

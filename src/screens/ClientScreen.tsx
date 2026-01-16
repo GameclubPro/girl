@@ -445,6 +445,7 @@ export const ClientScreen = ({
                       aria-hidden="true"
                     />
                   </span>
+                  <span className="category-label">{categoryLabel}</span>
                 </button>
               )
             })}
