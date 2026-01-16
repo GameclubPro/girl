@@ -17231,7 +17231,8 @@ h2 {
   }
 
   .client-master-actions {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .client-master-profile-actions {
@@ -17717,6 +17718,34 @@ h2 {
   .requests-top {
     align-items: center;
     flex-direction: row;
+  }
+}
+
+@media (max-width: 390px) {
+  .client-master-actions {
+    gap: 8px;
+  }
+
+  .client-master-cta {
+    padding: 11px 12px;
+    font-size: 14px;
+    border-radius: 18px;
+  }
+
+  .client-master-action-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .client-master-action-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (max-width: 340px) {
+  .client-master-actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
