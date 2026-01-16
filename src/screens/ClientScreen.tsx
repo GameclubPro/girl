@@ -422,6 +422,7 @@ export const ClientScreen = ({
           <div className="category-grid">
             {categoryItems.map((item) => {
               const isSelected = item.id === requestCategoryId
+              const categoryLabel = categoryLabelOverrides[item.id] ?? item.label
 
               return (
                 <button
@@ -429,24 +430,21 @@ export const ClientScreen = ({
                   type="button"
                   key={item.id}
                   aria-pressed={isSelected}
+                  aria-label={categoryLabel}
                   onClick={() =>
                     setRequestCategoryId((prev) =>
                       prev === item.id ? null : item.id
                     )
                   }
                 >
-                  <span className="category-left">
-                    <span className="category-icon" aria-hidden="true">
-                      <img
-                        className="category-icon-image"
-                        src={item.icon}
-                        alt=""
-                        aria-hidden="true"
-                      />
-                    </span>
-                    {categoryLabelOverrides[item.id] ?? item.label}
+                  <span className="category-icon" aria-hidden="true">
+                    <img
+                      className="category-icon-image"
+                      src={item.icon}
+                      alt=""
+                      aria-hidden="true"
+                    />
                   </span>
-                  <span className="category-arrow">›</span>
                 </button>
               )
             })}
