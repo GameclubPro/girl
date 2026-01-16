@@ -8734,7 +8734,7 @@
   border: 1px solid rgba(var(--shadow-rgb), 0.16);
   box-shadow: 0 16px 26px rgba(var(--shadow-rgb), 0.2);
   padding: 10px;
-  z-index: 30;
+  z-index: 60;
   animation: rise 0.22s ease forwards;
   transform-origin: bottom right;
 }
@@ -15901,6 +15901,10 @@ h2 {
   outline-offset: 2px;
 }
 
+.screen--client-master-profile .pro-profile-ig-header {
+  margin-top: -32px;
+}
+
 .screen--client-master-profile .pro-profile-ig-name-row {
   gap: 6px;
 }
@@ -16052,6 +16056,7 @@ h2 {
   flex-direction: column;
   gap: 14px;
   position: relative;
+  scroll-margin-top: calc(var(--safe-top) + var(--tg-top-offset) + 64px);
 }
 
 .screen--client-master-profile .master-profile-overview {
@@ -17440,6 +17445,10 @@ h2 {
     margin-top: -56px;
     column-gap: 12px;
     row-gap: 8px;
+  }
+
+  .screen--client-master-profile .pro-profile-ig-header {
+    margin-top: -24px;
   }
 
   .pro-profile-ig-avatar {
