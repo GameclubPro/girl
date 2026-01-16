@@ -7,7 +7,6 @@ import {
   IconStar,
   IconSwap,
   IconUser,
-  IconUsers,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { Booking, RequestResponse, ServiceRequest } from '../types/app'
@@ -185,7 +184,6 @@ type ClientRequestsScreenProps = {
   initialTab?: 'requests' | 'bookings'
   onCreateRequest: () => void
   onViewHome: () => void
-  onViewMasters: () => void
   onViewChats: () => void
   onViewProfile: (masterId: string) => void
   onRescheduleBooking: (booking: Booking) => void
@@ -205,7 +203,6 @@ export const ClientRequestsScreen = ({
   initialTab,
   onCreateRequest,
   onViewHome,
-  onViewMasters,
   onViewChats,
   onViewProfile,
   onRescheduleBooking,
@@ -1501,12 +1498,6 @@ export const ClientRequestsScreen = ({
             <IconHome />
           </span>
           Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewMasters}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUsers />
-          </span>
-          Мастера
         </button>
         <button className="nav-item" type="button" onClick={onViewChats}>
           <span className="nav-icon" aria-hidden="true">

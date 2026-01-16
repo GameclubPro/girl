@@ -4,7 +4,6 @@ import {
   IconHome,
   IconList,
   IconUser,
-  IconUsers,
 } from '../components/icons'
 import { StoryViewer } from '../components/StoryViewer'
 import { categoryItems } from '../data/clientData'
@@ -69,7 +68,6 @@ export const ClientScreen = ({
   onViewShowcase,
   onViewMasters,
   onViewChats,
-  onCreateRequest,
   onViewRequests,
   onViewProfile,
   onViewMasterProfile,
@@ -81,7 +79,6 @@ export const ClientScreen = ({
   onViewShowcase: () => void
   onViewMasters: () => void
   onViewChats: () => void
-  onCreateRequest: (categoryId?: string | null) => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewProfile: () => void
   onViewMasterProfile: (masterId: string) => void
@@ -90,7 +87,6 @@ export const ClientScreen = ({
     (activeCategoryId ? categoryLabelOverrides[activeCategoryId] : '') ??
     categoryItems.find((item) => item.id === activeCategoryId)?.label ??
     ''
-  const [requestCategoryId, setRequestCategoryId] = useState<string | null>(null)
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
   const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([])
   const [isStoriesLoading, setIsStoriesLoading] = useState(false)
@@ -101,10 +97,6 @@ export const ClientScreen = ({
   const [activeStoryIndex, setActiveStoryIndex] = useState(0)
   const showcaseGalleryRef = useRef<HTMLDivElement | null>(null)
   const [showcaseTileWidth, setShowcaseTileWidth] = useState<number | null>(null)
-  const requestCategoryLabel =
-    (requestCategoryId ? categoryLabelOverrides[requestCategoryId] : '') ??
-    categoryItems.find((item) => item.id === requestCategoryId)?.label ??
-    ''
   useEffect(() => {
     let cancelled = false
 
@@ -421,7 +413,7 @@ export const ClientScreen = ({
         <section className="client-section">
           <div className="category-grid">
             {categoryItems.map((item) => {
-              const isSelected = item.id === requestCategoryId
+              const isSelected = item.id === activeCategoryId
               const categoryLabel = categoryLabelOverrides[item.id] ?? item.label
 
               return (
@@ -431,11 +423,10 @@ export const ClientScreen = ({
                   key={item.id}
                   aria-pressed={isSelected}
                   aria-label={categoryLabel}
-                  onClick={() =>
-                    setRequestCategoryId((prev) =>
-                      prev === item.id ? null : item.id
-                    )
-                  }
+                  onClick={() => {
+                    onCategoryChange(item.id)
+                    onViewMasters()
+                  }}
                 >
                   <span className="category-icon" aria-hidden="true">
                     <img
@@ -451,21 +442,10 @@ export const ClientScreen = ({
             })}
           </div>
           <p className="category-helper">
-            {requestCategoryLabel
-              ? `Выбрана категория: ${requestCategoryLabel}`
-              : 'Выберите категорию, чтобы создать заявку'}
+            {activeCategoryLabel
+              ? `Выбрана категория: ${activeCategoryLabel}`
+              : 'Выберите категорию, чтобы открыть мастеров'}
           </p>
-          <button
-            className="cta cta--primary cta--wide"
-            type="button"
-            onClick={() => onCreateRequest(requestCategoryId)}
-            disabled={!requestCategoryId}
-          >
-            <span className="cta-icon" aria-hidden="true">
-              +
-            </span>
-            Создать заявку
-          </button>
         </section>
 
       </div>
@@ -476,12 +456,6 @@ export const ClientScreen = ({
             <IconHome />
           </span>
           Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewMasters}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUsers />
-          </span>
-          Мастера
         </button>
         <button className="nav-item" type="button" onClick={onViewChats}>
           <span className="nav-icon" aria-hidden="true">

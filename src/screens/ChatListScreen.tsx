@@ -5,7 +5,6 @@ import {
   IconList,
   IconSupport,
   IconUser,
-  IconUsers,
 } from '../components/icons'
 import { ProBottomNav } from '../components/ProBottomNav'
 import type { ChatMessage, ChatSummary } from '../types/app'
@@ -20,7 +19,6 @@ type ChatListScreenProps = {
   onOpenChat: (chatId: number) => void
   onOpenSupport?: () => void
   onViewHome?: () => void
-  onViewMasters?: () => void
   onViewRequests?: () => void
   onViewProfile?: () => void
   onViewCabinet?: () => void
@@ -80,7 +78,6 @@ export const ChatListScreen = ({
   onOpenChat,
   onOpenSupport,
   onViewHome,
-  onViewMasters,
   onViewRequests,
   onViewProfile,
   onViewCabinet,
@@ -565,12 +562,6 @@ export const ChatListScreen = ({
               <IconHome />
             </span>
             Главная
-          </button>
-          <button className="nav-item" type="button" onClick={onViewMasters}>
-            <span className="nav-icon" aria-hidden="true">
-              <IconUsers />
-            </span>
-            Мастера
           </button>
           <button className="nav-item is-active" type="button">
             <span className="nav-icon" aria-hidden="true">

@@ -5,7 +5,6 @@ import {
   IconHome,
   IconList,
   IconUser,
-  IconUsers,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, UserLocation } from '../types/app'
@@ -24,6 +23,7 @@ type ClientShowcaseScreenProps = {
   onBack: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewChats: () => void
+  onCreateRequest: (categoryId?: string | null) => void
   onCreateBooking: (masterId: string) => void
   onViewProfile: (masterId: string) => void
   onViewClientProfile: () => void
@@ -38,7 +38,6 @@ type ClientShowcaseGalleryScreenProps = {
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
   onBack: () => void
-  onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewChats: () => void
   onViewDetail: (item: ShowcaseMedia) => void
@@ -50,7 +49,6 @@ type ClientShowcaseDetailScreenProps = {
   activeCategoryId: string | null
   onBack: () => void
   onViewHome: () => void
-  onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewChats: () => void
   onViewClientProfile: () => void
@@ -359,7 +357,6 @@ export const ClientShowcaseGalleryScreen = ({
   activeCategoryId,
   onCategoryChange,
   onBack,
-  onViewMasters,
   onViewRequests,
   onViewChats,
   onViewDetail,
@@ -521,17 +518,11 @@ export const ClientShowcaseGalleryScreen = ({
       </div>
 
       <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item" type="button" onClick={onBack}>
+        <button className="nav-item is-active" type="button" onClick={onBack}>
           <span className="nav-icon" aria-hidden="true">
             <IconHome />
           </span>
           Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewMasters}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUsers />
-          </span>
-          Мастера
         </button>
         <button className="nav-item" type="button" onClick={onViewChats}>
           <span className="nav-icon" aria-hidden="true">
@@ -561,7 +552,6 @@ export const ClientShowcaseDetailScreen = ({
   activeCategoryId,
   onBack,
   onViewHome,
-  onViewMasters,
   onViewRequests,
   onViewChats,
   onViewClientProfile,
@@ -732,12 +722,6 @@ export const ClientShowcaseDetailScreen = ({
           </span>
           Главная
         </button>
-        <button className="nav-item" type="button" onClick={onViewMasters}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUsers />
-          </span>
-          Мастера
-        </button>
         <button className="nav-item" type="button" onClick={onViewChats}>
           <span className="nav-icon" aria-hidden="true">
             <IconChat />
@@ -768,6 +752,7 @@ export const ClientShowcaseScreen = ({
   onBack,
   onViewRequests,
   onViewChats,
+  onCreateRequest,
   onCreateBooking,
   onViewProfile,
   onViewClientProfile,
@@ -1365,20 +1350,29 @@ export const ClientShowcaseScreen = ({
             </div>
           )}
         </section>
+
+        <section className="client-section client-master-request">
+          <div className="client-master-request-card">
+            <button
+              className="cta cta--primary cta--wide"
+              type="button"
+              onClick={() => onCreateRequest(activeCategoryId)}
+            >
+              <span className="cta-icon" aria-hidden="true">
+                +
+              </span>
+              Создать заявку
+            </button>
+          </div>
+        </section>
       </div>
 
       <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item" type="button" onClick={onBack}>
+        <button className="nav-item is-active" type="button" onClick={onBack}>
           <span className="nav-icon" aria-hidden="true">
             <IconHome />
           </span>
           Главная
-        </button>
-        <button className="nav-item is-active" type="button">
-          <span className="nav-icon" aria-hidden="true">
-            <IconUsers />
-          </span>
-          Мастера
         </button>
         <button className="nav-item" type="button" onClick={onViewChats}>
           <span className="nav-icon" aria-hidden="true">

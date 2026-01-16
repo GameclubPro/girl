@@ -988,12 +988,6 @@ function App() {
         onViewShowcase={() => setView('client-gallery')}
         onViewMasters={() => setView('client-showcase')}
         onViewChats={openChatList}
-        onCreateRequest={(categoryId) => {
-          setRequestCategoryId(
-            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
-          )
-          setView('request')
-        }}
         onViewRequests={(tab) => openRequests(tab)}
         onViewProfile={() => setView('client-profile')}
         onViewMasterProfile={(masterId) => {
@@ -1051,6 +1045,12 @@ function App() {
         onViewRequests={(tab) => openRequests(tab)}
         onViewChats={openChatList}
         onViewClientProfile={() => setView('client-profile')}
+        onCreateRequest={(categoryId) => {
+          setRequestCategoryId(
+            categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
+          )
+          setView('request')
+        }}
         clientLocation={clientLocation}
         isLocating={isLocating}
         onRequestLocation={handleRequestLocation}
@@ -1125,10 +1125,6 @@ function App() {
           setSelectedShowcaseItem(null)
           setView('client')
         }}
-        onViewMasters={() => {
-          setSelectedShowcaseItem(null)
-          setView('client-showcase')
-        }}
         onViewRequests={() => {
           setSelectedShowcaseItem(null)
           openRequests()
@@ -1168,7 +1164,6 @@ function App() {
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onBack={() => setView('client')}
-        onViewMasters={() => setView('client-showcase')}
         onViewRequests={(tab) => openRequests(tab)}
         onViewChats={openChatList}
         onViewClientProfile={() => setView('client-profile')}
@@ -1189,7 +1184,6 @@ function App() {
         onOpenChat={(chatId) => openChatThread(chatId, 'chats')}
         onOpenSupport={() => void openSupportChat('chats')}
         onViewHome={() => setView('client')}
-        onViewMasters={() => setView('client-showcase')}
         onViewRequests={() =>
           role === 'pro' ? openProRequests() : openRequests()
         }
@@ -1280,7 +1274,6 @@ function App() {
           setView('request')
         }}
         onViewHome={() => setView('client')}
-        onViewMasters={() => setView('client-showcase')}
         onViewChats={openChatList}
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)

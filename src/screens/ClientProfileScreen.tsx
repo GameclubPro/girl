@@ -8,7 +8,6 @@ import {
   IconRefresh,
   IconStar,
   IconUser,
-  IconUsers,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type { Booking, ServiceRequest, UserLocation } from '../types/app'
@@ -1415,12 +1414,6 @@ export const ClientProfileScreen = ({
             <IconHome />
           </span>
           Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewMasters}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUsers />
-          </span>
-          Мастера
         </button>
         <button className="nav-item" type="button" onClick={onViewChats}>
           <span className="nav-icon" aria-hidden="true">

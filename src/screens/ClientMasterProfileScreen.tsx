@@ -1829,17 +1829,11 @@ export const ClientMasterProfileScreen = ({
       )}
 
       <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item" type="button" onClick={onViewHome}>
+        <button className="nav-item is-active" type="button" onClick={onViewHome}>
           <span className="nav-icon" aria-hidden="true">
             <IconHome />
           </span>
           Главная
-        </button>
-        <button className="nav-item is-active" type="button" onClick={onViewMasters}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUsers />
-          </span>
-          Мастера
         </button>
         <button className="nav-item" type="button" onClick={onViewChats}>
           <span className="nav-icon" aria-hidden="true">
