@@ -12,8 +12,9 @@ import {
   IconHome,
   IconList,
   IconPin,
+  IconStar,
+  IconCheck,
   IconUser,
-  IconUsers,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type {
@@ -959,8 +960,6 @@ export const ClientMasterProfileScreen = ({
                 </div>
                 <div className="pro-profile-ig-name-row">
                   <h1 className="pro-profile-ig-name">{displayName}</h1>
-                </div>
-                <div className="master-profile-follow-row">
                   <button
                     className={`pro-profile-ig-button master-profile-follow-button master-profile-follow-inline${
                       isFavorite ? ' is-active' : ''
@@ -970,7 +969,7 @@ export const ClientMasterProfileScreen = ({
                     aria-label={followAriaLabel}
                   >
                     <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                      <IconUsers />
+                      {isFavorite ? <IconCheck /> : <IconStar />}
                     </span>
                     <span className="pro-profile-ig-button-label">
                       {followActionLabel}

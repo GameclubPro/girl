@@ -15834,6 +15834,7 @@ h2 {
 
 .screen--client-master-profile .pro-shell {
   gap: 18px;
+  z-index: auto;
 }
 
 .master-profile-header {
@@ -15908,20 +15909,18 @@ h2 {
 }
 
 .screen--client-master-profile .pro-profile-ig-header {
-  row-gap: 8px;
+  row-gap: 6px;
 }
 
-.master-profile-follow-row {
-  grid-column: 2 / -1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+.screen--client-master-profile .pro-profile-ig-name-row {
+  gap: 6px;
 }
 
 .screen--client-master-profile .master-profile-follow-inline {
-  padding: 6px 12px;
+  padding: 6px 10px;
   font-size: 11px;
+  letter-spacing: 0;
+  line-height: 1;
   border-radius: 999px;
   box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.12);
 }

@@ -549,6 +549,19 @@ export const IconStar = () => (
   </svg>
 )
 
+export const IconCheck = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5.5 12.6 10 17l8.5-9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 export const IconSwap = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
