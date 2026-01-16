@@ -68,6 +68,22 @@ export const MediaCropper = ({
   const scaleRef = useRef(1)
   const offsetRef = useRef({ x: 0, y: 0 })
 
+  const applyTransform = useCallback(
+    (nextScale: number, nextOffset: { x: number; y: number }) => {
+      scaleRef.current = nextScale
+      offsetRef.current = nextOffset
+      setScale(nextScale)
+      setOffset(nextOffset)
+    },
+    []
+  )
+
+  const resetPointers = useCallback(() => {
+    pointersRef.current.clear()
+    lastDragRef.current = null
+    lastDistanceRef.current = null
+  }, [])
+
   const aspect = useMemo(() => (kind === 'avatar' ? 1 : coverAspect), [
     kind,
     coverAspect,
@@ -79,17 +95,16 @@ export const MediaCropper = ({
   const title = kind === 'avatar' ? 'Новый аватар' : 'Новая шапка'
   const hint =
     kind === 'avatar'
-      ? 'Перетащите фото и масштабируйте, чтобы лицо было в центре.'
-      : 'Сместите кадр так, чтобы ключевая зона была ближе к середине.'
-
-  useEffect(() => {
-    scaleRef.current = scale
-    offsetRef.current = offset
-  }, [scale, offset])
+      ? 'Перетащите фото и масштабируйте щипком или ползунком.'
+      : 'Сместите кадр и отрегулируйте масштаб щипком или ползунком.'
 
   useEffect(() => {
     setLocalError('')
-  }, [src, kind])
+    resetPointers()
+    setMinScale(1)
+    setMaxScale(3)
+    applyTransform(1, { x: 0, y: 0 })
+  }, [applyTransform, resetPointers, src, kind])
 
   useEffect(() => {
     setImageSize(null)
@@ -108,7 +123,16 @@ export const MediaCropper = ({
     if (!frame) return
     const rect = frame.getBoundingClientRect()
     if (!rect.width || !rect.height) return
-    setCropRect({ width: rect.width, height: rect.height })
+    setCropRect((current) => {
+      if (
+        current &&
+        Math.abs(current.width - rect.width) < 0.5 &&
+        Math.abs(current.height - rect.height) < 0.5
+      ) {
+        return current
+      }
+      return { width: rect.width, height: rect.height }
+    })
   }, [])
 
   useEffect(() => {
@@ -123,17 +147,27 @@ export const MediaCropper = ({
   }, [aspect, measureCropRect])
 
   useEffect(() => {
+    const frame = frameRef.current
+    if (!frame || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => measureCropRect())
+    observer.observe(frame)
+    return () => observer.disconnect()
+  }, [measureCropRect])
+
+  useEffect(() => {
     if (!imageSize || !cropRect) return
-    const nextMinScale = Math.max(
+    const rawMinScale = Math.max(
       cropRect.width / imageSize.width,
       cropRect.height / imageSize.height
     )
-    const nextMaxScale = nextMinScale * 4
+    const nextMinScale =
+      Number.isFinite(rawMinScale) && rawMinScale > 0 ? rawMinScale : 1
+    const nextMaxScale = Math.max(nextMinScale * 4, nextMinScale + 0.01)
     setMinScale(nextMinScale)
     setMaxScale(nextMaxScale)
-    setScale(nextMinScale)
-    setOffset({ x: 0, y: 0 })
-  }, [cropRect, imageSize, src])
+    applyTransform(nextMinScale, { x: 0, y: 0 })
+    resetPointers()
+  }, [applyTransform, cropRect, imageSize, resetPointers, src])
 
   const clampOffset = useCallback(
     (next: { x: number; y: number }, nextScale: number) => {
@@ -163,6 +197,8 @@ export const MediaCropper = ({
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (isLocked) return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (pointersRef.current.size >= 2) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     pointersRef.current.set(event.pointerId, {
@@ -193,9 +229,12 @@ export const MediaCropper = ({
       const prev = lastDragRef.current ?? next
       const dx = next.x - prev.x
       const dy = next.y - prev.y
-      setOffset((current) =>
-        clampOffset({ x: current.x + dx, y: current.y + dy }, scaleRef.current)
+      const currentOffset = offsetRef.current
+      const nextOffset = clampOffset(
+        { x: currentOffset.x + dx, y: currentOffset.y + dy },
+        scaleRef.current
       )
+      applyTransform(scaleRef.current, nextOffset)
       lastDragRef.current = next
       return
     }
@@ -220,8 +259,7 @@ export const MediaCropper = ({
         x: center.x - imgX * nextScale,
         y: center.y - imgY * nextScale,
       }
-      setScale(nextScale)
-      setOffset(clampOffset(nextOffset, nextScale))
+      applyTransform(nextScale, clampOffset(nextOffset, nextScale))
       lastDistanceRef.current = distance
     }
   }
@@ -243,7 +281,7 @@ export const MediaCropper = ({
   }
 
   const handleZoomChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextScale = Number(event.target.value)
+    const nextScale = clamp(Number(event.target.value), minScale, maxScale)
     const currentScale = scaleRef.current
     const currentOffset = offsetRef.current
     const imgX = (0 - currentOffset.x) / currentScale
@@ -252,14 +290,12 @@ export const MediaCropper = ({
       x: 0 - imgX * nextScale,
       y: 0 - imgY * nextScale,
     }
-    setScale(nextScale)
-    setOffset(clampOffset(nextOffset, nextScale))
+    applyTransform(nextScale, clampOffset(nextOffset, nextScale))
   }
 
   const handleReset = () => {
     if (!canRender) return
-    setScale(minScale)
-    setOffset({ x: 0, y: 0 })
+    applyTransform(minScale, { x: 0, y: 0 })
     setLocalError('')
   }
 
@@ -267,14 +303,22 @@ export const MediaCropper = ({
     if (!imageRef.current || !cropRect || !imageSize) return ''
     const currentScale = scaleRef.current
     const currentOffset = offsetRef.current
-    const cropWidth = cropRect.width / currentScale
-    const cropHeight = cropRect.height / currentScale
+    const cropWidth = Math.min(imageSize.width, cropRect.width / currentScale)
+    const cropHeight = Math.min(imageSize.height, cropRect.height / currentScale)
     const cropLeft =
       imageSize.width / 2 - cropWidth / 2 - currentOffset.x / currentScale
     const cropTop =
       imageSize.height / 2 - cropHeight / 2 - currentOffset.y / currentScale
-    const safeLeft = clamp(cropLeft, 0, imageSize.width - cropWidth)
-    const safeTop = clamp(cropTop, 0, imageSize.height - cropHeight)
+    const safeLeft = clamp(
+      cropLeft,
+      0,
+      Math.max(0, imageSize.width - cropWidth)
+    )
+    const safeTop = clamp(
+      cropTop,
+      0,
+      Math.max(0, imageSize.height - cropHeight)
+    )
     const targetWidth =
       kind === 'avatar' ? AVATAR_TARGET_SIZE : COVER_TARGET_WIDTH
     let outputWidth = Math.min(targetWidth, Math.round(cropWidth))
@@ -366,25 +410,9 @@ export const MediaCropper = ({
     >
       <div className="pro-cropper-shell">
         <div className="pro-cropper-header">
-          <button
-            className="pro-cropper-action"
-            type="button"
-            onClick={onCancel}
-            disabled={isLocked}
-          >
-            Отмена
-          </button>
           <div className="pro-cropper-title" id="pro-cropper-title">
             {title}
           </div>
-          <button
-            className="pro-cropper-action is-primary"
-            type="button"
-            onClick={handleConfirm}
-            disabled={isLocked || !canRender}
-          >
-            {isLocked ? 'Сохраняем...' : 'Готово'}
-          </button>
         </div>
         <div
           className="pro-cropper-viewport"
@@ -392,7 +420,6 @@ export const MediaCropper = ({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          onPointerLeave={handlePointerUp}
           role="presentation"
         >
           <img
@@ -450,6 +477,24 @@ export const MediaCropper = ({
           {(localError || error) && (
             <p className="pro-cropper-error">{localError || error}</p>
           )}
+          <div className="pro-cropper-actions">
+            <button
+              className="pro-cropper-action is-secondary"
+              type="button"
+              onClick={onCancel}
+              disabled={isLocked}
+            >
+              Отмена
+            </button>
+            <button
+              className="pro-cropper-action is-primary"
+              type="button"
+              onClick={handleConfirm}
+              disabled={isLocked || !canRender}
+            >
+              {isLocked ? 'Сохраняем...' : 'Готово'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
