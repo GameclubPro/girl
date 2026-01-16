@@ -967,12 +967,8 @@ export const ClientMasterProfileScreen = ({
                     <span aria-hidden="true">{initials}</span>
                   )}
                 </div>
-              </div>
-              <div className="master-profile-identity">
-                <div className="master-profile-title-row">
-                  <h1 className="pro-profile-ig-name master-profile-title">
-                    {displayName}
-                  </h1>
+                <div className="pro-profile-ig-name-row">
+                  <h1 className="pro-profile-ig-name">{displayName}</h1>
                   <button
                     className={`pro-profile-ig-button master-profile-follow-button master-profile-follow-inline${
                       isFavorite ? ' is-active' : ''
