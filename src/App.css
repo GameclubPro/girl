@@ -15907,6 +15907,40 @@ h2 {
   outline-offset: 2px;
 }
 
+.screen--client-master-profile .pro-profile-ig-header {
+  row-gap: 8px;
+}
+
+.master-profile-follow-row {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.screen--client-master-profile .master-profile-follow-inline {
+  padding: 6px 12px;
+  font-size: 11px;
+  border-radius: 999px;
+  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.12);
+}
+
+.screen--client-master-profile .pro-profile-ig-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 6px;
+}
+
+.screen--client-master-profile .master-profile-booking-cta {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 16px;
+  font-size: 14px;
+  border-radius: 18px;
+  letter-spacing: 0.02em;
+}
+
 .screen--client-master-profile .pro-profile-ig-stats {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;

@@ -36,7 +36,6 @@ type ClientMasterProfileScreenProps = {
   userId: string
   onBack: () => void
   onViewHome: () => void
-  onViewMasters: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewChats: () => void
   onViewProfile: () => void
@@ -269,7 +268,6 @@ export const ClientMasterProfileScreen = ({
   userId,
   onBack,
   onViewHome,
-  onViewMasters,
   onViewRequests,
   onViewChats,
   onViewProfile,
@@ -924,22 +922,6 @@ export const ClientMasterProfileScreen = ({
         >
           ←
         </button>
-        <button
-          className={`master-profile-like${isFavorite ? ' is-active' : ''}`}
-          type="button"
-          onClick={() => onToggleFavorite(favoritePayload)}
-          aria-label={followAriaLabel}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 20.2s-6.4-3.7-8.6-7.4c-1.6-2.7-0.8-6.1 2-7.2 2.1-0.9 4.6-0.1 6.6 1.8 2-1.9 4.5-2.7 6.6-1.8 2.8 1.1 3.6 4.5 2 7.2-2.2 3.7-8.6 7.4-8.6 7.4Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
 
         {loadError && <p className="pro-error">{loadError}</p>}
         {isLoading ? (
@@ -967,21 +949,38 @@ export const ClientMasterProfileScreen = ({
                   </span>
                 )}
               </div>
-            <div className="pro-profile-ig-header">
-              <div className="pro-profile-ig-avatar">
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
-                ) : (
-                  <span aria-hidden="true">{initials}</span>
-                )}
-              </div>
-              <div className="pro-profile-ig-name-row">
-                <h1 className="pro-profile-ig-name">{displayName}</h1>
-              </div>
-              <div className="pro-profile-ig-stats">
-                {profileStats.map((stat) => (
+              <div className="pro-profile-ig-header">
+                <div className="pro-profile-ig-avatar">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
+                  ) : (
+                    <span aria-hidden="true">{initials}</span>
+                  )}
+                </div>
+                <div className="pro-profile-ig-name-row">
+                  <h1 className="pro-profile-ig-name">{displayName}</h1>
+                </div>
+                <div className="master-profile-follow-row">
                   <button
-                    className={`pro-profile-ig-stat pro-profile-ig-stat-button${
+                    className={`pro-profile-ig-button master-profile-follow-button master-profile-follow-inline${
+                      isFavorite ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    onClick={() => onToggleFavorite(favoritePayload)}
+                    aria-label={followAriaLabel}
+                  >
+                    <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                      <IconUsers />
+                    </span>
+                    <span className="pro-profile-ig-button-label">
+                      {followActionLabel}
+                    </span>
+                  </button>
+                </div>
+                <div className="pro-profile-ig-stats">
+                  {profileStats.map((stat) => (
+                    <button
+                      className={`pro-profile-ig-stat pro-profile-ig-stat-button${
                       activeStat === stat.id ? ' is-active' : ''
                     }`}
                     type="button"
@@ -1000,33 +999,11 @@ export const ClientMasterProfileScreen = ({
             </div>
               <div className="pro-profile-ig-actions">
                 <button
-                  className="pro-profile-ig-button pro-profile-ig-button--primary"
+                  className="pro-profile-ig-button pro-profile-ig-button--primary master-profile-booking-cta"
                   type="button"
                   onClick={onCreateBooking}
                 >
                   Записаться
-                </button>
-                <button
-                  className={`pro-profile-ig-button master-profile-follow-button${
-                    isFavorite ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  onClick={() => onToggleFavorite(favoritePayload)}
-                  aria-label={followAriaLabel}
-                >
-                  <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                    <IconUsers />
-                  </span>
-                  <span className="pro-profile-ig-button-label">
-                    {followActionLabel}
-                  </span>
-                </button>
-                <button
-                  className="pro-profile-ig-button"
-                  type="button"
-                  onClick={onViewMasters}
-                >
-                  Все мастера
                 </button>
               </div>
             </section>

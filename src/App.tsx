@@ -1083,10 +1083,6 @@ function App() {
           setSelectedMasterId(null)
           setView('client')
         }}
-        onViewMasters={() => {
-          setSelectedMasterId(null)
-          setView('client-showcase')
-        }}
         onViewRequests={() => {
           setSelectedMasterId(null)
           openRequests()
