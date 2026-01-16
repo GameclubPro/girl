@@ -15743,13 +15743,17 @@ h2 {
 
 .client-master-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   position: relative;
   z-index: 1;
 }
 
 .client-master-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid rgba(var(--ink-rgb), 0.18);
   border-radius: 20px;
   padding: 13px 16px;
@@ -15759,11 +15763,26 @@ h2 {
   background: #ffffff;
   box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.14);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .client-master-cta:focus-visible {
   outline: 3px solid rgba(var(--accent-rgb), 0.35);
   outline-offset: 2px;
+}
+
+.client-master-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.client-master-action-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .client-master-ghost {

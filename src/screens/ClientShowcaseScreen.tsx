@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   IconChat,
+  IconCalendar,
   IconFilter,
   IconHome,
   IconList,
@@ -1349,13 +1350,19 @@ export const ClientShowcaseScreen = ({
                         type="button"
                         onClick={() => onCreateBooking(master.id)}
                       >
+                        <span className="client-master-action-icon" aria-hidden="true">
+                          <IconCalendar />
+                        </span>
                         Записаться
                       </button>
                       <button
-                        className="client-master-ghost"
+                        className="client-master-cta"
                         type="button"
                         onClick={() => onViewProfile(master.id)}
                       >
+                        <span className="client-master-action-icon" aria-hidden="true">
+                          <IconUser />
+                        </span>
                         Профиль
                       </button>
                     </div>
