@@ -16808,14 +16808,14 @@ h2 {
 }
 
 .category-card {
-  width: min(168px, 42vw);
+  width: min(148px, 36vw);
   border: 1px solid rgba(var(--shadow-rgb), 0.14);
   background:
     radial-gradient(120% 120% at 10% 10%, rgba(var(--accent-rgb), 0.14), transparent 60%),
     radial-gradient(120% 140% at 100% 0%, rgba(var(--shadow-rgb), 0.08), transparent 62%),
     linear-gradient(150deg, rgba(var(--paper-rgb), 0.98), rgba(var(--surface-muted-rgb), 0.9));
-  border-radius: 20px;
-  padding: 8px;
+  border-radius: 18px;
+  padding: 6px;
   display: grid;
   place-items: center;
   aspect-ratio: 1 / 1;
@@ -16830,8 +16830,8 @@ h2 {
 .category-card::after {
   content: '';
   position: absolute;
-  inset: 6px;
-  border-radius: 14px;
+  inset: 5px;
+  border-radius: 12px;
   border: 1px solid rgba(var(--paper-rgb), 0.6);
   opacity: 0.55;
   pointer-events: none;
@@ -16867,7 +16867,7 @@ h2 {
 .category-icon {
   width: 100%;
   height: 100%;
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(var(--paper-rgb), 0.72);
   display: grid;
   place-items: center;
