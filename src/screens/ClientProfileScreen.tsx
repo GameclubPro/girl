@@ -107,10 +107,8 @@ const formatRating = (average?: number | null, count?: number | null) => {
 }
 
 const categoryLabelOverrides: Record<string, string> = {
-  'beauty-nails': 'Маникюр',
-  'makeup-look': 'Макияж',
-  'cosmetology-care': 'Косметология',
-  'fitness-health': 'Фитнес',
+  'beauty-nails': 'Ногти',
+  'cosmetology-care': 'Уход за лицом',
 }
 
 const getCategoryLabel = (categoryId: string) =>

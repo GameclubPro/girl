@@ -62,10 +62,8 @@ type ClientShowcaseDetailScreenProps = {
 }
 
 const categoryLabelOverrides: Record<string, string> = {
-  'beauty-nails': 'Маникюр',
-  'makeup-look': 'Макияж',
-  'cosmetology-care': 'Косметология',
-  'fitness-health': 'Фитнес',
+  'beauty-nails': 'Ногти',
+  'cosmetology-care': 'Уход за лицом',
 }
 
 const categoryChips = [
@@ -92,11 +90,7 @@ const categoryPalettes: Record<string, CategoryPalette> = {
   'beauty-nails': basePalette,
   'brows-lashes': basePalette,
   hair: basePalette,
-  'makeup-look': basePalette,
   'cosmetology-care': basePalette,
-  'massage-body': basePalette,
-  'fitness-health': basePalette,
-  'home-family': basePalette,
   default: basePalette,
 }
 

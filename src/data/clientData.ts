@@ -1,11 +1,7 @@
 import categoryBeautyNails from '../assets/categories/beauty-nails.webp'
 import categoryBrowsLashes from '../assets/categories/brows-lashes.webp'
 import categoryHair from '../assets/categories/hair.webp'
-import categoryMakeupLook from '../assets/categories/makeup-look.webp'
 import categoryCosmetologyCare from '../assets/categories/cosmetology-care.webp'
-import categoryMassageBody from '../assets/categories/massage-body.webp'
-import categoryFitnessHealth from '../assets/categories/fitness-health.webp'
-import categoryHomeFamily from '../assets/categories/home-family.webp'
 import popularNails from '../assets/popular/nails.webp'
 import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
@@ -122,16 +118,12 @@ export const storyItems = [
 ] satisfies StoryItem[]
 
 export const categoryItems = [
-  { id: 'beauty-nails', icon: categoryBeautyNails, label: 'Красота и ногти' },
+  { id: 'beauty-nails', icon: categoryBeautyNails, label: 'Ногти' },
   { id: 'brows-lashes', icon: categoryBrowsLashes, label: 'Брови и ресницы' },
   { id: 'hair', icon: categoryHair, label: 'Волосы' },
-  { id: 'makeup-look', icon: categoryMakeupLook, label: 'Макияж и образ' },
   {
     id: 'cosmetology-care',
     icon: categoryCosmetologyCare,
-    label: 'Косметология и уход',
+    label: 'Уход за лицом',
   },
-  { id: 'massage-body', icon: categoryMassageBody, label: 'Массаж и тело' },
-  { id: 'fitness-health', icon: categoryFitnessHealth, label: 'Фитнес и здоровье' },
-  { id: 'home-family', icon: categoryHomeFamily, label: 'Дом и семья' },
 ] as const

@@ -12,10 +12,8 @@ import type { MasterProfile, StoryGroup } from '../types/app'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
 const categoryLabelOverrides: Record<string, string> = {
-  'beauty-nails': 'Маникюр',
-  'makeup-look': 'Макияж',
-  'cosmetology-care': 'Косметология',
-  'fitness-health': 'Фитнес',
+  'beauty-nails': 'Ногти',
+  'cosmetology-care': 'Уход за лицом',
 }
 
 type ShowcaseMedia = {
