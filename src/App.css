@@ -8695,7 +8695,7 @@
 
 .pro-profile-schedule-info-wrap {
   position: relative;
-  z-index: 3;
+  z-index: 8;
 }
 
 .pro-profile-schedule-info {
@@ -8734,7 +8734,7 @@
   border: 1px solid rgba(var(--shadow-rgb), 0.16);
   box-shadow: 0 16px 26px rgba(var(--shadow-rgb), 0.2);
   padding: 10px;
-  z-index: 20;
+  z-index: 30;
   animation: rise 0.22s ease forwards;
   transform-origin: bottom right;
 }
@@ -15884,13 +15884,6 @@ h2 {
   cursor: pointer;
 }
 
-.master-profile-back {
-  position: absolute;
-  top: calc(var(--safe-top) + var(--tg-top-offset) + 8px);
-  left: var(--pro-pad-x, 18px);
-  z-index: 6;
-}
-
 .master-profile-like svg {
   width: 18px;
   height: 18px;
@@ -15909,11 +15902,30 @@ h2 {
 }
 
 .screen--client-master-profile .pro-profile-ig-header {
-  row-gap: 6px;
+  grid-template-columns: auto;
+  grid-template-rows: auto;
+  row-gap: 0;
+  column-gap: 0;
 }
 
-.screen--client-master-profile .pro-profile-ig-name-row {
+.master-profile-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 6px;
+}
+
+.master-profile-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.master-profile-title {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .screen--client-master-profile .master-profile-follow-inline {

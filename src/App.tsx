@@ -1075,10 +1075,6 @@ function App() {
         apiBase={apiBase}
         masterId={selectedMasterId}
         userId={userId}
-        onBack={() => {
-          setSelectedMasterId(null)
-          setView('client-showcase')
-        }}
         onViewHome={() => {
           setSelectedMasterId(null)
           setView('client')

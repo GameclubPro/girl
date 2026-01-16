@@ -35,7 +35,6 @@ type ClientMasterProfileScreenProps = {
   apiBase: string
   masterId: string
   userId: string
-  onBack: () => void
   onViewHome: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewChats: () => void
@@ -267,7 +266,6 @@ export const ClientMasterProfileScreen = ({
   apiBase,
   masterId,
   userId,
-  onBack,
   onViewHome,
   onViewRequests,
   onViewChats,
@@ -311,6 +309,10 @@ export const ClientMasterProfileScreen = ({
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
   const reviewsSectionRef = useRef<HTMLElement | null>(null)
   const followersRequestIdRef = useRef(0)
+  const favoriteStateRef = useRef<{ masterId: string; isFavorite: boolean }>({
+    masterId: '',
+    isFavorite: false,
+  })
 
   useEffect(() => {
     if (!masterId) return
@@ -328,6 +330,12 @@ export const ClientMasterProfileScreen = ({
         const data = (await response.json()) as MasterProfile
         if (!cancelled) {
           setProfile(data)
+          setFollowersTotal(
+            typeof data.followersCount === 'number' &&
+              Number.isFinite(data.followersCount)
+              ? Math.max(0, Math.round(data.followersCount))
+              : 0
+          )
         }
       } catch (error) {
         if (!cancelled) {
@@ -642,7 +650,9 @@ export const ClientMasterProfileScreen = ({
     Number.isFinite(profile.followersCount)
       ? Math.max(0, Math.round(profile.followersCount))
       : 0
-  const followersValue = followersCount.toLocaleString('ru-RU')
+  const followersDisplayCount =
+    followersTotal > 0 || followersCount === 0 ? followersTotal : followersCount
+  const followersValue = followersDisplayCount.toLocaleString('ru-RU')
   const followersQueryValue = followersQuery.trim()
   const followersQueryFetch = followersQueryDebounced
   const followersTotalLabel = formatCount(
@@ -659,10 +669,6 @@ export const ClientMasterProfileScreen = ({
     ? 'Никого не нашли.'
     : 'Пока нет подписчиков.'
   const followersInitialLoading = isFollowersLoading && followers.length === 0
-
-  useEffect(() => {
-    setFollowersTotal((current) => (current > 0 ? current : followersCount))
-  }, [followersCount])
 
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
@@ -826,6 +832,18 @@ export const ClientMasterProfileScreen = ({
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_PREVIEW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded
   const isFavorite = favorites.some((favorite) => favorite.masterId === masterId)
+  useEffect(() => {
+    if (!profile) return
+    if (favoriteStateRef.current.masterId !== masterId) {
+      favoriteStateRef.current = { masterId, isFavorite }
+      return
+    }
+    if (favoriteStateRef.current.isFavorite === isFavorite) return
+    favoriteStateRef.current = { masterId, isFavorite }
+    setFollowersTotal((current) =>
+      Math.max(0, current + (isFavorite ? 1 : -1))
+    )
+  }, [isFavorite, masterId, profile])
   const followActionLabel = isFavorite ? 'Вы подписаны' : 'Подписаться'
   const followAriaLabel = isFavorite
     ? 'Отписаться от мастера'
@@ -915,15 +933,6 @@ export const ClientMasterProfileScreen = ({
   return (
     <div className="screen screen--client screen--client-master-profile">
       <div className="pro-shell pro-shell--ig">
-        <button
-          className="pro-back master-profile-back"
-          type="button"
-          onClick={onBack}
-          aria-label="Назад"
-        >
-          ←
-        </button>
-
         {loadError && <p className="pro-error">{loadError}</p>}
         {isLoading ? (
           <div className="master-profile-skeleton" aria-hidden="true">
@@ -958,8 +967,12 @@ export const ClientMasterProfileScreen = ({
                     <span aria-hidden="true">{initials}</span>
                   )}
                 </div>
-                <div className="pro-profile-ig-name-row">
-                  <h1 className="pro-profile-ig-name">{displayName}</h1>
+              </div>
+              <div className="master-profile-identity">
+                <div className="master-profile-title-row">
+                  <h1 className="pro-profile-ig-name master-profile-title">
+                    {displayName}
+                  </h1>
                   <button
                     className={`pro-profile-ig-button master-profile-follow-button master-profile-follow-inline${
                       isFavorite ? ' is-active' : ''
@@ -980,22 +993,22 @@ export const ClientMasterProfileScreen = ({
                   {profileStats.map((stat) => (
                     <button
                       className={`pro-profile-ig-stat pro-profile-ig-stat-button${
-                      activeStat === stat.id ? ' is-active' : ''
-                    }`}
-                    type="button"
-                    key={stat.id}
-                    onClick={() => handleStatTap(stat.id)}
-                    aria-label={getStatAriaLabel(stat)}
-                    aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
-                  >
-                    <span className="pro-profile-ig-stat-value">{stat.value}</span>
-                    <span className="pro-profile-ig-stat-label">
-                      {stat.label}
-                    </span>
-                  </button>
-                ))}
+                        activeStat === stat.id ? ' is-active' : ''
+                      }`}
+                      type="button"
+                      key={stat.id}
+                      onClick={() => handleStatTap(stat.id)}
+                      aria-label={getStatAriaLabel(stat)}
+                      aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
+                    >
+                      <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                      <span className="pro-profile-ig-stat-label">
+                        {stat.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
               <div className="pro-profile-ig-actions">
                 <button
                   className="pro-profile-ig-button pro-profile-ig-button--primary master-profile-booking-cta"
