@@ -1018,6 +1018,21 @@ export const ClientShowcaseScreen = ({
           </div>
         </section>
 
+        <section className="client-section client-master-request">
+          <div className="client-master-request-card">
+            <button
+              className="cta cta--primary cta--wide"
+              type="button"
+              onClick={() => onCreateRequest(activeCategoryId)}
+            >
+              <span className="cta-icon" aria-hidden="true">
+                +
+              </span>
+              Создать заявку
+            </button>
+          </div>
+        </section>
+
         <section className="client-section">
           <div className="client-master-search">
             <div className="client-master-search-field">
@@ -1349,21 +1364,6 @@ export const ClientShowcaseScreen = ({
               })}
             </div>
           )}
-        </section>
-
-        <section className="client-section client-master-request">
-          <div className="client-master-request-card">
-            <button
-              className="cta cta--primary cta--wide"
-              type="button"
-              onClick={() => onCreateRequest(activeCategoryId)}
-            >
-              <span className="cta-icon" aria-hidden="true">
-                +
-              </span>
-              Создать заявку
-            </button>
-          </div>
         </section>
       </div>
 

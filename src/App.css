@@ -15378,18 +15378,15 @@ h2 {
 }
 
 .client-master-request {
-  position: sticky;
-  bottom: calc(86px + var(--safe-bottom));
-  z-index: 4;
+  position: static;
 }
 
 .client-master-request-card {
   border-radius: 20px;
   padding: 8px;
   border: 1px solid rgba(var(--surface-muted-rgb), 0.6);
-  background: rgba(var(--paper-rgb), 0.92);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(12px);
+  background: #ffffff;
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
 }
 
 .client-geo-banner {
