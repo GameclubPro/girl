@@ -14344,6 +14344,11 @@ h2 {
   box-shadow: 0 12px 20px rgba(var(--accent-rgb), 0.2);
 }
 
+.client-category-pill.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .client-category-pill.is-pulsed {
   animation: category-pill-pulse 0.62s ease;
 }

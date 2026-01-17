@@ -119,12 +119,7 @@ export const ClientScreen = ({
   const activeCategoryLabel = activeCategoryId
     ? categoryLabelOverrides[activeCategoryId] ?? activeCategoryItem?.label ?? ''
     : ''
-  const activeCategoryPillLabel = activeCategoryLabel || 'Категория'
-  const isCategoryVisualActive = Boolean(activeCategoryId) && !isCategoryAnimating
-  const visualCategoryId = isCategoryVisualActive ? activeCategoryId : null
-  const visualCategoryItem = isCategoryVisualActive ? activeCategoryItem : null
-  const visualCategoryLabel = isCategoryVisualActive ? activeCategoryLabel : ''
-  const visualCategoryPillLabel = visualCategoryLabel || 'Категория'
+  const categoryPillLabel = activeCategoryLabel || 'Категория'
 
   useEffect(() => {
     if (activeCategoryId) return
@@ -285,7 +280,6 @@ export const ClientScreen = ({
   }, [clearCategoryGhost])
 
   const openCategoryOverlay = useCallback(() => {
-    if (isCategoryAnimating) return
     if (closeOverlayTimerRef.current) {
       window.clearTimeout(closeOverlayTimerRef.current)
     }
@@ -296,7 +290,7 @@ export const ClientScreen = ({
     setIsCategoryOverlayClosing(false)
     setIsCategoryOverlayExiting(false)
     setIsCategoryAnimating(false)
-  }, [isCategoryAnimating])
+  }, [])
 
   const triggerCategoryPulse = useCallback((delay = 0) => {
     clearPulseTimers()
@@ -467,8 +461,8 @@ export const ClientScreen = ({
   )
 
   const showcaseItems = useMemo<ShowcaseMedia[]>(() => {
-    const pool = visualCategoryId
-      ? showcasePool.filter((item) => item.categories.includes(visualCategoryId))
+    const pool = activeCategoryId
+      ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
       : showcasePool
     const basePool = pool.length > 0 ? pool : showcasePool
     if (basePool.length === 0) return []
@@ -495,7 +489,7 @@ export const ClientScreen = ({
       const fallback = pickRandom(shuffled)
       return fallback ?? shuffled[index % shuffled.length]
     })
-  }, [showcasePool, visualCategoryId])
+  }, [activeCategoryId, showcasePool])
 
   const showcaseResolutions = useMemo(() => {
     if (!showcaseTileWidth) return null
@@ -554,27 +548,29 @@ export const ClientScreen = ({
         <div className="client-category-row">
           <button
             className={`client-category-pill${
-              isCategoryVisualActive ? ' is-active' : ''
-            }${isCategoryPulsed ? ' is-pulsed' : ''}`}
+              activeCategoryId && !isCategoryAnimating ? ' is-active' : ''
+            }${isCategoryAnimating ? ' is-hidden' : ''}${
+              isCategoryPulsed ? ' is-pulsed' : ''
+            }`}
             type="button"
             onClick={openCategoryOverlay}
             ref={categoryTargetRef}
             aria-label={
-              isCategoryVisualActive
-                ? `Категория: ${visualCategoryPillLabel}`
+              activeCategoryId
+                ? `Категория: ${categoryPillLabel}`
                 : 'Выбрать категорию'
             }
           >
             <span className="client-category-pill-icon" aria-hidden="true">
-              {visualCategoryItem ? (
-                <img src={visualCategoryItem.icon} alt="" />
+              {activeCategoryItem ? (
+                <img src={activeCategoryItem.icon} alt="" />
               ) : (
                 <span className="client-category-pill-plus">+</span>
               )}
             </span>
-            <span className="client-category-pill-text">{visualCategoryPillLabel}</span>
+            <span className="client-category-pill-text">{categoryPillLabel}</span>
             <span className="client-category-pill-action">
-              {isCategoryVisualActive ? 'Сменить' : 'Выбрать'}
+              {activeCategoryId ? 'Сменить' : 'Выбрать'}
             </span>
           </button>
         </div>
@@ -692,10 +688,10 @@ export const ClientScreen = ({
         </section>
 
         <section className="client-section">
-          <div className={`category-focus${isCategoryVisualActive ? ' is-active' : ''}`}>
+          <div className={`category-focus${activeCategoryId ? ' is-active' : ''}`}>
             <span className="category-focus-icon" aria-hidden="true">
-              {visualCategoryItem ? (
-                <img src={visualCategoryItem.icon} alt="" />
+              {activeCategoryItem ? (
+                <img src={activeCategoryItem.icon} alt="" />
               ) : (
                 <span className="category-focus-placeholder">?</span>
               )}
@@ -703,10 +699,10 @@ export const ClientScreen = ({
             <div className="category-focus-body">
               <span className="category-focus-kicker">Категория</span>
               <span className="category-focus-title">
-                {visualCategoryLabel || 'Выберите категорию'}
+                {activeCategoryLabel || 'Выберите категорию'}
               </span>
               <span className="category-focus-subtitle">
-                {visualCategoryLabel
+                {activeCategoryLabel
                   ? 'Используем для подбора мастеров и фильтрации витрины.'
                   : 'Нужно выбрать, чтобы увидеть мастеров поблизости.'}
               </span>
@@ -714,14 +710,14 @@ export const ClientScreen = ({
             <button
               className="category-focus-action"
               type="button"
-              onClick={isCategoryVisualActive ? onViewMasters : openCategoryOverlay}
+              onClick={activeCategoryId ? onViewMasters : openCategoryOverlay}
             >
-              {isCategoryVisualActive ? 'Открыть мастеров' : 'Выбрать категорию'}
+              {activeCategoryId ? 'Открыть мастеров' : 'Выбрать категорию'}
             </button>
           </div>
           <p className="category-helper">
-            {visualCategoryLabel
-              ? `Выбрана категория: ${visualCategoryLabel}`
+            {activeCategoryLabel
+              ? `Выбрана категория: ${activeCategoryLabel}`
               : 'Выберите категорию, чтобы открыть мастеров'}
           </p>
         </section>
@@ -772,7 +768,7 @@ export const ClientScreen = ({
                   }`}
                 >
                   {activeCategoryId
-                    ? `Выбрано: ${activeCategoryPillLabel}`
+                    ? `Выбрано: ${categoryPillLabel}`
                     : 'Выберите категорию'}
                 </span>
               </div>
