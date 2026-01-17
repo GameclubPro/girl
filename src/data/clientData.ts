@@ -7,6 +7,7 @@ import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
 import popularNanny from '../assets/popular/nanny.webp'
 import collectionBudgetArt from '../assets/collections/collection-budget.webp'
+import collectionStarsArt from '../assets/collections/collection-stars.webp'
 import collectionVerifiedArt from '../assets/collections/collection-verified.webp'
 import storyAvatarOne from '../assets/kiven-girls.webp'
 import storyAvatarTwo from '../assets/kiven-girls1.webp'
@@ -94,6 +95,11 @@ export const collectionItems = [
     meta: 'Лучшие отзывы',
     tone: 'sky',
     categoryId: null,
+    cornerImage: collectionStarsArt,
+    cornerImagePosition: 'bottom-right',
+    cornerImageSize: 'clamp(120px, 40vw, 170px)',
+    cornerImageRight: '0px',
+    cornerImageBottom: '0px',
   },
 ] satisfies CollectionItem[]
 
