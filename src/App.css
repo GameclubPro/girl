@@ -16887,6 +16887,22 @@ h2 {
   overflow: hidden;
 }
 
+.collection-card::before {
+  content: '';
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: var(--collection-card-art-size, 160px);
+  height: var(--collection-card-art-size, 160px);
+  background-image: var(--collection-card-art-image, none);
+  background-repeat: no-repeat;
+  background-position: right bottom;
+  background-size: contain;
+  opacity: 0.98;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .collection-card:focus-visible {
   outline: 3px solid rgba(var(--accent-rgb), 0.4);
   outline-offset: 3px;
@@ -16904,28 +16920,7 @@ h2 {
   z-index: 0;
 }
 
-.collection-card-art {
-  position: absolute;
-  right: -8px;
-  bottom: -8px;
-  width: clamp(72px, 24vw, 112px);
-  height: clamp(72px, 24vw, 112px);
-  display: inline-flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  opacity: 0.96;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.collection-card-art img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.collection-card > :not(.collection-card-art) {
+.collection-card > * {
   position: relative;
   z-index: 1;
 }

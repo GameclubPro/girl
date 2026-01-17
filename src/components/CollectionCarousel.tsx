@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { collectionItems, type CollectionItem } from '../data/clientData'
 
 type CollectionCarouselProps = {
@@ -270,6 +278,12 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
             index >= collectionBaseIndex &&
             index < collectionBaseIndex + carouselItems.length
           const cardLabel = `Открыть подборку: ${item.title}`
+          const cardStyle = item.cornerImage
+            ? ({
+                '--collection-card-art-image': `url(${item.cornerImage})`,
+                '--collection-card-art-size': 'clamp(120px, 44vw, 190px)',
+              } as CSSProperties)
+            : undefined
           return (
             <button
               className={`collection-card collection-card--${item.tone}`}
@@ -279,6 +293,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
               aria-label={cardLabel}
               tabIndex={isPrimary ? 0 : -1}
               onClick={() => onSelect?.(item)}
+              style={cardStyle}
               ref={(element) => {
                 cardRefs.current[index] = element
               }}
@@ -296,11 +311,6 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
               <span className="collection-cta" aria-hidden="true">
                 Смотреть <span className="collection-cta-arrow">›</span>
               </span>
-              {item.cornerImage && (
-                <span className="collection-card-art" aria-hidden="true">
-                  <img src={item.cornerImage} alt="" loading="lazy" />
-                </span>
-              )}
             </button>
           )
         })}
