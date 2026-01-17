@@ -815,7 +815,7 @@ export const ClientScreen = ({
         </section>
 
         <section className="client-section">
-          <div className={`category-focus${activeCategoryId ? ' is-active' : ''}`}>
+          <div className="category-focus">
             <span className="category-focus-icon" aria-hidden="true">
               {activeCategoryItem ? (
                 <img src={activeCategoryItem.icon} alt="" />
