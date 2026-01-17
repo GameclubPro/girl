@@ -13037,6 +13037,12 @@ h2 {
   object-fit: contain;
 }
 
+.footer-image--left {
+  width: min(36vw, 160px);
+  margin-left: -6px;
+  margin-bottom: -6px;
+}
+
 .footer-placeholder {
   width: min(42vw, 190px);
   height: 1px;
