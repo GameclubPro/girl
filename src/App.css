@@ -17416,6 +17416,9 @@ h2 {
   padding-right: 2px;
   padding-bottom: 2px;
   scrollbar-width: none;
+  background: transparent;
+  box-shadow: none;
+  border: none;
 }
 
 .category-overlay-grid::-webkit-scrollbar {
