@@ -17430,12 +17430,12 @@ h2 {
     rgba(var(--surface-muted-rgb), 0.92)
   );
   border-radius: 20px;
-  padding: 14px 12px 12px;
+  padding: 10px 10px 12px;
   display: grid;
   grid-template-columns: 1fr;
   justify-items: center;
-  align-items: start;
-  gap: 8px;
+  align-items: center;
+  gap: 2px;
   text-align: center;
   cursor: pointer;
   opacity: 0;
@@ -17487,7 +17487,7 @@ h2 {
   align-items: center;
   justify-content: center;
   box-shadow: none;
-  transform: translateY(-4px);
+  transform: none;
 }
 
 .category-overlay-card-icon img {
@@ -17502,7 +17502,7 @@ h2 {
   color: var(--ink);
   text-align: center;
   justify-self: center;
-  transform: translateY(-2px);
+  transform: none;
 }
 
 .category-overlay-card-arrow {
