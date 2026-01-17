@@ -109,7 +109,9 @@ export const ClientScreen = ({
   const closeOverlayTimerRef = useRef<number | null>(null)
   const exitOverlayTimerRef = useRef<number | null>(null)
   const categoryTargetRef = useRef<HTMLButtonElement | null>(null)
-  const categoryGhostRef = useRef<HTMLDivElement | null>(null)
+  const categoryMorphRef = useRef<HTMLElement | null>(null)
+  const categoryMorphSourceRef = useRef<HTMLElement | null>(null)
+  const categoryMorphSourceVisibilityRef = useRef<string>('')
   const [isCategoryAnimating, setIsCategoryAnimating] = useState(false)
   const [isCategoryPulsed, setIsCategoryPulsed] = useState(false)
   const pulseTimerRef = useRef<number[]>([])
@@ -141,12 +143,22 @@ export const ClientScreen = ({
     pulseTimerRef.current = []
   }, [])
 
-  const clearCategoryGhost = useCallback(() => {
-    if (categoryGhostRef.current) {
-      categoryGhostRef.current.remove()
-      categoryGhostRef.current = null
+  const restoreCategoryMorphSource = useCallback(() => {
+    const sourceEl = categoryMorphSourceRef.current
+    if (sourceEl) {
+      sourceEl.style.visibility = categoryMorphSourceVisibilityRef.current
     }
+    categoryMorphSourceRef.current = null
+    categoryMorphSourceVisibilityRef.current = ''
   }, [])
+
+  const clearCategoryMorph = useCallback(() => {
+    if (categoryMorphRef.current) {
+      categoryMorphRef.current.remove()
+      categoryMorphRef.current = null
+    }
+    restoreCategoryMorphSource()
+  }, [restoreCategoryMorphSource])
 
   useEffect(() => {
     return () => {
@@ -156,10 +168,10 @@ export const ClientScreen = ({
       if (exitOverlayTimerRef.current) {
         window.clearTimeout(exitOverlayTimerRef.current)
       }
-      clearCategoryGhost()
+      clearCategoryMorph()
       clearPulseTimers()
     }
-  }, [clearCategoryGhost, clearPulseTimers])
+  }, [clearCategoryMorph, clearPulseTimers])
   useEffect(() => {
     let cancelled = false
 
@@ -269,7 +281,7 @@ export const ClientScreen = ({
     if (exitOverlayTimerRef.current) {
       window.clearTimeout(exitOverlayTimerRef.current)
     }
-    clearCategoryGhost()
+    clearCategoryMorph()
     setIsCategoryOverlayExiting(false)
     setIsCategoryAnimating(false)
     setIsCategoryOverlayClosing(true)
@@ -277,7 +289,7 @@ export const ClientScreen = ({
       setIsCategoryOverlayOpen(false)
       setIsCategoryOverlayClosing(false)
     }, 280)
-  }, [clearCategoryGhost])
+  }, [clearCategoryMorph])
 
   const openCategoryOverlay = useCallback(() => {
     if (closeOverlayTimerRef.current) {
@@ -304,45 +316,50 @@ export const ClientScreen = ({
     pulseTimerRef.current.push(startTimer)
   }, [clearPulseTimers])
 
-  const createCategoryGhost = useCallback(
-    (sourceEl: HTMLElement, item: CategoryItem) => {
-      const sourceRect = sourceEl.getBoundingClientRect()
-      if (!sourceRect.width || !sourceRect.height) return null
+  const createCategoryMorph = useCallback((sourceEl: HTMLElement) => {
+    const sourceRect = sourceEl.getBoundingClientRect()
+    if (!sourceRect.width || !sourceRect.height) return null
 
-      const ghost = document.createElement('div')
-      ghost.className = 'category-fly'
-      ghost.style.left = `${sourceRect.left}px`
-      ghost.style.top = `${sourceRect.top}px`
-      ghost.style.width = `${sourceRect.width}px`
-      ghost.style.height = `${sourceRect.height}px`
+    const morph = sourceEl.cloneNode(true) as HTMLElement
+    morph.classList.add('category-morph')
+    morph.style.position = 'fixed'
+    morph.style.left = `${sourceRect.left}px`
+    morph.style.top = `${sourceRect.top}px`
+    morph.style.width = `${sourceRect.width}px`
+    morph.style.height = `${sourceRect.height}px`
+    morph.style.margin = '0'
+    morph.style.opacity = '1'
+    morph.style.transform = 'none'
+    morph.style.animation = 'none'
+    morph.style.pointerEvents = 'none'
+    morph.style.zIndex = '140'
 
-      const iconWrap = document.createElement('span')
-      iconWrap.className = 'category-fly-icon'
+    const sourceStyles = window.getComputedStyle(sourceEl)
+    morph.style.borderRadius = sourceStyles.borderRadius
+    morph.style.boxShadow = sourceStyles.boxShadow
+    morph.style.background = sourceStyles.background
+    morph.style.borderColor = sourceStyles.borderColor
+    morph.style.borderWidth = sourceStyles.borderWidth
+    morph.style.borderStyle = sourceStyles.borderStyle
+    morph.style.padding = sourceStyles.padding
 
-      const iconImg = document.createElement('img')
-      iconImg.src = item.icon
-      iconImg.alt = ''
-      iconWrap.appendChild(iconImg)
+    document.body.appendChild(morph)
 
-      const label = document.createElement('span')
-      label.className = 'category-fly-label'
-      label.textContent = categoryLabelOverrides[item.id] ?? item.label
+    categoryMorphSourceRef.current = sourceEl
+    categoryMorphSourceVisibilityRef.current = sourceEl.style.visibility
+    sourceEl.style.visibility = 'hidden'
 
-      ghost.append(iconWrap, label)
-      document.body.appendChild(ghost)
+    return morph
+  }, [])
 
-      return ghost
-    },
-    []
-  )
-
-  const animateGhostToHeader = useCallback(
-    (ghost: HTMLDivElement, targetEl: HTMLElement, onFinish?: () => void) => {
-      const sourceRect = ghost.getBoundingClientRect()
+  const animateMorphToHeader = useCallback(
+    (morph: HTMLElement, targetEl: HTMLElement, onFinish?: () => void) => {
+      const sourceRect = morph.getBoundingClientRect()
       const targetRect = targetEl.getBoundingClientRect()
 
       if (!sourceRect.width || !targetRect.width) {
-        ghost.remove()
+        morph.remove()
+        restoreCategoryMorphSource()
         onFinish?.()
         return
       }
@@ -356,43 +373,72 @@ export const ClientScreen = ({
       const scaleX = targetRect.width / sourceRect.width
       const scaleY = targetRect.height / sourceRect.height
 
-      const overshootX = scaleX * 1.05
-      const overshootY = scaleY * 1.05
-      const animation = ghost.animate(
+      const sourceStyles = window.getComputedStyle(morph)
+      const targetStyles = window.getComputedStyle(targetEl)
+      const startPadding = `${sourceStyles.paddingTop} ${sourceStyles.paddingRight} ${sourceStyles.paddingBottom} ${sourceStyles.paddingLeft}`
+      const endPadding = `${targetStyles.paddingTop} ${targetStyles.paddingRight} ${targetStyles.paddingBottom} ${targetStyles.paddingLeft}`
+
+      const arrow = morph.querySelector(
+        '.category-overlay-card-arrow'
+      ) as HTMLElement | null
+      arrow?.animate(
+        [
+          { opacity: 1, transform: 'translateX(0)' },
+          { opacity: 0, transform: 'translateX(6px)' },
+        ],
+        { duration: 220, easing: 'ease', fill: 'forwards' }
+      )
+
+      const overshootX = scaleX * 1.04
+      const overshootY = scaleY * 1.04
+      const animation = morph.animate(
         [
           {
             transform: 'translate3d(0, 0, 0) scale(1)',
             opacity: 1,
-            borderRadius: '18px',
-            boxShadow: '0 18px 28px rgba(17, 24, 39, 0.22)',
+            borderRadius: sourceStyles.borderRadius,
+            boxShadow: sourceStyles.boxShadow,
+            borderColor: sourceStyles.borderColor,
+            background: sourceStyles.background,
+            padding: startPadding,
           },
           {
-            offset: 0.72,
+            offset: 0.7,
             transform: `translate3d(${deltaX * 0.92}px, ${deltaY * 0.92}px, 0) scale(${overshootX}, ${overshootY})`,
-            opacity: 0.45,
-            borderRadius: '28px',
-            boxShadow: '0 14px 20px rgba(17, 24, 39, 0.18)',
+            opacity: 0.7,
+            borderRadius: targetStyles.borderRadius,
+            boxShadow: targetStyles.boxShadow,
+            borderColor: targetStyles.borderColor,
+            background: targetStyles.background,
+            padding: endPadding,
           },
           {
             transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`,
-            opacity: 0.08,
-            borderRadius: '999px',
-            boxShadow: '0 8px 16px rgba(17, 24, 39, 0.14)',
+            opacity: 0.94,
+            borderRadius: targetStyles.borderRadius,
+            boxShadow: targetStyles.boxShadow,
+            borderColor: targetStyles.borderColor,
+            background: targetStyles.background,
+            padding: endPadding,
           },
         ],
         {
-          duration: 600,
+          duration: 620,
           easing: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
           fill: 'forwards',
         }
       )
 
-      animation.onfinish = () => {
-        ghost.remove()
+      const finalize = () => {
+        morph.remove()
+        restoreCategoryMorphSource()
         onFinish?.()
       }
+
+      animation.onfinish = finalize
+      animation.oncancel = finalize
     },
-    []
+    [restoreCategoryMorphSource]
   )
 
   const handleCategorySelect = useCallback(
@@ -420,40 +466,41 @@ export const ClientScreen = ({
       if (closeOverlayTimerRef.current) {
         window.clearTimeout(closeOverlayTimerRef.current)
       }
-      clearCategoryGhost()
+      clearCategoryMorph()
 
-      const ghost = createCategoryGhost(event.currentTarget, item)
-      if (ghost) {
-        categoryGhostRef.current = ghost
+      const morph = createCategoryMorph(event.currentTarget)
+      if (morph) {
+        categoryMorphRef.current = morph
       }
 
       setIsCategoryOverlayClosing(false)
       setIsCategoryOverlayExiting(true)
 
+      window.requestAnimationFrame(() => {
+        const currentMorph = categoryMorphRef.current
+        if (currentMorph && targetEl) {
+          animateMorphToHeader(currentMorph, targetEl, () => {
+            categoryMorphRef.current = null
+            setIsCategoryAnimating(false)
+            triggerCategoryPulse()
+          })
+        } else {
+          clearCategoryMorph()
+          setIsCategoryAnimating(false)
+          triggerCategoryPulse()
+        }
+      })
+
       exitOverlayTimerRef.current = window.setTimeout(() => {
         setIsCategoryOverlayOpen(false)
         setIsCategoryOverlayExiting(false)
-        window.requestAnimationFrame(() => {
-          const currentGhost = categoryGhostRef.current
-          if (currentGhost && targetEl) {
-            animateGhostToHeader(currentGhost, targetEl, () => {
-              categoryGhostRef.current = null
-              setIsCategoryAnimating(false)
-              triggerCategoryPulse()
-            })
-          } else {
-            clearCategoryGhost()
-            setIsCategoryAnimating(false)
-            triggerCategoryPulse()
-          }
-        })
       }, 420)
     },
     [
-      animateGhostToHeader,
-      clearCategoryGhost,
+      animateMorphToHeader,
+      clearCategoryMorph,
       closeCategoryOverlay,
-      createCategoryGhost,
+      createCategoryMorph,
       isCategoryOverlayExiting,
       onCategoryChange,
       triggerCategoryPulse,

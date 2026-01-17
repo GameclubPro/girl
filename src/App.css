@@ -17480,6 +17480,22 @@ h2 {
   color: var(--muted);
 }
 
+.category-morph {
+  position: fixed;
+  z-index: 140;
+  margin: 0;
+  opacity: 1;
+  animation: none;
+  transform: none;
+  pointer-events: none;
+  transform-origin: center;
+  will-change: transform, border-radius, box-shadow, background, opacity;
+}
+
+.category-morph .category-overlay-card-arrow {
+  will-change: opacity, transform;
+}
+
 .category-fly {
   position: fixed;
   z-index: 130;
