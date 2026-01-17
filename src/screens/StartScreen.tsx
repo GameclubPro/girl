@@ -19,14 +19,8 @@ export const StartScreen = ({
         <h1>KIVEN GIRL</h1>
         <p className="subtitle">
           <span className="subtitle-intro">Услуги</span>
-          <span className="subtitle-layout">
-            <span className="subtitle-strong subtitle-side--left">ДЕВУШЕК</span>
-            <span className="subtitle-accent subtitle-side subtitle-top">от</span>
-            <span className="subtitle-accent subtitle-side subtitle-bottom">
-              для
-            </span>
-            <span className="subtitle-strong subtitle-side--right">ДЕВУШЕК</span>
-          </span>
+          <span className="subtitle-main">для девушек</span>
+          <span className="subtitle-accent-line">от девушек</span>
         </p>
       </div>
 
