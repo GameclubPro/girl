@@ -403,9 +403,8 @@ export const ClientScreen = ({
         '(prefers-reduced-motion: reduce)'
       )?.matches
 
-      onCategoryChange(item.id)
-
       if (reduceMotion || !targetEl) {
+        onCategoryChange(item.id)
         setIsCategoryAnimating(false)
         triggerCategoryPulse(0)
         closeCategoryOverlay()
@@ -413,6 +412,7 @@ export const ClientScreen = ({
       }
 
       setIsCategoryAnimating(true)
+      onCategoryChange(item.id)
 
       if (exitOverlayTimerRef.current) {
         window.clearTimeout(exitOverlayTimerRef.current)
