@@ -12860,8 +12860,6 @@ h2 {
   width: 100%;
   height: auto;
   filter: none;
-  border-radius: 22px;
-  box-shadow: 0 14px 22px rgba(var(--shadow-rgb), 0.18);
   animation: float 6s ease-in-out infinite;
 }
 
