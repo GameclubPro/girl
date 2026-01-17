@@ -1,9 +1,7 @@
 import decorImage from '../assets/kiven-decor.webp'
 import logoImage from '../assets/kiven-logo.webp'
-import girlOneImage from '../assets/kiven-girl-1.webp'
-import girlTwoImage from '../assets/kiven-girl-2.webp'
-import clientRoleImage from '../../1.webp'
-import proRoleImage from '../../2.webp'
+import clientRoleImage from '../../1 (3).webp'
+import proRoleImage from '../../2 (3).webp'
 import type { Role } from '../types/app'
 
 export const StartScreen = ({
@@ -31,24 +29,7 @@ export const StartScreen = ({
 
       <h2 className="animate delay-2">Какая роль вам подходит?</h2>
 
-      <div className="illustration-wrap animate delay-3">
-        <div className="illustration-stack" aria-hidden="true">
-          <img
-            className="illustration illustration--left"
-            src={girlOneImage}
-            alt=""
-            loading="lazy"
-          />
-          <img
-            className="illustration illustration--right"
-            src={girlTwoImage}
-            alt=""
-            loading="lazy"
-          />
-        </div>
-      </div>
-
-      <div className="role-cards animate delay-4">
+      <div className="role-cards animate delay-3">
         <button
           className="role-card role-card--client"
           type="button"
@@ -77,7 +58,7 @@ export const StartScreen = ({
         </button>
       </div>
 
-      <p className="footer-copy animate delay-5">
+      <p className="footer-copy animate delay-4">
         Зарегистрируйтесь как заказчик или мастер
       </p>
 
