@@ -17430,12 +17430,12 @@ h2 {
     rgba(var(--surface-muted-rgb), 0.92)
   );
   border-radius: 20px;
-  padding: 10px 10px 12px;
-  display: grid;
-  grid-template-columns: 1fr;
-  justify-items: center;
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: flex-start;
+  gap: 4px;
   text-align: center;
   cursor: pointer;
   opacity: 0;
@@ -17446,7 +17446,8 @@ h2 {
     border-color 0.2s ease;
   position: relative;
   overflow: hidden;
-  min-height: 196px;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
 }
 
 .category-overlay-card::after {
@@ -17479,8 +17480,8 @@ h2 {
 }
 
 .category-overlay-card-icon {
-  width: 144px;
-  height: 144px;
+  width: clamp(110px, 34vw, 120px);
+  height: clamp(110px, 34vw, 120px);
   border-radius: 12px;
   background: transparent;
   display: inline-flex;
@@ -17491,8 +17492,8 @@ h2 {
 }
 
 .category-overlay-card-icon img {
-  width: 96px;
-  height: 96px;
+  width: 80%;
+  height: 80%;
   object-fit: contain;
 }
 
@@ -17503,6 +17504,7 @@ h2 {
   text-align: center;
   justify-self: center;
   transform: none;
+  line-height: 1.15;
 }
 
 .category-overlay-card-arrow {
