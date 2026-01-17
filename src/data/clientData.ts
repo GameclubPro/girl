@@ -6,6 +6,10 @@ import popularNails from '../assets/popular/nails.webp'
 import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
 import popularNanny from '../assets/popular/nanny.webp'
+import collectionBgOne from '../assets/collections/collection-1.webp'
+import collectionBgTwo from '../assets/collections/collection-2.webp'
+import collectionBgThree from '../assets/collections/collection-3.webp'
+import collectionBgFour from '../assets/collections/collection-4.webp'
 import storyAvatarOne from '../assets/kiven-girls.webp'
 import storyAvatarTwo from '../assets/kiven-girls1.webp'
 
@@ -17,6 +21,7 @@ export type CollectionItem = {
   meta: string
   tone: 'lavender' | 'sun' | 'mint' | 'rose' | 'sky'
   categoryId?: string | null
+  image?: string
 }
 
 export type PopularItem = {
@@ -42,6 +47,7 @@ export const collectionItems = [
     meta: '4.9 ★ и выше',
     tone: 'lavender',
     categoryId: null,
+    image: collectionBgOne,
   },
   {
     id: 'visit',
@@ -51,6 +57,7 @@ export const collectionItems = [
     meta: 'Ближайшие 2 часа',
     tone: 'sun',
     categoryId: null,
+    image: collectionBgTwo,
   },
   {
     id: 'budget',
@@ -60,6 +67,7 @@ export const collectionItems = [
     meta: 'Фиксированные цены',
     tone: 'mint',
     categoryId: null,
+    image: collectionBgThree,
   },
   {
     id: 'express',
@@ -69,6 +77,7 @@ export const collectionItems = [
     meta: 'Ответ за 10 минут',
     tone: 'rose',
     categoryId: null,
+    image: collectionBgFour,
   },
   {
     id: 'stars',
@@ -78,6 +87,7 @@ export const collectionItems = [
     meta: 'Лучшие отзывы',
     tone: 'sky',
     categoryId: null,
+    image: collectionBgOne,
   },
 ] satisfies CollectionItem[]
 

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { collectionItems, type CollectionItem } from '../data/clientData'
 
 type CollectionCarouselProps = {
@@ -270,6 +278,9 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
             index >= collectionBaseIndex &&
             index < collectionBaseIndex + carouselItems.length
           const cardLabel = `Открыть подборку: ${item.title}`
+          const cardStyle = item.image
+            ? ({ '--collection-card-image': `url(${item.image})` } as CSSProperties)
+            : undefined
           return (
             <button
               className={`collection-card collection-card--${item.tone}`}
@@ -279,6 +290,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
               aria-label={cardLabel}
               tabIndex={isPrimary ? 0 : -1}
               onClick={() => onSelect?.(item)}
+              style={cardStyle}
               ref={(element) => {
                 cardRefs.current[index] = element
               }}
