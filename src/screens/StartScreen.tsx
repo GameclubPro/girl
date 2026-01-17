@@ -1,6 +1,7 @@
 import decorImage from '../assets/kiven-decor.webp'
 import logoImage from '../assets/kiven-logo.webp'
-import girlsImage from '../assets/kiven-girls.webp'
+import girlOneImage from '../assets/kiven-girl-1.webp'
+import girlTwoImage from '../assets/kiven-girl-2.webp'
 import { StarPin } from '../components/StarPin'
 import type { Role } from '../types/app'
 
@@ -30,7 +31,20 @@ export const StartScreen = ({
       <h2 className="animate delay-2">Какая роль вам подходит?</h2>
 
       <div className="illustration-wrap animate delay-3">
-        <img className="illustration" src={girlsImage} alt="Две девушки" />
+        <div className="illustration-stack" aria-hidden="true">
+          <img
+            className="illustration illustration--left"
+            src={girlOneImage}
+            alt=""
+            loading="lazy"
+          />
+          <img
+            className="illustration illustration--right"
+            src={girlTwoImage}
+            alt=""
+            loading="lazy"
+          />
+        </div>
       </div>
 
       <div className="role-cards animate delay-4">

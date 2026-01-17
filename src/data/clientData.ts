@@ -11,8 +11,8 @@ import collectionExpressArt from '../assets/collections/collection-express.png'
 import collectionStarsArt from '../assets/collections/collection-stars.webp'
 import collectionVisitArt from '../assets/collections/collection-visit.webp'
 import collectionVerifiedArt from '../assets/collections/collection-verified.webp'
-import storyAvatarOne from '../assets/kiven-girls.webp'
-import storyAvatarTwo from '../assets/kiven-girls1.webp'
+import storyAvatarOne from '../assets/kiven-girl-1.webp'
+import storyAvatarTwo from '../assets/kiven-girl-2.webp'
 
 export type CollectionItem = {
   id: string
