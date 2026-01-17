@@ -12844,6 +12844,35 @@ h2 {
   color: var(--ink);
 }
 
+.illustration-wrap {
+  margin: 10px auto 20px;
+  width: min(360px, 100%);
+}
+
+.illustration-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 14px;
+}
+
+.illustration {
+  width: 100%;
+  height: auto;
+  filter: none;
+  animation: float 6s ease-in-out infinite;
+}
+
+.illustration--left {
+  transform: translateY(8px);
+  animation-delay: -1.2s;
+}
+
+.illustration--right {
+  transform: translateY(-6px);
+  animation-delay: -2.6s;
+}
+
 .role-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -18632,6 +18661,10 @@ h2 {
   .animate {
     opacity: 1;
     transform: none;
+    animation: none;
+  }
+
+  .illustration {
     animation: none;
   }
 
