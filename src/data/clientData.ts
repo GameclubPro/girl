@@ -9,6 +9,7 @@ import popularNanny from '../assets/popular/nanny.webp'
 import collectionBudgetArt from '../assets/collections/collection-budget.webp'
 import collectionExpressArt from '../assets/collections/collection-express.png'
 import collectionStarsArt from '../assets/collections/collection-stars.webp'
+import collectionVisitArt from '../assets/collections/collection-visit.webp'
 import collectionVerifiedArt from '../assets/collections/collection-verified.webp'
 import storyAvatarOne from '../assets/kiven-girls.webp'
 import storyAvatarTwo from '../assets/kiven-girls1.webp'
@@ -66,6 +67,11 @@ export const collectionItems = [
     meta: 'Ближайшие 2 часа',
     tone: 'sun',
     categoryId: null,
+    cornerImage: collectionVisitArt,
+    cornerImagePosition: 'bottom-right',
+    cornerImageSize: 'clamp(120px, 40vw, 170px)',
+    cornerImageRight: '0px',
+    cornerImageBottom: '0px',
   },
   {
     id: 'budget',
