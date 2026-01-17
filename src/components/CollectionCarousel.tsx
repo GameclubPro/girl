@@ -22,6 +22,10 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     () => [...carouselItems, ...carouselItems, ...carouselItems],
     [carouselItems]
   )
+  const itemsSignature = useMemo(
+    () => carouselItems.map((item) => item.id).join('|'),
+    [carouselItems]
+  )
   const trackRef = useRef<HTMLDivElement | null>(null)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const rafRef = useRef(0)
@@ -30,6 +34,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const pauseRef = useRef(false)
   const readyRef = useRef(false)
   const hasCenteredRef = useRef(false)
+  const lastCenteredLeftRef = useRef<number | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [fontsReady, setFontsReady] = useState(false)
 
@@ -68,11 +73,13 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const centerMiddle = useCallback(() => {
     const track = trackRef.current
     const middle = cardRefs.current[collectionBaseIndex]
-    if (!track || !middle) return
+    if (!track || !middle) return false
 
     const nextLeft =
       middle.offsetLeft - (track.clientWidth - middle.offsetWidth) / 2
     setScrollLeftInstant(nextLeft)
+    lastCenteredLeftRef.current = nextLeft
+    return true
   }, [collectionBaseIndex, setScrollLeftInstant])
 
   const normalizePosition = useCallback(() => {
@@ -87,14 +94,14 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     }
   }, [setScrollLeftInstant])
 
-  useEffect(() => {
-    cardRefs.current = []
+  useLayoutEffect(() => {
     setWidthRef.current = 0
     stepRef.current = 0
     readyRef.current = false
     hasCenteredRef.current = false
+    lastCenteredLeftRef.current = null
     setIsReady(false)
-  }, [carouselItems])
+  }, [itemsSignature])
 
   const markReady = useCallback(() => {
     if (readyRef.current) return
@@ -115,15 +122,22 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   useLayoutEffect(() => {
     let cancelled = false
     let layoutRaf = 0
+    let resizeObserver: ResizeObserver | null = null
 
     const applyLayout = () => {
       if (cancelled) return
       measure()
-      if (!hasCenteredRef.current) {
-        const track = trackRef.current
-        const middle = cardRefs.current[collectionBaseIndex]
-        if (track && middle) {
-          centerMiddle()
+      const track = trackRef.current
+      const step = stepRef.current
+      const lastCentered = lastCenteredLeftRef.current
+      const isNearLastCenter =
+        track &&
+        step > 0 &&
+        typeof lastCentered === 'number' &&
+        Math.abs(track.scrollLeft - lastCentered) < step * 0.5
+
+      if (!hasCenteredRef.current || isNearLastCenter) {
+        if (centerMiddle()) {
           hasCenteredRef.current = true
         }
       }
@@ -141,6 +155,13 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     }
 
     window.addEventListener('resize', scheduleLayout)
+    const trackEl = trackRef.current
+    if (trackEl && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        scheduleLayout()
+      })
+      resizeObserver.observe(trackEl)
+    }
 
     const fontsReady = document.fonts?.ready
     if (fontsReady) {
@@ -156,6 +177,9 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       }
       if (rafRef.current) {
         window.cancelAnimationFrame(rafRef.current)
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect()
       }
       window.removeEventListener('resize', scheduleLayout)
     }
@@ -198,6 +222,9 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       '(prefers-reduced-motion: reduce)'
     )
     if (prefersReducedMotion.matches) return
+    const supportsSmoothScroll =
+      typeof document !== 'undefined' &&
+      'scrollBehavior' in document.documentElement.style
 
     let resumeTimer = 0
     let startTimer = 0
@@ -225,7 +252,11 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
           return
         }
         normalizePosition()
-        track.scrollBy({ left: step, behavior: 'smooth' })
+        if (supportsSmoothScroll && typeof track.scrollBy === 'function') {
+          track.scrollBy({ left: step, behavior: 'smooth' })
+        } else {
+          track.scrollLeft += step
+        }
       }, 3200)
     }
 

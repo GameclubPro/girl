@@ -16857,9 +16857,15 @@ h2 {
   gap: 14px;
   overflow-x: auto;
   padding: 6px 18px 12px;
+  padding: 6px calc(18px + env(safe-area-inset-right, 0px)) 12px
+    calc(18px + env(safe-area-inset-left, 0px));
   margin: 0;
   scroll-snap-type: x mandatory;
   scroll-padding: 18px;
+  scroll-padding: 0 calc(18px + env(safe-area-inset-right, 0px)) 0
+    calc(18px + env(safe-area-inset-left, 0px));
+  scroll-snap-stop: always;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
