@@ -12882,16 +12882,14 @@ h2 {
 }
 
 .role-card {
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  border: none;
   border-radius: 22px;
   padding: 0;
-  background: #ffffff;
+  background: transparent;
   width: 100%;
   overflow: hidden;
   display: block;
-  box-shadow:
-    0 16px 24px rgba(var(--shadow-rgb), 0.14),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
+  box-shadow: none;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -12912,9 +12910,7 @@ h2 {
 
 .role-card:hover {
   transform: translateY(-2px);
-  box-shadow:
-    0 20px 30px rgba(var(--shadow-rgb), 0.2),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
+  box-shadow: none;
 }
 
 .role-card:active {
