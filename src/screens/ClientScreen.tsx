@@ -117,6 +117,7 @@ export const ClientScreen = ({
   const exitOverlayTimerRef = useRef<number | null>(null)
   const categoryTargetRef = useRef<HTMLButtonElement | null>(null)
   const categoryGhostRef = useRef<HTMLDivElement | null>(null)
+  const [isCategoryAnimating, setIsCategoryAnimating] = useState(false)
   const [isCategoryPulsed, setIsCategoryPulsed] = useState(false)
   const pulseTimerRef = useRef<number[]>([])
 
@@ -270,6 +271,7 @@ export const ClientScreen = ({
     }
     clearCategoryGhost()
     setIsCategoryOverlayExiting(false)
+    setIsCategoryAnimating(false)
     setIsCategoryOverlayClosing(true)
     closeOverlayTimerRef.current = window.setTimeout(() => {
       setIsCategoryOverlayOpen(false)
@@ -287,6 +289,7 @@ export const ClientScreen = ({
     setIsCategoryOverlayOpen(true)
     setIsCategoryOverlayClosing(false)
     setIsCategoryOverlayExiting(false)
+    setIsCategoryAnimating(false)
   }, [])
 
   const triggerCategoryPulse = useCallback((delay = 0) => {
@@ -403,10 +406,13 @@ export const ClientScreen = ({
       onCategoryChange(item.id)
 
       if (reduceMotion || !targetEl) {
+        setIsCategoryAnimating(false)
         triggerCategoryPulse(0)
         closeCategoryOverlay()
         return
       }
+
+      setIsCategoryAnimating(true)
 
       if (exitOverlayTimerRef.current) {
         window.clearTimeout(exitOverlayTimerRef.current)
@@ -432,10 +438,12 @@ export const ClientScreen = ({
           if (currentGhost && targetEl) {
             animateGhostToHeader(currentGhost, targetEl, () => {
               categoryGhostRef.current = null
+              setIsCategoryAnimating(false)
               triggerCategoryPulse()
             })
           } else {
             clearCategoryGhost()
+            setIsCategoryAnimating(false)
             triggerCategoryPulse()
           }
         })
@@ -540,7 +548,7 @@ export const ClientScreen = ({
         <div className="client-category-row">
           <button
             className={`client-category-pill${
-              activeCategoryId ? ' is-active' : ''
+              activeCategoryId && !isCategoryAnimating ? ' is-active' : ''
             }${isCategoryPulsed ? ' is-pulsed' : ''}`}
             type="button"
             onClick={openCategoryOverlay}
