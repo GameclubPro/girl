@@ -11,6 +11,7 @@ import {
   IconHome,
   IconList,
   IconUser,
+  IconUsers,
 } from '../components/icons'
 import { StoryViewer } from '../components/StoryViewer'
 import { CollectionCarousel } from '../components/CollectionCarousel'
@@ -79,6 +80,7 @@ export const ClientScreen = ({
   onViewRequests,
   onViewProfile,
   onViewMasterProfile,
+  onCreateRequest,
 }: {
   apiBase: string
   userId: string
@@ -90,6 +92,7 @@ export const ClientScreen = ({
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewProfile: () => void
   onViewMasterProfile: (masterId: string) => void
+  onCreateRequest: (categoryId?: string | null) => void
 }) => {
   type CategoryItem = (typeof categoryItems)[number]
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
@@ -723,6 +726,27 @@ export const ClientScreen = ({
             </button>
           </div>
           <CollectionCarousel onSelect={handleCollectionSelect} />
+        </section>
+
+        <section className="client-section">
+          <div className="cta-row">
+            <button className="cta cta--secondary" type="button" onClick={onViewMasters}>
+              <span className="cta-icon cta-icon--ghost" aria-hidden="true">
+                <IconUsers />
+              </span>
+              Найти мастера
+            </button>
+            <button
+              className="cta cta--primary"
+              type="button"
+              onClick={() => onCreateRequest(activeCategoryId)}
+            >
+              <span className="cta-icon" aria-hidden="true">
+                +
+              </span>
+              Создать заявку
+            </button>
+          </div>
         </section>
 
         <section className="client-section client-section--stories">
