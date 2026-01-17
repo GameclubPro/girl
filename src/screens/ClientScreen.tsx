@@ -814,41 +814,6 @@ export const ClientScreen = ({
           )}
         </section>
 
-        <section className="client-section">
-          <div className="category-focus">
-            <span className="category-focus-icon" aria-hidden="true">
-              {activeCategoryItem ? (
-                <img src={activeCategoryItem.icon} alt="" />
-              ) : (
-                <span className="category-focus-placeholder">?</span>
-              )}
-            </span>
-            <div className="category-focus-body">
-              <span className="category-focus-kicker">Категория</span>
-              <span className="category-focus-title">
-                {activeCategoryLabel || 'Выберите категорию'}
-              </span>
-              <span className="category-focus-subtitle">
-                {activeCategoryLabel
-                  ? 'Используем для подбора мастеров и фильтрации витрины.'
-                  : 'Нужно выбрать, чтобы увидеть мастеров поблизости.'}
-              </span>
-            </div>
-            <button
-              className="category-focus-action"
-              type="button"
-              onClick={activeCategoryId ? onViewMasters : openCategoryOverlay}
-            >
-              {activeCategoryId ? 'Открыть мастеров' : 'Выбрать категорию'}
-            </button>
-          </div>
-          <p className="category-helper">
-            {activeCategoryLabel
-              ? `Выбрана категория: ${activeCategoryLabel}`
-              : 'Выберите категорию, чтобы открыть мастеров'}
-          </p>
-        </section>
-
       </div>
 
       {isCategoryOverlayOpen && (
