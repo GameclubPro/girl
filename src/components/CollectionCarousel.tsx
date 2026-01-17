@@ -15,7 +15,7 @@ type CollectionCarouselProps = {
 }
 
 export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps) => {
-  const carouselItems =
+  const carouselItems: CollectionItem[] =
     items && items.length > 0 ? items : collectionItems
   const collectionBaseIndex = carouselItems.length
   const loopedCollectionItems = useMemo(
