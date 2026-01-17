@@ -7,6 +7,7 @@ import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
 import popularNanny from '../assets/popular/nanny.webp'
 import collectionBudgetArt from '../assets/collections/collection-budget.webp'
+import collectionExpressArt from '../assets/collections/collection-express.png'
 import collectionStarsArt from '../assets/collections/collection-stars.webp'
 import collectionVerifiedArt from '../assets/collections/collection-verified.webp'
 import storyAvatarOne from '../assets/kiven-girls.webp'
@@ -86,6 +87,11 @@ export const collectionItems = [
     meta: 'Ответ за 10 минут',
     tone: 'rose',
     categoryId: null,
+    cornerImage: collectionExpressArt,
+    cornerImagePosition: 'bottom-right',
+    cornerImageSize: 'clamp(120px, 40vw, 170px)',
+    cornerImageRight: '0px',
+    cornerImageBottom: '0px',
   },
   {
     id: 'stars',
