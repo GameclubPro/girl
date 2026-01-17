@@ -118,15 +118,8 @@ export const ClientScreen = ({
   const categoryTargetRef = useRef<HTMLButtonElement | null>(null)
   const categoryGhostRef = useRef<HTMLDivElement | null>(null)
   const [isCategoryAnimating, setIsCategoryAnimating] = useState(false)
-  const [pendingCategoryItem, setPendingCategoryItem] = useState<CategoryItem | null>(
-    null
-  )
   const [isCategoryPulsed, setIsCategoryPulsed] = useState(false)
   const pulseTimerRef = useRef<number[]>([])
-  const pendingCategoryLabel = pendingCategoryItem
-    ? categoryLabelOverrides[pendingCategoryItem.id] ?? pendingCategoryItem.label
-    : ''
-  const overlayCategoryLabel = pendingCategoryLabel || activeCategoryLabel
 
   useEffect(() => {
     if (activeCategoryId) return
@@ -279,7 +272,6 @@ export const ClientScreen = ({
     clearCategoryGhost()
     setIsCategoryOverlayExiting(false)
     setIsCategoryAnimating(false)
-    setPendingCategoryItem(null)
     setIsCategoryOverlayClosing(true)
     closeOverlayTimerRef.current = window.setTimeout(() => {
       setIsCategoryOverlayOpen(false)
@@ -298,7 +290,6 @@ export const ClientScreen = ({
     setIsCategoryOverlayClosing(false)
     setIsCategoryOverlayExiting(false)
     setIsCategoryAnimating(false)
-    setPendingCategoryItem(null)
   }, [])
 
   const triggerCategoryPulse = useCallback((delay = 0) => {
@@ -412,11 +403,8 @@ export const ClientScreen = ({
         '(prefers-reduced-motion: reduce)'
       )?.matches
 
-      setPendingCategoryItem(item)
-
       if (reduceMotion || !targetEl) {
         onCategoryChange(item.id)
-        setPendingCategoryItem(null)
         setIsCategoryAnimating(false)
         triggerCategoryPulse(0)
         closeCategoryOverlay()
@@ -424,6 +412,7 @@ export const ClientScreen = ({
       }
 
       setIsCategoryAnimating(true)
+      onCategoryChange(item.id)
 
       if (exitOverlayTimerRef.current) {
         window.clearTimeout(exitOverlayTimerRef.current)
@@ -449,15 +438,11 @@ export const ClientScreen = ({
           if (currentGhost && targetEl) {
             animateGhostToHeader(currentGhost, targetEl, () => {
               categoryGhostRef.current = null
-              onCategoryChange(item.id)
-              setPendingCategoryItem(null)
               setIsCategoryAnimating(false)
               triggerCategoryPulse()
             })
           } else {
             clearCategoryGhost()
-            onCategoryChange(item.id)
-            setPendingCategoryItem(null)
             setIsCategoryAnimating(false)
             triggerCategoryPulse()
           }
@@ -471,7 +456,6 @@ export const ClientScreen = ({
       createCategoryGhost,
       isCategoryOverlayExiting,
       onCategoryChange,
-      setPendingCategoryItem,
       triggerCategoryPulse,
     ]
   )
@@ -778,11 +762,11 @@ export const ClientScreen = ({
               <div className="category-overlay-meta">
                 <span
                   className={`category-overlay-chip${
-                    overlayCategoryLabel ? ' is-active' : ''
+                    activeCategoryId ? ' is-active' : ''
                   }`}
                 >
-                  {overlayCategoryLabel
-                    ? `Выбрано: ${overlayCategoryLabel}`
+                  {activeCategoryId
+                    ? `Выбрано: ${activeCategoryLabel || categoryPillLabel}`
                     : 'Выберите категорию'}
                 </span>
               </div>
