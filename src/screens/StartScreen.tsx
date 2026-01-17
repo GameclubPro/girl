@@ -4,6 +4,7 @@ import girlTwoImage from '../assets/kiven-girl-2.webp'
 import clientRoleImage from '../assets/start-role-client.webp'
 import proRoleImage from '../assets/start-role-pro.webp'
 import footerLeftImage from '../assets/start-footer-left.webp'
+import footerRightImage from '../assets/start-footer-right.webp'
 import type { Role } from '../types/app'
 
 export const StartScreen = ({
@@ -88,7 +89,12 @@ export const StartScreen = ({
           alt=""
           aria-hidden="true"
         />
-        <span className="footer-placeholder" aria-hidden="true" />
+        <img
+          className="footer-image footer-image--right"
+          src={footerRightImage}
+          alt=""
+          aria-hidden="true"
+        />
       </div>
     </main>
   </div>

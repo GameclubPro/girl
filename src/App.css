@@ -13050,8 +13050,11 @@ h2 {
   width: min(30vw, 140px);
 }
 
-.footer-placeholder {
-  display: none;
+.footer-image--right {
+  position: absolute;
+  right: -14px;
+  bottom: -8px;
+  width: min(30vw, 150px);
 }
 
 .client-shell {
