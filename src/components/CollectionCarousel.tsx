@@ -14,6 +14,10 @@ type CollectionCarouselProps = {
   onSelect?: (item: CollectionItem) => void
 }
 
+const AUTO_RESUME_DELAY_MS = 5000
+const USER_INPUT_WINDOW_MS = 1500
+const SCROLL_IDLE_DELAY_MS = 200
+
 export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps) => {
   const carouselItems: CollectionItem[] =
     items && items.length > 0 ? items : collectionItems
@@ -29,12 +33,18 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const trackRef = useRef<HTMLDivElement | null>(null)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const rafRef = useRef(0)
+  const programmaticScrollRafRef = useRef(0)
   const setWidthRef = useRef(0)
   const stepRef = useRef(0)
   const pauseRef = useRef(false)
   const readyRef = useRef(false)
   const hasCenteredRef = useRef(false)
   const lastCenteredLeftRef = useRef<number | null>(null)
+  const resumeTimerRef = useRef(0)
+  const userScrollTimerRef = useRef(0)
+  const lastUserInputRef = useRef(0)
+  const isUserScrollingRef = useRef(false)
+  const isProgrammaticScrollRef = useRef(false)
   const [isReady, setIsReady] = useState(false)
   const [fontsReady, setFontsReady] = useState(false)
 
@@ -63,6 +73,15 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const setScrollLeftInstant = useCallback((nextLeft: number) => {
     const track = trackRef.current
     if (!track) return
+
+    isProgrammaticScrollRef.current = true
+    if (programmaticScrollRafRef.current) {
+      window.cancelAnimationFrame(programmaticScrollRafRef.current)
+    }
+    programmaticScrollRafRef.current = window.requestAnimationFrame(() => {
+      isProgrammaticScrollRef.current = false
+      programmaticScrollRafRef.current = 0
+    })
 
     const previousBehavior = track.style.scrollBehavior
     track.style.scrollBehavior = 'auto'
@@ -110,12 +129,46 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     setIsReady(true)
   }, [])
 
+  const pauseAuto = useCallback((delay = AUTO_RESUME_DELAY_MS) => {
+    pauseRef.current = true
+    if (resumeTimerRef.current) {
+      window.clearTimeout(resumeTimerRef.current)
+    }
+    resumeTimerRef.current = window.setTimeout(() => {
+      pauseRef.current = false
+    }, delay)
+  }, [])
+
+  const handleUserInput = useCallback(() => {
+    lastUserInputRef.current = Date.now()
+    pauseAuto()
+  }, [pauseAuto])
+
   const handleScroll = () => {
     if (!readyRef.current) return
+    if (isProgrammaticScrollRef.current) return
+    const now = Date.now()
+    const isUserScroll = now - lastUserInputRef.current < USER_INPUT_WINDOW_MS
+
+    if (isUserScroll) {
+      lastUserInputRef.current = now
+      isUserScrollingRef.current = true
+      pauseAuto()
+      if (userScrollTimerRef.current) {
+        window.clearTimeout(userScrollTimerRef.current)
+      }
+      userScrollTimerRef.current = window.setTimeout(() => {
+        isUserScrollingRef.current = false
+        normalizePosition()
+      }, SCROLL_IDLE_DELAY_MS)
+    }
+
     if (rafRef.current) return
     rafRef.current = window.requestAnimationFrame(() => {
       rafRef.current = 0
-      normalizePosition()
+      if (!isUserScrollingRef.current) {
+        normalizePosition()
+      }
     })
   }
 
@@ -214,6 +267,20 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   }, [])
 
   useEffect(() => {
+    return () => {
+      if (resumeTimerRef.current) {
+        window.clearTimeout(resumeTimerRef.current)
+      }
+      if (userScrollTimerRef.current) {
+        window.clearTimeout(userScrollTimerRef.current)
+      }
+      if (programmaticScrollRafRef.current) {
+        window.cancelAnimationFrame(programmaticScrollRafRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     const track = trackRef.current
     if (!track) return
     if (!isReady || !fontsReady) return
@@ -226,7 +293,6 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       typeof document !== 'undefined' &&
       'scrollBehavior' in document.documentElement.style
 
-    let resumeTimer = 0
     let startTimer = 0
     let intervalId = 0
     let autoStarted = false
@@ -260,23 +326,12 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       }, 3200)
     }
 
-    const pauseAuto = () => {
-      if (!autoStarted) return
-      pauseRef.current = true
-      if (resumeTimer) {
-        window.clearTimeout(resumeTimer)
-      }
-      resumeTimer = window.setTimeout(() => {
-        pauseRef.current = false
-      }, 3500)
-    }
-
     pauseRef.current = true
     startTimer = window.setTimeout(startAuto, 1400)
 
-    track.addEventListener('pointerdown', pauseAuto)
-    track.addEventListener('touchstart', pauseAuto, { passive: true })
-    track.addEventListener('wheel', pauseAuto, { passive: true })
+    track.addEventListener('pointerdown', handleUserInput)
+    track.addEventListener('touchstart', handleUserInput, { passive: true })
+    track.addEventListener('wheel', handleUserInput, { passive: true })
     track.addEventListener('focusin', pauseAuto)
 
     return () => {
@@ -286,15 +341,12 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       if (intervalId) {
         window.clearInterval(intervalId)
       }
-      if (resumeTimer) {
-        window.clearTimeout(resumeTimer)
-      }
-      track.removeEventListener('pointerdown', pauseAuto)
-      track.removeEventListener('touchstart', pauseAuto)
-      track.removeEventListener('wheel', pauseAuto)
+      track.removeEventListener('pointerdown', handleUserInput)
+      track.removeEventListener('touchstart', handleUserInput)
+      track.removeEventListener('wheel', handleUserInput)
       track.removeEventListener('focusin', pauseAuto)
     }
-  }, [measure, normalizePosition, isReady, fontsReady])
+  }, [handleUserInput, measure, normalizePosition, pauseAuto, isReady, fontsReady])
 
   return (
     <div
