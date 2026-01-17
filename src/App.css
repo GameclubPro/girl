@@ -17446,7 +17446,7 @@ h2 {
     border-color 0.2s ease;
   position: relative;
   overflow: hidden;
-  min-height: 128px;
+  min-height: 196px;
 }
 
 .category-overlay-card::after {
@@ -17479,8 +17479,8 @@ h2 {
 }
 
 .category-overlay-card-icon {
-  width: 72px;
-  height: 72px;
+  width: 144px;
+  height: 144px;
   border-radius: 12px;
   background: transparent;
   display: inline-flex;
@@ -17491,8 +17491,8 @@ h2 {
 }
 
 .category-overlay-card-icon img {
-  width: 48px;
-  height: 48px;
+  width: 96px;
+  height: 96px;
   object-fit: contain;
 }
 
