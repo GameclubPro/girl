@@ -13039,8 +13039,8 @@ h2 {
 
 .footer-image--left {
   width: min(36vw, 160px);
-  margin-left: -6px;
-  margin-bottom: -6px;
+  margin-left: -18px;
+  margin-bottom: -14px;
 }
 
 .footer-placeholder {
