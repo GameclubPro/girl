@@ -91,13 +91,6 @@ export const ClientScreen = ({
   onViewMasterProfile: (masterId: string) => void
 }) => {
   type CategoryItem = (typeof categoryItems)[number]
-  const activeCategoryItem = activeCategoryId
-    ? categoryItems.find((item) => item.id === activeCategoryId) ?? null
-    : null
-  const activeCategoryLabel = activeCategoryId
-    ? categoryLabelOverrides[activeCategoryId] ?? activeCategoryItem?.label ?? ''
-    : ''
-  const categoryPillLabel = activeCategoryLabel || 'Категория'
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
   const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([])
   const [isStoriesLoading, setIsStoriesLoading] = useState(false)
@@ -120,6 +113,18 @@ export const ClientScreen = ({
   const [isCategoryAnimating, setIsCategoryAnimating] = useState(false)
   const [isCategoryPulsed, setIsCategoryPulsed] = useState(false)
   const pulseTimerRef = useRef<number[]>([])
+  const activeCategoryItem = activeCategoryId
+    ? categoryItems.find((item) => item.id === activeCategoryId) ?? null
+    : null
+  const activeCategoryLabel = activeCategoryId
+    ? categoryLabelOverrides[activeCategoryId] ?? activeCategoryItem?.label ?? ''
+    : ''
+  const activeCategoryPillLabel = activeCategoryLabel || 'Категория'
+  const isCategoryVisualActive = Boolean(activeCategoryId) && !isCategoryAnimating
+  const visualCategoryId = isCategoryVisualActive ? activeCategoryId : null
+  const visualCategoryItem = isCategoryVisualActive ? activeCategoryItem : null
+  const visualCategoryLabel = isCategoryVisualActive ? activeCategoryLabel : ''
+  const visualCategoryPillLabel = visualCategoryLabel || 'Категория'
 
   useEffect(() => {
     if (activeCategoryId) return
@@ -280,6 +285,7 @@ export const ClientScreen = ({
   }, [clearCategoryGhost])
 
   const openCategoryOverlay = useCallback(() => {
+    if (isCategoryAnimating) return
     if (closeOverlayTimerRef.current) {
       window.clearTimeout(closeOverlayTimerRef.current)
     }
@@ -290,7 +296,7 @@ export const ClientScreen = ({
     setIsCategoryOverlayClosing(false)
     setIsCategoryOverlayExiting(false)
     setIsCategoryAnimating(false)
-  }, [])
+  }, [isCategoryAnimating])
 
   const triggerCategoryPulse = useCallback((delay = 0) => {
     clearPulseTimers()
@@ -461,8 +467,8 @@ export const ClientScreen = ({
   )
 
   const showcaseItems = useMemo<ShowcaseMedia[]>(() => {
-    const pool = activeCategoryId
-      ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
+    const pool = visualCategoryId
+      ? showcasePool.filter((item) => item.categories.includes(visualCategoryId))
       : showcasePool
     const basePool = pool.length > 0 ? pool : showcasePool
     if (basePool.length === 0) return []
@@ -489,7 +495,7 @@ export const ClientScreen = ({
       const fallback = pickRandom(shuffled)
       return fallback ?? shuffled[index % shuffled.length]
     })
-  }, [activeCategoryId, showcasePool])
+  }, [showcasePool, visualCategoryId])
 
   const showcaseResolutions = useMemo(() => {
     if (!showcaseTileWidth) return null
@@ -548,27 +554,27 @@ export const ClientScreen = ({
         <div className="client-category-row">
           <button
             className={`client-category-pill${
-              activeCategoryId && !isCategoryAnimating ? ' is-active' : ''
+              isCategoryVisualActive ? ' is-active' : ''
             }${isCategoryPulsed ? ' is-pulsed' : ''}`}
             type="button"
             onClick={openCategoryOverlay}
             ref={categoryTargetRef}
             aria-label={
-              activeCategoryId
-                ? `Категория: ${categoryPillLabel}`
+              isCategoryVisualActive
+                ? `Категория: ${visualCategoryPillLabel}`
                 : 'Выбрать категорию'
             }
           >
             <span className="client-category-pill-icon" aria-hidden="true">
-              {activeCategoryItem ? (
-                <img src={activeCategoryItem.icon} alt="" />
+              {visualCategoryItem ? (
+                <img src={visualCategoryItem.icon} alt="" />
               ) : (
                 <span className="client-category-pill-plus">+</span>
               )}
             </span>
-            <span className="client-category-pill-text">{categoryPillLabel}</span>
+            <span className="client-category-pill-text">{visualCategoryPillLabel}</span>
             <span className="client-category-pill-action">
-              {activeCategoryId ? 'Сменить' : 'Выбрать'}
+              {isCategoryVisualActive ? 'Сменить' : 'Выбрать'}
             </span>
           </button>
         </div>
@@ -686,10 +692,10 @@ export const ClientScreen = ({
         </section>
 
         <section className="client-section">
-          <div className={`category-focus${activeCategoryId ? ' is-active' : ''}`}>
+          <div className={`category-focus${isCategoryVisualActive ? ' is-active' : ''}`}>
             <span className="category-focus-icon" aria-hidden="true">
-              {activeCategoryItem ? (
-                <img src={activeCategoryItem.icon} alt="" />
+              {visualCategoryItem ? (
+                <img src={visualCategoryItem.icon} alt="" />
               ) : (
                 <span className="category-focus-placeholder">?</span>
               )}
@@ -697,10 +703,10 @@ export const ClientScreen = ({
             <div className="category-focus-body">
               <span className="category-focus-kicker">Категория</span>
               <span className="category-focus-title">
-                {activeCategoryLabel || 'Выберите категорию'}
+                {visualCategoryLabel || 'Выберите категорию'}
               </span>
               <span className="category-focus-subtitle">
-                {activeCategoryLabel
+                {visualCategoryLabel
                   ? 'Используем для подбора мастеров и фильтрации витрины.'
                   : 'Нужно выбрать, чтобы увидеть мастеров поблизости.'}
               </span>
@@ -708,14 +714,14 @@ export const ClientScreen = ({
             <button
               className="category-focus-action"
               type="button"
-              onClick={activeCategoryId ? onViewMasters : openCategoryOverlay}
+              onClick={isCategoryVisualActive ? onViewMasters : openCategoryOverlay}
             >
-              {activeCategoryId ? 'Открыть мастеров' : 'Выбрать категорию'}
+              {isCategoryVisualActive ? 'Открыть мастеров' : 'Выбрать категорию'}
             </button>
           </div>
           <p className="category-helper">
-            {activeCategoryLabel
-              ? `Выбрана категория: ${activeCategoryLabel}`
+            {visualCategoryLabel
+              ? `Выбрана категория: ${visualCategoryLabel}`
               : 'Выберите категорию, чтобы открыть мастеров'}
           </p>
         </section>
@@ -766,7 +772,7 @@ export const ClientScreen = ({
                   }`}
                 >
                   {activeCategoryId
-                    ? `Выбрано: ${activeCategoryLabel || categoryPillLabel}`
+                    ? `Выбрано: ${activeCategoryPillLabel}`
                     : 'Выберите категорию'}
                 </span>
               </div>
