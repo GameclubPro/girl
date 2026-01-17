@@ -17478,8 +17478,8 @@ h2 {
 }
 
 .category-overlay-card-icon {
-  width: 36px;
-  height: 36px;
+  width: 72px;
+  height: 72px;
   border-radius: 12px;
   background: transparent;
   display: inline-flex;
@@ -17489,8 +17489,8 @@ h2 {
 }
 
 .category-overlay-card-icon img {
-  width: 24px;
-  height: 24px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
 }
 
