@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from 'react'
 import {
   IconChat,
   IconHome,
@@ -83,10 +90,14 @@ export const ClientScreen = ({
   onViewProfile: () => void
   onViewMasterProfile: (masterId: string) => void
 }) => {
-  const activeCategoryLabel =
-    (activeCategoryId ? categoryLabelOverrides[activeCategoryId] : '') ??
-    categoryItems.find((item) => item.id === activeCategoryId)?.label ??
-    ''
+  type CategoryItem = (typeof categoryItems)[number]
+  const activeCategoryItem = activeCategoryId
+    ? categoryItems.find((item) => item.id === activeCategoryId) ?? null
+    : null
+  const activeCategoryLabel = activeCategoryId
+    ? categoryLabelOverrides[activeCategoryId] ?? activeCategoryItem?.label ?? ''
+    : ''
+  const categoryPillLabel = activeCategoryLabel || 'Категория'
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
   const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([])
   const [isStoriesLoading, setIsStoriesLoading] = useState(false)
@@ -97,6 +108,35 @@ export const ClientScreen = ({
   const [activeStoryIndex, setActiveStoryIndex] = useState(0)
   const showcaseGalleryRef = useRef<HTMLDivElement | null>(null)
   const [showcaseTileWidth, setShowcaseTileWidth] = useState<number | null>(null)
+  const [isCategoryOverlayOpen, setIsCategoryOverlayOpen] = useState(
+    () => !activeCategoryId
+  )
+  const [isCategoryOverlayClosing, setIsCategoryOverlayClosing] = useState(false)
+  const closeOverlayTimerRef = useRef<number | null>(null)
+  const categoryTargetRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    if (activeCategoryId) return
+    setIsCategoryOverlayOpen(true)
+    setIsCategoryOverlayClosing(false)
+  }, [activeCategoryId])
+
+  useEffect(() => {
+    if (!isCategoryOverlayOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isCategoryOverlayOpen])
+
+  useEffect(() => {
+    return () => {
+      if (closeOverlayTimerRef.current) {
+        window.clearTimeout(closeOverlayTimerRef.current)
+      }
+    }
+  }, [])
   useEffect(() => {
     let cancelled = false
 
@@ -199,6 +239,105 @@ export const ClientScreen = ({
     return () => observer.disconnect()
   }, [])
 
+  const closeCategoryOverlay = useCallback(() => {
+    if (closeOverlayTimerRef.current) {
+      window.clearTimeout(closeOverlayTimerRef.current)
+    }
+    setIsCategoryOverlayClosing(true)
+    closeOverlayTimerRef.current = window.setTimeout(() => {
+      setIsCategoryOverlayOpen(false)
+      setIsCategoryOverlayClosing(false)
+    }, 280)
+  }, [])
+
+  const openCategoryOverlay = useCallback(() => {
+    if (closeOverlayTimerRef.current) {
+      window.clearTimeout(closeOverlayTimerRef.current)
+    }
+    setIsCategoryOverlayOpen(true)
+    setIsCategoryOverlayClosing(false)
+  }, [])
+
+  const flyCategoryToHeader = useCallback(
+    (sourceEl: HTMLElement, targetEl: HTMLElement, item: CategoryItem) => {
+      const sourceRect = sourceEl.getBoundingClientRect()
+      const targetRect = targetEl.getBoundingClientRect()
+
+      if (!sourceRect.width || !targetRect.width) return
+
+      const ghost = document.createElement('div')
+      ghost.className = 'category-fly'
+      ghost.style.left = `${sourceRect.left}px`
+      ghost.style.top = `${sourceRect.top}px`
+      ghost.style.width = `${sourceRect.width}px`
+      ghost.style.height = `${sourceRect.height}px`
+
+      const iconWrap = document.createElement('span')
+      iconWrap.className = 'category-fly-icon'
+
+      const iconImg = document.createElement('img')
+      iconImg.src = item.icon
+      iconImg.alt = ''
+      iconWrap.appendChild(iconImg)
+
+      const label = document.createElement('span')
+      label.className = 'category-fly-label'
+      label.textContent = categoryLabelOverrides[item.id] ?? item.label
+
+      ghost.append(iconWrap, label)
+      document.body.appendChild(ghost)
+
+      const startX = sourceRect.left + sourceRect.width / 2
+      const startY = sourceRect.top + sourceRect.height / 2
+      const endX = targetRect.left + targetRect.width / 2
+      const endY = targetRect.top + targetRect.height / 2
+      const deltaX = endX - startX
+      const deltaY = endY - startY
+      const scaleX = targetRect.width / sourceRect.width
+      const scaleY = targetRect.height / sourceRect.height
+
+      const animation = ghost.animate(
+        [
+          {
+            transform: 'translate3d(0, 0, 0) scale(1)',
+            opacity: 1,
+          },
+          {
+            transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`,
+            opacity: 0.2,
+          },
+        ],
+        {
+          duration: 520,
+          easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+          fill: 'forwards',
+        }
+      )
+
+      animation.onfinish = () => {
+        ghost.remove()
+      }
+    },
+    []
+  )
+
+  const handleCategorySelect = useCallback(
+    (item: CategoryItem, event: MouseEvent<HTMLButtonElement>) => {
+      const targetEl = categoryTargetRef.current
+      const reduceMotion = window.matchMedia?.(
+        '(prefers-reduced-motion: reduce)'
+      )?.matches
+
+      if (!reduceMotion && targetEl) {
+        flyCategoryToHeader(event.currentTarget, targetEl, item)
+      }
+
+      onCategoryChange(item.id)
+      closeCategoryOverlay()
+    },
+    [closeCategoryOverlay, flyCategoryToHeader, onCategoryChange]
+  )
+
   const showcaseItems = useMemo<ShowcaseMedia[]>(() => {
     const pool = activeCategoryId
       ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
@@ -284,19 +423,31 @@ export const ClientScreen = ({
         <div className="client-brand">KIVEN</div>
       </header>
       <div className="client-shell">
-        {activeCategoryId && activeCategoryLabel && (
+        <div className="client-category-row">
           <button
-            className="client-category-indicator"
+            className={`client-category-pill${activeCategoryId ? ' is-active' : ''}`}
             type="button"
-            onClick={() => onCategoryChange(null)}
-            aria-label="Сбросить категорию"
+            onClick={openCategoryOverlay}
+            ref={categoryTargetRef}
+            aria-label={
+              activeCategoryId
+                ? `Категория: ${categoryPillLabel}`
+                : 'Выбрать категорию'
+            }
           >
-            Категория: <strong>{activeCategoryLabel}</strong>
-            <span className="client-category-indicator-close" aria-hidden="true">
-              ×
+            <span className="client-category-pill-icon" aria-hidden="true">
+              {activeCategoryItem ? (
+                <img src={activeCategoryItem.icon} alt="" />
+              ) : (
+                <span className="client-category-pill-plus">+</span>
+              )}
+            </span>
+            <span className="client-category-pill-text">{categoryPillLabel}</span>
+            <span className="client-category-pill-action">
+              {activeCategoryId ? 'Сменить' : 'Выбрать'}
             </span>
           </button>
-        )}
+        </div>
 
         <section className="client-section">
           <div className="client-showcase-card">
@@ -411,35 +562,32 @@ export const ClientScreen = ({
         </section>
 
         <section className="client-section">
-          <div className="category-grid">
-            {categoryItems.map((item) => {
-              const isSelected = item.id === activeCategoryId
-              const categoryLabel = categoryLabelOverrides[item.id] ?? item.label
-
-              return (
-                <button
-                  className={`category-card${isSelected ? ' is-selected' : ''}`}
-                  type="button"
-                  key={item.id}
-                  aria-pressed={isSelected}
-                  aria-label={categoryLabel}
-                  onClick={() => {
-                    onCategoryChange(item.id)
-                    onViewMasters()
-                  }}
-                >
-                  <span className="category-icon" aria-hidden="true">
-                    <img
-                      className="category-icon-image"
-                      src={item.icon}
-                      alt=""
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span className="category-label">{categoryLabel}</span>
-                </button>
-              )
-            })}
+          <div className={`category-focus${activeCategoryId ? ' is-active' : ''}`}>
+            <span className="category-focus-icon" aria-hidden="true">
+              {activeCategoryItem ? (
+                <img src={activeCategoryItem.icon} alt="" />
+              ) : (
+                <span className="category-focus-placeholder">?</span>
+              )}
+            </span>
+            <div className="category-focus-body">
+              <span className="category-focus-kicker">Категория</span>
+              <span className="category-focus-title">
+                {activeCategoryLabel || 'Выберите категорию'}
+              </span>
+              <span className="category-focus-subtitle">
+                {activeCategoryLabel
+                  ? 'Используем для подбора мастеров и фильтрации витрины.'
+                  : 'Нужно выбрать, чтобы увидеть мастеров поблизости.'}
+              </span>
+            </div>
+            <button
+              className="category-focus-action"
+              type="button"
+              onClick={activeCategoryId ? onViewMasters : openCategoryOverlay}
+            >
+              {activeCategoryId ? 'Открыть мастеров' : 'Выбрать категорию'}
+            </button>
           </div>
           <p className="category-helper">
             {activeCategoryLabel
@@ -449,6 +597,70 @@ export const ClientScreen = ({
         </section>
 
       </div>
+
+      {isCategoryOverlayOpen && (
+        <div
+          className={`category-overlay${
+            isCategoryOverlayClosing ? ' is-closing' : ''
+          }`}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Выбор категории"
+          onClick={() => {
+            if (activeCategoryId) {
+              closeCategoryOverlay()
+            }
+          }}
+        >
+          <div
+            className="category-overlay-panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="category-overlay-head">
+              <p className="category-overlay-kicker">Категории</p>
+              <h2 className="category-overlay-title">Что нужно сегодня?</h2>
+              <p className="category-overlay-subtitle">
+                Выберите услугу, чтобы сразу увидеть лучших мастеров рядом.
+              </p>
+              {activeCategoryId && (
+                <button
+                  className="category-overlay-close"
+                  type="button"
+                  onClick={closeCategoryOverlay}
+                >
+                  Готово
+                </button>
+              )}
+            </div>
+            <div className="category-overlay-grid" role="list">
+              {categoryItems.map((item, index) => {
+                const isActive = item.id === activeCategoryId
+                const label = categoryLabelOverrides[item.id] ?? item.label
+                return (
+                  <button
+                    className={`category-overlay-card${
+                      isActive ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    key={item.id}
+                    role="listitem"
+                    onClick={(event) => handleCategorySelect(item, event)}
+                    style={{ animationDelay: `${index * 45}ms` }}
+                  >
+                    <span className="category-overlay-card-icon" aria-hidden="true">
+                      <img src={item.icon} alt="" loading="lazy" />
+                    </span>
+                    <span className="category-overlay-card-title">{label}</span>
+                    <span className="category-overlay-card-arrow" aria-hidden="true">
+                      &gt;
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="bottom-nav" aria-label="Навигация">
         <button className="nav-item is-active" type="button">
