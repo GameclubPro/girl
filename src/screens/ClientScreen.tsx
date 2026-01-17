@@ -112,8 +112,11 @@ export const ClientScreen = ({
     () => !activeCategoryId
   )
   const [isCategoryOverlayClosing, setIsCategoryOverlayClosing] = useState(false)
+  const [isCategoryOverlayExiting, setIsCategoryOverlayExiting] = useState(false)
   const closeOverlayTimerRef = useRef<number | null>(null)
+  const exitOverlayTimerRef = useRef<number | null>(null)
   const categoryTargetRef = useRef<HTMLButtonElement | null>(null)
+  const categoryGhostRef = useRef<HTMLDivElement | null>(null)
   const [isCategoryPulsed, setIsCategoryPulsed] = useState(false)
   const pulseTimerRef = useRef<number[]>([])
 
@@ -137,14 +140,25 @@ export const ClientScreen = ({
     pulseTimerRef.current = []
   }, [])
 
+  const clearCategoryGhost = useCallback(() => {
+    if (categoryGhostRef.current) {
+      categoryGhostRef.current.remove()
+      categoryGhostRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     return () => {
       if (closeOverlayTimerRef.current) {
         window.clearTimeout(closeOverlayTimerRef.current)
       }
+      if (exitOverlayTimerRef.current) {
+        window.clearTimeout(exitOverlayTimerRef.current)
+      }
+      clearCategoryGhost()
       clearPulseTimers()
     }
-  }, [clearPulseTimers])
+  }, [clearCategoryGhost, clearPulseTimers])
   useEffect(() => {
     let cancelled = false
 
@@ -251,19 +265,28 @@ export const ClientScreen = ({
     if (closeOverlayTimerRef.current) {
       window.clearTimeout(closeOverlayTimerRef.current)
     }
+    if (exitOverlayTimerRef.current) {
+      window.clearTimeout(exitOverlayTimerRef.current)
+    }
+    clearCategoryGhost()
+    setIsCategoryOverlayExiting(false)
     setIsCategoryOverlayClosing(true)
     closeOverlayTimerRef.current = window.setTimeout(() => {
       setIsCategoryOverlayOpen(false)
       setIsCategoryOverlayClosing(false)
     }, 280)
-  }, [])
+  }, [clearCategoryGhost])
 
   const openCategoryOverlay = useCallback(() => {
     if (closeOverlayTimerRef.current) {
       window.clearTimeout(closeOverlayTimerRef.current)
     }
+    if (exitOverlayTimerRef.current) {
+      window.clearTimeout(exitOverlayTimerRef.current)
+    }
     setIsCategoryOverlayOpen(true)
     setIsCategoryOverlayClosing(false)
+    setIsCategoryOverlayExiting(false)
   }, [])
 
   const triggerCategoryPulse = useCallback((delay = 0) => {
@@ -278,17 +301,10 @@ export const ClientScreen = ({
     pulseTimerRef.current.push(startTimer)
   }, [clearPulseTimers])
 
-  const flyCategoryToHeader = useCallback(
-    (
-      sourceEl: HTMLElement,
-      targetEl: HTMLElement,
-      item: CategoryItem,
-      onFinish?: () => void
-    ) => {
+  const createCategoryGhost = useCallback(
+    (sourceEl: HTMLElement, item: CategoryItem) => {
       const sourceRect = sourceEl.getBoundingClientRect()
-      const targetRect = targetEl.getBoundingClientRect()
-
-      if (!sourceRect.width || !targetRect.width) return
+      if (!sourceRect.width || !sourceRect.height) return null
 
       const ghost = document.createElement('div')
       ghost.className = 'category-fly'
@@ -311,6 +327,22 @@ export const ClientScreen = ({
 
       ghost.append(iconWrap, label)
       document.body.appendChild(ghost)
+
+      return ghost
+    },
+    []
+  )
+
+  const animateGhostToHeader = useCallback(
+    (ghost: HTMLDivElement, targetEl: HTMLElement, onFinish?: () => void) => {
+      const sourceRect = ghost.getBoundingClientRect()
+      const targetRect = targetEl.getBoundingClientRect()
+
+      if (!sourceRect.width || !targetRect.width) {
+        ghost.remove()
+        onFinish?.()
+        return
+      }
 
       const startX = sourceRect.left + sourceRect.width / 2
       const startY = sourceRect.top + sourceRect.height / 2
@@ -362,23 +394,62 @@ export const ClientScreen = ({
 
   const handleCategorySelect = useCallback(
     (item: CategoryItem, event: MouseEvent<HTMLButtonElement>) => {
+      if (isCategoryOverlayExiting) return
       const targetEl = categoryTargetRef.current
       const reduceMotion = window.matchMedia?.(
         '(prefers-reduced-motion: reduce)'
       )?.matches
 
-      if (!reduceMotion && targetEl) {
-        flyCategoryToHeader(event.currentTarget, targetEl, item, () =>
-          triggerCategoryPulse()
-        )
-      } else {
-        triggerCategoryPulse(260)
+      onCategoryChange(item.id)
+
+      if (reduceMotion || !targetEl) {
+        triggerCategoryPulse(0)
+        closeCategoryOverlay()
+        return
       }
 
-      onCategoryChange(item.id)
-      closeCategoryOverlay()
+      if (exitOverlayTimerRef.current) {
+        window.clearTimeout(exitOverlayTimerRef.current)
+      }
+      if (closeOverlayTimerRef.current) {
+        window.clearTimeout(closeOverlayTimerRef.current)
+      }
+      clearCategoryGhost()
+
+      const ghost = createCategoryGhost(event.currentTarget, item)
+      if (ghost) {
+        categoryGhostRef.current = ghost
+      }
+
+      setIsCategoryOverlayClosing(false)
+      setIsCategoryOverlayExiting(true)
+
+      exitOverlayTimerRef.current = window.setTimeout(() => {
+        setIsCategoryOverlayOpen(false)
+        setIsCategoryOverlayExiting(false)
+        window.requestAnimationFrame(() => {
+          const currentGhost = categoryGhostRef.current
+          if (currentGhost && targetEl) {
+            animateGhostToHeader(currentGhost, targetEl, () => {
+              categoryGhostRef.current = null
+              triggerCategoryPulse()
+            })
+          } else {
+            clearCategoryGhost()
+            triggerCategoryPulse()
+          }
+        })
+      }, 420)
     },
-    [closeCategoryOverlay, flyCategoryToHeader, onCategoryChange, triggerCategoryPulse]
+    [
+      animateGhostToHeader,
+      clearCategoryGhost,
+      closeCategoryOverlay,
+      createCategoryGhost,
+      isCategoryOverlayExiting,
+      onCategoryChange,
+      triggerCategoryPulse,
+    ]
   )
 
   const showcaseItems = useMemo<ShowcaseMedia[]>(() => {
@@ -647,11 +718,12 @@ export const ClientScreen = ({
         <div
           className={`category-overlay${
             isCategoryOverlayClosing ? ' is-closing' : ''
-          }`}
+          }${isCategoryOverlayExiting ? ' is-exiting' : ''}`}
           role="dialog"
           aria-modal="true"
           aria-label="Выбор категории"
           onClick={() => {
+            if (isCategoryOverlayExiting) return
             if (activeCategoryId) {
               closeCategoryOverlay()
             }
@@ -693,12 +765,12 @@ export const ClientScreen = ({
             </div>
             <div className="category-overlay-grid" role="list">
               {categoryItems.map((item, index) => {
-                const isActive = item.id === activeCategoryId
+                const isSelected = item.id === activeCategoryId
                 const label = categoryLabelOverrides[item.id] ?? item.label
                 return (
                   <button
                     className={`category-overlay-card${
-                      isActive ? ' is-active' : ''
+                      isSelected ? ' is-selected' : ''
                     }`}
                     type="button"
                     key={item.id}
