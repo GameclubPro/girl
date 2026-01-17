@@ -16900,7 +16900,8 @@ h2 {
   background-position: right bottom;
   background-size: contain;
   opacity: 0.98;
-  transform: var(--collection-card-art-transform, none);
+  transform: var(--collection-card-art-translate, translateY(0))
+    rotate(var(--collection-card-art-rotate, 0deg));
   pointer-events: none;
   z-index: 0;
 }

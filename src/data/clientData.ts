@@ -24,6 +24,7 @@ export type CollectionItem = {
   cornerImageSize?: string
   cornerImageRight?: string
   cornerImageBottom?: string
+  cornerImageRotate?: string
 }
 
 export type PopularItem = {
@@ -53,6 +54,7 @@ export const collectionItems = [
     cornerImagePosition: 'right',
     cornerImageSize: 'clamp(90px, 32vw, 140px)',
     cornerImageRight: '10px',
+    cornerImageRotate: '8deg',
   },
   {
     id: 'visit',

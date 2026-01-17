@@ -290,8 +290,11 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
                   item.cornerImagePosition === 'right'
                     ? 'auto'
                     : item.cornerImageBottom ?? '-6px',
-                '--collection-card-art-transform':
-                  item.cornerImagePosition === 'right' ? 'translateY(-50%)' : 'none',
+                '--collection-card-art-translate':
+                  item.cornerImagePosition === 'right'
+                    ? 'translateY(-50%)'
+                    : 'translateY(0)',
+                '--collection-card-art-rotate': item.cornerImageRotate ?? '0deg',
               } as CSSProperties)
             : undefined
           return (
