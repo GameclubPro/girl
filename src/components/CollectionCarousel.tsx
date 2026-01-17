@@ -283,10 +283,13 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
                 '--collection-card-art-image': `url(${item.cornerImage})`,
                 '--collection-card-art-size':
                   item.cornerImageSize ?? 'clamp(120px, 44vw, 190px)',
+                '--collection-card-art-right': item.cornerImageRight ?? '-6px',
                 '--collection-card-art-top':
                   item.cornerImagePosition === 'right' ? '50%' : 'auto',
                 '--collection-card-art-bottom':
-                  item.cornerImagePosition === 'right' ? 'auto' : '-6px',
+                  item.cornerImagePosition === 'right'
+                    ? 'auto'
+                    : item.cornerImageBottom ?? '-6px',
                 '--collection-card-art-transform':
                   item.cornerImagePosition === 'right' ? 'translateY(-50%)' : 'none',
               } as CSSProperties)

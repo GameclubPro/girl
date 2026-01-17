@@ -22,6 +22,8 @@ export type CollectionItem = {
   cornerImage?: string
   cornerImagePosition?: 'bottom-right' | 'right'
   cornerImageSize?: string
+  cornerImageRight?: string
+  cornerImageBottom?: string
 }
 
 export type PopularItem = {
@@ -49,7 +51,8 @@ export const collectionItems = [
     categoryId: null,
     cornerImage: collectionVerifiedArt,
     cornerImagePosition: 'right',
-    cornerImageSize: 'clamp(110px, 38vw, 170px)',
+    cornerImageSize: 'clamp(90px, 32vw, 140px)',
+    cornerImageRight: '10px',
   },
   {
     id: 'visit',

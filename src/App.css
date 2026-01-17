@@ -16890,7 +16890,7 @@ h2 {
 .collection-card::before {
   content: '';
   position: absolute;
-  right: -6px;
+  right: var(--collection-card-art-right, -6px);
   bottom: var(--collection-card-art-bottom, -6px);
   top: var(--collection-card-art-top, auto);
   width: var(--collection-card-art-size, 160px);
