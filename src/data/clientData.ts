@@ -7,6 +7,7 @@ import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
 import popularNanny from '../assets/popular/nanny.webp'
 import collectionBudgetArt from '../assets/collections/collection-budget.webp'
+import collectionVerifiedArt from '../assets/collections/collection-verified.webp'
 import storyAvatarOne from '../assets/kiven-girls.webp'
 import storyAvatarTwo from '../assets/kiven-girls1.webp'
 
@@ -19,6 +20,8 @@ export type CollectionItem = {
   tone: 'lavender' | 'sun' | 'mint' | 'rose' | 'sky'
   categoryId?: string | null
   cornerImage?: string
+  cornerImagePosition?: 'bottom-right' | 'right'
+  cornerImageSize?: string
 }
 
 export type PopularItem = {
@@ -44,6 +47,9 @@ export const collectionItems = [
     meta: '4.9 ★ и выше',
     tone: 'lavender',
     categoryId: null,
+    cornerImage: collectionVerifiedArt,
+    cornerImagePosition: 'right',
+    cornerImageSize: 'clamp(110px, 38vw, 170px)',
   },
   {
     id: 'visit',
@@ -63,6 +69,8 @@ export const collectionItems = [
     tone: 'mint',
     categoryId: null,
     cornerImage: collectionBudgetArt,
+    cornerImagePosition: 'bottom-right',
+    cornerImageSize: 'clamp(130px, 48vw, 200px)',
   },
   {
     id: 'express',

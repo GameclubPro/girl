@@ -281,7 +281,14 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
           const cardStyle = item.cornerImage
             ? ({
                 '--collection-card-art-image': `url(${item.cornerImage})`,
-                '--collection-card-art-size': 'clamp(120px, 44vw, 190px)',
+                '--collection-card-art-size':
+                  item.cornerImageSize ?? 'clamp(120px, 44vw, 190px)',
+                '--collection-card-art-top':
+                  item.cornerImagePosition === 'right' ? '50%' : 'auto',
+                '--collection-card-art-bottom':
+                  item.cornerImagePosition === 'right' ? 'auto' : '-6px',
+                '--collection-card-art-transform':
+                  item.cornerImagePosition === 'right' ? 'translateY(-50%)' : 'none',
               } as CSSProperties)
             : undefined
           return (
