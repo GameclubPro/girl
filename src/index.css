@@ -24,6 +24,9 @@
   --sapphire: var(--accent);
   --sapphire-dark: var(--accent-strong);
   --sapphire-soft: var(--accent-soft);
+  --raspberry: #d84b70;
+  --raspberry-rgb: 216, 75, 112;
+  --raspberry-soft: rgba(216, 75, 112, 0.12);
   --border: rgba(17, 24, 39, 0.16);
   --shadow-rgb: 17, 24, 39;
   --success: #1f7a4d;
