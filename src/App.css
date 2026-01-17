@@ -17486,6 +17486,7 @@ h2 {
   align-items: center;
   justify-content: center;
   box-shadow: none;
+  transform: translateY(-6px);
 }
 
 .category-overlay-card-icon img {
@@ -17498,6 +17499,9 @@ h2 {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
+  text-align: center;
+  justify-self: center;
+  transform: translateY(-4px);
 }
 
 .category-overlay-card-arrow {
