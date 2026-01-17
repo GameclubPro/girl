@@ -1,9 +1,9 @@
-import decorImage from '../assets/kiven-decor.webp'
 import logoImage from '../assets/kiven-logo.webp'
 import girlOneImage from '../assets/kiven-girl-1.webp'
 import girlTwoImage from '../assets/kiven-girl-2.webp'
-import clientRoleImage from '../../1.webp'
-import proRoleImage from '../../2.webp'
+import clientRoleImage from '../assets/start-role-client.webp'
+import proRoleImage from '../assets/start-role-pro.webp'
+import footerLeftImage from '../assets/start-footer-left.webp'
 import type { Role } from '../types/app'
 
 export const StartScreen = ({
@@ -82,7 +82,13 @@ export const StartScreen = ({
       </p>
 
       <div className="footer-decor" aria-hidden="true">
-        <img className="footer-image" src={decorImage} alt="" aria-hidden="true" />
+        <img
+          className="footer-image footer-image--left"
+          src={footerLeftImage}
+          alt=""
+          aria-hidden="true"
+        />
+        <span className="footer-placeholder" aria-hidden="true" />
       </div>
     </main>
   </div>

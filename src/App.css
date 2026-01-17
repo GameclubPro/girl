@@ -13022,13 +13022,25 @@ h2 {
   bottom: 0;
   width: 100vw;
   transform: translateX(-50%);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 16px calc(6px + var(--safe-bottom));
   pointer-events: none;
 }
 
 .footer-image {
-  width: 100%;
+  width: min(42vw, 190px);
   height: auto;
   display: block;
+  object-fit: contain;
+}
+
+.footer-placeholder {
+  width: min(42vw, 190px);
+  height: 1px;
+  visibility: hidden;
 }
 
 .client-shell {
