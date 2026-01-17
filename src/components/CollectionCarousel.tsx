@@ -144,6 +144,10 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     pauseAuto()
   }, [pauseAuto])
 
+  const handleFocusIn = useCallback(() => {
+    pauseAuto()
+  }, [pauseAuto])
+
   const handleScroll = () => {
     if (!readyRef.current) return
     if (isProgrammaticScrollRef.current) return
@@ -332,7 +336,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     track.addEventListener('pointerdown', handleUserInput)
     track.addEventListener('touchstart', handleUserInput, { passive: true })
     track.addEventListener('wheel', handleUserInput, { passive: true })
-    track.addEventListener('focusin', pauseAuto)
+    track.addEventListener('focusin', handleFocusIn)
 
     return () => {
       if (startTimer) {
@@ -344,9 +348,17 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       track.removeEventListener('pointerdown', handleUserInput)
       track.removeEventListener('touchstart', handleUserInput)
       track.removeEventListener('wheel', handleUserInput)
-      track.removeEventListener('focusin', pauseAuto)
+      track.removeEventListener('focusin', handleFocusIn)
     }
-  }, [handleUserInput, measure, normalizePosition, pauseAuto, isReady, fontsReady])
+  }, [
+    handleFocusIn,
+    handleUserInput,
+    measure,
+    normalizePosition,
+    pauseAuto,
+    isReady,
+    fontsReady,
+  ])
 
   return (
     <div
