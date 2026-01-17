@@ -114,6 +114,8 @@ export const ClientScreen = ({
   const [isCategoryOverlayClosing, setIsCategoryOverlayClosing] = useState(false)
   const closeOverlayTimerRef = useRef<number | null>(null)
   const categoryTargetRef = useRef<HTMLButtonElement | null>(null)
+  const [isCategoryPulsed, setIsCategoryPulsed] = useState(false)
+  const pulseTimerRef = useRef<number[]>([])
 
   useEffect(() => {
     if (activeCategoryId) return
@@ -130,13 +132,19 @@ export const ClientScreen = ({
     }
   }, [isCategoryOverlayOpen])
 
+  const clearPulseTimers = useCallback(() => {
+    pulseTimerRef.current.forEach((timer) => window.clearTimeout(timer))
+    pulseTimerRef.current = []
+  }, [])
+
   useEffect(() => {
     return () => {
       if (closeOverlayTimerRef.current) {
         window.clearTimeout(closeOverlayTimerRef.current)
       }
+      clearPulseTimers()
     }
-  }, [])
+  }, [clearPulseTimers])
   useEffect(() => {
     let cancelled = false
 
@@ -258,8 +266,25 @@ export const ClientScreen = ({
     setIsCategoryOverlayClosing(false)
   }, [])
 
+  const triggerCategoryPulse = useCallback((delay = 0) => {
+    clearPulseTimers()
+    const startTimer = window.setTimeout(() => {
+      setIsCategoryPulsed(true)
+      const stopTimer = window.setTimeout(() => {
+        setIsCategoryPulsed(false)
+      }, 620)
+      pulseTimerRef.current.push(stopTimer)
+    }, delay)
+    pulseTimerRef.current.push(startTimer)
+  }, [clearPulseTimers])
+
   const flyCategoryToHeader = useCallback(
-    (sourceEl: HTMLElement, targetEl: HTMLElement, item: CategoryItem) => {
+    (
+      sourceEl: HTMLElement,
+      targetEl: HTMLElement,
+      item: CategoryItem,
+      onFinish?: () => void
+    ) => {
       const sourceRect = sourceEl.getBoundingClientRect()
       const targetRect = targetEl.getBoundingClientRect()
 
@@ -296,26 +321,40 @@ export const ClientScreen = ({
       const scaleX = targetRect.width / sourceRect.width
       const scaleY = targetRect.height / sourceRect.height
 
+      const overshootX = scaleX * 1.05
+      const overshootY = scaleY * 1.05
       const animation = ghost.animate(
         [
           {
             transform: 'translate3d(0, 0, 0) scale(1)',
             opacity: 1,
+            borderRadius: '18px',
+            boxShadow: '0 18px 28px rgba(17, 24, 39, 0.22)',
+          },
+          {
+            offset: 0.72,
+            transform: `translate3d(${deltaX * 0.92}px, ${deltaY * 0.92}px, 0) scale(${overshootX}, ${overshootY})`,
+            opacity: 0.45,
+            borderRadius: '28px',
+            boxShadow: '0 14px 20px rgba(17, 24, 39, 0.18)',
           },
           {
             transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`,
-            opacity: 0.2,
+            opacity: 0.08,
+            borderRadius: '999px',
+            boxShadow: '0 8px 16px rgba(17, 24, 39, 0.14)',
           },
         ],
         {
-          duration: 520,
-          easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+          duration: 600,
+          easing: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
           fill: 'forwards',
         }
       )
 
       animation.onfinish = () => {
         ghost.remove()
+        onFinish?.()
       }
     },
     []
@@ -329,13 +368,17 @@ export const ClientScreen = ({
       )?.matches
 
       if (!reduceMotion && targetEl) {
-        flyCategoryToHeader(event.currentTarget, targetEl, item)
+        flyCategoryToHeader(event.currentTarget, targetEl, item, () =>
+          triggerCategoryPulse()
+        )
+      } else {
+        triggerCategoryPulse(260)
       }
 
       onCategoryChange(item.id)
       closeCategoryOverlay()
     },
-    [closeCategoryOverlay, flyCategoryToHeader, onCategoryChange]
+    [closeCategoryOverlay, flyCategoryToHeader, onCategoryChange, triggerCategoryPulse]
   )
 
   const showcaseItems = useMemo<ShowcaseMedia[]>(() => {
@@ -425,7 +468,9 @@ export const ClientScreen = ({
       <div className="client-shell">
         <div className="client-category-row">
           <button
-            className={`client-category-pill${activeCategoryId ? ' is-active' : ''}`}
+            className={`client-category-pill${
+              activeCategoryId ? ' is-active' : ''
+            }${isCategoryPulsed ? ' is-pulsed' : ''}`}
             type="button"
             onClick={openCategoryOverlay}
             ref={categoryTargetRef}
@@ -617,20 +662,34 @@ export const ClientScreen = ({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="category-overlay-head">
+              <span className="category-overlay-brand">KIVEN</span>
               <p className="category-overlay-kicker">Категории</p>
-              <h2 className="category-overlay-title">Что нужно сегодня?</h2>
+              <div className="category-overlay-title-row">
+                <h2 className="category-overlay-title">Что нужно сегодня?</h2>
+                {activeCategoryId && (
+                  <button
+                    className="category-overlay-close"
+                    type="button"
+                    onClick={closeCategoryOverlay}
+                  >
+                    Готово
+                  </button>
+                )}
+              </div>
               <p className="category-overlay-subtitle">
                 Выберите услугу, чтобы сразу увидеть лучших мастеров рядом.
               </p>
-              {activeCategoryId && (
-                <button
-                  className="category-overlay-close"
-                  type="button"
-                  onClick={closeCategoryOverlay}
+              <div className="category-overlay-meta">
+                <span
+                  className={`category-overlay-chip${
+                    activeCategoryId ? ' is-active' : ''
+                  }`}
                 >
-                  Готово
-                </button>
-              )}
+                  {activeCategoryId
+                    ? `Выбрано: ${activeCategoryLabel || categoryPillLabel}`
+                    : 'Выберите категорию'}
+                </span>
+              </div>
             </div>
             <div className="category-overlay-grid" role="list">
               {categoryItems.map((item, index) => {
