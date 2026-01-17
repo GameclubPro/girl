@@ -17423,13 +17423,14 @@ h2 {
 }
 
 .category-overlay-card {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.58);
   background: linear-gradient(
-    150deg,
-    rgba(var(--paper-rgb), 0.98),
-    rgba(var(--surface-muted-rgb), 0.92)
+    155deg,
+    rgba(226, 240, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.62) 46%,
+    rgba(210, 228, 248, 0.55) 100%
   );
-  border-radius: 20px;
+  border-radius: 22px;
   padding: 6px 8px 8px;
   display: flex;
   flex-direction: column;
@@ -17441,29 +17442,55 @@ h2 {
   opacity: 0;
   transform: translateY(10px);
   animation: category-card-in 0.45s ease forwards;
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
+  box-shadow:
+    0 18px 32px rgba(var(--accent-rgb), 0.18),
+    0 8px 14px rgba(var(--shadow-rgb), 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease,
     border-color 0.2s ease;
   position: relative;
+  z-index: 0;
   overflow: hidden;
   min-height: 0;
   aspect-ratio: 1 / 1;
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+
+.category-overlay-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.category-overlay-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(255, 255, 255, 0) 40%
+  );
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .category-overlay-card::after {
   content: '';
   position: absolute;
-  top: -40px;
-  right: -30px;
-  width: 120px;
-  height: 120px;
+  top: -46px;
+  right: -36px;
+  width: 140px;
+  height: 140px;
   background: radial-gradient(
     circle,
-    rgba(var(--paper-rgb), 0.75) 0%,
-    transparent 68%
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.25) 52%,
+    transparent 70%
   );
-  opacity: 0.6;
+  opacity: 0.75;
   pointer-events: none;
+  z-index: 0;
 }
 
 .category-overlay-card:active {
