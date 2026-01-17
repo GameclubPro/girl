@@ -16891,24 +16891,15 @@ h2 {
   content: '';
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(
-      160deg,
-      rgba(var(--paper-rgb), 0.82) 0%,
-      rgba(var(--paper-rgb), 0.32) 46%,
-      rgba(var(--shadow-rgb), 0.18) 100%
-    ),
-    var(--collection-card-image, none);
+  background-image: var(--collection-card-image, none);
   background-size: cover;
   background-position: center;
-  opacity: 0.95;
   transform: scale(1.02);
-  transition: transform 0.6s ease, opacity 0.35s ease;
+  transition: transform 0.6s ease;
   z-index: 0;
 }
 
 .collection-card:active::before {
-  opacity: 0.9;
   transform: scale(1);
 }
 
