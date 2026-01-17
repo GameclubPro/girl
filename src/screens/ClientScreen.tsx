@@ -389,8 +389,8 @@ export const ClientScreen = ({
         { duration: 220, easing: 'ease', fill: 'forwards' }
       )
 
-      const overshootX = scaleX * 1.04
-      const overshootY = scaleY * 1.04
+      const dipY = Math.max(16, Math.min(32, sourceRect.height * 0.35))
+      const curveLift = Math.max(10, dipY * 0.55)
       const animation = morph.animate(
         [
           {
@@ -403,9 +403,39 @@ export const ClientScreen = ({
             padding: startPadding,
           },
           {
-            offset: 0.7,
-            transform: `translate3d(${deltaX * 0.92}px, ${deltaY * 0.92}px, 0) scale(${overshootX}, ${overshootY})`,
-            opacity: 0.7,
+            offset: 0.18,
+            transform: `translate3d(${deltaX * 0.08}px, ${dipY}px, 0) scale(1)`,
+            opacity: 0.98,
+            borderRadius: sourceStyles.borderRadius,
+            boxShadow: sourceStyles.boxShadow,
+            borderColor: sourceStyles.borderColor,
+            background: sourceStyles.background,
+            padding: startPadding,
+          },
+          {
+            offset: 0.55,
+            transform: `translate3d(${deltaX * 0.6}px, ${deltaY * 0.55 - curveLift}px, 0) scale(1)`,
+            opacity: 0.97,
+            borderRadius: sourceStyles.borderRadius,
+            boxShadow: sourceStyles.boxShadow,
+            borderColor: sourceStyles.borderColor,
+            background: sourceStyles.background,
+            padding: startPadding,
+          },
+          {
+            offset: 0.82,
+            transform: `translate3d(${deltaX * 0.88}px, ${deltaY * 0.88}px, 0) scale(1)`,
+            opacity: 0.96,
+            borderRadius: sourceStyles.borderRadius,
+            boxShadow: sourceStyles.boxShadow,
+            borderColor: sourceStyles.borderColor,
+            background: sourceStyles.background,
+            padding: startPadding,
+          },
+          {
+            offset: 0.92,
+            transform: `translate3d(${deltaX * 0.95}px, ${deltaY * 0.95}px, 0) scale(1)`,
+            opacity: 0.98,
             borderRadius: targetStyles.borderRadius,
             boxShadow: targetStyles.boxShadow,
             borderColor: targetStyles.borderColor,
@@ -414,7 +444,7 @@ export const ClientScreen = ({
           },
           {
             transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`,
-            opacity: 0.94,
+            opacity: 1,
             borderRadius: targetStyles.borderRadius,
             boxShadow: targetStyles.boxShadow,
             borderColor: targetStyles.borderColor,
