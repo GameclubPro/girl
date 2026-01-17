@@ -13,7 +13,8 @@ import {
   IconUser,
 } from '../components/icons'
 import { StoryViewer } from '../components/StoryViewer'
-import { categoryItems } from '../data/clientData'
+import { CollectionCarousel } from '../components/CollectionCarousel'
+import { categoryItems, type CollectionItem } from '../data/clientData'
 import type { MasterProfile, StoryGroup } from '../types/app'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
@@ -616,6 +617,16 @@ export const ClientScreen = ({
     onViewMasterProfile(masterId)
   }
 
+  const handleCollectionSelect = useCallback(
+    (item: CollectionItem) => {
+      if (item.categoryId) {
+        onCategoryChange(item.categoryId)
+      }
+      onViewMasters()
+    },
+    [onCategoryChange, onViewMasters]
+  )
+
   return (
     <div className="screen screen--client">
       <header className="client-topbar client-topbar--floating">
@@ -697,6 +708,21 @@ export const ClientScreen = ({
               )}
             </div>
           </div>
+        </section>
+
+        <section className="client-section">
+          <div className="section-header">
+            <h3>Подборки для вас</h3>
+            <button
+              className="section-action"
+              type="button"
+              onClick={onViewMasters}
+              aria-label="Открыть подборки"
+            >
+              ›
+            </button>
+          </div>
+          <CollectionCarousel onSelect={handleCollectionSelect} />
         </section>
 
         <section className="client-section client-section--stories">

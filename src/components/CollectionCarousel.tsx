@@ -3,9 +3,10 @@ import { collectionItems, type CollectionItem } from '../data/clientData'
 
 type CollectionCarouselProps = {
   items?: CollectionItem[]
+  onSelect?: (item: CollectionItem) => void
 }
 
-export const CollectionCarousel = ({ items }: CollectionCarouselProps) => {
+export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps) => {
   const carouselItems =
     items && items.length > 0 ? items : collectionItems
   const collectionBaseIndex = carouselItems.length
@@ -268,13 +269,16 @@ export const CollectionCarousel = ({ items }: CollectionCarouselProps) => {
           const isPrimary =
             index >= collectionBaseIndex &&
             index < collectionBaseIndex + carouselItems.length
+          const cardLabel = `Открыть подборку: ${item.title}`
           return (
             <button
               className={`collection-card collection-card--${item.tone}`}
               key={`${item.id}-${index}`}
               type="button"
               aria-hidden={!isPrimary}
+              aria-label={cardLabel}
               tabIndex={isPrimary ? 0 : -1}
+              onClick={() => onSelect?.(item)}
               ref={(element) => {
                 cardRefs.current[index] = element
               }}
