@@ -2,7 +2,8 @@ import decorImage from '../assets/kiven-decor.webp'
 import logoImage from '../assets/kiven-logo.webp'
 import girlOneImage from '../assets/kiven-girl-1.webp'
 import girlTwoImage from '../assets/kiven-girl-2.webp'
-import { StarPin } from '../components/StarPin'
+import clientRoleImage from '../../1.webp'
+import proRoleImage from '../../2.webp'
 import type { Role } from '../types/app'
 
 export const StartScreen = ({
@@ -53,16 +54,26 @@ export const StartScreen = ({
           type="button"
           onClick={() => onRoleSelect('client')}
         >
-          <StarPin tone="lavender" />
-          <span>Мне нужна услуга</span>
+          <img
+            className="role-card__image"
+            src={clientRoleImage}
+            alt=""
+            aria-hidden="true"
+          />
+          <span className="role-card__label">Мне нужна услуга</span>
         </button>
         <button
           className="role-card role-card--pro"
           type="button"
           onClick={() => onRoleSelect('pro')}
         >
-          <StarPin tone="sun" />
-          <span>Я Мастер</span>
+          <img
+            className="role-card__image"
+            src={proRoleImage}
+            alt=""
+            aria-hidden="true"
+          />
+          <span className="role-card__label">Я Мастер</span>
         </button>
       </div>
 
