@@ -52,6 +52,7 @@ export const StartScreen = ({
         <button
           className="role-card role-card--client"
           type="button"
+          aria-label="Мне нужна услуга"
           onClick={() => onRoleSelect('client')}
         >
           <img
@@ -60,11 +61,11 @@ export const StartScreen = ({
             alt=""
             aria-hidden="true"
           />
-          <span className="role-card__label">Мне нужна услуга</span>
         </button>
         <button
           className="role-card role-card--pro"
           type="button"
+          aria-label="Я мастер"
           onClick={() => onRoleSelect('pro')}
         >
           <img
@@ -73,7 +74,6 @@ export const StartScreen = ({
             alt=""
             aria-hidden="true"
           />
-          <span className="role-card__label">Я Мастер</span>
         </button>
       </div>
 
