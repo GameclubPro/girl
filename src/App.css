@@ -8,6 +8,8 @@
 }
 
 .screen--start {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(
     90deg,
     rgba(var(--accent-rgb), 0.16) 0%,
@@ -19,6 +21,11 @@
   );
   padding: calc(18px + var(--safe-top) + var(--tg-top-offset)) 22px
     calc(30px + var(--safe-bottom));
+}
+
+.screen--start .content {
+  position: relative;
+  z-index: 1;
 }
 
 .screen--address {
@@ -13018,35 +13025,33 @@ h2 {
 
 .footer-decor {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: 0;
-  width: 100vw;
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 0 16px calc(6px + var(--safe-bottom));
+  width: 100%;
+  transform: none;
+  display: block;
+  padding: 0;
   pointer-events: none;
+  z-index: 0;
 }
 
 .footer-image {
-  width: min(42vw, 190px);
+  width: min(32vw, 150px);
   height: auto;
   display: block;
   object-fit: contain;
 }
 
 .footer-image--left {
-  width: min(36vw, 160px);
-  margin-left: -18px;
-  margin-bottom: -14px;
+  position: absolute;
+  left: -24px;
+  bottom: -20px;
+  width: min(30vw, 140px);
 }
 
 .footer-placeholder {
-  width: min(42vw, 190px);
-  height: 1px;
-  visibility: hidden;
+  display: none;
 }
 
 .client-shell {
