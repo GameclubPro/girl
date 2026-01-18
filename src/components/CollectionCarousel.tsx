@@ -50,6 +50,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const lastUserInputRef = useRef(0)
   const isUserScrollingRef = useRef(false)
   const isProgrammaticScrollRef = useRef(false)
+  const isPointerDownRef = useRef(false)
   const gestureStartIndexRef = useRef<number | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [fontsReady, setFontsReady] = useState(false)
@@ -149,13 +150,17 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     return clampIndex(rawIndex, 0, loopedCollectionItems.length - 1)
   }, [loopedCollectionItems.length])
 
+  const getScrollLeftForIndex = useCallback((index: number) => {
+    const track = trackRef.current
+    const card = cardRefs.current[index]
+    if (!track || !card) return null
+    return card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
+  }, [])
+
   const scrollToIndex = useCallback(
     (index: number, behavior: ScrollBehavior = 'smooth') => {
-      const track = trackRef.current
-      const card = cardRefs.current[index]
-      if (!track || !card) return
-      const nextLeft =
-        card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
+      const nextLeft = getScrollLeftForIndex(index)
+      if (nextLeft === null) return
       lastCenteredLeftRef.current = nextLeft
       if (behavior === 'auto') {
         setScrollLeftInstant(nextLeft)
@@ -171,7 +176,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       }, 360)
       track.scrollTo({ left: nextLeft, behavior })
     },
-    [setScrollLeftInstant]
+    [getScrollLeftForIndex, setScrollLeftInstant]
   )
 
   const beginUserGesture = useCallback(() => {
@@ -197,6 +202,31 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     scrollToIndex(nextIndex, 'smooth')
     gestureStartIndexRef.current = nextIndex
   }, [getCenteredIndex, scrollToIndex])
+
+  const clampScrollDuringGesture = useCallback(() => {
+    if (!isPointerDownRef.current) return
+    const track = trackRef.current
+    if (!track) return
+    if (typeof gestureStartIndexRef.current !== 'number') return
+    const minIndex = clampIndex(
+      gestureStartIndexRef.current - MAX_SWIPE_ITEMS,
+      0,
+      loopedCollectionItems.length - 1
+    )
+    const maxIndex = clampIndex(
+      gestureStartIndexRef.current + MAX_SWIPE_ITEMS,
+      0,
+      loopedCollectionItems.length - 1
+    )
+    const minLeft = getScrollLeftForIndex(minIndex)
+    const maxLeft = getScrollLeftForIndex(maxIndex)
+    if (minLeft === null || maxLeft === null) return
+    if (track.scrollLeft < minLeft) {
+      setScrollLeftInstant(minLeft)
+    } else if (track.scrollLeft > maxLeft) {
+      setScrollLeftInstant(maxLeft)
+    }
+  }, [getScrollLeftForIndex, loopedCollectionItems.length, setScrollLeftInstant])
 
   const scheduleUserSettle = useCallback(
     (delay = SCROLL_IDLE_DELAY_MS) => {
@@ -232,16 +262,29 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     pauseAuto()
   }, [pauseAuto])
 
+  const handlePointerDown = useCallback(() => {
+    isPointerDownRef.current = true
+    handleUserInput()
+  }, [handleUserInput])
+
+  const handlePointerUp = useCallback(() => {
+    if (!isPointerDownRef.current) return
+    isPointerDownRef.current = false
+    scheduleUserSettle(80)
+  }, [scheduleUserSettle])
+
   const handleScroll = () => {
     if (!readyRef.current) return
     if (isProgrammaticScrollRef.current) return
     const now = Date.now()
-    const isUserScroll = now - lastUserInputRef.current < USER_INPUT_WINDOW_MS
+    const isUserScroll =
+      isPointerDownRef.current || now - lastUserInputRef.current < USER_INPUT_WINDOW_MS
 
     if (isUserScroll) {
       lastUserInputRef.current = now
       isUserScrollingRef.current = true
       pauseAuto()
+      clampScrollDuringGesture()
       scheduleUserSettle()
     }
 
@@ -414,8 +457,12 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     pauseRef.current = true
     startTimer = window.setTimeout(startAuto, 1400)
 
-    track.addEventListener('pointerdown', handleUserInput)
-    track.addEventListener('touchstart', handleUserInput, { passive: true })
+    track.addEventListener('pointerdown', handlePointerDown)
+    track.addEventListener('pointerup', handlePointerUp)
+    track.addEventListener('pointercancel', handlePointerUp)
+    track.addEventListener('touchstart', handlePointerDown, { passive: true })
+    track.addEventListener('touchend', handlePointerUp, { passive: true })
+    track.addEventListener('touchcancel', handlePointerUp, { passive: true })
     track.addEventListener('wheel', handleUserInput, { passive: true })
     track.addEventListener('focusin', handleFocusIn)
 
@@ -426,17 +473,24 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       if (intervalId) {
         window.clearInterval(intervalId)
       }
-      track.removeEventListener('pointerdown', handleUserInput)
-      track.removeEventListener('touchstart', handleUserInput)
+      track.removeEventListener('pointerdown', handlePointerDown)
+      track.removeEventListener('pointerup', handlePointerUp)
+      track.removeEventListener('pointercancel', handlePointerUp)
+      track.removeEventListener('touchstart', handlePointerDown)
+      track.removeEventListener('touchend', handlePointerUp)
+      track.removeEventListener('touchcancel', handlePointerUp)
       track.removeEventListener('wheel', handleUserInput)
       track.removeEventListener('focusin', handleFocusIn)
     }
   }, [
     handleFocusIn,
     handleUserInput,
+    handlePointerDown,
+    handlePointerUp,
     measure,
     normalizePosition,
     pauseAuto,
+    clampScrollDuringGesture,
     isReady,
     fontsReady,
   ])
