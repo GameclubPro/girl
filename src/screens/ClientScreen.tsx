@@ -837,7 +837,9 @@ export const ClientScreen = ({
           >
             <div className="category-overlay-head">
               <div className="category-overlay-title-row">
-                <h2 className="category-overlay-title">Что нужно сегодня?</h2>
+                <h2 className="category-overlay-title">
+                  Выберите <span>категорию</span>
+                </h2>
                 {activeCategoryId && (
                   <button
                     className="category-overlay-close"
