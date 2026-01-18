@@ -840,15 +840,6 @@ export const ClientScreen = ({
                 <h2 className="category-overlay-title">
                   Выберите <span>категорию</span>
                 </h2>
-                {activeCategoryId && (
-                  <button
-                    className="category-overlay-close"
-                    type="button"
-                    onClick={closeCategoryOverlay}
-                  >
-                    Готово
-                  </button>
-                )}
               </div>
             </div>
             <div className="category-overlay-grid" role="list">
