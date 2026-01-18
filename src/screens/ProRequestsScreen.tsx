@@ -773,6 +773,74 @@ export const ProRequestsScreen = ({
     })
     return map
   }, [slots])
+  const bookingRangesByDate = useMemo(() => {
+    const map = new Map<
+      string,
+      { startMinutes: number; durationMinutes: number; booking: Booking }[]
+    >()
+    bookingCalendarItems.forEach((item) => {
+      const startMinutes = getMinutesFromDateTime(item.booking.scheduledAt)
+      if (startMinutes === null) return
+      const durationMinutes = item.booking.serviceDuration ?? BOOKING_DURATION_MIN
+      const list = map.get(item.dateKey)
+      const range = { startMinutes, durationMinutes, booking: item.booking }
+      if (list) {
+        list.push(range)
+      } else {
+        map.set(item.dateKey, [range])
+      }
+    })
+    return map
+  }, [bookingCalendarItems])
+
+  const applySlotTimes = (
+    dateKey: string,
+    times: number[],
+    options?: { replaceClosed?: boolean }
+  ) => {
+    const replaceClosed = options?.replaceClosed ?? false
+    const uniqueTimes = Array.from(new Set(times)).sort((a, b) => a - b)
+    if (uniqueTimes.length === 0) return
+    setSlots((current) => {
+      let next = [...current]
+      uniqueTimes.forEach((time) => {
+        const overlaps = next.filter(
+          (slot) =>
+            slot.dateKey === dateKey &&
+            rangesOverlap(time, SLOT_DURATION_MIN, slot.startMinutes, slot.durationMinutes)
+        )
+        const hasFree = overlaps.some((slot) => slot.status === 'free')
+        const hasClosed = overlaps.some((slot) => slot.status === 'closed')
+        if (hasFree) return
+        if (hasClosed && !replaceClosed) return
+        if (hasClosed && replaceClosed) {
+          next = next.filter(
+            (slot) =>
+              !(
+                slot.dateKey === dateKey &&
+                slot.status === 'closed' &&
+                rangesOverlap(
+                  time,
+                  SLOT_DURATION_MIN,
+                  slot.startMinutes,
+                  slot.durationMinutes
+                )
+              )
+          )
+        }
+        next.push({
+          id: buildSlotId(),
+          dateKey,
+          startMinutes: time,
+          durationMinutes: SLOT_DURATION_MIN,
+          status: 'free',
+          reason: null,
+          createdAt: Date.now(),
+        })
+      })
+      return next
+    })
+  }
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
     if (!scheduleLoaded || hasSeededSlots) return
@@ -850,25 +918,6 @@ export const ProRequestsScreen = ({
     })
     return map
   }, [slots])
-  const bookingRangesByDate = useMemo(() => {
-    const map = new Map<
-      string,
-      { startMinutes: number; durationMinutes: number; booking: Booking }[]
-    >()
-    bookingCalendarItems.forEach((item) => {
-      const startMinutes = getMinutesFromDateTime(item.booking.scheduledAt)
-      if (startMinutes === null) return
-      const durationMinutes = item.booking.serviceDuration ?? BOOKING_DURATION_MIN
-      const list = map.get(item.dateKey)
-      const range = { startMinutes, durationMinutes, booking: item.booking }
-      if (list) {
-        list.push(range)
-      } else {
-        map.set(item.dateKey, [range])
-      }
-    })
-    return map
-  }, [bookingCalendarItems])
   const selectedBookings = useMemo(
     () => bookingsByDate.get(selectedDateKey) ?? [],
     [bookingsByDate, selectedDateKey]
@@ -1098,55 +1147,6 @@ export const ProRequestsScreen = ({
       window.setTimeout(() => webApp.close?.(), 250)
     }
     setShareMessage('Открываем личку...')
-  }
-
-  const applySlotTimes = (
-    dateKey: string,
-    times: number[],
-    options?: { replaceClosed?: boolean }
-  ) => {
-    const replaceClosed = options?.replaceClosed ?? false
-    const uniqueTimes = Array.from(new Set(times)).sort((a, b) => a - b)
-    if (uniqueTimes.length === 0) return
-    setSlots((current) => {
-      let next = [...current]
-      uniqueTimes.forEach((time) => {
-        const overlaps = next.filter(
-          (slot) =>
-            slot.dateKey === dateKey &&
-            rangesOverlap(time, SLOT_DURATION_MIN, slot.startMinutes, slot.durationMinutes)
-        )
-        const hasFree = overlaps.some((slot) => slot.status === 'free')
-        const hasClosed = overlaps.some((slot) => slot.status === 'closed')
-        if (hasFree) return
-        if (hasClosed && !replaceClosed) return
-        if (hasClosed && replaceClosed) {
-          next = next.filter(
-            (slot) =>
-              !(
-                slot.dateKey === dateKey &&
-                slot.status === 'closed' &&
-                rangesOverlap(
-                  time,
-                  SLOT_DURATION_MIN,
-                  slot.startMinutes,
-                  slot.durationMinutes
-                )
-              )
-          )
-        }
-        next.push({
-          id: buildSlotId(),
-          dateKey,
-          startMinutes: time,
-          durationMinutes: SLOT_DURATION_MIN,
-          status: 'free',
-          reason: null,
-          createdAt: Date.now(),
-        })
-      })
-      return next
-    })
   }
 
   const handleOpenAddSlots = (options?: { rescheduleBookingId?: number | null }) => {
