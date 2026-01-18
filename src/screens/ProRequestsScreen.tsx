@@ -90,11 +90,16 @@ const formatLongDate = (value: Date) =>
     month: 'long',
   }).format(value)
 
-const formatMonthTitle = (value: Date) =>
-  new Intl.DateTimeFormat('ru-RU', {
+const formatWeekdayLong = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', { weekday: 'long' }).format(value)
+
+const formatMonthTitle = (value: Date) => {
+  const raw = new Intl.DateTimeFormat('ru-RU', {
     month: 'long',
     year: 'numeric',
   }).format(value)
+  return raw.replace(/\s?г\.?$/i, '').toUpperCase()
+}
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -130,6 +135,46 @@ const formatTimeLeft = (value?: string | null) => {
   const minutes = minutesTotal % 60
   if (hours <= 0) return `${minutesTotal} мин`
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
+}
+
+const formatCountLabel = (
+  value: number,
+  one: string,
+  few: string,
+  many: string
+) => {
+  const abs = Math.abs(value)
+  const mod10 = abs % 10
+  const mod100 = abs % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few
+  return many
+}
+
+const formatWindowCount = (value: number) =>
+  `${value} ${formatCountLabel(value, 'окно', 'окна', 'окон')}`
+
+const formatMinutes = (value: number) => {
+  const hours = Math.floor(value / 60)
+  const minutes = value % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const parseTimeMinutes = (value: string) => {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+const getMinutesFromDateTime = (value?: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.getHours() * 60 + parsed.getMinutes()
 }
 
 const buildShareLink = (base: string, startParam: string) => {
@@ -185,6 +230,160 @@ type BookingCalendarItem = {
   timeMs: number
 }
 
+type SlotStatus = 'free' | 'closed'
+
+type Slot = {
+  id: string
+  dateKey: string
+  startMinutes: number
+  durationMinutes: number
+  status: SlotStatus
+  reason?: string | null
+  createdAt: number
+}
+
+type SlotViewStatus = 'free' | 'closed' | 'booked'
+
+type SlotView = {
+  id: string
+  dateKey: string
+  startMinutes: number
+  durationMinutes: number
+  status: SlotViewStatus
+  reason?: string | null
+  booking?: Booking
+}
+
+type SlotFilter = 'all' | 'free' | 'booked' | 'closed'
+
+type ParsedSlotGroup = {
+  date: Date
+  dateKey: string
+  times: number[]
+}
+
+type SlotConfirm =
+  | { type: 'delete'; slotId: string; timeLabel: string }
+  | { type: 'open'; slotId: string; timeLabel: string }
+  | { type: 'cancel-booking'; bookingId: number; timeLabel: string }
+
+type PendingReplace = {
+  mode: 'add' | 'paste'
+  dateKey: string
+  times: number[]
+}
+
+const SLOT_DURATION_MIN = 60
+const SLOT_TIME_START = 8 * 60
+const SLOT_TIME_END = 21 * 60
+const SLOT_TIME_STEP = 30
+
+const buildSlotStorageKey = (userId: string) => `pro-slots:${userId}`
+
+const loadSlotsFromStorage = (userId: string) => {
+  if (typeof window === 'undefined' || !userId) return []
+  try {
+    const raw = window.localStorage.getItem(buildSlotStorageKey(userId))
+    if (!raw) return []
+    const data = JSON.parse(raw) as Slot[]
+    if (!Array.isArray(data)) return []
+    return data.filter(
+      (item) =>
+        typeof item?.id === 'string' &&
+        typeof item?.dateKey === 'string' &&
+        typeof item?.startMinutes === 'number' &&
+        typeof item?.durationMinutes === 'number' &&
+        (item?.status === 'free' || item?.status === 'closed')
+    )
+  } catch (error) {
+    return []
+  }
+}
+
+const buildSlotId = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+const rangesOverlap = (
+  startA: number,
+  durationA: number,
+  startB: number,
+  durationB: number
+) => startA < startB + durationB && startB < startA + durationA
+
+const parseSlotText = (input: string, baseYear: number) => {
+  const lines = input
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const groups: ParsedSlotGroup[] = []
+
+  for (const line of lines) {
+    const match = line.match(/^(.+?)[—–-](.+)$/)
+    if (!match) {
+      return {
+        groups: [],
+        error: `Не удалось распознать время в строке: "${line}". Проверь формат (например 13:00).`,
+      }
+    }
+    const datePart = match[1]?.trim() ?? ''
+    const timePart = match[2]?.trim() ?? ''
+    const dateMatch = datePart.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$/)
+    if (!dateMatch) {
+      return {
+        groups: [],
+        error: `Не удалось распознать дату: "${datePart}". Используйте формат 10.01 или 10.01.2026.`,
+      }
+    }
+    const day = Number(dateMatch[1])
+    const month = Number(dateMatch[2])
+    const rawYear = dateMatch[3]
+    let year = baseYear
+    if (rawYear) {
+      const numericYear = Number(rawYear)
+      year = numericYear < 100 ? 2000 + numericYear : numericYear
+    }
+    const parsedDate = new Date(year, month - 1, day)
+    if (
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.getFullYear() !== year ||
+      parsedDate.getMonth() !== month - 1 ||
+      parsedDate.getDate() !== day
+    ) {
+      return {
+        groups: [],
+        error: `Не удалось распознать дату: "${datePart}". Используйте формат 10.01 или 10.01.2026.`,
+      }
+    }
+    const timeMatches = timePart.match(/\d{1,2}:\d{2}/g) ?? []
+    if (timeMatches.length === 0) {
+      return {
+        groups: [],
+        error: `Не удалось распознать время в строке: "${line}". Проверь формат (например 13:00).`,
+      }
+    }
+    const times = Array.from(
+      new Set(
+        timeMatches
+          .map((time) => parseTimeMinutes(time))
+          .filter((time): time is number => time !== null)
+      )
+    ).sort((a, b) => a - b)
+    if (times.length === 0) {
+      return {
+        groups: [],
+        error: `Не удалось распознать время в строке: "${line}". Проверь формат (например 13:00).`,
+      }
+    }
+    groups.push({
+      date: parsedDate,
+      dateKey: toDateKey(parsedDate),
+      times,
+    })
+  }
+
+  return { groups, error: '' }
+}
+
 type ProRequestsScreenProps = {
   apiBase: string
   userId: string
@@ -234,17 +433,48 @@ export const ProRequestsScreen = ({
     return today
   })
   const [calendarInitialized, setCalendarInitialized] = useState(false)
+  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate])
+  const [shareMode, setShareMode] = useState<'general' | 'day'>('general')
   const [shareStatus, setShareStatus] = useState('')
   const shareTimerRef = useRef<number | null>(null)
+  const slotNoticeTimerRef = useRef<number | null>(null)
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
+  const [slots, setSlots] = useState<Slot[]>(() => loadSlotsFromStorage(userId))
+  const [isSlotsOpen, setIsSlotsOpen] = useState(false)
+  const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
+  const [slotNotice, setSlotNotice] = useState('')
+  const [slotConfirm, setSlotConfirm] = useState<SlotConfirm | null>(null)
+  const [isAddSlotsOpen, setIsAddSlotsOpen] = useState(false)
+  const [selectedTimes, setSelectedTimes] = useState<number[]>([])
+  const [addSlotsError, setAddSlotsError] = useState('')
+  const [pendingReplace, setPendingReplace] = useState<PendingReplace | null>(
+    null
+  )
+  const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(
+    null
+  )
+  const [slotDetailId, setSlotDetailId] = useState<number | null>(null)
+  const [isPasteSlotsOpen, setIsPasteSlotsOpen] = useState(false)
+  const [pasteInput, setPasteInput] = useState('')
+  const [pastePreview, setPastePreview] = useState<ParsedSlotGroup[] | null>(
+    null
+  )
+  const [pasteError, setPasteError] = useState('')
   const bookingStartParam = useMemo(
     () => buildBookingStartParam(userId),
     [userId]
   )
   const shareLink = useMemo(
-    () => (shareBase ? buildShareLink(shareBase, bookingStartParam) : ''),
-    [bookingStartParam, shareBase]
+    () => {
+      if (!shareBase) return ''
+      const baseLink = buildShareLink(shareBase, bookingStartParam)
+      if (!baseLink) return ''
+      if (shareMode !== 'day') return baseLink
+      const joiner = baseLink.includes('?') ? '&' : '?'
+      return `${baseLink}${joiner}date=${selectedDateKey}`
+    },
+    [bookingStartParam, shareBase, shareMode, selectedDateKey]
   )
 
   useEffect(() => {
@@ -322,6 +552,15 @@ export const ProRequestsScreen = ({
   }, [apiBase, userId])
 
   useEffect(() => {
+    if (!userId || typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(buildSlotStorageKey(userId), JSON.stringify(slots))
+    } catch (error) {
+      // ignore storage errors
+    }
+  }, [slots, userId])
+
+  useEffect(() => {
     if (!userId) return
     let cancelled = false
 
@@ -375,6 +614,9 @@ export const ProRequestsScreen = ({
     return () => {
       if (shareTimerRef.current) {
         window.clearTimeout(shareTimerRef.current)
+      }
+      if (slotNoticeTimerRef.current) {
+        window.clearTimeout(slotNoticeTimerRef.current)
       }
     }
   }, [])
@@ -454,11 +696,120 @@ export const ProRequestsScreen = ({
     })
     return map
   }, [bookingCalendarItems])
-  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate])
+  const slotsByDate = useMemo(() => {
+    const map = new Map<string, Slot[]>()
+    slots.forEach((slot) => {
+      const list = map.get(slot.dateKey)
+      if (list) {
+        list.push(slot)
+      } else {
+        map.set(slot.dateKey, [slot])
+      }
+    })
+    return map
+  }, [slots])
+  const freeSlotsByDate = useMemo(() => {
+    const map = new Map<string, number>()
+    slots.forEach((slot) => {
+      if (slot.status !== 'free') return
+      map.set(slot.dateKey, (map.get(slot.dateKey) ?? 0) + 1)
+    })
+    return map
+  }, [slots])
+  const bookingRangesByDate = useMemo(() => {
+    const map = new Map<
+      string,
+      { startMinutes: number; durationMinutes: number; booking: Booking }[]
+    >()
+    bookingCalendarItems.forEach((item) => {
+      const startMinutes = getMinutesFromDateTime(item.booking.scheduledAt)
+      if (startMinutes === null) return
+      const durationMinutes = item.booking.serviceDuration ?? SLOT_DURATION_MIN
+      const list = map.get(item.dateKey)
+      const range = { startMinutes, durationMinutes, booking: item.booking }
+      if (list) {
+        list.push(range)
+      } else {
+        map.set(item.dateKey, [range])
+      }
+    })
+    return map
+  }, [bookingCalendarItems])
   const selectedBookings = useMemo(
     () => bookingsByDate.get(selectedDateKey) ?? [],
     [bookingsByDate, selectedDateKey]
   )
+  const selectedSlots = useMemo(
+    () => slotsByDate.get(selectedDateKey) ?? [],
+    [slotsByDate, selectedDateKey]
+  )
+  const rescheduleBooking = useMemo(
+    () => bookingItems.find((booking) => booking.id === rescheduleBookingId) ?? null,
+    [bookingItems, rescheduleBookingId]
+  )
+  const isRescheduleMode = Boolean(rescheduleBooking)
+  const selectedSlotViews = useMemo(() => {
+    const manualViews: SlotView[] = selectedSlots.map((slot) => ({
+      id: slot.id,
+      dateKey: slot.dateKey,
+      startMinutes: slot.startMinutes,
+      durationMinutes: slot.durationMinutes,
+      status: slot.status === 'free' ? 'free' : 'closed',
+      reason: slot.reason ?? null,
+    }))
+    const bookedViews: SlotView[] = (bookingRangesByDate.get(selectedDateKey) ?? [])
+      .map((range) => ({
+        id: `booking-${range.booking.id}`,
+        dateKey: selectedDateKey,
+        startMinutes: range.startMinutes,
+        durationMinutes: range.durationMinutes,
+        status: 'booked' as const,
+        booking: range.booking,
+      }))
+    return [...manualViews, ...bookedViews].sort(
+      (a, b) => a.startMinutes - b.startMinutes
+    )
+  }, [bookingRangesByDate, selectedDateKey, selectedSlots])
+  const filteredSlotViews = useMemo(() => {
+    if (slotFilter === 'all') return selectedSlotViews
+    return selectedSlotViews.filter((slot) => slot.status === slotFilter)
+  }, [selectedSlotViews, slotFilter])
+  const slotStats = useMemo(() => {
+    let free = 0
+    let booked = 0
+    let closed = 0
+    selectedSlotViews.forEach((slot) => {
+      if (slot.status === 'free') free += 1
+      if (slot.status === 'booked') booked += 1
+      if (slot.status === 'closed') closed += 1
+    })
+    return { free, booked, closed }
+  }, [selectedSlotViews])
+  const slotConfirmContent = useMemo(() => {
+    if (!slotConfirm) return null
+    if (slotConfirm.type === 'delete') {
+      return {
+        title: `Удалить окно ${slotConfirm.timeLabel}?`,
+        confirmLabel: 'Удалить',
+        cancelLabel: 'Отмена',
+        tone: 'is-danger',
+      }
+    }
+    if (slotConfirm.type === 'open') {
+      return {
+        title: `Открыть окно ${slotConfirm.timeLabel} для записи?`,
+        confirmLabel: 'Открыть',
+        cancelLabel: 'Отмена',
+        tone: 'is-primary',
+      }
+    }
+    return {
+      title: 'Отменить запись клиента?',
+      confirmLabel: 'Отменить запись',
+      cancelLabel: 'Назад',
+      tone: 'is-danger',
+    }
+  }, [slotConfirm])
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStartDate, index)),
     [weekStartDate]
@@ -472,11 +823,42 @@ export const ProRequestsScreen = ({
     () => formatLongDate(selectedDate),
     [selectedDate]
   )
+  const selectedDayTitle = useMemo(
+    () => `${formatLongDate(selectedDate)}, ${formatWeekdayLong(selectedDate)}`,
+    [selectedDate]
+  )
   const todayKey = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return toDateKey(today)
   }, [])
+  const timeGrid = useMemo(() => {
+    const items: number[] = []
+    for (let time = SLOT_TIME_START; time < SLOT_TIME_END; time += SLOT_TIME_STEP) {
+      items.push(time)
+    }
+    return items
+  }, [])
+  const timeSlotStates = useMemo(() => {
+    const bookedRanges = bookingRangesByDate.get(selectedDateKey) ?? []
+    const dateSlots = selectedSlots
+    return timeGrid.map((time) => {
+      const overlapsBooking = bookedRanges.some((range) =>
+        rangesOverlap(time, SLOT_DURATION_MIN, range.startMinutes, range.durationMinutes)
+      )
+      const overlappingSlot = dateSlots.find((slot) =>
+        rangesOverlap(time, SLOT_DURATION_MIN, slot.startMinutes, slot.durationMinutes)
+      )
+      const isClosed = overlappingSlot?.status === 'closed'
+      const isFreeExisting = overlappingSlot?.status === 'free'
+      return {
+        time,
+        isBooked: overlapsBooking,
+        isClosed,
+        isFreeExisting,
+      }
+    })
+  }, [bookingRangesByDate, selectedDateKey, selectedSlots, timeGrid])
 
   useEffect(() => {
     if (calendarInitialized || bookingCalendarItems.length === 0) return
@@ -489,9 +871,12 @@ export const ProRequestsScreen = ({
     setCalendarInitialized(true)
   }, [bookingCalendarItems, calendarInitialized])
 
-  const handleSelectDate = (date: Date) => {
+  const handleOpenSlots = (date: Date) => {
     setSelectedDate(date)
     setCalendarInitialized(true)
+    setSlotFilter('all')
+    setSlotConfirm(null)
+    setIsSlotsOpen(true)
   }
 
   const handleShiftWeek = (direction: number) => {
@@ -507,6 +892,16 @@ export const ProRequestsScreen = ({
     }
     shareTimerRef.current = window.setTimeout(() => {
       setShareStatus('')
+    }, 2400)
+  }
+
+  const setSlotMessage = (message: string) => {
+    setSlotNotice(message)
+    if (slotNoticeTimerRef.current) {
+      window.clearTimeout(slotNoticeTimerRef.current)
+    }
+    slotNoticeTimerRef.current = window.setTimeout(() => {
+      setSlotNotice('')
     }, 2400)
   }
 
@@ -561,6 +956,385 @@ export const ProRequestsScreen = ({
     setShareMessage('Открываем личку...')
   }
 
+  const applySlotTimes = (
+    dateKey: string,
+    times: number[],
+    options?: { replaceClosed?: boolean }
+  ) => {
+    const replaceClosed = options?.replaceClosed ?? false
+    const uniqueTimes = Array.from(new Set(times)).sort((a, b) => a - b)
+    if (uniqueTimes.length === 0) return
+    setSlots((current) => {
+      let next = [...current]
+      uniqueTimes.forEach((time) => {
+        const overlaps = next.filter(
+          (slot) =>
+            slot.dateKey === dateKey &&
+            rangesOverlap(time, SLOT_DURATION_MIN, slot.startMinutes, slot.durationMinutes)
+        )
+        const hasFree = overlaps.some((slot) => slot.status === 'free')
+        const hasClosed = overlaps.some((slot) => slot.status === 'closed')
+        if (hasFree) return
+        if (hasClosed && !replaceClosed) return
+        if (hasClosed && replaceClosed) {
+          next = next.filter(
+            (slot) =>
+              !(
+                slot.dateKey === dateKey &&
+                slot.status === 'closed' &&
+                rangesOverlap(
+                  time,
+                  SLOT_DURATION_MIN,
+                  slot.startMinutes,
+                  slot.durationMinutes
+                )
+              )
+          )
+        }
+        next.push({
+          id: buildSlotId(),
+          dateKey,
+          startMinutes: time,
+          durationMinutes: SLOT_DURATION_MIN,
+          status: 'free',
+          reason: null,
+          createdAt: Date.now(),
+        })
+      })
+      return next
+    })
+  }
+
+  const handleOpenAddSlots = (options?: { rescheduleBookingId?: number | null }) => {
+    setRescheduleBookingId(options?.rescheduleBookingId ?? null)
+    setSelectedTimes([])
+    setAddSlotsError('')
+    setPendingReplace(null)
+    setIsAddSlotsOpen(true)
+  }
+
+  const handleCloseAddSlots = () => {
+    setIsAddSlotsOpen(false)
+    setSelectedTimes([])
+    setAddSlotsError('')
+    setPendingReplace(null)
+    setRescheduleBookingId(null)
+  }
+
+  const handleOpenPasteSlots = () => {
+    setPasteInput('')
+    setPastePreview(null)
+    setPasteError('')
+    setIsPasteSlotsOpen(true)
+  }
+
+  const handleClosePasteSlots = () => {
+    setIsPasteSlotsOpen(false)
+    setPastePreview(null)
+    setPasteError('')
+  }
+
+  const toggleTimeSelection = (time: number) => {
+    setSelectedTimes((current) => {
+      if (isRescheduleMode) {
+        return current[0] === time ? [] : [time]
+      }
+      if (current.includes(time)) {
+        return current.filter((item) => item !== time)
+      }
+      return [...current, time].sort((a, b) => a - b)
+    })
+  }
+
+  const handlePresetSelect = (range: { start: number; end: number }) => {
+    if (isRescheduleMode) return
+    const nextTimes = timeSlotStates
+      .filter(
+        (state) =>
+          state.time >= range.start &&
+          state.time < range.end &&
+          !state.isBooked &&
+          !state.isFreeExisting
+      )
+      .map((state) => state.time)
+    setSelectedTimes(nextTimes)
+  }
+
+  const handleSelectAllTimes = () => {
+    if (isRescheduleMode) return
+    const nextTimes = timeSlotStates
+      .filter((state) => !state.isBooked && !state.isFreeExisting)
+      .map((state) => state.time)
+    setSelectedTimes(nextTimes)
+  }
+
+  const handleClearTimes = () => {
+    setSelectedTimes([])
+  }
+
+  const handleRescheduleBooking = (newTime: number) => {
+    if (!rescheduleBooking) return
+    const oldMinutes = getMinutesFromDateTime(rescheduleBooking.scheduledAt)
+    const oldDate = parseDateOnly(rescheduleBooking.scheduledAt)
+    const updatedDate = new Date(selectedDate)
+    updatedDate.setHours(Math.floor(newTime / 60), newTime % 60, 0, 0)
+    const updatedScheduledAt = updatedDate.toISOString()
+    setBookings((current) =>
+      current.map((booking) =>
+        booking.id === rescheduleBooking.id
+          ? { ...booking, scheduledAt: updatedScheduledAt }
+          : booking
+      )
+    )
+    setSlots((current) => {
+      let next = current.filter(
+        (slot) =>
+          !(
+            slot.dateKey === selectedDateKey &&
+            slot.status === 'free' &&
+            rangesOverlap(
+              newTime,
+              SLOT_DURATION_MIN,
+              slot.startMinutes,
+              slot.durationMinutes
+            )
+          )
+      )
+      if (oldDate && oldMinutes !== null) {
+        const oldKey = toDateKey(oldDate)
+        const hasOverlap = next.some(
+          (slot) =>
+            slot.dateKey === oldKey &&
+            rangesOverlap(
+              oldMinutes,
+              SLOT_DURATION_MIN,
+              slot.startMinutes,
+              slot.durationMinutes
+            )
+        )
+        if (!hasOverlap) {
+          next = [
+            ...next,
+            {
+              id: buildSlotId(),
+              dateKey: oldKey,
+              startMinutes: oldMinutes,
+              durationMinutes: SLOT_DURATION_MIN,
+              status: 'free',
+              reason: null,
+              createdAt: Date.now(),
+            },
+          ]
+        }
+      }
+      return next
+    })
+    setSlotMessage('Запись перенесена.')
+    handleCloseAddSlots()
+  }
+
+  const handleSaveSlots = () => {
+    setAddSlotsError('')
+    const uniqueTimes = Array.from(new Set(selectedTimes)).sort((a, b) => a - b)
+    if (uniqueTimes.length === 0) {
+      setAddSlotsError('Выберите хотя бы одно окно.')
+      return
+    }
+    const bookedRanges = bookingRangesByDate.get(selectedDateKey) ?? []
+    const availableTimes = uniqueTimes.filter(
+      (time) =>
+        !bookedRanges.some((range) =>
+          rangesOverlap(time, SLOT_DURATION_MIN, range.startMinutes, range.durationMinutes)
+        )
+    )
+    if (availableTimes.length !== uniqueTimes.length) {
+      setAddSlotsError('Это время уже занято записью.')
+    }
+    if (availableTimes.length === 0) return
+
+    const closedSlots = selectedSlots.filter((slot) => slot.status === 'closed')
+    const closedOverlaps = availableTimes.filter((time) =>
+      closedSlots.some((slot) =>
+        rangesOverlap(time, SLOT_DURATION_MIN, slot.startMinutes, slot.durationMinutes)
+      )
+    )
+    if (isRescheduleMode) {
+      if (closedOverlaps.length > 0) {
+        setAddSlotsError('Время пересекается с закрытым периодом.')
+        return
+      }
+      handleRescheduleBooking(availableTimes[0])
+      return
+    }
+
+    if (closedOverlaps.length > 0) {
+      setPendingReplace({
+        mode: 'add',
+        dateKey: selectedDateKey,
+        times: availableTimes,
+      })
+      return
+    }
+
+    applySlotTimes(selectedDateKey, availableTimes)
+    setSlotMessage('Окна добавлены.')
+    handleCloseAddSlots()
+  }
+
+  const handleReplaceDecision = (replaceClosed: boolean) => {
+    if (!pendingReplace) return
+    const dateKey = pendingReplace.dateKey
+    const closedSlots = (slotsByDate.get(dateKey) ?? []).filter(
+      (slot) => slot.status === 'closed'
+    )
+    const candidateTimes = pendingReplace.times
+    const finalTimes = replaceClosed
+      ? candidateTimes
+      : candidateTimes.filter(
+          (time) =>
+            !closedSlots.some((slot) =>
+              rangesOverlap(
+                time,
+                SLOT_DURATION_MIN,
+                slot.startMinutes,
+                slot.durationMinutes
+              )
+            )
+        )
+    setPendingReplace(null)
+    if (finalTimes.length === 0) {
+      setAddSlotsError('Время пересекается с закрытым периодом.')
+      return
+    }
+    applySlotTimes(dateKey, finalTimes, { replaceClosed })
+    setSlotMessage('Окна добавлены.')
+    handleCloseAddSlots()
+  }
+
+  const handleParsePaste = () => {
+    setPasteError('')
+    const result = parseSlotText(pasteInput, selectedDate.getFullYear())
+    if (result.error) {
+      setPasteError(result.error)
+      setPastePreview(null)
+      return
+    }
+    setPastePreview(result.groups)
+  }
+
+  const handleSavePaste = () => {
+    if (!pastePreview || pastePreview.length === 0) {
+      setPasteError('Выберите хотя бы одно окно.')
+      return
+    }
+    let savedSlots = 0
+    let bookingConflict = false
+    let closedConflict = false
+    pastePreview.forEach((group) => {
+      const bookedRanges = bookingRangesByDate.get(group.dateKey) ?? []
+      const dateSlots = slotsByDate.get(group.dateKey) ?? []
+      const closedSlots = dateSlots.filter((slot) => slot.status === 'closed')
+      const freeSlots = dateSlots.filter((slot) => slot.status === 'free')
+      const availableTimes = group.times.filter((time) => {
+        if (
+          bookedRanges.some((range) =>
+            rangesOverlap(time, SLOT_DURATION_MIN, range.startMinutes, range.durationMinutes)
+          )
+        ) {
+          bookingConflict = true
+          return false
+        }
+        if (
+          closedSlots.some((slot) =>
+            rangesOverlap(time, SLOT_DURATION_MIN, slot.startMinutes, slot.durationMinutes)
+          )
+        ) {
+          closedConflict = true
+          return false
+        }
+        if (
+          freeSlots.some((slot) =>
+            rangesOverlap(time, SLOT_DURATION_MIN, slot.startMinutes, slot.durationMinutes)
+          )
+        ) {
+          return false
+        }
+        return true
+      })
+      if (availableTimes.length > 0) {
+        applySlotTimes(group.dateKey, availableTimes)
+        savedSlots += availableTimes.length
+      }
+    })
+    if (savedSlots === 0) {
+      if (bookingConflict) {
+        setPasteError('Это время уже занято записью.')
+        return
+      }
+      if (closedConflict) {
+        setPasteError('Время пересекается с закрытым периодом.')
+        return
+      }
+      setPasteError('Выберите хотя бы одно окно.')
+      return
+    }
+    setSlotMessage('Окна добавлены.')
+    handleClosePasteSlots()
+  }
+
+  const handleCloseSlot = (slotId: string) => {
+    setSlots((current) =>
+      current.map((slot) =>
+        slot.id === slotId
+          ? { ...slot, status: 'closed', reason: slot.reason ?? 'Закрыто мастером' }
+          : slot
+      )
+    )
+  }
+
+  const handleOpenSlot = (slotId: string) => {
+    setSlots((current) =>
+      current.map((slot) =>
+        slot.id === slotId ? { ...slot, status: 'free', reason: null } : slot
+      )
+    )
+  }
+
+  const handleDeleteSlot = (slotId: string) => {
+    setSlots((current) => current.filter((slot) => slot.id !== slotId))
+  }
+
+  const handleCancelBooking = (bookingId: number) => {
+    const booking = bookingItems.find((item) => item.id === bookingId)
+    setBookings((current) =>
+      current.map((item) =>
+        item.id === bookingId ? { ...item, status: 'cancelled' } : item
+      )
+    )
+    if (booking) {
+      const date = parseDateOnly(booking.scheduledAt)
+      const minutes = getMinutesFromDateTime(booking.scheduledAt)
+      if (date && minutes !== null) {
+        applySlotTimes(toDateKey(date), [minutes])
+      }
+    }
+    setSlotMessage('Запись отменена.')
+  }
+
+  const handleConfirmSlotAction = () => {
+    if (!slotConfirm) return
+    if (slotConfirm.type === 'delete') {
+      handleDeleteSlot(slotConfirm.slotId)
+    }
+    if (slotConfirm.type === 'open') {
+      handleOpenSlot(slotConfirm.slotId)
+    }
+    if (slotConfirm.type === 'cancel-booking') {
+      handleCancelBooking(slotConfirm.bookingId)
+    }
+    setSlotConfirm(null)
+  }
+
   const missingLabels = useMemo(() => {
     const labels: string[] = []
     if (missingFields.includes('displayName')) {
@@ -606,6 +1380,26 @@ export const ProRequestsScreen = ({
         <span className="pro-cabinet-pill is-primary">Быстро</span>
       </header>
       <div className="pro-cabinet-share-body">
+        <div className="pro-cabinet-share-toggle" role="group" aria-label="Тип ссылки">
+          <button
+            className={`pro-cabinet-share-toggle-btn${
+              shareMode === 'general' ? ' is-active' : ''
+            }`}
+            type="button"
+            onClick={() => setShareMode('general')}
+          >
+            Общая ссылка
+          </button>
+          <button
+            className={`pro-cabinet-share-toggle-btn${
+              shareMode === 'day' ? ' is-active' : ''
+            }`}
+            type="button"
+            onClick={() => setShareMode('day')}
+          >
+            Ссылка на выбранный день
+          </button>
+        </div>
         <button
           className="pro-cabinet-share-link"
           type="button"
@@ -613,7 +1407,12 @@ export const ProRequestsScreen = ({
           disabled={!shareLink}
           aria-label="Скопировать ссылку для записи"
         >
-          <span className="pro-cabinet-share-link-label">Ваша ссылка</span>
+          <span className="pro-cabinet-share-link-label">
+            {shareMode === 'day' ? 'Ваша ссылка на день' : 'Ваша ссылка'}
+          </span>
+          {shareMode === 'day' && (
+            <span className="pro-cabinet-share-link-note">{selectedDateLabel}</span>
+          )}
           <span className="pro-cabinet-share-link-value">
             {shareLink || 'Ссылка будет доступна после настройки'}
           </span>
@@ -1433,18 +2232,8 @@ export const ProRequestsScreen = ({
                   {weekDays.map((day, index) => {
                     const dayKey = toDateKey(day)
                     const summary = bookingSummaryByDate.get(dayKey)
-                    const count = summary?.count ?? 0
-                    const countTone = summary
-                      ? summary.hasConfirmed && summary.hasCancelled
-                        ? 'is-mixed'
-                        : summary.hasCancelled
-                          ? 'is-cancelled'
-                          : summary.hasConfirmed
-                            ? 'is-confirmed'
-                            : summary.hasOther
-                              ? 'is-waiting'
-                              : ''
-                      : ''
+                    const hasBooked = (summary?.count ?? 0) > 0
+                    const freeCount = freeSlotsByDate.get(dayKey) ?? 0
                     const isSelected = dayKey === selectedDateKey
                     const isToday = dayKey === todayKey
                     return (
@@ -1456,7 +2245,7 @@ export const ProRequestsScreen = ({
                         type="button"
                         role="tab"
                         aria-selected={isSelected}
-                        onClick={() => handleSelectDate(day)}
+                        onClick={() => handleOpenSlots(day)}
                       >
                         <span className="booking-calendar-day-name">
                           {weekDayLabels[index]}
@@ -1464,14 +2253,13 @@ export const ProRequestsScreen = ({
                         <span className="booking-calendar-day-number">
                           {day.getDate()}
                         </span>
-                        {count > 0 && (
-                          <span
-                            className={`booking-calendar-day-count${
-                              countTone ? ` ${countTone}` : ''
-                            }`}
-                          >
-                            {count}
+                        {freeCount > 0 && (
+                          <span className="booking-calendar-day-count">
+                            {freeCount}
                           </span>
+                        )}
+                        {hasBooked && (
+                          <span className="booking-calendar-day-dot" aria-hidden="true" />
                         )}
                       </button>
                     )
@@ -1485,6 +2273,13 @@ export const ProRequestsScreen = ({
                   <span className="booking-calendar-summary-date">
                     {selectedDateLabel}
                   </span>
+                  <button
+                    className="booking-calendar-add"
+                    type="button"
+                    onClick={() => handleOpenSlots(selectedDate)}
+                  >
+                    Добавить окна
+                  </button>
                 </div>
               </section>
 
@@ -1493,36 +2288,39 @@ export const ProRequestsScreen = ({
               )}
               {bookingsError && <p className="requests-error">{bookingsError}</p>}
 
-              {!isBookingsLoading &&
-                confirmedBookingItems.length === 0 &&
-                !bookingsError && (
-                  <p className="requests-empty">
-                    Пока нет подтвержденных записей. Неподтвержденные ждут в
-                    разделе «Заявки».
-                  </p>
-                )}
+              {!isBookingsLoading && !bookingsError && (
+                <div className="booking-calendar-label">
+                  <span>Записи на</span>
+                  <span className="booking-calendar-label-date">
+                    {selectedDateLabel}
+                  </span>
+                  <span className="booking-calendar-label-count">
+                    {selectedBookings.length}
+                  </span>
+                </div>
+              )}
 
               {!isBookingsLoading &&
-                confirmedBookingItems.length > 0 &&
-                !bookingsError && (
-                  <div className="booking-calendar-label">
-                    <span>Записи на</span>
-                    <span className="booking-calendar-label-date">
-                      {selectedDateLabel}
-                    </span>
-                    <span className="booking-calendar-label-count">
-                      {selectedBookings.length}
-                    </span>
+                !bookingsError &&
+                selectedBookings.length === 0 && (
+                  <div className="booking-empty">
+                    <p className="booking-empty-title">
+                      На выбранный день записей нет.
+                    </p>
+                    <p className="booking-empty-hint">
+                      Выберите дату с отметкой или добавьте окна.
+                    </p>
+                    <button
+                      className="cta cta--primary cta--wide"
+                      type="button"
+                      onClick={() => {
+                        setIsSlotsOpen(true)
+                        handleOpenAddSlots()
+                      }}
+                    >
+                      Добавить окна
+                    </button>
                   </div>
-                )}
-
-              {!isBookingsLoading &&
-                confirmedBookingItems.length > 0 &&
-                selectedBookings.length === 0 &&
-                !bookingsError && (
-                  <p className="requests-empty">
-                    На выбранный день записей нет. Выберите дату с отметкой.
-                  </p>
                 )}
 
               {selectedBookings.length > 0 && (
@@ -1534,6 +2332,496 @@ export const ProRequestsScreen = ({
             </>
           )}
       </div>
+
+      {isSlotsOpen && (
+        <div
+          className="pro-slots-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsSlotsOpen(false)}
+        >
+          <div className="pro-slots-sheet" onClick={(event) => event.stopPropagation()}>
+            <span className="pro-slots-handle" aria-hidden="true" />
+            <header className="pro-slots-head">
+              <div>
+                <p className="pro-slots-kicker">Окна дня</p>
+                <h3 className="pro-slots-title">{selectedDayTitle}</h3>
+              </div>
+              <button
+                className="pro-slots-close"
+                type="button"
+                onClick={() => setIsSlotsOpen(false)}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </header>
+            <div className="pro-slots-filters" role="tablist">
+              {([
+                ['all', 'Все'],
+                ['free', 'Свободные'],
+                ['booked', 'Занятые'],
+                ['closed', 'Закрытые'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  className={`pro-slots-filter${
+                    slotFilter === value ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="tab"
+                  aria-selected={slotFilter === value}
+                  onClick={() => setSlotFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="pro-slots-meta">
+              <span>Свободные {slotStats.free}</span>
+              <span>Занятые {slotStats.booked}</span>
+              <span>Закрытые {slotStats.closed}</span>
+            </div>
+
+            {filteredSlotViews.length === 0 ? (
+              <div className="pro-slots-empty">
+                <p className="pro-slots-empty-title">
+                  На выбранный день окон нет.
+                </p>
+                <p className="pro-slots-empty-hint">
+                  Добавьте окна — они появятся в записи у клиентов.
+                </p>
+              </div>
+            ) : (
+              <div className="pro-slots-list">
+                {filteredSlotViews.map((slot) => {
+                  const timeLabel = formatMinutes(slot.startMinutes)
+                  const statusLabel =
+                    slot.status === 'free'
+                      ? 'Свободно'
+                      : slot.status === 'booked'
+                        ? 'Занято'
+                        : 'Закрыто'
+                  const booking = slot.booking
+                  const hasDetails = booking && slotDetailId === booking.id
+                  return (
+                    <div className="pro-slot-card" key={`${slot.id}-${timeLabel}`}>
+                      <div className="pro-slot-time">{timeLabel}</div>
+                      <div className="pro-slot-body">
+                        <div className="pro-slot-top">
+                          <span className={`pro-slot-status is-${slot.status}`}>
+                            {slot.status === 'closed' && (
+                              <span
+                                className="pro-slot-status-icon"
+                                aria-hidden="true"
+                              >
+                                🔒
+                              </span>
+                            )}
+                            {statusLabel}
+                          </span>
+                          <div className="pro-slot-actions">
+                            {slot.status === 'free' && (
+                              <>
+                                <button
+                                  className="pro-slot-action"
+                                  type="button"
+                                  onClick={() => handleCloseSlot(slot.id)}
+                                >
+                                  Закрыть
+                                </button>
+                                <button
+                                  className="pro-slot-action is-danger"
+                                  type="button"
+                                  onClick={() =>
+                                    setSlotConfirm({
+                                      type: 'delete',
+                                      slotId: slot.id,
+                                      timeLabel,
+                                    })
+                                  }
+                                >
+                                  Удалить
+                                </button>
+                              </>
+                            )}
+                            {slot.status === 'booked' && booking && (
+                              <>
+                                <button
+                                  className="pro-slot-action"
+                                  type="button"
+                                  onClick={() =>
+                                    setSlotDetailId((current) =>
+                                      current === booking.id ? null : booking.id
+                                    )
+                                  }
+                                >
+                                  Детали
+                                </button>
+                                <button
+                                  className="pro-slot-action"
+                                  type="button"
+                                  onClick={() =>
+                                    handleOpenAddSlots({
+                                      rescheduleBookingId: booking.id,
+                                    })
+                                  }
+                                >
+                                  Перенести
+                                </button>
+                                <button
+                                  className="pro-slot-action is-danger"
+                                  type="button"
+                                  onClick={() =>
+                                    setSlotConfirm({
+                                      type: 'cancel-booking',
+                                      bookingId: booking.id,
+                                      timeLabel,
+                                    })
+                                  }
+                                >
+                                  Отменить
+                                </button>
+                              </>
+                            )}
+                            {slot.status === 'closed' && (
+                              <button
+                                className="pro-slot-action"
+                                type="button"
+                                onClick={() =>
+                                  setSlotConfirm({
+                                    type: 'open',
+                                    slotId: slot.id,
+                                    timeLabel,
+                                  })
+                                }
+                              >
+                                Открыть
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {booking && (
+                          <div className="pro-slot-meta">
+                            <span>
+                              Клиент: {booking.clientName ?? 'Клиент'}
+                            </span>
+                            <span>Услуга: {booking.serviceName}</span>
+                          </div>
+                        )}
+                        {slot.status === 'closed' && slot.reason && (
+                          <div className="pro-slot-meta">{slot.reason}</div>
+                        )}
+                        {booking && hasDetails && (
+                          <div className="pro-slot-details">
+                            <span>{formatDateTime(booking.scheduledAt)}</span>
+                            <span>
+                              {booking.locationType === 'client'
+                                ? 'У клиента'
+                                : 'У мастера'}
+                            </span>
+                            {booking.address ? (
+                              <span>Адрес: {booking.address}</span>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {slotConfirmContent && (
+              <div className="pro-slots-confirm">
+                <p className="pro-slots-confirm-title">{slotConfirmContent.title}</p>
+                <div className="pro-slots-confirm-actions">
+                  <button
+                    className={`pro-slots-confirm-primary ${
+                      slotConfirmContent.tone === 'is-danger' ? 'is-danger' : ''
+                    }`}
+                    type="button"
+                    onClick={handleConfirmSlotAction}
+                  >
+                    {slotConfirmContent.confirmLabel}
+                  </button>
+                  <button
+                    className="pro-slots-confirm-secondary"
+                    type="button"
+                    onClick={() => setSlotConfirm(null)}
+                  >
+                    {slotConfirmContent.cancelLabel}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {slotNotice && (
+              <p className="pro-slots-notice" role="status">
+                {slotNotice}
+              </p>
+            )}
+
+            <div className="pro-slots-footer">
+              <button
+                className="pro-slots-footer-primary"
+                type="button"
+                onClick={() => handleOpenAddSlots()}
+              >
+                Добавить окна
+              </button>
+              <button
+                className="pro-slots-footer-secondary"
+                type="button"
+                onClick={handleOpenPasteSlots}
+              >
+                Вставить списком
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAddSlotsOpen && (
+        <div
+          className="pro-slot-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={handleCloseAddSlots}
+        >
+          <div className="pro-slot-sheet" onClick={(event) => event.stopPropagation()}>
+            <span className="pro-slot-sheet-handle" aria-hidden="true" />
+            <header className="pro-slot-sheet-head">
+              <p className="pro-slot-sheet-kicker">
+                {isRescheduleMode ? 'Перенос' : 'Добавление окон'}
+              </p>
+              <h3 className="pro-slot-sheet-title">
+                {isRescheduleMode ? 'Перенести запись' : 'Добавить окна'}
+              </h3>
+              <p className="pro-slot-sheet-subtitle">{selectedDateLabel}</p>
+            </header>
+
+            <div className="pro-slot-sheet-section">
+              <span className="pro-slot-sheet-label">Шаг 1. Дата</span>
+              <div className="pro-slot-sheet-date">{selectedDateLabel}</div>
+            </div>
+
+            <div className="pro-slot-sheet-section">
+              <span className="pro-slot-sheet-label">Шаг 2. Время</span>
+              {!isRescheduleMode && (
+                <div className="pro-slot-presets">
+                  <button
+                    className="pro-slot-preset"
+                    type="button"
+                    onClick={() =>
+                      handlePresetSelect({
+                        start: 8 * 60,
+                        end: 12 * 60,
+                      })
+                    }
+                  >
+                    Утро
+                  </button>
+                  <button
+                    className="pro-slot-preset"
+                    type="button"
+                    onClick={() =>
+                      handlePresetSelect({
+                        start: 12 * 60,
+                        end: 17 * 60,
+                      })
+                    }
+                  >
+                    День
+                  </button>
+                  <button
+                    className="pro-slot-preset"
+                    type="button"
+                    onClick={() =>
+                      handlePresetSelect({
+                        start: 17 * 60,
+                        end: 21 * 60,
+                      })
+                    }
+                  >
+                    Вечер
+                  </button>
+                  <button
+                    className="pro-slot-preset is-ghost"
+                    type="button"
+                    onClick={handleSelectAllTimes}
+                  >
+                    Выбрать все
+                  </button>
+                  <button
+                    className="pro-slot-preset is-ghost"
+                    type="button"
+                    onClick={handleClearTimes}
+                  >
+                    Очистить
+                  </button>
+                </div>
+              )}
+              <div className="pro-slot-time-grid" role="list">
+                {timeSlotStates.map((state) => {
+                  const isSelected = selectedTimes.includes(state.time)
+                  const isDisabled =
+                    state.isBooked || (!isRescheduleMode && state.isFreeExisting)
+                  return (
+                    <button
+                      className={`pro-slot-time-chip${
+                        isSelected ? ' is-selected' : ''
+                      }${state.isBooked ? ' is-booked' : ''}${
+                        state.isClosed ? ' is-closed' : ''
+                      }${state.isFreeExisting ? ' is-open' : ''}`}
+                      type="button"
+                      key={`time-${state.time}`}
+                      role="listitem"
+                      disabled={isDisabled}
+                      onClick={() => toggleTimeSelection(state.time)}
+                    >
+                      {formatMinutes(state.time)}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="pro-slot-legend">
+                <span className="pro-slot-legend-item is-booked">Занято</span>
+                <span className="pro-slot-legend-item is-closed">Закрыто</span>
+                <span className="pro-slot-legend-item is-open">Открыто</span>
+              </div>
+              {!isRescheduleMode && (
+                <button
+                  className="pro-slot-sheet-alt"
+                  type="button"
+                  onClick={handleOpenPasteSlots}
+                >
+                  Вставить списком
+                </button>
+              )}
+            </div>
+
+            <div className="pro-slot-sheet-section">
+              <span className="pro-slot-sheet-label">Шаг 3. Сохранить</span>
+              <div className="pro-slot-sheet-actions">
+                <button
+                  className="pro-slot-sheet-primary"
+                  type="button"
+                  onClick={handleSaveSlots}
+                >
+                  {isRescheduleMode ? 'Перенести запись' : 'Сохранить окна'}
+                </button>
+                <button
+                  className="pro-slot-sheet-secondary"
+                  type="button"
+                  onClick={handleCloseAddSlots}
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+
+            {addSlotsError && <p className="pro-slot-sheet-error">{addSlotsError}</p>}
+
+            {pendingReplace && (
+              <div className="pro-slot-sheet-confirm">
+                <p className="pro-slot-sheet-confirm-title">
+                  Заменить закрытый на свободный?
+                </p>
+                <div className="pro-slot-sheet-confirm-actions">
+                  <button
+                    className="pro-slot-sheet-primary"
+                    type="button"
+                    onClick={() => handleReplaceDecision(true)}
+                  >
+                    Да
+                  </button>
+                  <button
+                    className="pro-slot-sheet-secondary"
+                    type="button"
+                    onClick={() => handleReplaceDecision(false)}
+                  >
+                    Нет
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isPasteSlotsOpen && (
+        <div
+          className="pro-slot-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={handleClosePasteSlots}
+        >
+          <div
+            className="pro-slot-sheet pro-slot-sheet--paste"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-slot-sheet-handle" aria-hidden="true" />
+            <header className="pro-slot-sheet-head">
+              <p className="pro-slot-sheet-kicker">Быстрое добавление</p>
+              <h3 className="pro-slot-sheet-title">Вставить списком</h3>
+              <p className="pro-slot-sheet-subtitle">
+                Вставьте даты и время строками
+              </p>
+            </header>
+            <div className="pro-slot-sheet-section">
+              <textarea
+                className="pro-slot-textarea"
+                placeholder={`10.01 — 13:00 15:00\n11.01 — 09:00 17:00`}
+                rows={4}
+                value={pasteInput}
+                onChange={(event) => setPasteInput(event.target.value)}
+              />
+              <button
+                className="pro-slot-sheet-secondary"
+                type="button"
+                onClick={handleParsePaste}
+              >
+                Распознать
+              </button>
+            </div>
+            {pastePreview && (
+              <div className="pro-slot-preview">
+                {pastePreview.map((group) => (
+                  <div className="pro-slot-preview-row" key={group.dateKey}>
+                    <span className="pro-slot-preview-date">
+                      {formatLongDate(group.date)}
+                    </span>
+                    <span className="pro-slot-preview-times">
+                      {group.times.map(formatMinutes).join(', ')}
+                    </span>
+                    <span className="pro-slot-preview-count">
+                      {formatWindowCount(group.times.length)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="pro-slot-sheet-actions">
+              <button
+                className="pro-slot-sheet-primary"
+                type="button"
+                onClick={handleSavePaste}
+              >
+                Сохранить окна
+              </button>
+              <button
+                className="pro-slot-sheet-secondary"
+                type="button"
+                onClick={handleClosePasteSlots}
+              >
+                Назад
+              </button>
+            </div>
+            {pasteError && <p className="pro-slot-sheet-error">{pasteError}</p>}
+          </div>
+        </div>
+      )}
 
       <ProBottomNav
         active="requests"
