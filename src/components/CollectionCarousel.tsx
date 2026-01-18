@@ -17,6 +17,10 @@ type CollectionCarouselProps = {
 const AUTO_RESUME_DELAY_MS = 5000
 const USER_INPUT_WINDOW_MS = 1500
 const SCROLL_IDLE_DELAY_MS = 200
+const MAX_SWIPE_ITEMS = 1
+
+const clampIndex = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value))
 
 export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps) => {
   const carouselItems: CollectionItem[] =
@@ -34,6 +38,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const rafRef = useRef(0)
   const programmaticScrollRafRef = useRef(0)
+  const programmaticScrollTimeoutRef = useRef(0)
   const setWidthRef = useRef(0)
   const stepRef = useRef(0)
   const pauseRef = useRef(false)
@@ -45,6 +50,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const lastUserInputRef = useRef(0)
   const isUserScrollingRef = useRef(false)
   const isProgrammaticScrollRef = useRef(false)
+  const gestureStartIndexRef = useRef<number | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [fontsReady, setFontsReady] = useState(false)
 
@@ -129,6 +135,83 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     setIsReady(true)
   }, [])
 
+  const getCenteredIndex = useCallback(() => {
+    const track = trackRef.current
+    const step = stepRef.current
+    const first = cardRefs.current[0]
+    if (!track || !step || !first) return null
+    const cardWidth = first.getBoundingClientRect().width
+    if (!cardWidth) return null
+    const center = track.scrollLeft + track.clientWidth / 2
+    const firstCenter = first.offsetLeft + cardWidth / 2
+    const rawIndex = Math.round((center - firstCenter) / step)
+    if (!Number.isFinite(rawIndex)) return null
+    return clampIndex(rawIndex, 0, loopedCollectionItems.length - 1)
+  }, [loopedCollectionItems.length])
+
+  const scrollToIndex = useCallback(
+    (index: number, behavior: ScrollBehavior = 'smooth') => {
+      const track = trackRef.current
+      const card = cardRefs.current[index]
+      if (!track || !card) return
+      const nextLeft =
+        card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
+      lastCenteredLeftRef.current = nextLeft
+      if (behavior === 'auto') {
+        setScrollLeftInstant(nextLeft)
+        return
+      }
+      if (programmaticScrollTimeoutRef.current) {
+        window.clearTimeout(programmaticScrollTimeoutRef.current)
+      }
+      isProgrammaticScrollRef.current = true
+      programmaticScrollTimeoutRef.current = window.setTimeout(() => {
+        isProgrammaticScrollRef.current = false
+        programmaticScrollTimeoutRef.current = 0
+      }, 360)
+      track.scrollTo({ left: nextLeft, behavior })
+    },
+    [setScrollLeftInstant]
+  )
+
+  const beginUserGesture = useCallback(() => {
+    if (!readyRef.current) return
+    const currentIndex = getCenteredIndex()
+    if (typeof currentIndex === 'number') {
+      gestureStartIndexRef.current = currentIndex
+    }
+  }, [getCenteredIndex])
+
+  const settleUserScroll = useCallback(() => {
+    if (!readyRef.current) return
+    const targetIndex = getCenteredIndex()
+    if (targetIndex === null) return
+    let nextIndex = targetIndex
+    if (typeof gestureStartIndexRef.current === 'number') {
+      const min = gestureStartIndexRef.current - MAX_SWIPE_ITEMS
+      const max = gestureStartIndexRef.current + MAX_SWIPE_ITEMS
+      nextIndex = clampIndex(nextIndex, min, max)
+    }
+    lastUserInputRef.current = 0
+    isUserScrollingRef.current = false
+    scrollToIndex(nextIndex, 'smooth')
+    gestureStartIndexRef.current = nextIndex
+  }, [getCenteredIndex, scrollToIndex])
+
+  const scheduleUserSettle = useCallback(
+    (delay = SCROLL_IDLE_DELAY_MS) => {
+      if (userScrollTimerRef.current) {
+        window.clearTimeout(userScrollTimerRef.current)
+      }
+      userScrollTimerRef.current = window.setTimeout(() => {
+        isUserScrollingRef.current = false
+        normalizePosition()
+        settleUserScroll()
+      }, delay)
+    },
+    [normalizePosition, settleUserScroll]
+  )
+
   const pauseAuto = useCallback((delay = AUTO_RESUME_DELAY_MS) => {
     pauseRef.current = true
     if (resumeTimerRef.current) {
@@ -141,8 +224,9 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
 
   const handleUserInput = useCallback(() => {
     lastUserInputRef.current = Date.now()
+    beginUserGesture()
     pauseAuto()
-  }, [pauseAuto])
+  }, [beginUserGesture, pauseAuto])
 
   const handleFocusIn = useCallback(() => {
     pauseAuto()
@@ -158,13 +242,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       lastUserInputRef.current = now
       isUserScrollingRef.current = true
       pauseAuto()
-      if (userScrollTimerRef.current) {
-        window.clearTimeout(userScrollTimerRef.current)
-      }
-      userScrollTimerRef.current = window.setTimeout(() => {
-        isUserScrollingRef.current = false
-        normalizePosition()
-      }, SCROLL_IDLE_DELAY_MS)
+      scheduleUserSettle()
     }
 
     if (rafRef.current) return
@@ -280,6 +358,9 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       }
       if (programmaticScrollRafRef.current) {
         window.cancelAnimationFrame(programmaticScrollRafRef.current)
+      }
+      if (programmaticScrollTimeoutRef.current) {
+        window.clearTimeout(programmaticScrollTimeoutRef.current)
       }
     }
   }, [])
