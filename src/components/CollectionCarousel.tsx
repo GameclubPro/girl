@@ -159,6 +159,8 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
 
   const scrollToIndex = useCallback(
     (index: number, behavior: ScrollBehavior = 'smooth') => {
+      const track = trackRef.current
+      if (!track) return
       const nextLeft = getScrollLeftForIndex(index)
       if (nextLeft === null) return
       lastCenteredLeftRef.current = nextLeft
