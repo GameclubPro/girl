@@ -12201,6 +12201,7 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
+  position: relative;
 }
 
 .pro-slot-time {
@@ -12272,6 +12273,7 @@
   scrollbar-width: none;
   flex: 1 1 auto;
   min-width: 0;
+  padding-right: 36px;
 }
 
 .pro-slot-actions::-webkit-scrollbar {
@@ -12298,6 +12300,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
 }
 
 .pro-slot-action--icon svg {
