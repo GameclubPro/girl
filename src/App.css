@@ -17368,8 +17368,8 @@ h2 {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px 14px 24px;
-  scroll-padding: 18px 14px;
+  padding: 0;
+  scroll-padding: 0;
   scrollbar-width: none;
 }
 
@@ -17497,7 +17497,7 @@ h2 {
 }
 
 .category-overlay-card-title {
-  font-size: 13px;
+  font-size: clamp(14px, 3.8vw, 16px);
   font-weight: 700;
   color: var(--ink);
   text-align: center;
