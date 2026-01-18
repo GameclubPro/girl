@@ -36,7 +36,7 @@ const buildGreeting = (displayName?: string | null) => {
   const safeName = displayName?.trim() ?? ''
   const firstName = safeName.split(' ')[0] ?? ''
   const { text, emoji } = getDayGreeting(new Date())
-  const greeting = `${text} ${emoji}`.trim()
+  const greeting = `${emoji} ${text}`.trim()
   return firstName ? `${greeting}, ${firstName}` : greeting
 }
 
