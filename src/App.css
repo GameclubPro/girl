@@ -16872,10 +16872,15 @@ h2 {
 
 .collection-card {
   flex: 0 0 min(250px, 78%);
-  --collection-card-content-safe: clamp(70px, 22vw, 140px);
+  --collection-card-content-safe: clamp(
+    90px,
+    calc(var(--collection-card-art-size, 160px) * 0.7),
+    170px
+  );
   border: 1px solid rgba(var(--surface-rgb), 0.9);
   border-radius: 22px;
   padding: 14px 16px 16px;
+  padding-right: calc(16px + var(--collection-card-content-safe));
   min-height: 132px;
   display: flex;
   flex-direction: column;
@@ -16928,6 +16933,8 @@ h2 {
 .collection-card > * {
   position: relative;
   z-index: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .collection-card--lavender {
@@ -16962,7 +16969,6 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
-  max-width: calc(100% - var(--collection-card-content-safe));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -16983,7 +16989,6 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: calc(100% - var(--collection-card-content-safe));
   min-width: 0;
 }
 
@@ -17015,7 +17020,6 @@ h2 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: calc(100% - var(--collection-card-content-safe));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
