@@ -438,10 +438,10 @@ export const ProRequestsScreen = ({
   const [shareStatus, setShareStatus] = useState('')
   const shareTimerRef = useRef<number | null>(null)
   const slotNoticeTimerRef = useRef<number | null>(null)
+  const slotsSectionRef = useRef<HTMLDivElement | null>(null)
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
   const [slots, setSlots] = useState<Slot[]>(() => loadSlotsFromStorage(userId))
-  const [isSlotsOpen, setIsSlotsOpen] = useState(false)
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [slotNotice, setSlotNotice] = useState('')
   const [slotConfirm, setSlotConfirm] = useState<SlotConfirm | null>(null)
@@ -871,12 +871,22 @@ export const ProRequestsScreen = ({
     setCalendarInitialized(true)
   }, [bookingCalendarItems, calendarInitialized])
 
-  const handleOpenSlots = (date: Date) => {
+  const scrollToSlots = () => {
+    if (typeof window === 'undefined') return
+    const node = slotsSectionRef.current
+    if (!node) return
+    window.requestAnimationFrame(() => {
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  const handleSelectDate = (date: Date, options?: { scroll?: boolean }) => {
     setSelectedDate(date)
     setCalendarInitialized(true)
-    setSlotFilter('all')
     setSlotConfirm(null)
-    setIsSlotsOpen(true)
+    setSlotDetailId(null)
+    if (options?.scroll === false) return
+    scrollToSlots()
   }
 
   const handleShiftWeek = (direction: number) => {
@@ -2245,7 +2255,7 @@ export const ProRequestsScreen = ({
                         type="button"
                         role="tab"
                         aria-selected={isSelected}
-                        onClick={() => handleOpenSlots(day)}
+                        onClick={() => handleSelectDate(day)}
                       >
                         <span className="booking-calendar-day-name">
                           {weekDayLabels[index]}
@@ -2276,10 +2286,252 @@ export const ProRequestsScreen = ({
                   <button
                     className="booking-calendar-add"
                     type="button"
-                    onClick={() => handleOpenSlots(selectedDate)}
+                    onClick={() => {
+                      scrollToSlots()
+                      handleOpenAddSlots()
+                    }}
                   >
                     Добавить окна
                   </button>
+                </div>
+              </section>
+
+              <section
+                className="pro-slots-inline"
+                ref={slotsSectionRef}
+                aria-label="Окна дня"
+              >
+                <div className="pro-slots-sheet">
+                  <header className="pro-slots-head">
+                    <div>
+                      <p className="pro-slots-kicker">Окна дня</p>
+                      <h3 className="pro-slots-title">{selectedDayTitle}</h3>
+                    </div>
+                  </header>
+                  <div className="pro-slots-filters" role="tablist">
+                    {([
+                      ['all', 'Все'],
+                      ['free', 'Свободные'],
+                      ['booked', 'Занятые'],
+                      ['closed', 'Закрытые'],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        className={`pro-slots-filter${
+                          slotFilter === value ? ' is-active' : ''
+                        }`}
+                        type="button"
+                        role="tab"
+                        aria-selected={slotFilter === value}
+                        onClick={() => setSlotFilter(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pro-slots-meta">
+                    <span>Свободные {slotStats.free}</span>
+                    <span>Занятые {slotStats.booked}</span>
+                    <span>Закрытые {slotStats.closed}</span>
+                  </div>
+
+                  {filteredSlotViews.length === 0 ? (
+                    <div className="pro-slots-empty">
+                      <p className="pro-slots-empty-title">
+                        На выбранный день окон нет.
+                      </p>
+                      <p className="pro-slots-empty-hint">
+                        Добавьте окна — они появятся в записи у клиентов.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="pro-slots-list">
+                      {filteredSlotViews.map((slot) => {
+                        const timeLabel = formatMinutes(slot.startMinutes)
+                        const statusLabel =
+                          slot.status === 'free'
+                            ? 'Свободно'
+                            : slot.status === 'booked'
+                              ? 'Занято'
+                              : 'Закрыто'
+                        const booking = slot.booking
+                        const hasDetails = booking && slotDetailId === booking.id
+                        return (
+                          <div className="pro-slot-card" key={`${slot.id}-${timeLabel}`}>
+                            <div className="pro-slot-time">{timeLabel}</div>
+                            <div className="pro-slot-body">
+                              <div className="pro-slot-top">
+                                <span className={`pro-slot-status is-${slot.status}`}>
+                                  {slot.status === 'closed' && (
+                                    <span
+                                      className="pro-slot-status-icon"
+                                      aria-hidden="true"
+                                    >
+                                      🔒
+                                    </span>
+                                  )}
+                                  {statusLabel}
+                                </span>
+                                <div className="pro-slot-actions">
+                                  {slot.status === 'free' && (
+                                    <>
+                                      <button
+                                        className="pro-slot-action"
+                                        type="button"
+                                        onClick={() => handleCloseSlot(slot.id)}
+                                      >
+                                        Закрыть
+                                      </button>
+                                      <button
+                                        className="pro-slot-action is-danger"
+                                        type="button"
+                                        onClick={() =>
+                                          setSlotConfirm({
+                                            type: 'delete',
+                                            slotId: slot.id,
+                                            timeLabel,
+                                          })
+                                        }
+                                      >
+                                        Удалить
+                                      </button>
+                                    </>
+                                  )}
+                                  {slot.status === 'booked' && booking && (
+                                    <>
+                                      <button
+                                        className="pro-slot-action"
+                                        type="button"
+                                        onClick={() =>
+                                          setSlotDetailId((current) =>
+                                            current === booking.id ? null : booking.id
+                                          )
+                                        }
+                                      >
+                                        Детали
+                                      </button>
+                                      <button
+                                        className="pro-slot-action"
+                                        type="button"
+                                        onClick={() =>
+                                          handleOpenAddSlots({
+                                            rescheduleBookingId: booking.id,
+                                          })
+                                        }
+                                      >
+                                        Перенести
+                                      </button>
+                                      <button
+                                        className="pro-slot-action is-danger"
+                                        type="button"
+                                        onClick={() =>
+                                          setSlotConfirm({
+                                            type: 'cancel-booking',
+                                            bookingId: booking.id,
+                                            timeLabel,
+                                          })
+                                        }
+                                      >
+                                        Отменить
+                                      </button>
+                                    </>
+                                  )}
+                                  {slot.status === 'closed' && (
+                                    <button
+                                      className="pro-slot-action"
+                                      type="button"
+                                      onClick={() =>
+                                        setSlotConfirm({
+                                          type: 'open',
+                                          slotId: slot.id,
+                                          timeLabel,
+                                        })
+                                      }
+                                    >
+                                      Открыть
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {booking && (
+                                <div className="pro-slot-meta">
+                                  <span>
+                                    Клиент: {booking.clientName ?? 'Клиент'}
+                                  </span>
+                                  <span>Услуга: {booking.serviceName}</span>
+                                </div>
+                              )}
+                              {slot.status === 'closed' && slot.reason && (
+                                <div className="pro-slot-meta">{slot.reason}</div>
+                              )}
+                              {booking && hasDetails && (
+                                <div className="pro-slot-details">
+                                  <span>{formatDateTime(booking.scheduledAt)}</span>
+                                  <span>
+                                    {booking.locationType === 'client'
+                                      ? 'У клиента'
+                                      : 'У мастера'}
+                                  </span>
+                                  {booking.address ? (
+                                    <span>Адрес: {booking.address}</span>
+                                  ) : null}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {slotConfirmContent && (
+                    <div className="pro-slots-confirm">
+                      <p className="pro-slots-confirm-title">
+                        {slotConfirmContent.title}
+                      </p>
+                      <div className="pro-slots-confirm-actions">
+                        <button
+                          className={`pro-slots-confirm-primary ${
+                            slotConfirmContent.tone === 'is-danger' ? 'is-danger' : ''
+                          }`}
+                          type="button"
+                          onClick={handleConfirmSlotAction}
+                        >
+                          {slotConfirmContent.confirmLabel}
+                        </button>
+                        <button
+                          className="pro-slots-confirm-secondary"
+                          type="button"
+                          onClick={() => setSlotConfirm(null)}
+                        >
+                          {slotConfirmContent.cancelLabel}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {slotNotice && (
+                    <p className="pro-slots-notice" role="status">
+                      {slotNotice}
+                    </p>
+                  )}
+
+                  <div className="pro-slots-footer">
+                    <button
+                      className="pro-slots-footer-primary"
+                      type="button"
+                      onClick={() => handleOpenAddSlots()}
+                    >
+                      Добавить окна
+                    </button>
+                    <button
+                      className="pro-slots-footer-secondary"
+                      type="button"
+                      onClick={handleOpenPasteSlots}
+                    >
+                      Вставить списком
+                    </button>
+                  </div>
                 </div>
               </section>
 
@@ -2314,7 +2566,7 @@ export const ProRequestsScreen = ({
                       className="cta cta--primary cta--wide"
                       type="button"
                       onClick={() => {
-                        setIsSlotsOpen(true)
+                        scrollToSlots()
                         handleOpenAddSlots()
                       }}
                     >
@@ -2332,255 +2584,6 @@ export const ProRequestsScreen = ({
             </>
           )}
       </div>
-
-      {isSlotsOpen && (
-        <div
-          className="pro-slots-overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setIsSlotsOpen(false)}
-        >
-          <div className="pro-slots-sheet" onClick={(event) => event.stopPropagation()}>
-            <span className="pro-slots-handle" aria-hidden="true" />
-            <header className="pro-slots-head">
-              <div>
-                <p className="pro-slots-kicker">Окна дня</p>
-                <h3 className="pro-slots-title">{selectedDayTitle}</h3>
-              </div>
-              <button
-                className="pro-slots-close"
-                type="button"
-                onClick={() => setIsSlotsOpen(false)}
-                aria-label="Закрыть"
-              >
-                ×
-              </button>
-            </header>
-            <div className="pro-slots-filters" role="tablist">
-              {([
-                ['all', 'Все'],
-                ['free', 'Свободные'],
-                ['booked', 'Занятые'],
-                ['closed', 'Закрытые'],
-              ] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  className={`pro-slots-filter${
-                    slotFilter === value ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={slotFilter === value}
-                  onClick={() => setSlotFilter(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="pro-slots-meta">
-              <span>Свободные {slotStats.free}</span>
-              <span>Занятые {slotStats.booked}</span>
-              <span>Закрытые {slotStats.closed}</span>
-            </div>
-
-            {filteredSlotViews.length === 0 ? (
-              <div className="pro-slots-empty">
-                <p className="pro-slots-empty-title">
-                  На выбранный день окон нет.
-                </p>
-                <p className="pro-slots-empty-hint">
-                  Добавьте окна — они появятся в записи у клиентов.
-                </p>
-              </div>
-            ) : (
-              <div className="pro-slots-list">
-                {filteredSlotViews.map((slot) => {
-                  const timeLabel = formatMinutes(slot.startMinutes)
-                  const statusLabel =
-                    slot.status === 'free'
-                      ? 'Свободно'
-                      : slot.status === 'booked'
-                        ? 'Занято'
-                        : 'Закрыто'
-                  const booking = slot.booking
-                  const hasDetails = booking && slotDetailId === booking.id
-                  return (
-                    <div className="pro-slot-card" key={`${slot.id}-${timeLabel}`}>
-                      <div className="pro-slot-time">{timeLabel}</div>
-                      <div className="pro-slot-body">
-                        <div className="pro-slot-top">
-                          <span className={`pro-slot-status is-${slot.status}`}>
-                            {slot.status === 'closed' && (
-                              <span
-                                className="pro-slot-status-icon"
-                                aria-hidden="true"
-                              >
-                                🔒
-                              </span>
-                            )}
-                            {statusLabel}
-                          </span>
-                          <div className="pro-slot-actions">
-                            {slot.status === 'free' && (
-                              <>
-                                <button
-                                  className="pro-slot-action"
-                                  type="button"
-                                  onClick={() => handleCloseSlot(slot.id)}
-                                >
-                                  Закрыть
-                                </button>
-                                <button
-                                  className="pro-slot-action is-danger"
-                                  type="button"
-                                  onClick={() =>
-                                    setSlotConfirm({
-                                      type: 'delete',
-                                      slotId: slot.id,
-                                      timeLabel,
-                                    })
-                                  }
-                                >
-                                  Удалить
-                                </button>
-                              </>
-                            )}
-                            {slot.status === 'booked' && booking && (
-                              <>
-                                <button
-                                  className="pro-slot-action"
-                                  type="button"
-                                  onClick={() =>
-                                    setSlotDetailId((current) =>
-                                      current === booking.id ? null : booking.id
-                                    )
-                                  }
-                                >
-                                  Детали
-                                </button>
-                                <button
-                                  className="pro-slot-action"
-                                  type="button"
-                                  onClick={() =>
-                                    handleOpenAddSlots({
-                                      rescheduleBookingId: booking.id,
-                                    })
-                                  }
-                                >
-                                  Перенести
-                                </button>
-                                <button
-                                  className="pro-slot-action is-danger"
-                                  type="button"
-                                  onClick={() =>
-                                    setSlotConfirm({
-                                      type: 'cancel-booking',
-                                      bookingId: booking.id,
-                                      timeLabel,
-                                    })
-                                  }
-                                >
-                                  Отменить
-                                </button>
-                              </>
-                            )}
-                            {slot.status === 'closed' && (
-                              <button
-                                className="pro-slot-action"
-                                type="button"
-                                onClick={() =>
-                                  setSlotConfirm({
-                                    type: 'open',
-                                    slotId: slot.id,
-                                    timeLabel,
-                                  })
-                                }
-                              >
-                                Открыть
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {booking && (
-                          <div className="pro-slot-meta">
-                            <span>
-                              Клиент: {booking.clientName ?? 'Клиент'}
-                            </span>
-                            <span>Услуга: {booking.serviceName}</span>
-                          </div>
-                        )}
-                        {slot.status === 'closed' && slot.reason && (
-                          <div className="pro-slot-meta">{slot.reason}</div>
-                        )}
-                        {booking && hasDetails && (
-                          <div className="pro-slot-details">
-                            <span>{formatDateTime(booking.scheduledAt)}</span>
-                            <span>
-                              {booking.locationType === 'client'
-                                ? 'У клиента'
-                                : 'У мастера'}
-                            </span>
-                            {booking.address ? (
-                              <span>Адрес: {booking.address}</span>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {slotConfirmContent && (
-              <div className="pro-slots-confirm">
-                <p className="pro-slots-confirm-title">{slotConfirmContent.title}</p>
-                <div className="pro-slots-confirm-actions">
-                  <button
-                    className={`pro-slots-confirm-primary ${
-                      slotConfirmContent.tone === 'is-danger' ? 'is-danger' : ''
-                    }`}
-                    type="button"
-                    onClick={handleConfirmSlotAction}
-                  >
-                    {slotConfirmContent.confirmLabel}
-                  </button>
-                  <button
-                    className="pro-slots-confirm-secondary"
-                    type="button"
-                    onClick={() => setSlotConfirm(null)}
-                  >
-                    {slotConfirmContent.cancelLabel}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {slotNotice && (
-              <p className="pro-slots-notice" role="status">
-                {slotNotice}
-              </p>
-            )}
-
-            <div className="pro-slots-footer">
-              <button
-                className="pro-slots-footer-primary"
-                type="button"
-                onClick={() => handleOpenAddSlots()}
-              >
-                Добавить окна
-              </button>
-              <button
-                className="pro-slots-footer-secondary"
-                type="button"
-                onClick={handleOpenPasteSlots}
-              >
-                Вставить списком
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isAddSlotsOpen && (
         <div
