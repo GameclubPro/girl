@@ -49,7 +49,6 @@ const bookingStatusToneMap = {
 
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-const DEFAULT_SLOT_COUNT = 16
 const DEFAULT_SLOT_RANGE_DAYS = 14
 const BOOKING_DURATION_MIN = 60
 
@@ -861,11 +860,7 @@ export const ProRequestsScreen = ({
     const availableCount = Math.floor(
       (profileScheduleEnd - profileScheduleStart) / SLOT_TIME_STEP
     )
-    const slotCount = Math.min(
-      DEFAULT_SLOT_COUNT,
-      Math.max(0, availableCount)
-    )
-    if (slotCount <= 0) return
+    if (availableCount <= 0) return
 
     window.localStorage.setItem(buildSlotSeedKey(userId), '1')
     setHasSeededSlots(true)
@@ -879,8 +874,12 @@ export const ProRequestsScreen = ({
       if (existingSlots.length > 0) continue
       const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
       const times: number[] = []
-      for (let index = 0; index < slotCount; index += 1) {
-        times.push(profileScheduleStart + index * SLOT_TIME_STEP)
+      for (
+        let time = profileScheduleStart;
+        time + SLOT_TIME_STEP <= profileScheduleEnd;
+        time += SLOT_TIME_STEP
+      ) {
+        times.push(time)
       }
       const filtered = times.filter(
         (time) =>
