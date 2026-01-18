@@ -39,6 +39,7 @@ type ProProfileScreenProps = {
   apiBase: string
   userId: string
   displayNameFallback: string
+  telegramAvatarUrl?: string | null
   onBack: () => void
   onViewRequests: () => void
   onViewChats: () => void
@@ -286,6 +287,7 @@ export const ProProfileScreen = ({
   apiBase,
   userId,
   displayNameFallback,
+  telegramAvatarUrl,
   onBack,
   onViewRequests,
   onViewChats,
@@ -337,6 +339,7 @@ export const ProProfileScreen = ({
   const [saveSuccess, setSaveSuccess] = useState('')
   const [certificatesError, setCertificatesError] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [hasAvatar, setHasAvatar] = useState(false)
   const [coverUrl, setCoverUrl] = useState('')
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] =
@@ -406,7 +409,7 @@ export const ProProfileScreen = ({
   const avatarActionsOpenRef = useRef(false)
   const portfolioPanelRef = useRef<HTMLElement | null>(null)
   const reviewsSectionRef = useRef<HTMLElement | null>(null)
-  const portfolioAutosaveTimerRef = useRef<number | null>(null)
+  const profileAutosaveTimerRef = useRef<number | null>(null)
   const portfolioLongPressTimerRef = useRef<number | null>(null)
   const portfolioLongPressTriggeredRef = useRef(false)
   const portfolioLongPressStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -445,14 +448,6 @@ export const ProProfileScreen = ({
         }))
         .filter((certificate) => certificate.title || certificate.url),
     [certificates]
-  )
-  const portfolioAutosaveKey = useMemo(
-    () =>
-      JSON.stringify({
-        portfolio: portfolioStrings,
-        showcase: showcaseStrings,
-      }),
-    [portfolioStrings, showcaseStrings]
   )
   const servicePriceRange = useMemo(
     () => getServicePriceRange(serviceItems),
@@ -508,6 +503,7 @@ export const ProProfileScreen = ({
   const displayNameValue =
     displayName.trim() || displayNameFallback.trim() || 'Мастер'
   const aboutPreview = about.trim() || 'Статус пока не добавлен.'
+  const avatarDisplayUrl = avatarUrl || telegramAvatarUrl || ''
   const profileInitials = useMemo(() => {
     const source = displayNameValue.trim()
     if (!source) return 'MK'
@@ -519,7 +515,7 @@ export const ProProfileScreen = ({
     return initials || 'MK'
   }, [displayNameValue])
   const experienceValue = parseNumber(experienceYears)
-  const saveButtonLabel = isSaving ? 'Сохраняем...' : 'Сохранить'
+  const saveButtonLabel = isSaving ? 'Сохраняем...' : 'Готово'
   const canSave = Boolean(profilePayload) && !isSaving
   const priceLabel =
     priceFromValue !== null && priceToValue !== null
@@ -1272,18 +1268,18 @@ export const ProProfileScreen = ({
     if (!profilePayload) return
     if (!hasLoadedRef.current) return
     if (isPortfolioUploading || isShowcaseUploading) return
-    if (portfolioAutosaveTimerRef.current) {
-      window.clearTimeout(portfolioAutosaveTimerRef.current)
+    if (profileAutosaveTimerRef.current) {
+      window.clearTimeout(profileAutosaveTimerRef.current)
     }
-    portfolioAutosaveTimerRef.current = window.setTimeout(() => {
+    profileAutosaveTimerRef.current = window.setTimeout(() => {
       void saveProfile(profilePayload)
     }, 700)
     return () => {
-      if (portfolioAutosaveTimerRef.current) {
-        window.clearTimeout(portfolioAutosaveTimerRef.current)
+      if (profileAutosaveTimerRef.current) {
+        window.clearTimeout(profileAutosaveTimerRef.current)
       }
     }
-  }, [isPortfolioUploading, isShowcaseUploading, portfolioAutosaveKey])
+  }, [profilePayload, isPortfolioUploading, isShowcaseUploading])
 
   useEffect(() => {
     hasLoadedRef.current = false
@@ -1296,8 +1292,8 @@ export const ProProfileScreen = ({
       if (autosaveSuccessTimerRef.current) {
         window.clearTimeout(autosaveSuccessTimerRef.current)
       }
-      if (portfolioAutosaveTimerRef.current) {
-        window.clearTimeout(portfolioAutosaveTimerRef.current)
+      if (profileAutosaveTimerRef.current) {
+        window.clearTimeout(profileAutosaveTimerRef.current)
       }
       if (portfolioLongPressTimerRef.current) {
         window.clearTimeout(portfolioLongPressTimerRef.current)
@@ -1439,6 +1435,7 @@ export const ProProfileScreen = ({
         setShowcaseItems(nextShowcaseItems)
         setCertificates(nextCertificates)
         setAvatarUrl(data.avatarUrl ?? '')
+        setHasAvatar(Boolean(data.hasAvatar))
         setCoverUrl(data.coverUrl ?? '')
         const nextFollowersCount =
           typeof data.followersCount === 'number' &&
@@ -1792,7 +1789,7 @@ export const ProProfileScreen = ({
         const payload = await response.json().catch(() => null)
         const message =
           payload?.error === 'profile_not_found'
-            ? 'Сначала сохраните профиль, чтобы загрузить медиа.'
+            ? 'Не удалось загрузить изображение.'
             : payload?.error === 'image_too_large'
               ? 'Файл слишком большой. Максимум 3 МБ.'
               : payload?.error === 'invalid_image'
@@ -1806,6 +1803,7 @@ export const ProProfileScreen = ({
       }
       if (kind === 'avatar') {
         setAvatarUrl(payload.avatarUrl ?? '')
+        setHasAvatar(true)
       } else {
         setCoverUrl(payload.coverUrl ?? '')
       }
@@ -1904,6 +1902,7 @@ export const ProProfileScreen = ({
         throw new Error('Не удалось удалить аватар.')
       }
       setAvatarUrl('')
+      setHasAvatar(false)
     } catch (error) {
       setMediaError(
         error instanceof Error ? error.message : 'Не удалось удалить аватар.'
@@ -2711,8 +2710,8 @@ export const ProProfileScreen = ({
                 }
               }}
             >
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={`Аватар ${displayNameValue}`} />
+              {avatarDisplayUrl ? (
+                <img src={avatarDisplayUrl} alt={`Аватар ${displayNameValue}`} />
               ) : (
                 <span aria-hidden="true">{profileInitials}</span>
               )}
@@ -4142,8 +4141,8 @@ export const ProProfileScreen = ({
                         }`}
                         aria-busy={isAvatarUploading}
                       >
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt="Аватар" />
+                        {avatarDisplayUrl ? (
+                          <img src={avatarDisplayUrl} alt="Аватар" />
                         ) : (
                           <span aria-hidden="true">{profileInitials}</span>
                         )}
@@ -4157,7 +4156,7 @@ export const ProProfileScreen = ({
                         >
                           Сменить
                         </button>
-                        {avatarUrl && (
+                        {hasAvatar && avatarUrl && (
                           <button
                             className="pro-profile-editor-media-action is-danger"
                             type="button"

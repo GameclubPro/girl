@@ -59,6 +59,7 @@ export type MasterProfile = {
   showcaseUrls?: string[]
   certificates?: MasterCertificate[]
   avatarUrl?: string | null
+  hasAvatar?: boolean
   coverUrl?: string | null
   isActive?: boolean
   scheduleDays?: string[]

@@ -106,6 +106,7 @@ const showcaseSlotClasses = ['is-a', 'is-b', 'is-c', 'is-d'] as const
 type ProCabinetScreenProps = {
   apiBase: string
   userId: string
+  telegramAvatarUrl?: string | null
   onEditProfile: (section?: ProProfileSection) => void
   onViewRequests: () => void
   onViewChats: () => void
@@ -121,6 +122,7 @@ type ProCabinetScreenProps = {
 export const ProCabinetScreen = ({
   apiBase,
   userId,
+  telegramAvatarUrl,
   onEditProfile,
   onViewRequests,
   onViewChats,
@@ -252,6 +254,7 @@ export const ProCabinetScreen = ({
     () => getInitials(profileDisplayName || 'Мастер'),
     [profileDisplayName]
   )
+  const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
   const tapHint = (
     <span className="pro-cabinet-nav-hint" aria-hidden="true">
       <span className="pro-cabinet-nav-hint-arrow" />
@@ -492,8 +495,8 @@ export const ProCabinetScreen = ({
                 <span className="pro-cabinet-nav-stories-badge">NEW</span>
                 <span className="pro-cabinet-nav-story-ring" aria-hidden="true">
                   <span className="pro-cabinet-nav-story-avatar">
-                    {profileAvatarUrl ? (
-                      <img src={profileAvatarUrl} alt="" loading="lazy" />
+                    {avatarDisplayUrl ? (
+                      <img src={avatarDisplayUrl} alt="" loading="lazy" />
                     ) : (
                       <span>{profileInitials}</span>
                     )}

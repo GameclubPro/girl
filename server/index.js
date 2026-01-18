@@ -648,6 +648,28 @@ const ensureUser = async (userId) => {
   )
 }
 
+const ensureMasterProfile = async (userId) => {
+  await ensureUser(userId)
+  const profileResult = await pool.query(
+    `
+      SELECT 1
+      FROM master_profiles
+      WHERE user_id = $1
+    `,
+    [userId]
+  )
+  if (profileResult.rows.length > 0) return
+  const displayName = (await resolveUserDisplayName(userId)) || 'Мастер'
+  await pool.query(
+    `
+      INSERT INTO master_profiles (user_id, display_name)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id) DO NOTHING
+    `,
+    [userId, displayName]
+  )
+}
+
 const registerChatClient = (userId, ws) => {
   const normalized = normalizeText(userId)
   if (!normalized) return
@@ -1439,9 +1461,15 @@ const ensureSchema = async () => {
       last_name TEXT,
       username TEXT,
       language_code TEXT,
+      avatar_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS avatar_url TEXT;
   `)
 
   await pool.query(`
@@ -1972,7 +2000,8 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.post('/api/user', async (req, res) => {
-  const { userId, firstName, lastName, username, languageCode } = req.body ?? {}
+  const { userId, firstName, lastName, username, languageCode, photoUrl } =
+    req.body ?? {}
   const normalizedUserId = typeof userId === 'string' ? userId.trim() : ''
 
   if (!normalizedUserId) {
@@ -1985,16 +2014,26 @@ app.post('/api/user', async (req, res) => {
     return trimmed.length ? trimmed : null
   }
 
+  const normalizedPhotoUrl = normalizeExternalUrl(photoUrl)
+
   try {
     await pool.query(
       `
-        INSERT INTO users (user_id, first_name, last_name, username, language_code)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO users (
+          user_id,
+          first_name,
+          last_name,
+          username,
+          language_code,
+          avatar_url
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (user_id) DO UPDATE
         SET first_name = EXCLUDED.first_name,
             last_name = EXCLUDED.last_name,
             username = EXCLUDED.username,
             language_code = EXCLUDED.language_code,
+            avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
             updated_at = NOW()
       `,
       [
@@ -2003,6 +2042,7 @@ app.post('/api/user', async (req, res) => {
         normalizeOptional(lastName),
         normalizeOptional(username),
         normalizeOptional(languageCode),
+        normalizedPhotoUrl,
       ]
     )
 
@@ -2361,7 +2401,7 @@ app.get('/api/masters', async (req, res) => {
           mp.experience_years AS "experienceYears",
           mp.price_from AS "priceFrom",
           mp.price_to AS "priceTo",
-          mp.avatar_path AS "avatarPath",
+          COALESCE(mp.avatar_path, u.avatar_url) AS "avatarPath",
           mp.cover_path AS "coverPath",
           mp.is_active AS "isActive",
           mp.schedule_days AS "scheduleDays",
@@ -2380,6 +2420,7 @@ app.get('/api/masters', async (req, res) => {
           ul.lng AS "locationLng",
           ul.share_to_clients AS "shareToClients"
         FROM master_profiles mp
+        LEFT JOIN users u ON u.user_id = mp.user_id
         LEFT JOIN cities c ON c.id = mp.city_id
         LEFT JOIN districts d ON d.id = mp.district_id
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
@@ -2495,7 +2536,8 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.experience_years AS "experienceYears",
           mp.price_from AS "priceFrom",
           mp.price_to AS "priceTo",
-          mp.avatar_path AS "avatarPath",
+          COALESCE(mp.avatar_path, u.avatar_url) AS "avatarPath",
+          (mp.avatar_path IS NOT NULL) AS "hasAvatar",
           mp.cover_path AS "coverPath",
           mp.is_active AS "isActive",
           mp.schedule_days AS "scheduleDays",
@@ -2513,6 +2555,7 @@ app.get('/api/masters/:userId', async (req, res) => {
           COALESCE(mf.followers_count, 0) AS "followersCount",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
+        LEFT JOIN users u ON u.user_id = mp.user_id
         LEFT JOIN cities c ON c.id = mp.city_id
         LEFT JOIN districts d ON d.id = mp.district_id
         LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
@@ -2825,7 +2868,7 @@ app.get('/api/masters/:userId/followers', async (req, res) => {
           u.updated_at AS "updatedAt",
           mp.user_id AS "proUserId",
           mp.display_name AS "displayName",
-          mp.avatar_path AS "avatarPath"
+          COALESCE(mp.avatar_path, u.avatar_url) AS "avatarPath"
         FROM master_followers mf
         LEFT JOIN users u ON u.user_id = mf.follower_id
         LEFT JOIN master_profiles mp ON mp.user_id = mf.follower_id
@@ -3040,13 +3083,14 @@ app.get('/api/stories', async (req, res) => {
           s.created_at AS "createdAt",
           s.expires_at AS "expiresAt",
           mp.display_name AS "displayName",
-          mp.avatar_path AS "avatarPath",
+          COALESCE(mp.avatar_path, u.avatar_url) AS "avatarPath",
           mp.categories,
           mp.updated_at AS "updatedAt",
           CASE WHEN v.story_id IS NULL THEN false ELSE true END AS "isSeen"
         FROM master_followers mf
         JOIN master_stories s ON s.master_id = mf.master_id
         LEFT JOIN master_profiles mp ON mp.user_id = s.master_id
+        LEFT JOIN users u ON u.user_id = s.master_id
         LEFT JOIN master_story_views v
           ON v.story_id = s.id AND v.viewer_id = $1
         WHERE mf.follower_id = $1
@@ -3203,7 +3247,7 @@ app.post('/api/masters/media', async (req, res) => {
   }
 
   try {
-    const profileResult = await pool.query(
+    let profileResult = await pool.query(
       `
         SELECT avatar_path, cover_path
         FROM master_profiles
@@ -3213,8 +3257,19 @@ app.post('/api/masters/media', async (req, res) => {
     )
 
     if (profileResult.rows.length === 0) {
-      res.status(404).json({ error: 'profile_not_found' })
-      return
+      await ensureMasterProfile(normalizedUserId)
+      profileResult = await pool.query(
+        `
+          SELECT avatar_path, cover_path
+          FROM master_profiles
+          WHERE user_id = $1
+        `,
+        [normalizedUserId]
+      )
+      if (profileResult.rows.length === 0) {
+        res.status(404).json({ error: 'profile_not_found' })
+        return
+      }
     }
 
     const safeUserId = sanitizePathSegment(normalizedUserId)
@@ -3471,7 +3526,7 @@ app.delete('/api/masters/media', async (req, res) => {
   }
 
   try {
-    const profileResult = await pool.query(
+    let profileResult = await pool.query(
       `
         SELECT avatar_path, cover_path
         FROM master_profiles
@@ -3481,8 +3536,19 @@ app.delete('/api/masters/media', async (req, res) => {
     )
 
     if (profileResult.rows.length === 0) {
-      res.status(404).json({ error: 'profile_not_found' })
-      return
+      await ensureMasterProfile(normalizedUserId)
+      profileResult = await pool.query(
+        `
+          SELECT avatar_path, cover_path
+          FROM master_profiles
+          WHERE user_id = $1
+        `,
+        [normalizedUserId]
+      )
+      if (profileResult.rows.length === 0) {
+        res.status(404).json({ error: 'profile_not_found' })
+        return
+      }
     }
 
     const column = normalizedKind === 'avatar' ? 'avatar_path' : 'cover_path'
@@ -3933,7 +3999,7 @@ app.get('/api/bookings', async (req, res) => {
           b.client_id AS "clientId",
           b.master_id AS "masterId",
           mp.display_name AS "masterName",
-          mp.avatar_path AS "masterAvatarPath",
+          COALESCE(mp.avatar_path, u.avatar_url) AS "masterAvatarPath",
           b.city_id AS "cityId",
           b.district_id AS "districtId",
           c.name AS "cityName",
@@ -3953,6 +4019,7 @@ app.get('/api/bookings', async (req, res) => {
           mr.id AS "reviewId"
         FROM service_bookings b
         LEFT JOIN master_profiles mp ON mp.user_id = b.master_id
+        LEFT JOIN users u ON u.user_id = b.master_id
         LEFT JOIN master_reviews mr ON mr.booking_id = b.id
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
@@ -5155,9 +5222,10 @@ app.get('/api/requests', async (req, res) => {
             SELECT
               rr.master_id,
               mp.display_name,
-              mp.avatar_path
+              COALESCE(mp.avatar_path, u.avatar_url) AS avatar_path
             FROM request_responses rr
             LEFT JOIN master_profiles mp ON mp.user_id = rr.master_id
+            LEFT JOIN users u ON u.user_id = rr.master_id
             WHERE rr.request_id = r.id
             ORDER BY rr.created_at DESC
             LIMIT 3
@@ -5287,7 +5355,7 @@ app.get('/api/requests/:id/responses', async (req, res) => {
           mp.experience_years AS "experienceYears",
           mp.price_from AS "priceFrom",
           mp.price_to AS "priceTo",
-          mp.avatar_path AS "avatarPath",
+          COALESCE(mp.avatar_path, u.avatar_url) AS "avatarPath",
           mp.portfolio_urls AS "portfolioUrls",
           COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls",
           rr.price,
@@ -5300,6 +5368,7 @@ app.get('/api/requests/:id/responses', async (req, res) => {
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage"
         FROM request_responses rr
         LEFT JOIN master_profiles mp ON mp.user_id = rr.master_id
+        LEFT JOIN users u ON u.user_id = rr.master_id
         LEFT JOIN master_showcases ms ON ms.user_id = rr.master_id
         LEFT JOIN chats ch
           ON ch.request_id = rr.request_id
@@ -5835,7 +5904,7 @@ app.get('/api/chats', async (req, res) => {
           sb.category_id AS "bookingCategoryId",
           sb.status AS "bookingStatus",
           mp.display_name AS "masterName",
-          mp.avatar_path AS "masterAvatarPath",
+          COALESCE(mp.avatar_path, um.avatar_url) AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
           u.last_name AS "clientLastName",
           u.username AS "clientUsername"
@@ -5845,6 +5914,7 @@ app.get('/api/chats', async (req, res) => {
         LEFT JOIN service_requests sr ON sr.id = c.request_id
         LEFT JOIN service_bookings sb ON sb.id = c.booking_id
         LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
+        LEFT JOIN users um ON um.user_id = c.master_id
         LEFT JOIN users u ON u.user_id = c.client_id
         WHERE cm.user_id = $1
           AND (
@@ -5992,7 +6062,7 @@ app.get('/api/chats/:id', async (req, res) => {
           sb.service_price AS "bookingServicePrice",
           sb.status AS "bookingStatus",
           mp.display_name AS "masterName",
-          mp.avatar_path AS "masterAvatarPath",
+          COALESCE(mp.avatar_path, um.avatar_url) AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
           u.last_name AS "clientLastName",
           u.username AS "clientUsername"
@@ -6000,6 +6070,7 @@ app.get('/api/chats/:id', async (req, res) => {
         LEFT JOIN service_requests sr ON sr.id = c.request_id
         LEFT JOIN service_bookings sb ON sb.id = c.booking_id
         LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
+        LEFT JOIN users um ON um.user_id = c.master_id
         LEFT JOIN users u ON u.user_id = c.client_id
         WHERE c.id = $1
       `,

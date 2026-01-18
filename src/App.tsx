@@ -188,6 +188,7 @@ function App() {
       .filter(Boolean)
       .join(' ')
       .trim() || telegramUser?.username?.trim() || ''
+  const telegramAvatarUrl = telegramUser?.photo_url ?? null
 
   useEffect(() => {
     if (deepLinkHandledRef.current) return
@@ -405,6 +406,7 @@ function App() {
       lastName: telegramUser.last_name ?? null,
       username: telegramUser.username ?? null,
       languageCode: telegramUser.language_code ?? null,
+      photoUrl: telegramUser.photo_url ?? null,
     }
 
     const controller = new AbortController()
@@ -423,6 +425,7 @@ function App() {
     telegramUser?.last_name,
     telegramUser?.username,
     telegramUser?.language_code,
+    telegramUser?.photo_url,
     userId,
   ])
 
@@ -1299,6 +1302,7 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
+        telegramAvatarUrl={telegramAvatarUrl}
         onBack={() => {
           setProProfileSection(null)
           setProProfilePortfolioView(null)
@@ -1412,6 +1416,7 @@ function App() {
       <ProCabinetScreen
         apiBase={apiBase}
         userId={userId}
+        telegramAvatarUrl={telegramAvatarUrl}
         onEditProfile={(section) => openProProfile({ section: section ?? null })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
