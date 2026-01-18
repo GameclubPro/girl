@@ -836,8 +836,6 @@ export const ClientScreen = ({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="category-overlay-head">
-              <span className="category-overlay-brand">KIVEN</span>
-              <p className="category-overlay-kicker">Категории</p>
               <div className="category-overlay-title-row">
                 <h2 className="category-overlay-title">Что нужно сегодня?</h2>
                 {activeCategoryId && (
@@ -849,20 +847,6 @@ export const ClientScreen = ({
                     Готово
                   </button>
                 )}
-              </div>
-              <p className="category-overlay-subtitle">
-                Выберите услугу, чтобы сразу увидеть лучших мастеров рядом.
-              </p>
-              <div className="category-overlay-meta">
-                <span
-                  className={`category-overlay-chip${
-                    activeCategoryId ? ' is-active' : ''
-                  }`}
-                >
-                  {activeCategoryId
-                    ? `Выбрано: ${categoryPillLabel}`
-                    : 'Выберите категорию'}
-                </span>
               </div>
             </div>
             <div className="category-overlay-grid" role="list">

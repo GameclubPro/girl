@@ -17323,24 +17323,6 @@ h2 {
   position: relative;
 }
 
-.category-overlay-brand {
-  font-family: var(--font-title);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2.4px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.category-overlay-kicker {
-  margin: 0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .category-overlay-title-row {
   display: flex;
   align-items: flex-start;
@@ -17354,37 +17336,6 @@ h2 {
   font-size: clamp(22px, 5.8vw, 26px);
   font-weight: 700;
   color: var(--ink);
-}
-
-.category-overlay-subtitle {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.category-overlay-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.category-overlay-chip {
-  border: 1px solid rgba(var(--accent-rgb), 0.2);
-  background: rgba(var(--paper-rgb), 0.85);
-  color: var(--muted);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-}
-
-.category-overlay-chip.is-active {
-  border-color: rgba(var(--accent-rgb), 0.4);
-  background: rgba(var(--accent-rgb), 0.16);
-  color: var(--accent-strong);
 }
 
 .category-overlay-close {
