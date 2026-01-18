@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
+import { IconChevron } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type {
   Booking,
@@ -1474,6 +1475,7 @@ export const ProRequestsScreen = ({
         slot.id === slotId ? { ...slot, status: 'free', reason: null } : slot
       )
     )
+    setSlotMessage('Окно открыто.')
   }
 
   const handleDeleteSlot = (slotId: string) => {
@@ -2524,110 +2526,116 @@ export const ProRequestsScreen = ({
                         const hasDetails = booking && slotDetailId === booking.id
                         return (
                           <div className="pro-slot-card" key={`${slot.id}-${timeLabel}`}>
-                            <div className="pro-slot-time">{timeLabel}</div>
-                            <div className="pro-slot-body">
-                              <div className="pro-slot-top">
-                                <span className={`pro-slot-status is-${slot.status}`}>
-                                  {slot.status === 'closed' && (
-                                    <span
-                                      className="pro-slot-status-icon"
-                                      aria-hidden="true"
-                                    >
-                                      🔒
-                                    </span>
-                                  )}
-                                  {statusLabel}
-                                </span>
-                                <div className="pro-slot-actions">
-                                  {slot.status === 'free' && (
-                                    <>
+                            <div className="pro-slot-row">
+                              <div className="pro-slot-time">{timeLabel}</div>
+                              <div className="pro-slot-body">
+                                <div className="pro-slot-top">
+                                  <span className={`pro-slot-status is-${slot.status}`}>
+                                    {slot.status === 'closed' && (
+                                      <span
+                                        className="pro-slot-status-icon"
+                                        aria-hidden="true"
+                                      >
+                                        🔒
+                                      </span>
+                                    )}
+                                    {statusLabel}
+                                  </span>
+                                  <div className="pro-slot-actions">
+                                    {slot.status === 'free' && (
+                                      <>
+                                        <button
+                                          className="pro-slot-action"
+                                          type="button"
+                                          onClick={() => handleCloseSlot(slot.id)}
+                                        >
+                                          Закрыть
+                                        </button>
+                                        <button
+                                          className="pro-slot-action is-danger"
+                                          type="button"
+                                          onClick={() =>
+                                            setSlotConfirm({
+                                              type: 'delete',
+                                              slotId: slot.id,
+                                              timeLabel,
+                                            })
+                                          }
+                                        >
+                                          Удалить
+                                        </button>
+                                      </>
+                                    )}
+                                    {slot.status === 'booked' && booking && (
+                                      <>
+                                        <button
+                                          className={`pro-slot-action pro-slot-action--icon${
+                                            hasDetails ? ' is-active' : ''
+                                          }`}
+                                          type="button"
+                                          aria-label={
+                                            hasDetails
+                                              ? 'Скрыть детали'
+                                              : 'Показать детали'
+                                          }
+                                          aria-pressed={hasDetails}
+                                          onClick={() =>
+                                            setSlotDetailId((current) =>
+                                              current === booking.id
+                                                ? null
+                                                : booking.id
+                                            )
+                                          }
+                                        >
+                                          <IconChevron />
+                                        </button>
+                                        <button
+                                          className="pro-slot-action"
+                                          type="button"
+                                          onClick={() =>
+                                            handleOpenAddSlots({
+                                              rescheduleBookingId: booking.id,
+                                            })
+                                          }
+                                        >
+                                          Перенести
+                                        </button>
+                                        <button
+                                          className="pro-slot-action is-danger"
+                                          type="button"
+                                          onClick={() =>
+                                            setSlotConfirm({
+                                              type: 'cancel-booking',
+                                              bookingId: booking.id,
+                                              timeLabel,
+                                            })
+                                          }
+                                        >
+                                          Отменить
+                                        </button>
+                                      </>
+                                    )}
+                                    {slot.status === 'closed' && (
                                       <button
                                         className="pro-slot-action"
                                         type="button"
-                                        onClick={() => handleCloseSlot(slot.id)}
+                                        onClick={() => handleOpenSlot(slot.id)}
                                       >
-                                        Закрыть
+                                        Открыть
                                       </button>
-                                      <button
-                                        className="pro-slot-action is-danger"
-                                        type="button"
-                                        onClick={() =>
-                                          setSlotConfirm({
-                                            type: 'delete',
-                                            slotId: slot.id,
-                                            timeLabel,
-                                          })
-                                        }
-                                      >
-                                        Удалить
-                                      </button>
-                                    </>
-                                  )}
-                                  {slot.status === 'booked' && booking && (
-                                    <>
-                                      <button
-                                        className="pro-slot-action"
-                                        type="button"
-                                        onClick={() =>
-                                          setSlotDetailId((current) =>
-                                            current === booking.id ? null : booking.id
-                                          )
-                                        }
-                                      >
-                                        Детали
-                                      </button>
-                                      <button
-                                        className="pro-slot-action"
-                                        type="button"
-                                        onClick={() =>
-                                          handleOpenAddSlots({
-                                            rescheduleBookingId: booking.id,
-                                          })
-                                        }
-                                      >
-                                        Перенести
-                                      </button>
-                                      <button
-                                        className="pro-slot-action is-danger"
-                                        type="button"
-                                        onClick={() =>
-                                          setSlotConfirm({
-                                            type: 'cancel-booking',
-                                            bookingId: booking.id,
-                                            timeLabel,
-                                          })
-                                        }
-                                      >
-                                        Отменить
-                                      </button>
-                                    </>
-                                  )}
-                                  {slot.status === 'closed' && (
-                                    <button
-                                      className="pro-slot-action"
-                                      type="button"
-                                      onClick={() =>
-                                        setSlotConfirm({
-                                          type: 'open',
-                                          slotId: slot.id,
-                                          timeLabel,
-                                        })
-                                      }
-                                    >
-                                      Открыть
-                                    </button>
-                                  )}
+                                    )}
+                                  </div>
                                 </div>
+                                {slot.status === 'closed' && slot.reason && (
+                                  <div className="pro-slot-meta">{slot.reason}</div>
+                                )}
                               </div>
-                              {slot.status === 'closed' && slot.reason && (
-                                <div className="pro-slot-meta">{slot.reason}</div>
-                              )}
-                              {booking && hasDetails && (
-                                <div className="pro-slot-details">
-                                  {renderBookingItem(booking)}
-                                </div>
-                              )}
                             </div>
+                            {booking && hasDetails && (
+                              <div className="pro-slot-details">
+                                {renderBookingItem(booking)}
+                              </div>
+                            )}
                           </div>
                         )
                       })}

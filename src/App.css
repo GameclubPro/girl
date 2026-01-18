@@ -12191,9 +12191,16 @@
   padding: 10px;
   background: rgba(var(--paper-rgb), 0.96);
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
   min-height: 84px;
+}
+
+.pro-slot-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 }
 
 .pro-slot-time {
@@ -12276,6 +12283,26 @@
   cursor: pointer;
 }
 
+.pro-slot-action--icon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pro-slot-action--icon svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.pro-slot-action--icon.is-active svg {
+  transform: rotate(180deg);
+}
+
 .pro-slot-action.is-danger {
   color: var(--danger);
   border-color: rgba(var(--danger-rgb), 0.25);
@@ -12297,9 +12324,19 @@
 }
 
 .pro-slot-details {
+  width: 100%;
+  border-top: 1px solid rgba(var(--shadow-rgb), 0.12);
+  padding-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.pro-slot-details .booking-item {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .pro-slots-confirm {
