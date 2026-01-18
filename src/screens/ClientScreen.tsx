@@ -24,6 +24,21 @@ const categoryLabelOverrides: Record<string, string> = {
   'cosmetology-care': 'Уход за лицом',
 }
 
+const getDayGreeting = (date: Date) => {
+  const hour = date.getHours()
+  if (hour >= 5 && hour < 12) return 'Доброе утро'
+  if (hour >= 12 && hour < 18) return 'Добрый день'
+  if (hour >= 18 && hour < 23) return 'Добрый вечер'
+  return 'Доброй ночи'
+}
+
+const buildGreeting = (displayName?: string | null) => {
+  const safeName = displayName?.trim() ?? ''
+  const firstName = safeName.split(' ')[0] ?? ''
+  const greeting = getDayGreeting(new Date())
+  return firstName ? `${greeting}, ${firstName}` : greeting
+}
+
 type ShowcaseMedia = {
   id: string
   url: string
@@ -81,6 +96,7 @@ export const ClientScreen = ({
   onViewProfile,
   onViewMasterProfile,
   onCreateRequest,
+  displayName,
 }: {
   apiBase: string
   userId: string
@@ -93,6 +109,7 @@ export const ClientScreen = ({
   onViewProfile: () => void
   onViewMasterProfile: (masterId: string) => void
   onCreateRequest: (categoryId?: string | null) => void
+  displayName?: string | null
 }) => {
   type CategoryItem = (typeof categoryItems)[number]
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
@@ -126,6 +143,7 @@ export const ClientScreen = ({
     ? categoryLabelOverrides[activeCategoryId] ?? activeCategoryItem?.label ?? ''
     : ''
   const categoryPillLabel = activeCategoryLabel || 'Категория'
+  const greetingText = buildGreeting(displayName)
 
   useEffect(() => {
     if (activeCategoryId) return
@@ -838,7 +856,10 @@ export const ClientScreen = ({
             <div className="category-overlay-head">
               <div className="category-overlay-title-row">
                 <h2 className="category-overlay-title">
-                  Выберите <span>категорию</span>
+                  <span className="category-overlay-greeting">{greetingText}</span>
+                  <span className="category-overlay-question">
+                    Что вам нужно сегодня?
+                  </span>
                 </h2>
               </div>
             </div>

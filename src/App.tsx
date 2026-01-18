@@ -986,6 +986,7 @@ function App() {
       <ClientScreen
         apiBase={apiBase}
         userId={userId}
+        displayName={clientName}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onViewShowcase={() => setView('client-gallery')}
