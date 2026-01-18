@@ -26,16 +26,17 @@ const categoryLabelOverrides: Record<string, string> = {
 
 const getDayGreeting = (date: Date) => {
   const hour = date.getHours()
-  if (hour >= 5 && hour < 12) return 'Доброе утро'
-  if (hour >= 12 && hour < 18) return 'Добрый день'
-  if (hour >= 18 && hour < 23) return 'Добрый вечер'
-  return 'Доброй ночи'
+  if (hour >= 5 && hour < 12) return { text: 'Доброе утро', emoji: '☀️' }
+  if (hour >= 12 && hour < 18) return { text: 'Добрый день', emoji: '🌤️' }
+  if (hour >= 18 && hour < 23) return { text: 'Добрый вечер', emoji: '🌙' }
+  return { text: 'Доброй ночи', emoji: '✨' }
 }
 
 const buildGreeting = (displayName?: string | null) => {
   const safeName = displayName?.trim() ?? ''
   const firstName = safeName.split(' ')[0] ?? ''
-  const greeting = getDayGreeting(new Date())
+  const { text, emoji } = getDayGreeting(new Date())
+  const greeting = `${text} ${emoji}`.trim()
   return firstName ? `${greeting}, ${firstName}` : greeting
 }
 
