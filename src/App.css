@@ -17336,6 +17336,7 @@ h2 {
   width: 100%;
   position: relative;
   padding: 0;
+  margin: 0 -6px;
 }
 
 .category-overlay-title {
