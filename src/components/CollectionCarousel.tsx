@@ -14,491 +14,193 @@ type CollectionCarouselProps = {
   onSelect?: (item: CollectionItem) => void
 }
 
-const AUTO_RESUME_DELAY_MS = 5000
-const USER_INPUT_WINDOW_MS = 1500
-const SCROLL_IDLE_DELAY_MS = 200
+const DRAG_START_PX = 6
+const DRAG_THRESHOLD_PX = 44
+const EDGE_RESISTANCE = 0.35
 const MAX_SWIPE_ITEMS = 1
 
 const clampIndex = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
 
+const clampValue = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value))
+
+type LayoutMetrics = {
+  step: number
+  cardWidth: number
+  trackWidth: number
+  startOffset: number
+}
+
 export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps) => {
   const carouselItems: CollectionItem[] =
     items && items.length > 0 ? items : collectionItems
-  const collectionBaseIndex = carouselItems.length
-  const loopedCollectionItems = useMemo(
-    () => [...carouselItems, ...carouselItems, ...carouselItems],
-    [carouselItems]
-  )
   const itemsSignature = useMemo(
     () => carouselItems.map((item) => item.id).join('|'),
     [carouselItems]
   )
   const trackRef = useRef<HTMLDivElement | null>(null)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const rafRef = useRef(0)
-  const programmaticScrollRafRef = useRef(0)
-  const programmaticScrollTimeoutRef = useRef(0)
-  const setWidthRef = useRef(0)
-  const stepRef = useRef(0)
-  const pauseRef = useRef(false)
-  const readyRef = useRef(false)
-  const hasCenteredRef = useRef(false)
-  const lastCenteredLeftRef = useRef<number | null>(null)
-  const resumeTimerRef = useRef(0)
-  const userScrollTimerRef = useRef(0)
-  const lastUserInputRef = useRef(0)
-  const isUserScrollingRef = useRef(false)
-  const isProgrammaticScrollRef = useRef(false)
+  const pointerIdRef = useRef<number | null>(null)
+  const dragStartXRef = useRef(0)
+  const dragDeltaRef = useRef(0)
   const isPointerDownRef = useRef(false)
-  const gestureStartIndexRef = useRef<number | null>(null)
-  const [isReady, setIsReady] = useState(false)
-  const [fontsReady, setFontsReady] = useState(false)
+  const hasDraggedRef = useRef(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const [layout, setLayout] = useState<LayoutMetrics>({
+    step: 0,
+    cardWidth: 0,
+    trackWidth: 0,
+    startOffset: 0,
+  })
 
-  const measure = useCallback(() => {
+  const updateLayout = useCallback(() => {
     const track = trackRef.current
     const first = cardRefs.current[0]
-    const middle = cardRefs.current[collectionBaseIndex]
-    if (!track || !middle) return
+    const second = cardRefs.current[1]
+    if (!track || !first) return
 
     const trackStyle = window.getComputedStyle(track)
     const gapValue = trackStyle.columnGap || trackStyle.gap || '0'
     const gap = Number.parseFloat(gapValue) || 0
-    const cardWidth = middle.getBoundingClientRect().width
-    const middleNext = cardRefs.current[collectionBaseIndex + 1]
-    const offsetStep = middleNext ? middleNext.offsetLeft - middle.offsetLeft : 0
-    const step = offsetStep > 0 ? offsetStep : cardWidth + gap
+    const cardWidth = first.getBoundingClientRect().width
+    const step = second ? second.offsetLeft - first.offsetLeft : cardWidth + gap
+    const trackWidth = track.clientWidth
+    const startOffset = first.offsetLeft
 
     if (!Number.isFinite(step) || step <= 0) return
 
-    stepRef.current = step
-    const offsetSetWidth = first ? middle.offsetLeft - first.offsetLeft : 0
-    setWidthRef.current =
-      offsetSetWidth > 0 ? offsetSetWidth : step * carouselItems.length
-  }, [carouselItems.length, collectionBaseIndex])
-
-  const setScrollLeftInstant = useCallback((nextLeft: number) => {
-    const track = trackRef.current
-    if (!track) return
-
-    isProgrammaticScrollRef.current = true
-    if (programmaticScrollRafRef.current) {
-      window.cancelAnimationFrame(programmaticScrollRafRef.current)
-    }
-    programmaticScrollRafRef.current = window.requestAnimationFrame(() => {
-      isProgrammaticScrollRef.current = false
-      programmaticScrollRafRef.current = 0
+    setLayout((prev) => {
+      if (
+        prev.step === step &&
+        prev.cardWidth === cardWidth &&
+        prev.trackWidth === trackWidth &&
+        prev.startOffset === startOffset
+      ) {
+        return prev
+      }
+      return { step, cardWidth, trackWidth, startOffset }
     })
-
-    const previousBehavior = track.style.scrollBehavior
-    track.style.scrollBehavior = 'auto'
-    track.scrollLeft = nextLeft
-    track.style.scrollBehavior = previousBehavior
   }, [])
 
-  const centerMiddle = useCallback(() => {
-    const track = trackRef.current
-    const middle = cardRefs.current[collectionBaseIndex]
-    if (!track || !middle) return false
-
-    const nextLeft =
-      middle.offsetLeft - (track.clientWidth - middle.offsetWidth) / 2
-    setScrollLeftInstant(nextLeft)
-    lastCenteredLeftRef.current = nextLeft
-    return true
-  }, [collectionBaseIndex, setScrollLeftInstant])
-
-  const normalizePosition = useCallback(() => {
-    const track = trackRef.current
-    const setWidth = setWidthRef.current
-    if (!track || !setWidth) return
-
-    if (track.scrollLeft < setWidth * 0.2) {
-      setScrollLeftInstant(track.scrollLeft + setWidth)
-    } else if (track.scrollLeft > setWidth * 1.8) {
-      setScrollLeftInstant(track.scrollLeft - setWidth)
-    }
-  }, [setScrollLeftInstant])
+  useLayoutEffect(() => {
+    updateLayout()
+  }, [itemsSignature, updateLayout])
 
   useLayoutEffect(() => {
-    setWidthRef.current = 0
-    stepRef.current = 0
-    readyRef.current = false
-    hasCenteredRef.current = false
-    lastCenteredLeftRef.current = null
-    setIsReady(false)
+    const track = trackRef.current
+    if (!track || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      updateLayout()
+    })
+    observer.observe(track)
+    return () => observer.disconnect()
+  }, [updateLayout])
+
+  useEffect(() => {
+    setActiveIndex(0)
+    setDragOffset(0)
+    dragDeltaRef.current = 0
+    hasDraggedRef.current = false
   }, [itemsSignature])
 
-  const markReady = useCallback(() => {
-    if (readyRef.current) return
-    if (!setWidthRef.current || !stepRef.current) return
-    readyRef.current = true
-    setIsReady(true)
-  }, [])
+  useEffect(() => {
+    if (carouselItems.length === 0) return
+    setActiveIndex((prev) => clampIndex(prev, 0, carouselItems.length - 1))
+  }, [carouselItems.length])
 
-  const getCenteredIndex = useCallback(() => {
-    const track = trackRef.current
-    const step = stepRef.current
-    const first = cardRefs.current[0]
-    if (!track || !step || !first) return null
-    const cardWidth = first.getBoundingClientRect().width
-    if (!cardWidth) return null
-    const center = track.scrollLeft + track.clientWidth / 2
-    const firstCenter = first.offsetLeft + cardWidth / 2
-    const rawIndex = Math.round((center - firstCenter) / step)
-    if (!Number.isFinite(rawIndex)) return null
-    return clampIndex(rawIndex, 0, loopedCollectionItems.length - 1)
-  }, [loopedCollectionItems.length])
+  const baseOffset =
+    layout.trackWidth && layout.cardWidth
+      ? layout.trackWidth / 2 - (layout.startOffset + layout.cardWidth / 2)
+      : 0
+  const maxDrag = layout.step ? layout.step * 1.1 : 0
 
-  const getScrollLeftForIndex = useCallback((index: number) => {
-    const track = trackRef.current
-    const card = cardRefs.current[index]
-    if (!track || !card) return null
-    return card.offsetLeft - (track.clientWidth - card.offsetWidth) / 2
-  }, [])
-
-  const scrollToIndex = useCallback(
-    (index: number, behavior: ScrollBehavior = 'smooth') => {
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0 && event.pointerType !== 'touch') return
       const track = trackRef.current
       if (!track) return
-      const nextLeft = getScrollLeftForIndex(index)
-      if (nextLeft === null) return
-      lastCenteredLeftRef.current = nextLeft
-      if (behavior === 'auto') {
-        setScrollLeftInstant(nextLeft)
-        return
-      }
-      if (programmaticScrollTimeoutRef.current) {
-        window.clearTimeout(programmaticScrollTimeoutRef.current)
-      }
-      isProgrammaticScrollRef.current = true
-      programmaticScrollTimeoutRef.current = window.setTimeout(() => {
-        isProgrammaticScrollRef.current = false
-        programmaticScrollTimeoutRef.current = 0
-      }, 360)
-      track.scrollTo({ left: nextLeft, behavior })
+      pointerIdRef.current = event.pointerId
+      isPointerDownRef.current = true
+      hasDraggedRef.current = false
+      dragStartXRef.current = event.clientX
+      dragDeltaRef.current = 0
+      setIsDragging(false)
+      track.setPointerCapture(event.pointerId)
     },
-    [getScrollLeftForIndex, setScrollLeftInstant]
+    []
   )
 
-  const beginUserGesture = useCallback(() => {
-    if (!readyRef.current) return
-    const currentIndex = getCenteredIndex()
-    if (typeof currentIndex === 'number') {
-      gestureStartIndexRef.current = currentIndex
-    }
-  }, [getCenteredIndex])
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isPointerDownRef.current) return
+      if (pointerIdRef.current !== event.pointerId) return
+      if (!layout.step) return
 
-  const settleUserScroll = useCallback(() => {
-    if (!readyRef.current) return
-    const targetIndex = getCenteredIndex()
-    if (targetIndex === null) return
-    let nextIndex = targetIndex
-    if (typeof gestureStartIndexRef.current === 'number') {
-      const min = gestureStartIndexRef.current - MAX_SWIPE_ITEMS
-      const max = gestureStartIndexRef.current + MAX_SWIPE_ITEMS
-      nextIndex = clampIndex(nextIndex, min, max)
-    }
-    lastUserInputRef.current = 0
-    isUserScrollingRef.current = false
-    scrollToIndex(nextIndex, 'smooth')
-    gestureStartIndexRef.current = nextIndex
-  }, [getCenteredIndex, scrollToIndex])
-
-  const clampScrollDuringGesture = useCallback(() => {
-    if (!isPointerDownRef.current && !isUserScrollingRef.current) return
-    const track = trackRef.current
-    if (!track) return
-    if (typeof gestureStartIndexRef.current !== 'number') return
-    const minIndex = clampIndex(
-      gestureStartIndexRef.current - MAX_SWIPE_ITEMS,
-      0,
-      loopedCollectionItems.length - 1
-    )
-    const maxIndex = clampIndex(
-      gestureStartIndexRef.current + MAX_SWIPE_ITEMS,
-      0,
-      loopedCollectionItems.length - 1
-    )
-    const minLeft = getScrollLeftForIndex(minIndex)
-    const maxLeft = getScrollLeftForIndex(maxIndex)
-    if (minLeft === null || maxLeft === null) return
-    if (track.scrollLeft < minLeft) {
-      setScrollLeftInstant(minLeft)
-    } else if (track.scrollLeft > maxLeft) {
-      setScrollLeftInstant(maxLeft)
-    }
-  }, [getScrollLeftForIndex, loopedCollectionItems.length, setScrollLeftInstant])
-
-  const scheduleUserSettle = useCallback(
-    (delay = SCROLL_IDLE_DELAY_MS) => {
-      if (userScrollTimerRef.current) {
-        window.clearTimeout(userScrollTimerRef.current)
+      const delta = event.clientX - dragStartXRef.current
+      dragDeltaRef.current = delta
+      const absDelta = Math.abs(delta)
+      if (absDelta > DRAG_START_PX) {
+        hasDraggedRef.current = true
+        setIsDragging(true)
       }
-      userScrollTimerRef.current = window.setTimeout(() => {
-        isUserScrollingRef.current = false
-        normalizePosition()
-        settleUserScroll()
-      }, delay)
+
+      let nextOffset = clampValue(delta, -maxDrag, maxDrag)
+      if (activeIndex === 0 && nextOffset > 0) {
+        nextOffset *= EDGE_RESISTANCE
+      }
+      if (activeIndex === carouselItems.length - 1 && nextOffset < 0) {
+        nextOffset *= EDGE_RESISTANCE
+      }
+      setDragOffset(nextOffset)
+      event.preventDefault()
     },
-    [normalizePosition, settleUserScroll]
+    [activeIndex, carouselItems.length, layout.step, maxDrag]
   )
 
-  const pauseAuto = useCallback((delay = AUTO_RESUME_DELAY_MS) => {
-    pauseRef.current = true
-    if (resumeTimerRef.current) {
-      window.clearTimeout(resumeTimerRef.current)
-    }
-    resumeTimerRef.current = window.setTimeout(() => {
-      pauseRef.current = false
-    }, delay)
-  }, [])
-
-  const handleUserInput = useCallback(() => {
-    lastUserInputRef.current = Date.now()
-    beginUserGesture()
-    pauseAuto()
-  }, [beginUserGesture, pauseAuto])
-
-  const handleFocusIn = useCallback(() => {
-    pauseAuto()
-  }, [pauseAuto])
-
-  const handlePointerDown = useCallback(() => {
-    isPointerDownRef.current = true
-    isUserScrollingRef.current = true
-    handleUserInput()
-  }, [handleUserInput])
-
-  const handlePointerUp = useCallback(() => {
-    if (!isPointerDownRef.current) return
-    isPointerDownRef.current = false
-    scheduleUserSettle(80)
-  }, [scheduleUserSettle])
-
-  const handleScroll = () => {
-    if (!readyRef.current) return
-    if (isProgrammaticScrollRef.current) return
-    const now = Date.now()
-    const isUserScroll =
-      isPointerDownRef.current ||
-      isUserScrollingRef.current ||
-      now - lastUserInputRef.current < USER_INPUT_WINDOW_MS
-
-    if (isUserScroll) {
-      lastUserInputRef.current = now
-      isUserScrollingRef.current = true
-      pauseAuto()
-      clampScrollDuringGesture()
-      scheduleUserSettle()
-    }
-
-    if (rafRef.current) return
-    rafRef.current = window.requestAnimationFrame(() => {
-      rafRef.current = 0
-      if (!isUserScrollingRef.current) {
-        normalizePosition()
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isPointerDownRef.current) return
+      if (pointerIdRef.current !== event.pointerId) return
+      const track = trackRef.current
+      if (track) {
+        track.releasePointerCapture(event.pointerId)
       }
-    })
+      isPointerDownRef.current = false
+      pointerIdRef.current = null
+
+      const delta = dragDeltaRef.current
+      const threshold = Math.max(DRAG_THRESHOLD_PX, layout.step * 0.18)
+      const canMove = Math.abs(delta) > threshold
+
+      let nextIndex = activeIndex
+      if (canMove) {
+        const direction = delta < 0 ? 1 : -1
+        nextIndex = clampIndex(
+          activeIndex + clampIndex(direction, -MAX_SWIPE_ITEMS, MAX_SWIPE_ITEMS),
+          0,
+          Math.max(0, carouselItems.length - 1)
+        )
+      }
+
+      setActiveIndex(nextIndex)
+      setDragOffset(0)
+      setIsDragging(false)
+      dragDeltaRef.current = 0
+    },
+    [activeIndex, carouselItems.length, layout.step]
+  )
+
+  const handleCardClick = (item: CollectionItem) => {
+    if (hasDraggedRef.current) return
+    onSelect?.(item)
   }
 
-  useLayoutEffect(() => {
-    let cancelled = false
-    let layoutRaf = 0
-    let resizeObserver: ResizeObserver | null = null
-
-    const applyLayout = () => {
-      if (cancelled) return
-      measure()
-      const track = trackRef.current
-      const step = stepRef.current
-      const lastCentered = lastCenteredLeftRef.current
-      const isNearLastCenter =
-        track &&
-        step > 0 &&
-        typeof lastCentered === 'number' &&
-        Math.abs(track.scrollLeft - lastCentered) < step * 0.5
-
-      if (!hasCenteredRef.current || isNearLastCenter) {
-        if (centerMiddle()) {
-          hasCenteredRef.current = true
-        }
-      }
-      normalizePosition()
-      markReady()
-    }
-
-    applyLayout()
-
-    const scheduleLayout = () => {
-      if (layoutRaf) {
-        window.cancelAnimationFrame(layoutRaf)
-      }
-      layoutRaf = window.requestAnimationFrame(applyLayout)
-    }
-
-    window.addEventListener('resize', scheduleLayout)
-    const trackEl = trackRef.current
-    if (trackEl && typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => {
-        scheduleLayout()
-      })
-      resizeObserver.observe(trackEl)
-    }
-
-    const fontsReady = document.fonts?.ready
-    if (fontsReady) {
-      fontsReady.then(() => {
-        scheduleLayout()
-      })
-    }
-
-    return () => {
-      cancelled = true
-      if (layoutRaf) {
-        window.cancelAnimationFrame(layoutRaf)
-      }
-      if (rafRef.current) {
-        window.cancelAnimationFrame(rafRef.current)
-      }
-      if (resizeObserver) {
-        resizeObserver.disconnect()
-      }
-      window.removeEventListener('resize', scheduleLayout)
-    }
-  }, [centerMiddle, markReady, measure, normalizePosition, loopedCollectionItems])
-
-  useEffect(() => {
-    let cancelled = false
-    let fallbackTimer = 0
-    const readyPromise = document.fonts?.ready
-
-    if (readyPromise) {
-      readyPromise.then(() => {
-        if (!cancelled) {
-          setFontsReady(true)
-        }
-      })
-      fallbackTimer = window.setTimeout(() => {
-        if (!cancelled) {
-          setFontsReady(true)
-        }
-      }, 2000)
-    } else {
-      setFontsReady(true)
-    }
-
-    return () => {
-      cancelled = true
-      if (fallbackTimer) {
-        window.clearTimeout(fallbackTimer)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (resumeTimerRef.current) {
-        window.clearTimeout(resumeTimerRef.current)
-      }
-      if (userScrollTimerRef.current) {
-        window.clearTimeout(userScrollTimerRef.current)
-      }
-      if (programmaticScrollRafRef.current) {
-        window.cancelAnimationFrame(programmaticScrollRafRef.current)
-      }
-      if (programmaticScrollTimeoutRef.current) {
-        window.clearTimeout(programmaticScrollTimeoutRef.current)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    const track = trackRef.current
-    if (!track) return
-    if (!isReady || !fontsReady) return
-
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    )
-    if (prefersReducedMotion.matches) return
-    const supportsSmoothScroll =
-      typeof document !== 'undefined' &&
-      'scrollBehavior' in document.documentElement.style
-
-    let startTimer = 0
-    let intervalId = 0
-    let autoStarted = false
-
-    const startAuto = () => {
-      if (autoStarted) return
-      autoStarted = true
-      measure()
-      normalizePosition()
-      pauseRef.current = false
-      intervalId = window.setInterval(() => {
-        if (pauseRef.current) return
-        const setWidth = setWidthRef.current
-        const step = stepRef.current
-        if (!setWidth || !step) {
-          measure()
-          normalizePosition()
-          return
-        }
-        if (step < setWidth * 0.1 || step > setWidth * 0.4) {
-          measure()
-          normalizePosition()
-          return
-        }
-        normalizePosition()
-        if (supportsSmoothScroll && typeof track.scrollBy === 'function') {
-          track.scrollBy({ left: step, behavior: 'smooth' })
-        } else {
-          track.scrollLeft += step
-        }
-      }, 3200)
-    }
-
-    pauseRef.current = true
-    startTimer = window.setTimeout(startAuto, 1400)
-
-    track.addEventListener('pointerdown', handlePointerDown)
-    track.addEventListener('pointerup', handlePointerUp)
-    track.addEventListener('pointercancel', handlePointerUp)
-    track.addEventListener('touchstart', handlePointerDown, { passive: true })
-    track.addEventListener('touchend', handlePointerUp, { passive: true })
-    track.addEventListener('touchcancel', handlePointerUp, { passive: true })
-    track.addEventListener('wheel', handleUserInput, { passive: true })
-    track.addEventListener('focusin', handleFocusIn)
-
-    return () => {
-      if (startTimer) {
-        window.clearTimeout(startTimer)
-      }
-      if (intervalId) {
-        window.clearInterval(intervalId)
-      }
-      track.removeEventListener('pointerdown', handlePointerDown)
-      track.removeEventListener('pointerup', handlePointerUp)
-      track.removeEventListener('pointercancel', handlePointerUp)
-      track.removeEventListener('touchstart', handlePointerDown)
-      track.removeEventListener('touchend', handlePointerUp)
-      track.removeEventListener('touchcancel', handlePointerUp)
-      track.removeEventListener('wheel', handleUserInput)
-      track.removeEventListener('focusin', handleFocusIn)
-    }
-  }, [
-    handleFocusIn,
-    handleUserInput,
-    handlePointerDown,
-    handlePointerUp,
-    measure,
-    normalizePosition,
-    pauseAuto,
-    clampScrollDuringGesture,
-    isReady,
-    fontsReady,
-  ])
+  const trackStyle: CSSProperties = {
+    transform: `translate3d(${baseOffset - activeIndex * layout.step + dragOffset}px, 0, 0)`,
+  }
 
   return (
     <div
@@ -507,11 +209,16 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       aria-label="Подборки для вас"
       aria-roledescription="carousel"
     >
-      <div className="collection-track" ref={trackRef} onScroll={handleScroll}>
-        {loopedCollectionItems.map((item, index) => {
-          const isPrimary =
-            index >= collectionBaseIndex &&
-            index < collectionBaseIndex + carouselItems.length
+      <div
+        className={`collection-track${isDragging ? ' is-dragging' : ''}`}
+        ref={trackRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={trackStyle}
+      >
+        {carouselItems.map((item, index) => {
           const cardLabel = `Открыть подборку: ${item.title}`
           const cardStyle = item.cornerImage
             ? ({
@@ -535,12 +242,10 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
           return (
             <button
               className={`collection-card collection-card--${item.tone}`}
-              key={`${item.id}-${index}`}
+              key={item.id}
               type="button"
-              aria-hidden={!isPrimary}
               aria-label={cardLabel}
-              tabIndex={isPrimary ? 0 : -1}
-              onClick={() => onSelect?.(item)}
+              onClick={() => handleCardClick(item)}
               style={cardStyle}
               ref={(element) => {
                 cardRefs.current[index] = element
