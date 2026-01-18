@@ -16866,6 +16866,10 @@ h2 {
   cursor: grabbing;
 }
 
+.collection-track.is-jumping {
+  transition: none;
+}
+
 .collection-card {
   flex: 0 0 min(250px, 78%);
   border: 1px solid rgba(var(--surface-rgb), 0.9);

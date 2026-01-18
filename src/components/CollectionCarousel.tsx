@@ -16,8 +16,8 @@ type CollectionCarouselProps = {
 
 const DRAG_START_PX = 6
 const DRAG_THRESHOLD_PX = 44
-const EDGE_RESISTANCE = 0.35
 const MAX_SWIPE_ITEMS = 1
+const TRANSITION_MS = 260
 
 const clampIndex = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
@@ -33,8 +33,14 @@ type LayoutMetrics = {
 }
 
 export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps) => {
-  const carouselItems: CollectionItem[] =
-    items && items.length > 0 ? items : collectionItems
+  const baseItems = items && items.length > 0 ? items : collectionItems
+  const carouselItems = useMemo(() => [...baseItems].reverse(), [baseItems])
+  const loopItems = useMemo(() => {
+    if (carouselItems.length <= 1) return carouselItems
+    const first = carouselItems[0]
+    const last = carouselItems[carouselItems.length - 1]
+    return [last, ...carouselItems, first]
+  }, [carouselItems])
   const itemsSignature = useMemo(
     () => carouselItems.map((item) => item.id).join('|'),
     [carouselItems]
@@ -46,9 +52,13 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   const dragDeltaRef = useRef(0)
   const isPointerDownRef = useRef(false)
   const hasDraggedRef = useRef(false)
-  const [activeIndex, setActiveIndex] = useState(0)
+  const snapTimerRef = useRef(0)
+  const [visualIndex, setVisualIndex] = useState(
+    carouselItems.length > 1 ? 1 : 0
+  )
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const [isTransitionEnabled, setIsTransitionEnabled] = useState(true)
   const [layout, setLayout] = useState<LayoutMetrics>({
     step: 0,
     cardWidth: 0,
@@ -100,7 +110,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   }, [updateLayout])
 
   useEffect(() => {
-    setActiveIndex(0)
+    setVisualIndex(carouselItems.length > 1 ? 1 : 0)
     setDragOffset(0)
     dragDeltaRef.current = 0
     hasDraggedRef.current = false
@@ -108,8 +118,11 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
 
   useEffect(() => {
     if (carouselItems.length === 0) return
-    setActiveIndex((prev) => clampIndex(prev, 0, carouselItems.length - 1))
-  }, [carouselItems.length])
+    setVisualIndex((prev) => {
+      const maxIndex = loopItems.length > 0 ? loopItems.length - 1 : 0
+      return clampIndex(prev, 0, maxIndex)
+    })
+  }, [carouselItems.length, loopItems.length])
 
   const baseOffset =
     layout.trackWidth && layout.cardWidth
@@ -147,17 +160,11 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
         setIsDragging(true)
       }
 
-      let nextOffset = clampValue(delta, -maxDrag, maxDrag)
-      if (activeIndex === 0 && nextOffset > 0) {
-        nextOffset *= EDGE_RESISTANCE
-      }
-      if (activeIndex === carouselItems.length - 1 && nextOffset < 0) {
-        nextOffset *= EDGE_RESISTANCE
-      }
+      const nextOffset = clampValue(delta, -maxDrag, maxDrag)
       setDragOffset(nextOffset)
       event.preventDefault()
     },
-    [activeIndex, carouselItems.length, layout.step, maxDrag]
+    [layout.step, maxDrag]
   )
 
   const handlePointerUp = useCallback(
@@ -175,22 +182,22 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       const threshold = Math.max(DRAG_THRESHOLD_PX, layout.step * 0.18)
       const canMove = Math.abs(delta) > threshold
 
-      let nextIndex = activeIndex
+      let nextIndex = visualIndex
       if (canMove) {
         const direction = delta < 0 ? 1 : -1
         nextIndex = clampIndex(
-          activeIndex + clampIndex(direction, -MAX_SWIPE_ITEMS, MAX_SWIPE_ITEMS),
+          visualIndex + clampIndex(direction, -MAX_SWIPE_ITEMS, MAX_SWIPE_ITEMS),
           0,
-          Math.max(0, carouselItems.length - 1)
+          Math.max(0, loopItems.length - 1)
         )
       }
 
-      setActiveIndex(nextIndex)
+      setVisualIndex(nextIndex)
       setDragOffset(0)
       setIsDragging(false)
       dragDeltaRef.current = 0
     },
-    [activeIndex, carouselItems.length, layout.step]
+    [loopItems.length, layout.step, visualIndex]
   )
 
   const handleCardClick = (item: CollectionItem) => {
@@ -198,8 +205,38 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     onSelect?.(item)
   }
 
+  useEffect(() => {
+    if (snapTimerRef.current) {
+      window.clearTimeout(snapTimerRef.current)
+    }
+    if (carouselItems.length <= 1) return
+    if (isDragging) return
+    const maxIndex = loopItems.length - 1
+    if (visualIndex !== 0 && visualIndex !== maxIndex) return
+    snapTimerRef.current = window.setTimeout(() => {
+      setIsTransitionEnabled(false)
+      setVisualIndex(visualIndex === 0 ? carouselItems.length : 1)
+      window.requestAnimationFrame(() => {
+        setIsTransitionEnabled(true)
+      })
+    }, TRANSITION_MS)
+    return () => {
+      if (snapTimerRef.current) {
+        window.clearTimeout(snapTimerRef.current)
+      }
+    }
+  }, [carouselItems.length, isDragging, loopItems.length, visualIndex])
+
+  useEffect(() => {
+    return () => {
+      if (snapTimerRef.current) {
+        window.clearTimeout(snapTimerRef.current)
+      }
+    }
+  }, [])
+
   const trackStyle: CSSProperties = {
-    transform: `translate3d(${baseOffset - activeIndex * layout.step + dragOffset}px, 0, 0)`,
+    transform: `translate3d(${baseOffset - visualIndex * layout.step + dragOffset}px, 0, 0)`,
   }
 
   return (
@@ -210,7 +247,9 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
       aria-roledescription="carousel"
     >
       <div
-        className={`collection-track${isDragging ? ' is-dragging' : ''}`}
+        className={`collection-track${isDragging ? ' is-dragging' : ''}${
+          isTransitionEnabled ? '' : ' is-jumping'
+        }`}
         ref={trackRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -218,7 +257,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
         onPointerCancel={handlePointerUp}
         style={trackStyle}
       >
-        {carouselItems.map((item, index) => {
+        {loopItems.map((item, index) => {
           const cardLabel = `Открыть подборку: ${item.title}`
           const cardStyle = item.cornerImage
             ? ({
@@ -242,7 +281,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
           return (
             <button
               className={`collection-card collection-card--${item.tone}`}
-              key={item.id}
+              key={`${item.id}-${index}`}
               type="button"
               aria-label={cardLabel}
               onClick={() => handleCardClick(item)}
