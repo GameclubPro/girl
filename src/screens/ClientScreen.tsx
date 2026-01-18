@@ -864,31 +864,33 @@ export const ClientScreen = ({
                 </h2>
               </div>
             </div>
-            <div className="category-overlay-grid" role="list">
-              {categoryItems.map((item, index) => {
-                const isSelected = item.id === activeCategoryId
-                const label = categoryLabelOverrides[item.id] ?? item.label
-                return (
-                  <button
-                    className={`category-overlay-card${
-                      isSelected ? ' is-selected' : ''
-                    }`}
-                    type="button"
-                    key={item.id}
-                    role="listitem"
-                    onClick={(event) => handleCategorySelect(item, event)}
-                    style={{ animationDelay: `${index * 45}ms` }}
-                  >
-                    <span className="category-overlay-card-icon" aria-hidden="true">
-                      <img src={item.icon} alt="" loading="lazy" />
-                    </span>
-                    <span className="category-overlay-card-title">{label}</span>
-                    <span className="category-overlay-card-arrow" aria-hidden="true">
-                      &gt;
-                    </span>
-                  </button>
-                )
-              })}
+            <div className="category-overlay-scroll">
+              <div className="category-overlay-grid" role="list">
+                {categoryItems.map((item, index) => {
+                  const isSelected = item.id === activeCategoryId
+                  const label = categoryLabelOverrides[item.id] ?? item.label
+                  return (
+                    <button
+                      className={`category-overlay-card${
+                        isSelected ? ' is-selected' : ''
+                      }`}
+                      type="button"
+                      key={item.id}
+                      role="listitem"
+                      onClick={(event) => handleCategorySelect(item, event)}
+                      style={{ animationDelay: `${index * 45}ms` }}
+                    >
+                      <span className="category-overlay-card-icon" aria-hidden="true">
+                        <img src={item.icon} alt="" loading="lazy" />
+                      </span>
+                      <span className="category-overlay-card-title">{label}</span>
+                      <span className="category-overlay-card-arrow" aria-hidden="true">
+                        &gt;
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
