@@ -3,6 +3,7 @@ import { ProBottomNav } from '../components/ProBottomNav'
 import { categoryItems } from '../data/clientData'
 import type {
   Booking,
+  MasterProfile,
   ProfileStatus,
   ProProfileSection,
   ServiceRequest,
@@ -47,6 +48,12 @@ const bookingStatusToneMap = {
 } as const
 
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+const DEFAULT_SLOT_COUNT = 16
+const DEFAULT_SLOT_RANGE_DAYS = 14
+const BOOKING_DURATION_MIN = 60
+
+const getDayKey = (date: Date) => dayKeyOrder[date.getDay()] ?? 'mon'
 
 const addDays = (value: Date, days: number) => {
   const next = new Date(value)
@@ -273,12 +280,13 @@ type PendingReplace = {
   times: number[]
 }
 
-const SLOT_DURATION_MIN = 60
+const SLOT_DURATION_MIN = 30
 const SLOT_TIME_START = 8 * 60
 const SLOT_TIME_END = 21 * 60
 const SLOT_TIME_STEP = 30
 
 const buildSlotStorageKey = (userId: string) => `pro-slots:${userId}`
+const buildSlotSeedKey = (userId: string) => `pro-slots-seeded:${userId}`
 
 const loadSlotsFromStorage = (userId: string) => {
   if (typeof window === 'undefined' || !userId) return []
@@ -287,14 +295,19 @@ const loadSlotsFromStorage = (userId: string) => {
     if (!raw) return []
     const data = JSON.parse(raw) as Slot[]
     if (!Array.isArray(data)) return []
-    return data.filter(
-      (item) =>
-        typeof item?.id === 'string' &&
-        typeof item?.dateKey === 'string' &&
-        typeof item?.startMinutes === 'number' &&
-        typeof item?.durationMinutes === 'number' &&
-        (item?.status === 'free' || item?.status === 'closed')
-    )
+    return data
+      .filter(
+        (item) =>
+          typeof item?.id === 'string' &&
+          typeof item?.dateKey === 'string' &&
+          typeof item?.startMinutes === 'number' &&
+          typeof item?.durationMinutes === 'number' &&
+          (item?.status === 'free' || item?.status === 'closed')
+      )
+      .map((item) => ({
+        ...item,
+        durationMinutes: SLOT_DURATION_MIN,
+      }))
   } catch (error) {
     return []
   }
@@ -441,6 +454,13 @@ export const ProRequestsScreen = ({
   const slotsSectionRef = useRef<HTMLDivElement | null>(null)
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
+  const [profileScheduleDays, setProfileScheduleDays] = useState<string[]>([])
+  const [profileScheduleStart, setProfileScheduleStart] = useState<number | null>(
+    null
+  )
+  const [profileScheduleEnd, setProfileScheduleEnd] = useState<number | null>(null)
+  const [scheduleLoaded, setScheduleLoaded] = useState(false)
+  const [hasSeededSlots, setHasSeededSlots] = useState(false)
   const [slots, setSlots] = useState<Slot[]>(() => loadSlotsFromStorage(userId))
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [slotNotice, setSlotNotice] = useState('')
@@ -481,9 +501,54 @@ export const ProRequestsScreen = ({
     if (!initialTab) return
     setActiveTab(initialTab)
   }, [initialTab])
+  useEffect(() => {
+    if (!userId || typeof window === 'undefined') return
+    const seedKey = buildSlotSeedKey(userId)
+    setHasSeededSlots(window.localStorage.getItem(seedKey) === '1')
+  }, [userId])
   const shareText =
     'Запись к мастеру\nОткройте ссылку, чтобы выбрать услугу и время.'
   const shareUrl = shareLink ? buildTelegramShareUrl(shareLink, shareText) : ''
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+
+    const loadProfile = async () => {
+      try {
+        const response = await fetch(
+          `${apiBase}/api/masters/${encodeURIComponent(userId)}`
+        )
+        if (!response.ok) {
+          throw new Error('Load master profile failed')
+        }
+        const data = (await response.json()) as MasterProfile
+        if (cancelled) return
+        const days = Array.isArray(data.scheduleDays)
+          ? data.scheduleDays.map((day) => day.trim().toLowerCase()).filter(Boolean)
+          : []
+        setProfileScheduleDays(days)
+        setProfileScheduleStart(parseTimeMinutes(data.scheduleStart ?? ''))
+        setProfileScheduleEnd(parseTimeMinutes(data.scheduleEnd ?? ''))
+      } catch (error) {
+        if (!cancelled) {
+          setProfileScheduleDays([])
+          setProfileScheduleStart(null)
+          setProfileScheduleEnd(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setScheduleLoaded(true)
+        }
+      }
+    }
+
+    loadProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiBase, userId])
 
   useEffect(() => {
     if (!userId) return
@@ -708,6 +773,75 @@ export const ProRequestsScreen = ({
     })
     return map
   }, [slots])
+  useEffect(() => {
+    if (!userId || typeof window === 'undefined') return
+    if (!scheduleLoaded || hasSeededSlots) return
+    if (profileScheduleDays.length === 0) return
+    if (profileScheduleStart === null || profileScheduleEnd === null) return
+    if (profileScheduleEnd <= profileScheduleStart) return
+    if (isBookingsLoading) return
+
+    if (slots.length > 0) {
+      window.localStorage.setItem(buildSlotSeedKey(userId), '1')
+      setHasSeededSlots(true)
+      return
+    }
+
+    const daySet = new Set(profileScheduleDays)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const availableCount = Math.floor(
+      (profileScheduleEnd - profileScheduleStart) / SLOT_TIME_STEP
+    )
+    const slotCount = Math.min(
+      DEFAULT_SLOT_COUNT,
+      Math.max(0, availableCount)
+    )
+    if (slotCount <= 0) return
+
+    window.localStorage.setItem(buildSlotSeedKey(userId), '1')
+    setHasSeededSlots(true)
+
+    for (let offset = 0; offset < DEFAULT_SLOT_RANGE_DAYS; offset += 1) {
+      const date = addDays(today, offset)
+      const dayKey = getDayKey(date)
+      if (!daySet.has(dayKey)) continue
+      const dateKey = toDateKey(date)
+      const existingSlots = slotsByDate.get(dateKey) ?? []
+      if (existingSlots.length > 0) continue
+      const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
+      const times: number[] = []
+      for (let index = 0; index < slotCount; index += 1) {
+        times.push(profileScheduleStart + index * SLOT_TIME_STEP)
+      }
+      const filtered = times.filter(
+        (time) =>
+          !bookedRanges.some((range) =>
+            rangesOverlap(
+              time,
+              SLOT_DURATION_MIN,
+              range.startMinutes,
+              range.durationMinutes
+            )
+          )
+      )
+      if (filtered.length > 0) {
+        applySlotTimes(dateKey, filtered)
+      }
+    }
+  }, [
+    applySlotTimes,
+    bookingRangesByDate,
+    hasSeededSlots,
+    isBookingsLoading,
+    profileScheduleDays,
+    profileScheduleEnd,
+    profileScheduleStart,
+    scheduleLoaded,
+    slots.length,
+    slotsByDate,
+    userId,
+  ])
   const freeSlotsByDate = useMemo(() => {
     const map = new Map<string, number>()
     slots.forEach((slot) => {
@@ -724,7 +858,7 @@ export const ProRequestsScreen = ({
     bookingCalendarItems.forEach((item) => {
       const startMinutes = getMinutesFromDateTime(item.booking.scheduledAt)
       if (startMinutes === null) return
-      const durationMinutes = item.booking.serviceDuration ?? SLOT_DURATION_MIN
+      const durationMinutes = item.booking.serviceDuration ?? BOOKING_DURATION_MIN
       const list = map.get(item.dateKey)
       const range = { startMinutes, durationMinutes, booking: item.booking }
       if (list) {
@@ -2453,28 +2587,12 @@ export const ProRequestsScreen = ({
                                   )}
                                 </div>
                               </div>
-                              {booking && (
-                                <div className="pro-slot-meta">
-                                  <span>
-                                    Клиент: {booking.clientName ?? 'Клиент'}
-                                  </span>
-                                  <span>Услуга: {booking.serviceName}</span>
-                                </div>
-                              )}
                               {slot.status === 'closed' && slot.reason && (
                                 <div className="pro-slot-meta">{slot.reason}</div>
                               )}
                               {booking && hasDetails && (
                                 <div className="pro-slot-details">
-                                  <span>{formatDateTime(booking.scheduledAt)}</span>
-                                  <span>
-                                    {booking.locationType === 'client'
-                                      ? 'У клиента'
-                                      : 'У мастера'}
-                                  </span>
-                                  {booking.address ? (
-                                    <span>Адрес: {booking.address}</span>
-                                  ) : null}
+                                  {renderBookingItem(booking)}
                                 </div>
                               )}
                             </div>
@@ -2539,47 +2657,6 @@ export const ProRequestsScreen = ({
                 <p className="requests-status">Загружаем записи...</p>
               )}
               {bookingsError && <p className="requests-error">{bookingsError}</p>}
-
-              {!isBookingsLoading && !bookingsError && (
-                <div className="booking-calendar-label">
-                  <span>Записи на</span>
-                  <span className="booking-calendar-label-date">
-                    {selectedDateLabel}
-                  </span>
-                  <span className="booking-calendar-label-count">
-                    {selectedBookings.length}
-                  </span>
-                </div>
-              )}
-
-              {!isBookingsLoading &&
-                !bookingsError &&
-                selectedBookings.length === 0 && (
-                  <div className="booking-empty">
-                    <p className="booking-empty-title">
-                      На выбранный день записей нет.
-                    </p>
-                    <p className="booking-empty-hint">
-                      Выберите дату с отметкой или добавьте окна.
-                    </p>
-                    <button
-                      className="cta cta--primary cta--wide"
-                      type="button"
-                      onClick={() => {
-                        scrollToSlots()
-                        handleOpenAddSlots()
-                      }}
-                    >
-                      Добавить окна
-                    </button>
-                  </div>
-                )}
-
-              {selectedBookings.length > 0 && (
-                <div className="requests-list booking-list">
-                  {selectedBookings.map((booking) => renderBookingItem(booking))}
-                </div>
-              )}
               {renderShareCard()}
             </>
           )}

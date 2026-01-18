@@ -12193,6 +12193,7 @@
   display: flex;
   gap: 12px;
   box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
+  min-height: 84px;
 }
 
 .pro-slot-time {
@@ -12254,8 +12255,14 @@
 
 .pro-slot-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pro-slot-actions::-webkit-scrollbar {
+  display: none;
 }
 
 .pro-slot-action {
@@ -12290,16 +12297,9 @@
 }
 
 .pro-slot-details {
-  border-radius: 12px;
-  padding: 6px 8px;
-  background: rgba(var(--surface-muted-rgb), 0.6);
-  border: 1px solid rgba(var(--shadow-rgb), 0.08);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--pro-ink);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
 }
 
 .pro-slots-confirm {
