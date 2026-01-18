@@ -76,6 +76,18 @@ const toDateKey = (value: Date) => {
   return `${year}-${month}-${day}`
 }
 
+const parseDateKey = (value: string) => {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  if (Number.isNaN(date.getTime())) return null
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
 const parseDateOnly = (value?: string | null) => {
   if (!value) return null
   const parsed = new Date(value)
@@ -1034,6 +1046,34 @@ export const ProRequestsScreen = ({
       }
     })
   }, [bookingRangesByDate, selectedDateKey, selectedSlots, timeGrid])
+
+  useEffect(() => {
+    if (calendarInitialized) return
+    if (bookingCalendarItems.length > 0) return
+    if (slots.length === 0) return
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    let nextDate: Date | null = null
+    let earliestDate: Date | null = null
+
+    slotsByDate.forEach((_value, key) => {
+      const date = parseDateKey(key)
+      if (!date) return
+      if (!earliestDate || date < earliestDate) {
+        earliestDate = date
+      }
+      if (date >= today && (!nextDate || date < nextDate)) {
+        nextDate = date
+      }
+    })
+
+    const targetDate = nextDate ?? earliestDate
+    if (!targetDate) return
+    setSelectedDate(targetDate)
+    setWeekStartDate(startOfWeek(targetDate))
+    setCalendarInitialized(true)
+  }, [bookingCalendarItems.length, calendarInitialized, slots.length, slotsByDate])
 
   useEffect(() => {
     if (calendarInitialized || bookingCalendarItems.length === 0) return
