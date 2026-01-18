@@ -843,17 +843,11 @@ export const ProRequestsScreen = ({
   }
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
-    if (!scheduleLoaded || hasSeededSlots) return
+    if (!scheduleLoaded || (hasSeededSlots && slots.length > 0)) return
     if (profileScheduleDays.length === 0) return
     if (profileScheduleStart === null || profileScheduleEnd === null) return
     if (profileScheduleEnd <= profileScheduleStart) return
     if (isBookingsLoading) return
-
-    if (slots.length > 0) {
-      window.localStorage.setItem(buildSlotSeedKey(userId), '1')
-      setHasSeededSlots(true)
-      return
-    }
 
     const daySet = new Set(profileScheduleDays)
     const today = new Date()
@@ -871,8 +865,6 @@ export const ProRequestsScreen = ({
       const dayKey = getDayKey(date)
       if (!daySet.has(dayKey)) continue
       const dateKey = toDateKey(date)
-      const existingSlots = slotsByDate.get(dateKey) ?? []
-      if (existingSlots.length > 0) continue
       const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
       const times: number[] = []
       for (
