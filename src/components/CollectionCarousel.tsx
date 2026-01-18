@@ -206,7 +206,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
   }, [getCenteredIndex, scrollToIndex])
 
   const clampScrollDuringGesture = useCallback(() => {
-    if (!isPointerDownRef.current) return
+    if (!isPointerDownRef.current && !isUserScrollingRef.current) return
     const track = trackRef.current
     if (!track) return
     if (typeof gestureStartIndexRef.current !== 'number') return
@@ -266,6 +266,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
 
   const handlePointerDown = useCallback(() => {
     isPointerDownRef.current = true
+    isUserScrollingRef.current = true
     handleUserInput()
   }, [handleUserInput])
 
@@ -280,7 +281,9 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
     if (isProgrammaticScrollRef.current) return
     const now = Date.now()
     const isUserScroll =
-      isPointerDownRef.current || now - lastUserInputRef.current < USER_INPUT_WINDOW_MS
+      isPointerDownRef.current ||
+      isUserScrollingRef.current ||
+      now - lastUserInputRef.current < USER_INPUT_WINDOW_MS
 
     if (isUserScroll) {
       lastUserInputRef.current = now
