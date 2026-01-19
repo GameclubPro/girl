@@ -610,7 +610,7 @@ export const ClientProfileScreen = ({
     )
     return sorted.slice(0, 3)
   }, [openRequests])
-  const favoritesPreview = useMemo(() => favorites.slice(0, 3), [favorites])
+  const favoritesPreview = useMemo(() => favorites.slice(0, 2), [favorites])
   const favoriteCount = favorites.length
   const nextBookingTime = nextBooking ? formatDateTime(nextBooking.scheduledAt) : ''
   const nextBookingStatus = nextBooking
@@ -624,6 +624,7 @@ export const ClientProfileScreen = ({
       {
         id: 'address',
         label: 'Город и район',
+        hint: 'Для точного подбора мастеров',
         done: Boolean(cityName && districtName),
         actionLabel: 'Указать',
         onAction: onEditAddress,
@@ -631,6 +632,7 @@ export const ClientProfileScreen = ({
       {
         id: 'location',
         label: 'Геолокация',
+        hint: 'Чтобы видеть мастеров рядом',
         done: Boolean(location),
         actionLabel: 'Поделиться',
         onAction: handleRequestLocation,
@@ -638,6 +640,7 @@ export const ClientProfileScreen = ({
       {
         id: 'request',
         label: 'Первая заявка',
+        hint: 'Получите отклики быстрее',
         done: requests.length > 0,
         actionLabel: 'Создать',
         onAction: onCreateRequest,
@@ -645,6 +648,7 @@ export const ClientProfileScreen = ({
       {
         id: 'booking',
         label: 'Первая запись',
+        hint: 'Выберите мастера под себя',
         done: bookings.length > 0,
         actionLabel: 'Найти мастера',
         onAction: onViewMasters,
@@ -652,6 +656,7 @@ export const ClientProfileScreen = ({
       {
         id: 'favorite',
         label: 'Избранное',
+        hint: 'Сохраните лучших мастеров',
         done: favoriteCount > 0,
         actionLabel: 'Смотреть мастеров',
         onAction: onViewMasters,
@@ -670,25 +675,37 @@ export const ClientProfileScreen = ({
       requests.length,
     ]
   )
+  const completedSteps = profileChecklist.filter((item) => item.done).length
   const completionPercent = Math.round(
-    (profileChecklist.filter((item) => item.done).length /
-      profileChecklist.length) *
-      100
+    (completedSteps / profileChecklist.length) * 100
   )
+  const remainingSteps = Math.max(profileChecklist.length - completedSteps, 0)
+  const isProfileComplete = completionPercent >= 100
+  const nextSteps = profileChecklist.filter((item) => !item.done).slice(0, 3)
+  const remainingStepsLabel = remainingSteps
+    ? `Осталось ${formatCount(remainingSteps, 'шаг', 'шага', 'шагов')}`
+    : 'Профиль готов'
+  const profileStatusLabel = isProfileComplete ? 'Профиль готов' : 'Следующие шаги'
   const locationLabel = buildLocationLabel(cityName, districtName)
   const locationMeta = formatLocationMeta(location)
   const locationMetaItems = locationMeta ? locationMeta.split(' • ') : []
   const locationStatusLabel = location ? 'Геолокация включена' : 'Геолокация выключена'
   const addressLabel = addressLine.trim() || 'Адрес не указан'
   const addressMeta = addressUpdatedAt ? `Обновлено ${formatShortDate(addressUpdatedAt)}` : ''
-  const locationShareLabel = location
-    ? location.shareToMasters === false
-      ? 'Мастера не видят расстояние'
-      : 'Мастера видят только расстояние, адрес скрыт'
-    : 'Геолокация не задана'
+  const locationShareLabel = !location
+    ? 'Геолокация не задана'
+    : location.shareToMasters === false
+      ? 'Расстояние скрыто'
+      : 'Мастера видят только расстояние'
   const lastUpdatedLabel = lastUpdated
     ? lastUpdated.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
     : ''
+  const updatedLabel = isRefreshing
+    ? 'Обновляем…'
+    : lastUpdatedLabel
+      ? `Обновлено в ${lastUpdatedLabel}`
+      : ''
+  const errorMessage = [loadError, metaError, shareError].filter(Boolean).join(' ')
 
   return (
     <div className="screen screen--client screen--client-profile">
@@ -697,9 +714,13 @@ export const ClientProfileScreen = ({
           <div>
             <p className="client-profile-kicker">Профиль</p>
             <h1 className="client-profile-title">Мой кабинет</h1>
-            {lastUpdatedLabel && (
-              <p className="client-profile-updated">
-                Обновлено в {lastUpdatedLabel}
+            {updatedLabel && (
+              <p
+                className={`client-profile-updated${
+                  isRefreshing ? ' is-refreshing' : ''
+                }`}
+              >
+                {updatedLabel}
               </p>
             )}
           </div>
@@ -726,9 +747,18 @@ export const ClientProfileScreen = ({
           </div>
         </header>
 
-        {loadError && <p className="client-profile-error">{loadError}</p>}
-        {metaError && <p className="client-profile-error">{metaError}</p>}
-        {shareError && <p className="client-profile-error">{shareError}</p>}
+        {errorMessage && (
+          <div className="client-profile-banner" role="alert">
+            <span>{errorMessage}</span>
+            <button
+              className="client-profile-banner-action"
+              type="button"
+              onClick={handleRefresh}
+            >
+              Повторить
+            </button>
+          </div>
+        )}
 
         <section className="client-profile-hero animate delay-1">
           <div className="client-profile-identity">
@@ -738,8 +768,12 @@ export const ClientProfileScreen = ({
             <div className="client-profile-title-group">
               <h2 className="client-profile-name">{displayName}</h2>
               <div className="client-profile-hero-meta">
-                <span className="client-profile-badge">
-                  Профиль {completionPercent}%
+                <span
+                  className={`client-profile-badge${
+                    isProfileComplete ? ' is-ready' : ''
+                  }`}
+                >
+                  {profileStatusLabel}
                 </span>
                 <span className="client-profile-subtitle">Клиент KIVEN</span>
               </div>
@@ -748,19 +782,28 @@ export const ClientProfileScreen = ({
 
           <div className="client-profile-primary-action">
             <button
-              className="cta cta--primary cta--wide"
+              className="cta cta--primary cta--wide client-profile-cta"
               type="button"
               onClick={onCreateRequest}
             >
               Новая заявка
             </button>
-            <button
-              className="client-profile-link"
-              type="button"
-              onClick={onViewMasters}
-            >
-              Найти мастера <span aria-hidden="true">→</span>
-            </button>
+            <div className="client-profile-hero-actions">
+              <button
+                className="client-profile-ghost"
+                type="button"
+                onClick={onViewMasters}
+              >
+                Найти мастера
+              </button>
+              <button
+                className="client-profile-ghost is-muted"
+                type="button"
+                onClick={onOpenSupport}
+              >
+                Поддержка
+              </button>
+            </div>
           </div>
 
           <div className="client-profile-stats">
@@ -843,81 +886,440 @@ export const ClientProfileScreen = ({
           >
             {activeTab === 'summary' && (
               <>
-                <section className="client-section client-profile-section">
+                <section className="client-section client-profile-section animate delay-1">
                   <div className="section-header">
-                    <h3>Готовность профиля</h3>
+                    <h3>Action Center</h3>
+                    {attentionTotal > 0 && (
+                      <span className="client-profile-attention-badge">
+                        {formatCount(attentionTotal, 'задача', 'задачи', 'задач')}
+                      </span>
+                    )}
                   </div>
-                  <div className="client-profile-card client-profile-progress">
-                    <div className="client-profile-progress-head">
-                      <span className="client-profile-progress-title">
-                        Профиль заполнен
-                      </span>
-                      <span className="client-profile-progress-value">
-                        {completionPercent}%
-                      </span>
-                    </div>
-                    <div className="client-profile-progress-bar" aria-hidden="true">
-                      <span style={{ width: `${completionPercent}%` }} />
-                    </div>
-                    <div className="client-profile-checklist">
-                      {profileChecklist.map((item) => (
-                        <div
-                          className={`client-profile-check-item${
-                            item.done ? ' is-done' : ''
-                          }`}
-                          key={item.id}
-                        >
-                          <span
-                            className="client-profile-check-status"
-                            aria-hidden="true"
-                          />
-                          <span className="client-profile-check-label">
-                            {item.label}
-                          </span>
-                          {item.done ? (
-                            <span className="client-profile-check-done">Готово</span>
-                          ) : (
-                            <button
-                              className="client-profile-check-action"
-                              type="button"
-                              onClick={item.onAction}
-                            >
-                              {item.actionLabel}
-                            </button>
-                          )}
+                  <div className="client-profile-action-center">
+                    <div className="client-profile-card client-profile-action-card">
+                      <div className="client-profile-action-head">
+                        <div>
+                          <p className="client-profile-action-kicker">Приоритеты</p>
+                          <p className="client-profile-action-subtitle">
+                            {attentionItems.length > 0
+                              ? 'Ответы и подтверждения'
+                              : 'Нет срочных задач'}
+                          </p>
                         </div>
-                      ))}
+                        <button
+                          className="client-profile-card-action"
+                          type="button"
+                          onClick={() => handleTabChange('activity')}
+                        >
+                          Все
+                        </button>
+                      </div>
+                      {attentionItems.length > 0 ? (
+                        <div className="client-profile-priority-list" role="list">
+                          {attentionItems.map((item) => (
+                            <button
+                              className={`client-profile-priority-item is-${item.tone}`}
+                              type="button"
+                              key={item.id}
+                              onClick={item.onClick}
+                              role="listitem"
+                            >
+                              <span className="client-profile-priority-count">
+                                {item.count}
+                              </span>
+                              <span className="client-profile-priority-body">
+                                <span className="client-profile-priority-label">
+                                  {item.label}
+                                </span>
+                                <span className="client-profile-priority-meta">
+                                  {item.meta}
+                                </span>
+                              </span>
+                              <span
+                                className="client-profile-priority-chevron"
+                                aria-hidden="true"
+                              >
+                                →
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="client-profile-empty-block">
+                          <p className="client-profile-empty">
+                            Все спокойно — можно планировать следующую запись.
+                          </p>
+                          <button
+                            className="client-profile-action is-primary"
+                            type="button"
+                            onClick={onCreateRequest}
+                          >
+                            Создать заявку
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div
+                      className={`client-profile-card client-profile-action-card${
+                        isProfileComplete ? ' is-ready' : ''
+                      }`}
+                    >
+                      <div className="client-profile-action-head">
+                        <div>
+                          <p className="client-profile-action-kicker">
+                            {isProfileComplete ? 'Профиль' : 'Следующие шаги'}
+                          </p>
+                          <p className="client-profile-action-subtitle">
+                            {isProfileComplete
+                              ? 'Все готово для поиска мастеров'
+                              : remainingStepsLabel}
+                          </p>
+                        </div>
+                        {!isProfileComplete && (
+                          <span className="client-profile-action-count">
+                            {completedSteps}/{profileChecklist.length}
+                          </span>
+                        )}
+                      </div>
+                      {isProfileComplete ? (
+                        <div className="client-profile-ready">
+                          <p className="client-profile-ready-text">
+                            Проверьте приватность и настройки геолокации.
+                          </p>
+                          <button
+                            className="client-profile-action is-ghost"
+                            type="button"
+                            onClick={() => handleTabChange('location')}
+                          >
+                            Приватность и безопасность
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="client-profile-steps">
+                          {nextSteps.map((item) => (
+                            <div className="client-profile-step" key={item.id}>
+                              <div className="client-profile-step-info">
+                                <span className="client-profile-step-label">
+                                  {item.label}
+                                </span>
+                                {item.hint && (
+                                  <span className="client-profile-step-meta">
+                                    {item.hint}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                className="client-profile-step-action"
+                                type="button"
+                                onClick={item.onAction}
+                              >
+                                {item.actionLabel}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </section>
 
-                <section className="client-section client-profile-section">
+                <section className="client-section client-profile-section animate delay-2">
                   <div className="section-header">
-                    <h3>Быстрые действия</h3>
+                    <h3>Следующая запись</h3>
                   </div>
-                  <div className="client-profile-card">
-                    <div className="client-profile-shortcuts">
+                  <div className="client-profile-card is-highlight">
+                    <div className="client-profile-card-head">
+                      <div className="client-profile-card-title">
+                        <span className="client-profile-card-icon" aria-hidden="true">
+                          <IconClock />
+                        </span>
+                        <span>Ближайшая запись</span>
+                      </div>
                       <button
-                        className="client-profile-shortcut"
-                        type="button"
-                        onClick={() => onViewRequests('requests')}
-                      >
-                        Мои заявки
-                      </button>
-                      <button
-                        className="client-profile-shortcut"
+                        className="client-profile-card-action"
                         type="button"
                         onClick={() => onViewRequests('bookings')}
                       >
-                        Мои записи
+                        Все
                       </button>
+                    </div>
+                    {nextBooking ? (
+                      <div className="client-profile-booking">
+                        <div className="client-profile-booking-info">
+                          <span className="client-profile-booking-title">
+                            {nextBooking.serviceName || 'Услуга'}
+                          </span>
+                          <span className="client-profile-booking-meta">
+                            {nextBooking.masterName || 'Мастер'}
+                            {nextBookingTime ? ` • ${nextBookingTime}` : ''}
+                          </span>
+                          {(nextBooking.cityName || nextBooking.districtName) && (
+                            <span className="client-profile-booking-meta">
+                              {[nextBooking.cityName, nextBooking.districtName]
+                                .filter(Boolean)
+                                .join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`client-profile-chip ${nextBookingTone}`}>
+                          {nextBookingStatus}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="client-profile-empty-block">
+                        <p className="client-profile-empty">
+                          Пока нет активных записей. Найдите мастера или создайте заявку.
+                        </p>
+                        <div className="client-profile-empty-actions">
+                          <button
+                            className="client-profile-action is-primary"
+                            type="button"
+                            onClick={onViewMasters}
+                          >
+                            Найти мастера
+                          </button>
+                          <button
+                            className="client-profile-link"
+                            type="button"
+                            onClick={onCreateRequest}
+                          >
+                            Создать заявку <span aria-hidden="true">→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="client-section client-profile-section animate delay-3">
+                  <div className="section-header">
+                    <h3>Активные заявки</h3>
+                    {openRequestsCount > 0 && (
+                      <span className="client-profile-attention-badge">
+                        {formatCount(openRequestsCount, 'заявка', 'заявки', 'заявок')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="client-profile-card">
+                    <div className="client-profile-card-head">
+                      <div className="client-profile-card-title">
+                        <span className="client-profile-card-icon" aria-hidden="true">
+                          <IconList />
+                        </span>
+                        <span>Ваши заявки</span>
+                      </div>
                       <button
-                        className="client-profile-shortcut is-wide"
+                        className="client-profile-card-action"
                         type="button"
-                        onClick={onOpenSupport}
+                        onClick={() => onViewRequests('requests')}
                       >
-                        Поддержка в чате
+                        Все
                       </button>
+                    </div>
+                    {recentRequests.length > 0 ? (
+                      <div className="client-profile-requests">
+                        {recentRequests.map((request) => (
+                          <button
+                            className="client-profile-request"
+                            key={request.id}
+                            type="button"
+                            onClick={() => onViewRequests('requests')}
+                          >
+                            <div className="client-profile-request-info">
+                              <span className="client-profile-request-title">
+                                {request.serviceName || 'Услуга'}
+                              </span>
+                              <span className="client-profile-request-meta">
+                                {getCategoryLabel(request.categoryId)}
+                                {request.createdAt
+                                  ? ` • ${formatShortDate(request.createdAt)}`
+                                  : ''}
+                              </span>
+                            </div>
+                            <span
+                              className={`client-profile-chip${
+                                (request.responsesCount ?? 0) > 0
+                                  ? ' is-warning'
+                                  : ' is-muted'
+                              }`}
+                            >
+                              {(request.responsesCount ?? 0) > 0
+                                ? formatCount(
+                                    request.responsesCount ?? 0,
+                                    'отклик',
+                                    'отклика',
+                                    'откликов'
+                                  )
+                                : 'Без откликов'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="client-profile-empty-block">
+                        <p className="client-profile-empty">
+                          Открытых заявок пока нет. Создайте первую и получите отклики.
+                        </p>
+                        <button
+                          className="client-profile-action is-primary"
+                          type="button"
+                          onClick={onCreateRequest}
+                        >
+                          Создать заявку
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="client-section client-profile-section animate delay-4">
+                  <div className="section-header">
+                    <h3>Избранное</h3>
+                    <button
+                      className="client-profile-card-action"
+                      type="button"
+                      onClick={() => handleTabChange('favorites')}
+                    >
+                      Все
+                    </button>
+                  </div>
+                  <div className="client-profile-card">
+                    {favoritesPreview.length > 0 ? (
+                      <div className="client-profile-favorites">
+                        {favoritesPreview.map((favorite) => {
+                          const categoryLabels = Array.isArray(favorite.categories)
+                            ? favorite.categories.slice(0, 2).map(getCategoryLabel)
+                            : []
+                          const ratingLabel = formatRating(
+                            favorite.reviewsAverage,
+                            favorite.reviewsCount
+                          )
+                          const locationLine = [favorite.cityName, favorite.districtName]
+                            .filter(Boolean)
+                            .join(', ')
+                          return (
+                            <button
+                              className="client-profile-favorite"
+                              key={favorite.masterId}
+                              type="button"
+                              onClick={() => onViewMasterProfile(favorite.masterId)}
+                            >
+                              <span
+                                className="client-profile-favorite-avatar"
+                                aria-hidden="true"
+                              >
+                                {favorite.avatarUrl ? (
+                                  <img src={favorite.avatarUrl} alt="" loading="lazy" />
+                                ) : (
+                                  <span>{getInitials(favorite.displayName)}</span>
+                                )}
+                              </span>
+                              <span className="client-profile-favorite-body">
+                                <span className="client-profile-favorite-head">
+                                  <span className="client-profile-favorite-name">
+                                    {favorite.displayName}
+                                  </span>
+                                  <span className="client-profile-favorite-rating">
+                                    {ratingLabel}
+                                  </span>
+                                </span>
+                                <span className="client-profile-favorite-meta">
+                                  {categoryLabels.join(' • ') ||
+                                    'Категории не указаны'}
+                                </span>
+                                <span className="client-profile-favorite-meta">
+                                  {locationLine || 'Локация не указана'}
+                                </span>
+                              </span>
+                              <span
+                                className="client-profile-favorite-chevron"
+                                aria-hidden="true"
+                              >
+                                →
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="client-profile-empty-block">
+                        <p className="client-profile-empty">
+                          Пока нет сохраненных мастеров. Откройте витрину и добавьте
+                          тех, кто понравился.
+                        </p>
+                        <button
+                          className="client-profile-action"
+                          type="button"
+                          onClick={onViewMasters}
+                        >
+                          Найти мастера
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="client-section client-profile-section animate delay-5">
+                  <div className="section-header">
+                    <h3>Локация</h3>
+                    <button
+                      className="client-profile-card-action"
+                      type="button"
+                      onClick={() => handleTabChange('location')}
+                    >
+                      Управлять
+                    </button>
+                  </div>
+                  <div className="client-profile-card">
+                    <div className="client-profile-location-preview">
+                      <div className="client-profile-location">
+                        <div className="client-profile-location-map" aria-hidden="true">
+                          <span className="client-profile-location-map-pin">
+                            <IconPin />
+                          </span>
+                          <span className="client-profile-location-map-dot" />
+                          <span className="client-profile-location-map-dot is-secondary" />
+                        </div>
+                        <div className="client-profile-location-info">
+                          <span className="client-profile-location-title">
+                            {locationLabel}
+                          </span>
+                          <span className="client-profile-location-subtitle">
+                            Данные для подбора мастеров
+                          </span>
+                          <span className="client-profile-location-address">
+                            {addressLabel}
+                          </span>
+                          {addressMeta && (
+                            <span className="client-profile-location-chip">
+                              {addressMeta}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="client-profile-location-status">
+                        <span
+                          className={`client-profile-location-label${
+                            location ? ' is-active' : ''
+                          }`}
+                        >
+                          {locationStatusLabel}
+                        </span>
+                        <div className="client-profile-location-chips">
+                          <span className="client-profile-location-chip">
+                            {locationShareLabel}
+                          </span>
+                          {locationMetaItems.map((item, index) => (
+                            <span
+                              className="client-profile-location-chip"
+                              key={`${item}-${index}`}
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </section>
@@ -926,7 +1328,7 @@ export const ClientProfileScreen = ({
 
             {activeTab === 'activity' && (
               <>
-                <section className="client-section client-profile-section">
+                <section className="client-section client-profile-section animate delay-1">
                   <div className="section-header">
                     <h3>Требуют внимания</h3>
                     {attentionTotal > 0 && (
@@ -983,7 +1385,7 @@ export const ClientProfileScreen = ({
                   </div>
                 </section>
 
-                <section className="client-section client-profile-section">
+                <section className="client-section client-profile-section animate delay-2">
                   <div className="section-header">
                     <h3>Ближайшее</h3>
                   </div>
@@ -1051,7 +1453,7 @@ export const ClientProfileScreen = ({
                   </div>
                 </section>
 
-                <section className="client-section client-profile-section">
+                <section className="client-section client-profile-section animate delay-3">
                   <div className="section-header">
                     <h3>Последние записи</h3>
                   </div>
@@ -1128,7 +1530,7 @@ export const ClientProfileScreen = ({
                   </div>
                 </section>
 
-                <section className="client-section client-profile-section">
+                <section className="client-section client-profile-section animate delay-4">
                   <div className="section-header">
                     <h3>Активные заявки</h3>
                   </div>
@@ -1207,7 +1609,7 @@ export const ClientProfileScreen = ({
             )}
 
             {activeTab === 'location' && (
-              <section className="client-section client-profile-section">
+              <section className="client-section client-profile-section animate delay-1">
                 <div className="section-header">
                   <h3>Локация</h3>
                 </div>
@@ -1310,7 +1712,7 @@ export const ClientProfileScreen = ({
             )}
 
             {activeTab === 'favorites' && (
-              <section className="client-section client-profile-section">
+              <section className="client-section client-profile-section animate delay-1">
                 <div className="section-header">
                   <h3>Избранное</h3>
                 </div>
@@ -1330,9 +1732,9 @@ export const ClientProfileScreen = ({
                       Найти
                     </button>
                   </div>
-                  {favoritesPreview.length > 0 ? (
+                  {favorites.length > 0 ? (
                     <div className="client-profile-favorites">
-                      {favoritesPreview.map((favorite) => {
+                      {favorites.map((favorite) => {
                         const categoryLabels = Array.isArray(favorite.categories)
                           ? favorite.categories.slice(0, 2).map(getCategoryLabel)
                           : []
