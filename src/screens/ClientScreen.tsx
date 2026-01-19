@@ -396,6 +396,9 @@ export const ClientScreen = ({
       const scaleX = targetRect.width / sourceRect.width
       const scaleY = targetRect.height / sourceRect.height
 
+      const scaleAt = (t: number) =>
+        `scale(${1 + (scaleX - 1) * t}, ${1 + (scaleY - 1) * t})`
+
       const sourceStyles = window.getComputedStyle(morph)
       const targetStyles = window.getComputedStyle(targetEl)
       const startPadding = `${sourceStyles.paddingTop} ${sourceStyles.paddingRight} ${sourceStyles.paddingBottom} ${sourceStyles.paddingLeft}`
@@ -417,7 +420,7 @@ export const ClientScreen = ({
       const animation = morph.animate(
         [
           {
-            transform: 'translate3d(0, 0, 0) scale(1)',
+            transform: `translate3d(0, 0, 0) ${scaleAt(0)}`,
             opacity: 1,
             borderRadius: sourceStyles.borderRadius,
             boxShadow: sourceStyles.boxShadow,
@@ -427,7 +430,9 @@ export const ClientScreen = ({
           },
           {
             offset: 0.18,
-            transform: `translate3d(${deltaX * 0.08}px, ${dipY}px, 0) scale(1)`,
+            transform: `translate3d(${deltaX * 0.08}px, ${dipY}px, 0) ${scaleAt(
+              0.18
+            )}`,
             opacity: 0.98,
             borderRadius: sourceStyles.borderRadius,
             boxShadow: sourceStyles.boxShadow,
@@ -437,7 +442,9 @@ export const ClientScreen = ({
           },
           {
             offset: 0.55,
-            transform: `translate3d(${deltaX * 0.6}px, ${deltaY * 0.55 - curveLift}px, 0) scale(1)`,
+            transform: `translate3d(${deltaX * 0.6}px, ${
+              deltaY * 0.55 - curveLift
+            }px, 0) ${scaleAt(0.55)}`,
             opacity: 0.97,
             borderRadius: sourceStyles.borderRadius,
             boxShadow: sourceStyles.boxShadow,
@@ -447,7 +454,9 @@ export const ClientScreen = ({
           },
           {
             offset: 0.82,
-            transform: `translate3d(${deltaX * 0.88}px, ${deltaY * 0.88}px, 0) scale(1)`,
+            transform: `translate3d(${deltaX * 0.88}px, ${
+              deltaY * 0.88
+            }px, 0) ${scaleAt(0.82)}`,
             opacity: 0.96,
             borderRadius: sourceStyles.borderRadius,
             boxShadow: sourceStyles.boxShadow,
@@ -457,7 +466,9 @@ export const ClientScreen = ({
           },
           {
             offset: 0.92,
-            transform: `translate3d(${deltaX * 0.95}px, ${deltaY * 0.95}px, 0) scale(1)`,
+            transform: `translate3d(${deltaX * 0.95}px, ${
+              deltaY * 0.95
+            }px, 0) ${scaleAt(0.92)}`,
             opacity: 0.98,
             borderRadius: targetStyles.borderRadius,
             boxShadow: targetStyles.boxShadow,
