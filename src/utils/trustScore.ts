@@ -7,14 +7,9 @@ const TRUST_CONFIDENCE_THRESHOLDS = { new: 0.35, medium: 0.7 }
 const TRUST_SCORE_THRESHOLDS = { low: 45, high: 70 }
 
 const trustEventLabelMap: Record<string, string> = {
-  booking_confirmed: 'Подтвержденные записи',
-  booking_completed: 'Завершенные визиты',
-  'client_cancel_>24h': 'Отмена заранее',
-  'client_cancel_<24h': 'Отмена в последний момент',
-  client_no_show: 'Неявка без предупреждения',
-  request_response_accept: 'Принятые предложения',
-  client_decline_price: 'Отказ от цены',
-  profile_complete: 'Заполненный профиль',
+  visit_on_time: 'Визиты вовремя',
+  visit_rescheduled: 'Переносы записи',
+  visit_no_show: 'Неявки',
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -97,26 +92,14 @@ export const buildTrustTips = (trust?: ClientTrust | null) => {
     trust?.reasons?.positive?.map((item) => item.eventType) ?? []
   )
 
-  if (negativeTypes.has('client_no_show')) {
+  if (negativeTypes.has('visit_no_show')) {
     tips.push('Не пропускайте запись без предупреждения.')
   }
-  if (negativeTypes.has('client_cancel_<24h')) {
-    tips.push('Отменяйте минимум за 24 часа.')
+  if (negativeTypes.has('visit_rescheduled')) {
+    tips.push('Переносите запись заранее и подтверждайте новое время.')
   }
-  if (negativeTypes.has('client_cancel_>24h')) {
-    tips.push('Планируйте визиты заранее, чтобы не отменять.')
-  }
-  if (negativeTypes.has('client_decline_price')) {
-    tips.push('Согласуйте бюджет до подтверждения.')
-  }
-  if (!positiveTypes.has('profile_complete')) {
-    tips.push('Добавьте адрес и включите геолокацию.')
-  }
-  if (
-    !positiveTypes.has('booking_completed') &&
-    !positiveTypes.has('booking_confirmed')
-  ) {
-    tips.push('Подтверждайте записи и приходите вовремя.')
+  if (!positiveTypes.has('visit_on_time')) {
+    tips.push('Приходите вовремя и завершайте запись.')
   }
   if (resolveTrustLevel(trust?.confidence ?? 0) === 'new') {
     tips.push('Сделайте несколько визитов, чтобы повысить уверенность.')

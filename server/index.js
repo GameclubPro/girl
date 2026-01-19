@@ -36,15 +36,12 @@ const TRUST_LEVEL_THRESHOLDS = {
   medium: 0.7,
 }
 const TRUST_EVENT_WEIGHTS = {
-  booking_confirmed: 2,
-  booking_completed: 4,
-  'client_cancel_>24h': -6,
-  'client_cancel_<24h': -12,
-  client_no_show: -24,
-  request_response_accept: 2,
-  client_decline_price: -2,
-  profile_complete: 3,
+  visit_on_time: 5,
+  visit_rescheduled: -3,
+  visit_no_show: -30,
 }
+const TRUST_EVENT_TYPE_LIST = Object.keys(TRUST_EVENT_WEIGHTS)
+const TRUST_EVENT_TYPES = new Set(TRUST_EVENT_TYPE_LIST)
 const MAX_CERTIFICATES = 12
 const SUPPORT_AGENT_IDS = Array.from(
   new Set(
@@ -180,14 +177,19 @@ const summarizeTrustEvents = (events) => {
   const now = Date.now()
   const grouped = new Map()
   let totalImpact = 0
+  let usedEvents = 0
 
   events.forEach((event) => {
+    if (!TRUST_EVENT_TYPES.has(event.eventType)) return
+    const weight = Number(event.weight)
+    if (!Number.isFinite(weight)) return
     const createdAt = new Date(event.createdAt)
     const createdMs = createdAt.getTime()
     if (Number.isNaN(createdMs)) return
     const days = Math.max(0, (now - createdMs) / DAY_MS)
     const decay = Math.exp(-Math.LN2 * (days / TRUST_HALF_LIFE_DAYS))
-    const impact = Number(event.weight) * decay
+    const impact = weight * decay
+    usedEvents += 1
     totalImpact += impact
 
     const existing = grouped.get(event.eventType) ?? {
@@ -222,7 +224,7 @@ const summarizeTrustEvents = (events) => {
     0,
     100
   )
-  const eventCount = events.length
+  const eventCount = usedEvents
   const confidence = 1 - Math.exp(-eventCount / TRUST_CONFIDENCE_SCALE)
 
   return {
@@ -757,8 +759,9 @@ const refreshClientTrustScore = async (userId) => {
         created_at AS "createdAt"
       FROM client_trust_events
       WHERE user_id = $1
+        AND event_type = ANY($2::text[])
     `,
-    [userId]
+    [userId, TRUST_EVENT_TYPE_LIST]
   )
 
   const summary = summarizeTrustEvents(eventsResult.rows)
@@ -889,42 +892,6 @@ const logClientTrustEvent = async ({
   }
 
   return { inserted: true }
-}
-
-const resolveCancelEventType = (scheduledAt, cancelledAt) => {
-  const scheduled = new Date(scheduledAt ?? '')
-  if (Number.isNaN(scheduled.getTime())) return null
-  const cancelled = cancelledAt ? new Date(cancelledAt) : new Date()
-  if (Number.isNaN(cancelled.getTime())) return null
-  const diffHours = (scheduled.getTime() - cancelled.getTime()) / (60 * 60 * 1000)
-  return diffHours >= 24 ? 'client_cancel_>24h' : 'client_cancel_<24h'
-}
-
-const isProfileCompleteForTrust = async (userId) => {
-  const [address, location] = await Promise.all([
-    loadUserAddress(userId),
-    loadUserLocation(userId),
-  ])
-  const hasAddress =
-    Boolean(address?.address?.trim()) &&
-    Number.isInteger(address?.cityId) &&
-    Number.isInteger(address?.districtId)
-  const hasLocation =
-    typeof location?.lat === 'number' && typeof location?.lng === 'number'
-  return hasAddress && hasLocation
-}
-
-const maybeLogProfileComplete = async (userId, options = {}) => {
-  const normalizedUserId = normalizeText(userId)
-  if (!normalizedUserId) return null
-  const isComplete = await isProfileCompleteForTrust(normalizedUserId)
-  if (!isComplete) return null
-  return logClientTrustEvent({
-    userId: normalizedUserId,
-    eventType: 'profile_complete',
-    meta: { ref: 'profile_complete' },
-    skipRefresh: Boolean(options.skipRefresh),
-  })
 }
 
 const ensureMasterProfile = async (userId) => {
@@ -1451,23 +1418,6 @@ const loadUserLocation = async (userId) => {
         share_to_masters AS "shareToMasters",
         updated_at AS "updatedAt"
       FROM user_locations
-      WHERE user_id = $1
-    `,
-    [userId]
-  )
-  return result.rows[0] ?? null
-}
-
-const loadUserAddress = async (userId) => {
-  const result = await pool.query(
-    `
-      SELECT
-        user_id AS "userId",
-        city_id AS "cityId",
-        district_id AS "districtId",
-        address,
-        updated_at AS "updatedAt"
-      FROM user_addresses
       WHERE user_id = $1
     `,
     [userId]
@@ -2535,7 +2485,6 @@ app.post('/api/address', async (req, res) => {
       [normalizedUserId, parsedCityId, parsedDistrictId, addressValue]
     )
 
-    await maybeLogProfileComplete(normalizedUserId)
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/address failed:', error)
@@ -2621,7 +2570,6 @@ app.post('/api/location', async (req, res) => {
     )
 
     const location = await loadUserLocation(normalizedUserId)
-    await maybeLogProfileComplete(normalizedUserId)
     res.json({ ok: true, location })
   } catch (error) {
     console.error('POST /api/location failed:', error)
@@ -5241,16 +5189,6 @@ app.patch('/api/bookings/:id', async (req, res) => {
         [bookingId]
       )
 
-      await logClientTrustEvent({
-        userId: booking.clientId,
-        eventType: 'booking_confirmed',
-        meta: {
-          ref: `booking:${bookingId}`,
-          bookingId,
-          scheduledAt: booking.scheduledAt,
-        },
-      })
-
       let chatPayload = null
       try {
         chatPayload = await createChatForBooking({
@@ -5361,16 +5299,6 @@ app.patch('/api/bookings/:id', async (req, res) => {
         [bookingId, booking.proposedPrice]
       )
 
-      await logClientTrustEvent({
-        userId: booking.clientId,
-        eventType: 'booking_confirmed',
-        meta: {
-          ref: `booking:${bookingId}`,
-          bookingId,
-          scheduledAt: booking.scheduledAt,
-        },
-      })
-
       let chatPayload = null
       try {
         chatPayload = await createChatForBooking({
@@ -5424,12 +5352,41 @@ app.patch('/api/bookings/:id', async (req, res) => {
       }
 
       const cancelledAt = new Date().toISOString()
-      const cancelEventType = resolveCancelEventType(
-        booking.scheduledAt,
-        cancelledAt
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET status = 'cancelled',
+              cancelled_by = 'client',
+              cancelled_at = $2,
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId, cancelledAt]
       )
+
+      res.json({ ok: true, status: 'cancelled' })
+      return
+    }
+
+    if (normalizedAction === 'client-cancel') {
+      if (!isClient) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (!['pending', 'confirmed', 'price_proposed', 'price_pending'].includes(booking.status)) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      const cancelledDate = new Date()
+      const cancelledAt = cancelledDate.toISOString()
+      const scheduledAt = new Date(booking.scheduledAt ?? '')
       const outcomeValue =
-        cancelEventType === 'client_cancel_<24h' ? 'late_cancel' : null
+        !Number.isNaN(scheduledAt.getTime()) &&
+        scheduledAt.getTime() - cancelledDate.getTime() < 24 * 60 * 60 * 1000
+          ? 'late_cancel'
+          : null
 
       await pool.query(
         `
@@ -5446,61 +5403,13 @@ app.patch('/api/bookings/:id', async (req, res) => {
 
       await logClientTrustEvent({
         userId: booking.clientId,
-        eventType: 'client_decline_price',
+        eventType: 'visit_rescheduled',
         meta: {
           ref: `booking:${bookingId}`,
           bookingId,
           scheduledAt: booking.scheduledAt,
-          cancelWindow: cancelEventType,
         },
       })
-
-      res.json({ ok: true, status: 'cancelled' })
-      return
-    }
-
-    if (normalizedAction === 'client-cancel') {
-      if (!isClient) {
-        res.status(403).json({ error: 'forbidden' })
-        return
-      }
-      if (!['pending', 'confirmed', 'price_proposed', 'price_pending'].includes(booking.status)) {
-        res.status(409).json({ error: 'status_invalid' })
-        return
-      }
-
-      const cancelledAt = new Date().toISOString()
-      const cancelEventType = resolveCancelEventType(
-        booking.scheduledAt,
-        cancelledAt
-      )
-      const outcomeValue =
-        cancelEventType === 'client_cancel_<24h' ? 'late_cancel' : null
-
-      await pool.query(
-        `
-          UPDATE service_bookings
-          SET status = 'cancelled',
-              cancelled_by = 'client',
-              cancelled_at = $2,
-              outcome = $3,
-              updated_at = NOW()
-          WHERE id = $1
-        `,
-        [bookingId, cancelledAt, outcomeValue]
-      )
-
-      if (cancelEventType) {
-        await logClientTrustEvent({
-          userId: booking.clientId,
-          eventType: cancelEventType,
-          meta: {
-            ref: `booking:${bookingId}`,
-            bookingId,
-            scheduledAt: booking.scheduledAt,
-          },
-        })
-      }
 
       res.json({ ok: true, status: 'cancelled' })
       return
@@ -5542,7 +5451,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
       if (normalizedOutcome === 'completed') {
         await logClientTrustEvent({
           userId: booking.clientId,
-          eventType: 'booking_completed',
+          eventType: 'visit_on_time',
           meta: {
             ref: `booking:${bookingId}`,
             bookingId,
@@ -5552,7 +5461,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
       } else if (normalizedOutcome === 'no_show') {
         await logClientTrustEvent({
           userId: booking.clientId,
-          eventType: 'client_no_show',
+          eventType: 'visit_no_show',
           meta: {
             ref: `booking:${bookingId}`,
             bookingId,
@@ -5562,7 +5471,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
       } else if (normalizedOutcome === 'late_cancel') {
         await logClientTrustEvent({
           userId: booking.clientId,
-          eventType: 'client_cancel_<24h',
+          eventType: 'visit_rescheduled',
           meta: {
             ref: `booking:${bookingId}`,
             bookingId,
@@ -5717,7 +5626,7 @@ app.post('/api/bookings/:id/review', async (req, res) => {
 
     await logClientTrustEvent({
       userId: booking.clientId,
-      eventType: 'booking_completed',
+      eventType: 'visit_on_time',
       meta: {
         ref: `booking:${bookingId}`,
         bookingId,
@@ -6326,16 +6235,6 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
           `,
           [requestId]
         )
-
-        await logClientTrustEvent({
-          userId: request.userId,
-          eventType: 'request_response_accept',
-          meta: {
-            ref: `response:${responseId}`,
-            requestId,
-            responseId,
-          },
-        })
       }
 
       let chatId = null
@@ -7313,53 +7212,6 @@ const backfillClientTrustScores = async () => {
     }
   }
 
-  const profileResult = await pool.query(
-    `
-      SELECT ua.user_id AS "userId"
-      FROM user_addresses ua
-      JOIN user_locations ul ON ul.user_id = ua.user_id
-      WHERE ua.address IS NOT NULL
-        AND ua.address <> ''
-        AND ua.city_id IS NOT NULL
-        AND ua.district_id IS NOT NULL
-        AND ul.lat IS NOT NULL
-        AND ul.lng IS NOT NULL
-    `
-  )
-
-  for (const row of profileResult.rows) {
-    await trackEvent({
-      userId: row.userId,
-      eventType: 'profile_complete',
-      meta: { ref: 'profile_complete' },
-    })
-  }
-
-  const confirmedBookings = await pool.query(
-    `
-      SELECT
-        id,
-        client_id AS "clientId",
-        scheduled_at AS "scheduledAt",
-        updated_at AS "updatedAt"
-      FROM service_bookings
-      WHERE status = 'confirmed'
-    `
-  )
-
-  for (const row of confirmedBookings.rows) {
-    await trackEvent({
-      userId: row.clientId,
-      eventType: 'booking_confirmed',
-      meta: {
-        ref: `booking:${row.id}`,
-        bookingId: row.id,
-        scheduledAt: row.scheduledAt,
-      },
-      occurredAt: row.updatedAt,
-    })
-  }
-
   const completedBookings = await pool.query(
     `
       SELECT
@@ -7376,7 +7228,7 @@ const backfillClientTrustScores = async () => {
   for (const row of completedBookings.rows) {
     await trackEvent({
       userId: row.clientId,
-      eventType: 'booking_completed',
+      eventType: 'visit_on_time',
       meta: {
         ref: `booking:${row.id}`,
         bookingId: row.id,
@@ -7401,11 +7253,9 @@ const backfillClientTrustScores = async () => {
   )
 
   for (const row of cancelledBookings.rows) {
-    const eventType = resolveCancelEventType(row.scheduledAt, row.cancelledAt)
-    if (!eventType) continue
     await trackEvent({
       userId: row.clientId,
-      eventType,
+      eventType: 'visit_rescheduled',
       meta: {
         ref: `booking:${row.id}`,
         bookingId: row.id,
@@ -7430,7 +7280,7 @@ const backfillClientTrustScores = async () => {
   for (const row of lateCancelBookings.rows) {
     await trackEvent({
       userId: row.clientId,
-      eventType: 'client_cancel_<24h',
+      eventType: 'visit_rescheduled',
       meta: {
         ref: `booking:${row.id}`,
         bookingId: row.id,
@@ -7456,37 +7306,11 @@ const backfillClientTrustScores = async () => {
   for (const row of noShowBookings.rows) {
     await trackEvent({
       userId: row.clientId,
-      eventType: 'client_no_show',
+      eventType: 'visit_no_show',
       meta: {
         ref: `booking:${row.id}`,
         bookingId: row.id,
         scheduledAt: row.scheduledAt,
-      },
-      occurredAt: row.updatedAt,
-    })
-  }
-
-  const acceptedResponses = await pool.query(
-    `
-      SELECT
-        rr.id AS "responseId",
-        rr.request_id AS "requestId",
-        rr.updated_at AS "updatedAt",
-        sr.user_id AS "clientId"
-      FROM request_responses rr
-      JOIN service_requests sr ON sr.id = rr.request_id
-      WHERE rr.status = 'accepted'
-    `
-  )
-
-  for (const row of acceptedResponses.rows) {
-    await trackEvent({
-      userId: row.clientId,
-      eventType: 'request_response_accept',
-      meta: {
-        ref: `response:${row.responseId}`,
-        requestId: row.requestId,
-        responseId: row.responseId,
       },
       occurredAt: row.updatedAt,
     })
