@@ -315,7 +315,7 @@ export const ChatThreadScreen = ({
   ])
 
   const updateCounterpartTrust = useCallback(
-    (nextTrust) => {
+    (nextTrust: ChatDetail['counterpart']['trust']) => {
       if (!nextTrust) return
       setDetail((current) => {
         if (!current) return current
