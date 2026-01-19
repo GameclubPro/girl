@@ -9,9 +9,16 @@ import {
   IconStar,
   IconUser,
 } from '../components/icons'
+import { TrustMeter } from '../components/TrustMeter'
 import { categoryItems } from '../data/clientData'
-import type { Booking, ServiceRequest, UserLocation } from '../types/app'
+import type {
+  Booking,
+  ClientTrust,
+  ServiceRequest,
+  UserLocation,
+} from '../types/app'
 import type { FavoriteMaster } from '../utils/favorites'
+import { buildTrustTips } from '../utils/trustScore'
 
 type ClientProfileScreenProps = {
   apiBase: string
@@ -177,6 +184,7 @@ export const ClientProfileScreen = ({
 }: ClientProfileScreenProps) => {
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [trust, setTrust] = useState<ClientTrust | null>(null)
   const [location, setLocation] = useState<UserLocation | null>(null)
   const [cityName, setCityName] = useState('')
   const [districtName, setDistrictName] = useState('')
@@ -184,6 +192,7 @@ export const ClientProfileScreen = ({
   const [addressUpdatedAt, setAddressUpdatedAt] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [trustError, setTrustError] = useState('')
   const [metaError, setMetaError] = useState('')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -235,13 +244,23 @@ export const ClientProfileScreen = ({
       return Array.isArray(data) ? data : []
     }
 
+    const loadTrust = async () => {
+      const response = await fetch(
+        `${apiBase}/api/clients/${encodeURIComponent(userId)}/trust?userId=${encodeURIComponent(userId)}`
+      )
+      if (!response.ok) {
+        throw new Error('Load trust failed')
+      }
+      const data = (await response.json().catch(() => null)) as ClientTrust | null
+      return data ?? null
+    }
+
     const loadSummary = async () => {
       setIsLoading(true)
       setLoadError('')
-      const [requestsResult, bookingsResult] = await Promise.allSettled([
-        loadRequests(),
-        loadBookings(),
-      ])
+      setTrustError('')
+      const [requestsResult, bookingsResult, trustResult] =
+        await Promise.allSettled([loadRequests(), loadBookings(), loadTrust()])
 
       if (cancelled) return
 
@@ -250,6 +269,12 @@ export const ClientProfileScreen = ({
       }
       if (bookingsResult.status === 'fulfilled') {
         setBookings(bookingsResult.value)
+      }
+      if (trustResult.status === 'fulfilled') {
+        setTrust(trustResult.value)
+      }
+      if (trustResult.status === 'rejected') {
+        setTrustError('Не удалось загрузить добросовестность.')
       }
 
       const nextError = [
@@ -261,7 +286,8 @@ export const ClientProfileScreen = ({
       setLoadError(nextError)
       if (
         requestsResult.status === 'fulfilled' ||
-        bookingsResult.status === 'fulfilled'
+        bookingsResult.status === 'fulfilled' ||
+        trustResult.status === 'fulfilled'
       ) {
         setLastUpdated(new Date())
       }
@@ -277,6 +303,7 @@ export const ClientProfileScreen = ({
 
   const refreshSummary = useCallback(async () => {
     if (!userId) return
+    setTrustError('')
     const loadRequests = async () => {
       const response = await fetch(
         `${apiBase}/api/requests?userId=${encodeURIComponent(userId)}`
@@ -302,16 +329,32 @@ export const ClientProfileScreen = ({
       return Array.isArray(data) ? data : []
     }
 
-    const [requestsResult, bookingsResult] = await Promise.allSettled([
-      loadRequests(),
-      loadBookings(),
-    ])
+    const loadTrust = async () => {
+      const response = await fetch(
+        `${apiBase}/api/clients/${encodeURIComponent(userId)}/trust?userId=${encodeURIComponent(userId)}`
+      )
+      if (!response.ok) {
+        throw new Error('Load trust failed')
+      }
+      const data = (await response.json().catch(() => null)) as ClientTrust | null
+      return data ?? null
+    }
+
+    const [requestsResult, bookingsResult, trustResult] =
+      await Promise.allSettled([loadRequests(), loadBookings(), loadTrust()])
 
     if (requestsResult.status === 'fulfilled') {
       setRequests(requestsResult.value)
     }
     if (bookingsResult.status === 'fulfilled') {
       setBookings(bookingsResult.value)
+    }
+    if (trustResult.status === 'fulfilled') {
+      setTrust(trustResult.value)
+      setTrustError('')
+    }
+    if (trustResult.status === 'rejected') {
+      setTrustError('Не удалось загрузить добросовестность.')
     }
 
     const nextError = [
@@ -323,7 +366,8 @@ export const ClientProfileScreen = ({
     setLoadError(nextError)
     if (
       requestsResult.status === 'fulfilled' ||
-      bookingsResult.status === 'fulfilled'
+      bookingsResult.status === 'fulfilled' ||
+      trustResult.status === 'fulfilled'
     ) {
       setLastUpdated(new Date())
     }
@@ -686,6 +730,7 @@ export const ClientProfileScreen = ({
     ? `Осталось ${formatCount(remainingSteps, 'шаг', 'шага', 'шагов')}`
     : 'Профиль готов'
   const profileStatusLabel = isProfileComplete ? 'Профиль готов' : 'Следующие шаги'
+  const trustTips = useMemo(() => buildTrustTips(trust), [trust])
   const locationLabel = buildLocationLabel(cityName, districtName)
   const locationMeta = formatLocationMeta(location)
   const locationMetaItems = locationMeta ? locationMeta.split(' • ') : []
@@ -1026,6 +1071,19 @@ export const ClientProfileScreen = ({
 
                 <section className="client-section client-profile-section animate delay-2">
                   <div className="section-header">
+                    <h3>Добросовестность</h3>
+                  </div>
+                  {trustError ? (
+                    <div className="trust-meter-card is-error" role="alert">
+                      Не удалось загрузить шкалу добросовестности.
+                    </div>
+                  ) : (
+                    <TrustMeter trust={trust} tips={trustTips} />
+                  )}
+                </section>
+
+                <section className="client-section client-profile-section animate delay-3">
+                  <div className="section-header">
                     <h3>Следующая запись</h3>
                   </div>
                   <div className="client-profile-card is-highlight">
@@ -1092,7 +1150,7 @@ export const ClientProfileScreen = ({
                   </div>
                 </section>
 
-                <section className="client-section client-profile-section animate delay-3">
+                <section className="client-section client-profile-section animate delay-4">
                   <div className="section-header">
                     <h3>Активные заявки</h3>
                     {openRequestsCount > 0 && (

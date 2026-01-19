@@ -8,6 +8,7 @@ import {
   type ChangeEvent,
 } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
+import { TrustBadge } from '../components/TrustBadge'
 import type { ChatDetail, ChatMessage } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
@@ -149,6 +150,7 @@ export const ChatThreadScreen = ({
     null | 'price' | 'time' | 'location'
   >(null)
   const [quickValue, setQuickValue] = useState('')
+  const [isTrustSheetOpen, setIsTrustSheetOpen] = useState(false)
   const screenRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
@@ -179,6 +181,8 @@ export const ChatThreadScreen = ({
   const counterpart = detail?.counterpart
   const request = detail?.request
   const booking = detail?.booking
+  const isProViewer = detail?.chat?.memberRole === 'master'
+  const showTrustBadge = Boolean(isProViewer && counterpart?.role === 'client')
   const contextType = detail?.chat?.contextType ?? null
   const isSupportChat = contextType === 'support'
   const isBookingChat = contextType === 'booking'
@@ -1035,6 +1039,14 @@ export const ChatThreadScreen = ({
     })
   }
 
+  const openTrustSheet = useCallback(() => {
+    setIsTrustSheetOpen(true)
+  }, [])
+
+  const closeTrustSheet = useCallback(() => {
+    setIsTrustSheetOpen(false)
+  }, [])
+
   const onLoadMore = () => {
     const oldestId = messages[0]?.id
     if (oldestId && oldestId > 0) {
@@ -1061,9 +1073,25 @@ export const ChatThreadScreen = ({
             ←
           </button>
           <div className="chat-thread-title">
-            <span className="chat-thread-name">
-              {counterpart?.name ?? 'Чат'}
-            </span>
+            <div className="chat-thread-name-row">
+              <span className="chat-thread-name">
+                {counterpart?.name ?? 'Чат'}
+              </span>
+              {showTrustBadge && (
+                <button
+                  className="trust-badge-button"
+                  type="button"
+                  onClick={openTrustSheet}
+                  aria-label="Открыть шкалу добросовестности"
+                >
+                  <TrustBadge
+                    trust={counterpart?.trust ?? null}
+                    size="sm"
+                    className="chat-thread-trust"
+                  />
+                </button>
+              )}
+            </div>
             <div className="chat-thread-subline">
               <span className="chat-thread-subtitle">{headerSubtitle}</span>
               <span
@@ -1441,6 +1469,57 @@ export const ChatThreadScreen = ({
           </p>
         )}
       </div>
+
+      {showTrustBadge && isTrustSheetOpen && (
+        <div
+          className="trust-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="trust-sheet-title"
+          onClick={closeTrustSheet}
+        >
+          <div
+            className="trust-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="trust-sheet-handle" aria-hidden="true" />
+            <div className="trust-sheet-head">
+              <div>
+                <p className="trust-sheet-kicker">Шкала доверия</p>
+                <h3 className="trust-sheet-title" id="trust-sheet-title">
+                  Как читать добросовестность
+                </h3>
+                <p className="trust-sheet-subtitle">
+                  Считаем по истории подтверждений, отмен и завершенных записей.
+                  Личные данные не используются.
+                </p>
+              </div>
+              <button
+                className="trust-sheet-close"
+                type="button"
+                onClick={closeTrustSheet}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <div className="trust-sheet-scale" aria-hidden="true" />
+            <div className="trust-sheet-legend">
+              <div className="trust-sheet-legend-item is-new">Новый</div>
+              <div className="trust-sheet-legend-item is-low">0–44</div>
+              <div className="trust-sheet-legend-item is-mid">45–69</div>
+              <div className="trust-sheet-legend-item is-high">70–100</div>
+            </div>
+            <button
+              className="trust-sheet-action"
+              type="button"
+              onClick={closeTrustSheet}
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

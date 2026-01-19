@@ -6,6 +6,7 @@ import {
   IconSupport,
   IconUser,
 } from '../components/icons'
+import { TrustBadge } from '../components/TrustBadge'
 import { ProBottomNav } from '../components/ProBottomNav'
 import type { ChatMessage, ChatSummary } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
@@ -514,6 +515,8 @@ export const ChatListScreen = ({
             const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
             const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
             const unreadCount = chat.unreadCount ?? 0
+            const showTrust =
+              role === 'pro' && counterpart.role === 'client' && !isSupportChat
 
             return (
               <button
@@ -534,7 +537,16 @@ export const ChatListScreen = ({
                 </span>
                 <span className="chat-card-main">
                   <span className="chat-card-top">
-                    <span className="chat-card-name">{counterpart.name}</span>
+                    <span className="chat-card-name-row">
+                      <span className="chat-card-name">{counterpart.name}</span>
+                      {showTrust && (
+                        <TrustBadge
+                          trust={counterpart.trust ?? null}
+                          size="sm"
+                          className="chat-card-trust"
+                        />
+                      )}
+                    </span>
                     <span className="chat-card-time">{lastTime}</span>
                   </span>
                   <span className="chat-card-service">{serviceName}</span>

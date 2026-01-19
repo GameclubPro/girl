@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Booking, ServiceRequest } from '../types/app'
+import type { Booking, ClientTrust, ServiceRequest } from '../types/app'
 
 type RequestStats = {
   total: number
@@ -13,6 +13,7 @@ export type ClientSummary = {
   name: string
   count: number
   lastSeenTime: number | null
+  trust?: ClientTrust | null
 }
 
 export type BookingStats = {
@@ -46,6 +47,26 @@ const toTimeMs = (value?: string | null) => {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
   return parsed.getTime()
+}
+
+const mergeClientTrust = (
+  current?: ClientTrust | null,
+  incoming?: ClientTrust | null
+) => {
+  if (!incoming) return current ?? null
+  if (!current) return incoming
+  const currentUpdated = toTimeMs(current.updatedAt ?? null)
+  const incomingUpdated = toTimeMs(incoming.updatedAt ?? null)
+  if (
+    incomingUpdated !== null &&
+    (currentUpdated === null || incomingUpdated > currentUpdated)
+  ) {
+    return incoming
+  }
+  if (currentUpdated === null && incomingUpdated === null) {
+    return incoming.confidence >= current.confidence ? incoming : current
+  }
+  return current
 }
 
 const getRequestStats = (requests: ServiceRequest[]): RequestStats => {
@@ -122,6 +143,7 @@ const getBookingStats = (bookings: Booking[]): BookingStats => {
       name: clientName,
       count: (existing?.count ?? 0) + 1,
       lastSeenTime: nextLastSeen,
+      trust: mergeClientTrust(existing?.trust, booking.clientTrust ?? null),
     })
   })
 

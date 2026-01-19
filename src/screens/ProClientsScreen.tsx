@@ -1,4 +1,5 @@
 import { ProBottomNav } from '../components/ProBottomNav'
+import { TrustBadge } from '../components/TrustBadge'
 import { useProCabinetData } from '../hooks/useProCabinetData'
 
 type ProClientsScreenProps = {
@@ -123,15 +124,22 @@ export const ProClientsScreen = ({
             <div className="pro-detail-list">
               {bookingStats.clientSummaries.slice(0, 6).map((client) => (
                 <div className="pro-detail-list-item" key={client.id}>
-                  <div className="pro-detail-avatar" aria-hidden="true">
-                    {getInitials(client.name)}
-                  </div>
-                  <div className="pro-detail-list-body">
+                <div className="pro-detail-avatar" aria-hidden="true">
+                  {getInitials(client.name)}
+                </div>
+                <div className="pro-detail-list-body">
+                  <span className="pro-detail-list-title-row">
                     <span className="pro-detail-list-title">{client.name}</span>
-                    <span className="pro-detail-list-subtitle">
-                      Визитов: {client.count}
-                    </span>
-                  </div>
+                    <TrustBadge
+                      trust={client.trust ?? null}
+                      size="sm"
+                      className="pro-detail-list-trust"
+                    />
+                  </span>
+                  <span className="pro-detail-list-subtitle">
+                    Визитов: {client.count}
+                  </span>
+                </div>
                   <span className="pro-detail-list-meta">
                     {formatDate(client.lastSeenTime)}
                   </span>

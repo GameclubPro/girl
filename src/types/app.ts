@@ -18,6 +18,24 @@ export type UserLocation = {
   shareToMasters?: boolean
 }
 
+export type TrustReason = {
+  eventType: string
+  count: number
+  value: number
+  lastAt?: string | null
+}
+
+export type ClientTrust = {
+  score: number
+  confidence: number
+  level?: string | null
+  updatedAt?: string | null
+  reasons?: {
+    positive: TrustReason[]
+    negative: TrustReason[]
+  } | null
+}
+
 export type Role = 'client' | 'pro'
 
 export type ProfileStatus = 'draft' | 'ready' | 'complete'
@@ -116,6 +134,7 @@ export type ServiceRequest = {
   id: number
   userId: string
   clientName?: string | null
+  clientTrust?: ClientTrust | null
   cityId: number | null
   districtId: number | null
   cityName?: string | null
@@ -162,6 +181,7 @@ export type Booking = {
   masterName?: string | null
   masterAvatarUrl?: string | null
   clientName?: string | null
+  clientTrust?: ClientTrust | null
   categoryId: string
   serviceName: string
   servicePrice?: number | null
@@ -243,6 +263,7 @@ export type ChatSummary = {
     role: 'client' | 'master'
     name: string
     avatarUrl?: string | null
+    trust?: ClientTrust | null
   }
   request?: {
     id: number
@@ -279,6 +300,7 @@ export type ChatDetail = {
     role: 'client' | 'master'
     name: string
     avatarUrl?: string | null
+    trust?: ClientTrust | null
   }
   request?: {
     id: number

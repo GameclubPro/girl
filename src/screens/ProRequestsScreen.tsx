@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
+import { TrustBadge } from '../components/TrustBadge'
 import {
   IconChevron,
   IconClose,
@@ -1678,7 +1679,14 @@ export const ProRequestsScreen = ({
             <span>{clientInitials}</span>
           </span>
           <div className="booking-item-main">
-            <div className="booking-item-master">{clientName}</div>
+            <div className="booking-item-main-row">
+              <div className="booking-item-master">{clientName}</div>
+              <TrustBadge
+                trust={booking.clientTrust ?? null}
+                size="sm"
+                className="booking-item-trust"
+              />
+            </div>
             <div className="booking-item-service">
               {booking.serviceName}
             </div>
@@ -2172,7 +2180,14 @@ export const ProRequestsScreen = ({
                             <span>{clientInitials}</span>
                           </span>
                           <div className="booking-item-main">
-                            <div className="booking-item-master">{clientName}</div>
+                            <div className="booking-item-main-row">
+                              <div className="booking-item-master">{clientName}</div>
+                              <TrustBadge
+                                trust={item.clientTrust ?? null}
+                                size="sm"
+                                className="booking-item-trust"
+                              />
+                            </div>
                             <div className="booking-item-service">
                               {item.serviceName}
                             </div>

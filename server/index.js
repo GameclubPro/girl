@@ -28,6 +28,23 @@ const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
 const CHAT_MESSAGE_DEFAULT_LIMIT = 30
 const CHAT_MESSAGE_MAX_LIMIT = 80
 const CHAT_STREAM_PATH = '/api/chats/stream'
+const TRUST_BASE_SCORE = 60
+const TRUST_HALF_LIFE_DAYS = 90
+const TRUST_CONFIDENCE_SCALE = 8
+const TRUST_LEVEL_THRESHOLDS = {
+  new: 0.35,
+  medium: 0.7,
+}
+const TRUST_EVENT_WEIGHTS = {
+  booking_confirmed: 2,
+  booking_completed: 4,
+  'client_cancel_>24h': -6,
+  'client_cancel_<24h': -12,
+  client_no_show: -24,
+  request_response_accept: 2,
+  client_decline_price: -2,
+  profile_complete: 3,
+}
 const MAX_CERTIFICATES = 12
 const SUPPORT_AGENT_IDS = Array.from(
   new Set(
@@ -149,6 +166,72 @@ const parseRangeDays = (value) => {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+const clampValue = (value, min, max) => Math.min(max, Math.max(min, value))
+
+const getTrustLevelLabel = (confidence) => {
+  const safeConfidence = Number.isFinite(confidence) ? confidence : 0
+  if (safeConfidence < TRUST_LEVEL_THRESHOLDS.new) return 'Новый'
+  if (safeConfidence <= TRUST_LEVEL_THRESHOLDS.medium) return 'Средняя уверенность'
+  return 'Высокая уверенность'
+}
+
+const summarizeTrustEvents = (events) => {
+  const now = Date.now()
+  const grouped = new Map()
+  let totalImpact = 0
+
+  events.forEach((event) => {
+    const createdAt = new Date(event.createdAt)
+    const createdMs = createdAt.getTime()
+    if (Number.isNaN(createdMs)) return
+    const days = Math.max(0, (now - createdMs) / DAY_MS)
+    const decay = Math.exp(-Math.LN2 * (days / TRUST_HALF_LIFE_DAYS))
+    const impact = Number(event.weight) * decay
+    totalImpact += impact
+
+    const existing = grouped.get(event.eventType) ?? {
+      eventType: event.eventType,
+      count: 0,
+      value: 0,
+      lastAt: event.createdAt,
+    }
+    existing.count += 1
+    existing.value += impact
+    if (new Date(existing.lastAt).getTime() < createdMs) {
+      existing.lastAt = event.createdAt
+    }
+    grouped.set(event.eventType, existing)
+  })
+
+  const entries = Array.from(grouped.values()).map((entry) => ({
+    ...entry,
+    value: Number(entry.value.toFixed(2)),
+  }))
+  const positive = entries
+    .filter((entry) => entry.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3)
+  const negative = entries
+    .filter((entry) => entry.value < 0)
+    .sort((a, b) => a.value - b.value)
+    .slice(0, 3)
+
+  const score = clampValue(
+    Math.round(TRUST_BASE_SCORE + totalImpact),
+    0,
+    100
+  )
+  const eventCount = events.length
+  const confidence = 1 - Math.exp(-eventCount / TRUST_CONFIDENCE_SCALE)
+
+  return {
+    score,
+    confidence,
+    reasons: { positive, negative },
+    eventCount,
+  }
+}
 
 const toDateKey = (value, tzOffsetMinutes) => {
   const parsed = new Date(value)
@@ -646,6 +729,202 @@ const ensureUser = async (userId) => {
     `,
     [userId]
   )
+}
+
+const loadClientTrustScore = async (userId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        user_id AS "userId",
+        score,
+        confidence,
+        reasons,
+        updated_at AS "updatedAt"
+      FROM client_trust_scores
+      WHERE user_id = $1
+    `,
+    [userId]
+  )
+  return result.rows[0] ?? null
+}
+
+const refreshClientTrustScore = async (userId) => {
+  const eventsResult = await pool.query(
+    `
+      SELECT
+        event_type AS "eventType",
+        weight,
+        created_at AS "createdAt"
+      FROM client_trust_events
+      WHERE user_id = $1
+    `,
+    [userId]
+  )
+
+  const summary = summarizeTrustEvents(eventsResult.rows)
+  const updatedAt = new Date().toISOString()
+  await pool.query(
+    `
+      INSERT INTO client_trust_scores (user_id, score, confidence, updated_at, reasons)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (user_id) DO UPDATE
+      SET score = EXCLUDED.score,
+          confidence = EXCLUDED.confidence,
+          updated_at = EXCLUDED.updated_at,
+          reasons = EXCLUDED.reasons
+    `,
+    [
+      userId,
+      summary.score,
+      summary.confidence,
+      updatedAt,
+      JSON.stringify(summary.reasons ?? { positive: [], negative: [] }),
+    ]
+  )
+
+  return {
+    score: summary.score,
+    confidence: summary.confidence,
+    reasons: summary.reasons ?? { positive: [], negative: [] },
+    updatedAt,
+    level: getTrustLevelLabel(summary.confidence),
+    eventCount: summary.eventCount,
+  }
+}
+
+const buildTrustPayload = (row, options = {}) => {
+  if (!row) return null
+  const scoreKey = options.scoreKey ?? 'score'
+  const confidenceKey = options.confidenceKey ?? 'confidence'
+  const updatedAtKey = options.updatedAtKey ?? 'updatedAt'
+  const reasonsKey = options.reasonsKey ?? 'reasons'
+  const includeReasons = Boolean(options.includeReasons)
+
+  const scoreRaw = row[scoreKey]
+  if (scoreRaw === null || scoreRaw === undefined) return null
+  const score = Number(scoreRaw)
+  if (!Number.isFinite(score)) return null
+  const confidence = Number(row[confidenceKey] ?? 0)
+  const updatedAt = row[updatedAtKey] ?? null
+  const payload = {
+    score,
+    confidence,
+    level: getTrustLevelLabel(confidence),
+    updatedAt,
+  }
+  if (includeReasons) {
+    payload.reasons = row[reasonsKey] ?? { positive: [], negative: [] }
+  }
+  return payload
+}
+
+const logClientTrustEvent = async ({
+  userId,
+  eventType,
+  meta,
+  occurredAt,
+  skipRefresh,
+}) => {
+  const normalizedUserId = normalizeText(userId)
+  const normalizedEventType = normalizeText(eventType)
+  if (!normalizedUserId || !normalizedEventType) {
+    return { inserted: false }
+  }
+
+  const weight = TRUST_EVENT_WEIGHTS[normalizedEventType]
+  if (typeof weight !== 'number') {
+    return { inserted: false }
+  }
+
+  const safeMeta =
+    meta && typeof meta === 'object' && !Array.isArray(meta) ? meta : {}
+  const ref =
+    typeof safeMeta.ref === 'string' ? safeMeta.ref.trim() : ''
+
+  if (ref) {
+    const existing = await pool.query(
+      `
+        SELECT id
+        FROM client_trust_events
+        WHERE user_id = $1
+          AND event_type = $2
+          AND meta->>'ref' = $3
+        LIMIT 1
+      `,
+      [normalizedUserId, normalizedEventType, ref]
+    )
+    if (existing.rows.length > 0) {
+      return { inserted: false }
+    }
+  }
+
+  await ensureUser(normalizedUserId)
+
+  if (occurredAt) {
+    await pool.query(
+      `
+        INSERT INTO client_trust_events (user_id, event_type, weight, meta, created_at)
+        VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        normalizedUserId,
+        normalizedEventType,
+        weight,
+        JSON.stringify(safeMeta),
+        occurredAt,
+      ]
+    )
+  } else {
+    await pool.query(
+      `
+        INSERT INTO client_trust_events (user_id, event_type, weight, meta)
+        VALUES ($1, $2, $3, $4)
+      `,
+      [normalizedUserId, normalizedEventType, weight, JSON.stringify(safeMeta)]
+    )
+  }
+
+  if (!skipRefresh) {
+    await refreshClientTrustScore(normalizedUserId)
+  }
+
+  return { inserted: true }
+}
+
+const resolveCancelEventType = (scheduledAt, cancelledAt) => {
+  const scheduled = new Date(scheduledAt ?? '')
+  if (Number.isNaN(scheduled.getTime())) return null
+  const cancelled = cancelledAt ? new Date(cancelledAt) : new Date()
+  if (Number.isNaN(cancelled.getTime())) return null
+  const diffHours = (scheduled.getTime() - cancelled.getTime()) / (60 * 60 * 1000)
+  return diffHours >= 24 ? 'client_cancel_>24h' : 'client_cancel_<24h'
+}
+
+const isProfileCompleteForTrust = async (userId) => {
+  const [address, location] = await Promise.all([
+    loadUserAddress(userId),
+    loadUserLocation(userId),
+  ])
+  const hasAddress =
+    Boolean(address?.address?.trim()) &&
+    Number.isInteger(address?.cityId) &&
+    Number.isInteger(address?.districtId)
+  const hasLocation =
+    typeof location?.lat === 'number' && typeof location?.lng === 'number'
+  return hasAddress && hasLocation
+}
+
+const maybeLogProfileComplete = async (userId, options = {}) => {
+  const normalizedUserId = normalizeText(userId)
+  if (!normalizedUserId) return null
+  const isComplete = await isProfileCompleteForTrust(normalizedUserId)
+  if (!isComplete) return null
+  return logClientTrustEvent({
+    userId: normalizedUserId,
+    eventType: 'profile_complete',
+    meta: { ref: 'profile_complete' },
+    skipRefresh: Boolean(options.skipRefresh),
+  })
 }
 
 const ensureMasterProfile = async (userId) => {
@@ -1172,6 +1451,23 @@ const loadUserLocation = async (userId) => {
         share_to_masters AS "shareToMasters",
         updated_at AS "updatedAt"
       FROM user_locations
+      WHERE user_id = $1
+    `,
+    [userId]
+  )
+  return result.rows[0] ?? null
+}
+
+const loadUserAddress = async (userId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        user_id AS "userId",
+        city_id AS "cityId",
+        district_id AS "districtId",
+        address,
+        updated_at AS "updatedAt"
+      FROM user_addresses
       WHERE user_id = $1
     `,
     [userId]
@@ -1771,9 +2067,63 @@ const ensureSchema = async () => {
       status TEXT NOT NULL DEFAULT 'pending',
       proposed_price INTEGER,
       client_comment TEXT,
+      cancelled_by TEXT,
+      cancelled_at TIMESTAMPTZ,
+      outcome TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS cancelled_by TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS outcome TEXT;
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS client_trust_events (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      weight INTEGER NOT NULL,
+      meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS client_trust_events_user_idx
+    ON client_trust_events (user_id, created_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS client_trust_events_type_idx
+    ON client_trust_events (event_type);
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS client_trust_scores (
+      user_id TEXT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+      score INTEGER NOT NULL,
+      confidence REAL NOT NULL,
+      reasons JSONB NOT NULL DEFAULT '{"positive": [], "negative": []}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS client_trust_scores_updated_idx
+    ON client_trust_scores (updated_at DESC);
   `)
 
   await pool.query(`
@@ -2185,6 +2535,7 @@ app.post('/api/address', async (req, res) => {
       [normalizedUserId, parsedCityId, parsedDistrictId, addressValue]
     )
 
+    await maybeLogProfileComplete(normalizedUserId)
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/address failed:', error)
@@ -2270,6 +2621,7 @@ app.post('/api/location', async (req, res) => {
     )
 
     const location = await loadUserLocation(normalizedUserId)
+    await maybeLogProfileComplete(normalizedUserId)
     res.json({ ok: true, location })
   } catch (error) {
     console.error('POST /api/location failed:', error)
@@ -2347,6 +2699,45 @@ app.delete('/api/location', async (req, res) => {
     res.json({ ok: true })
   } catch (error) {
     console.error('DELETE /api/location failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/clients/:id/trust', async (req, res) => {
+  const clientId = normalizeText(req.params.id)
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!clientId) {
+    res.status(400).json({ error: 'clientId_required' })
+    return
+  }
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (normalizedUserId !== clientId) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
+
+  try {
+    let trustRow = await loadClientTrustScore(clientId)
+    if (!trustRow) {
+      trustRow = await refreshClientTrustScore(clientId)
+    }
+    const payload =
+      buildTrustPayload(trustRow, { includeReasons: true }) ?? {
+        score: TRUST_BASE_SCORE,
+        confidence: 0,
+        level: getTrustLevelLabel(0),
+        updatedAt: null,
+        reasons: { positive: [], negative: [] },
+      }
+    res.json(payload)
+  } catch (error) {
+    console.error('GET /api/clients/:id/trust failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -3915,7 +4306,10 @@ app.get('/api/pro/requests', async (req, res) => {
           ch.id AS "chatId",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
-          ul.share_to_masters AS "clientShareToMasters"
+          ul.share_to_masters AS "clientShareToMasters",
+          cts.score AS "clientTrustScore",
+          cts.confidence AS "clientTrustConfidence",
+          cts.updated_at AS "clientTrustUpdatedAt"
         FROM request_dispatches rd
         JOIN service_requests r ON r.id = rd.request_id
         LEFT JOIN users u ON u.user_id = r.user_id
@@ -3924,6 +4318,7 @@ app.get('/api/pro/requests', async (req, res) => {
         LEFT JOIN user_locations ul ON ul.user_id = r.user_id
         LEFT JOIN request_responses rr
           ON rr.request_id = r.id AND rr.master_id = rd.master_id
+        LEFT JOIN client_trust_scores cts ON cts.user_id = r.user_id
         LEFT JOIN chats ch
           ON ch.request_id = r.id
           AND ch.master_id = rd.master_id
@@ -3948,6 +4343,11 @@ app.get('/api/pro/requests', async (req, res) => {
         row.clientUsername,
         'Клиент'
       )
+      const clientTrust = buildTrustPayload(row, {
+        scoreKey: 'clientTrustScore',
+        confidenceKey: 'clientTrustConfidence',
+        updatedAtKey: 'clientTrustUpdatedAt',
+      })
       const distanceKm =
         masterLocation &&
         row.clientShareToMasters &&
@@ -3968,12 +4368,16 @@ app.get('/api/pro/requests', async (req, res) => {
         ...row,
         clientName,
         distanceKm,
+        clientTrust,
         clientLat: undefined,
         clientLng: undefined,
         clientShareToMasters: undefined,
         clientFirstName: undefined,
         clientLastName: undefined,
         clientUsername: undefined,
+        clientTrustScore: undefined,
+        clientTrustConfidence: undefined,
+        clientTrustUpdatedAt: undefined,
       }
     })
     res.json({ ...summary, isActive: profile.isActive, requests: payload })
@@ -4079,12 +4483,16 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.created_at AS "createdAt",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
-          ul.share_to_masters AS "clientShareToMasters"
+          ul.share_to_masters AS "clientShareToMasters",
+          cts.score AS "clientTrustScore",
+          cts.confidence AS "clientTrustConfidence",
+          cts.updated_at AS "clientTrustUpdatedAt"
         FROM service_bookings b
         LEFT JOIN users u ON u.user_id = b.client_id
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
         LEFT JOIN user_locations ul ON ul.user_id = b.client_id
+        LEFT JOIN client_trust_scores cts ON cts.user_id = b.client_id
         WHERE b.master_id = $1
         ORDER BY b.created_at DESC
       `,
@@ -4097,6 +4505,11 @@ app.get('/api/pro/bookings', async (req, res) => {
         .join(' ')
         .trim()
       const clientName = nameParts || (row.clientUsername ? `@${row.clientUsername}` : 'Клиент')
+      const clientTrust = buildTrustPayload(row, {
+        scoreKey: 'clientTrustScore',
+        confidenceKey: 'clientTrustConfidence',
+        updatedAtKey: 'clientTrustUpdatedAt',
+      })
       const distanceKm =
         masterLocation &&
         row.clientShareToMasters &&
@@ -4117,9 +4530,13 @@ app.get('/api/pro/bookings', async (req, res) => {
         ...row,
         clientName,
         distanceKm,
+        clientTrust,
         clientLat: undefined,
         clientLng: undefined,
         clientShareToMasters: undefined,
+        clientTrustScore: undefined,
+        clientTrustConfidence: undefined,
+        clientTrustUpdatedAt: undefined,
       }
     })
 
@@ -4754,10 +5171,11 @@ app.patch('/api/bookings/:id', async (req, res) => {
     return
   }
 
-  const { userId, action, price } = req.body ?? {}
+  const { userId, action, price, outcome } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
   const normalizedAction = normalizeText(action)
   const parsedPrice = parseOptionalInt(price)
+  const normalizedOutcome = normalizeText(outcome)
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -4779,7 +5197,10 @@ app.patch('/api/bookings/:id', async (req, res) => {
           status,
           service_name AS "serviceName",
           service_price AS "servicePrice",
-          proposed_price AS "proposedPrice"
+          proposed_price AS "proposedPrice",
+          scheduled_at AS "scheduledAt",
+          cancelled_at AS "cancelledAt",
+          outcome
         FROM service_bookings
         WHERE id = $1
       `,
@@ -4819,6 +5240,16 @@ app.patch('/api/bookings/:id', async (req, res) => {
         `,
         [bookingId]
       )
+
+      await logClientTrustEvent({
+        userId: booking.clientId,
+        eventType: 'booking_confirmed',
+        meta: {
+          ref: `booking:${bookingId}`,
+          bookingId,
+          scheduledAt: booking.scheduledAt,
+        },
+      })
 
       let chatPayload = null
       try {
@@ -4867,6 +5298,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
         `
           UPDATE service_bookings
           SET status = 'declined',
+              cancelled_by = 'master',
+              cancelled_at = NOW(),
               updated_at = NOW()
           WHERE id = $1
         `,
@@ -4928,6 +5361,16 @@ app.patch('/api/bookings/:id', async (req, res) => {
         [bookingId, booking.proposedPrice]
       )
 
+      await logClientTrustEvent({
+        userId: booking.clientId,
+        eventType: 'booking_confirmed',
+        meta: {
+          ref: `booking:${bookingId}`,
+          bookingId,
+          scheduledAt: booking.scheduledAt,
+        },
+      })
+
       let chatPayload = null
       try {
         chatPayload = await createChatForBooking({
@@ -4980,15 +5423,37 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
+      const cancelledAt = new Date().toISOString()
+      const cancelEventType = resolveCancelEventType(
+        booking.scheduledAt,
+        cancelledAt
+      )
+      const outcomeValue =
+        cancelEventType === 'client_cancel_<24h' ? 'late_cancel' : null
+
       await pool.query(
         `
           UPDATE service_bookings
           SET status = 'cancelled',
+              cancelled_by = 'client',
+              cancelled_at = $2,
+              outcome = $3,
               updated_at = NOW()
           WHERE id = $1
         `,
-        [bookingId]
+        [bookingId, cancelledAt, outcomeValue]
       )
+
+      await logClientTrustEvent({
+        userId: booking.clientId,
+        eventType: 'client_decline_price',
+        meta: {
+          ref: `booking:${bookingId}`,
+          bookingId,
+          scheduledAt: booking.scheduledAt,
+          cancelWindow: cancelEventType,
+        },
+      })
 
       res.json({ ok: true, status: 'cancelled' })
       return
@@ -5004,17 +5469,110 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
+      const cancelledAt = new Date().toISOString()
+      const cancelEventType = resolveCancelEventType(
+        booking.scheduledAt,
+        cancelledAt
+      )
+      const outcomeValue =
+        cancelEventType === 'client_cancel_<24h' ? 'late_cancel' : null
+
       await pool.query(
         `
           UPDATE service_bookings
           SET status = 'cancelled',
+              cancelled_by = 'client',
+              cancelled_at = $2,
+              outcome = $3,
               updated_at = NOW()
           WHERE id = $1
         `,
-        [bookingId]
+        [bookingId, cancelledAt, outcomeValue]
       )
 
+      if (cancelEventType) {
+        await logClientTrustEvent({
+          userId: booking.clientId,
+          eventType: cancelEventType,
+          meta: {
+            ref: `booking:${bookingId}`,
+            bookingId,
+            scheduledAt: booking.scheduledAt,
+          },
+        })
+      }
+
       res.json({ ok: true, status: 'cancelled' })
+      return
+    }
+
+    if (normalizedAction === 'set-outcome') {
+      if (!isMaster) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+
+      if (!['completed', 'late_cancel', 'no_show'].includes(normalizedOutcome)) {
+        res.status(400).json({ error: 'outcome_invalid' })
+        return
+      }
+
+      if (booking.status !== 'confirmed') {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
+      const updates = ['outcome = $2', 'updated_at = NOW()']
+      const values = [bookingId, normalizedOutcome]
+
+      if (normalizedOutcome === 'late_cancel') {
+        updates.push(`cancelled_by = COALESCE(cancelled_by, 'client')`)
+        updates.push(`cancelled_at = COALESCE(cancelled_at, NOW())`)
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET ${updates.join(', ')}
+          WHERE id = $1
+        `,
+        values
+      )
+
+      if (normalizedOutcome === 'completed') {
+        await logClientTrustEvent({
+          userId: booking.clientId,
+          eventType: 'booking_completed',
+          meta: {
+            ref: `booking:${bookingId}`,
+            bookingId,
+            scheduledAt: booking.scheduledAt,
+          },
+        })
+      } else if (normalizedOutcome === 'no_show') {
+        await logClientTrustEvent({
+          userId: booking.clientId,
+          eventType: 'client_no_show',
+          meta: {
+            ref: `booking:${bookingId}`,
+            bookingId,
+            scheduledAt: booking.scheduledAt,
+          },
+        })
+      } else if (normalizedOutcome === 'late_cancel') {
+        await logClientTrustEvent({
+          userId: booking.clientId,
+          eventType: 'client_cancel_<24h',
+          meta: {
+            ref: `booking:${bookingId}`,
+            bookingId,
+            scheduledAt: booking.scheduledAt,
+            source: 'outcome',
+          },
+        })
+      }
+
+      res.json({ ok: true, outcome: normalizedOutcome })
       return
     }
 
@@ -5146,6 +5704,27 @@ app.post('/api/bookings/:id/review', async (req, res) => {
         bookingId,
       ]
     )
+
+    await pool.query(
+      `
+        UPDATE service_bookings
+        SET outcome = COALESCE(outcome, 'completed'),
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [bookingId]
+    )
+
+    await logClientTrustEvent({
+      userId: booking.clientId,
+      eventType: 'booking_completed',
+      meta: {
+        ref: `booking:${bookingId}`,
+        bookingId,
+        scheduledAt: booking.scheduledAt,
+        source: 'review',
+      },
+    })
 
     res.json({ ok: true, reviewId: insertResult.rows[0]?.id })
   } catch (error) {
@@ -5747,6 +6326,16 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
           `,
           [requestId]
         )
+
+        await logClientTrustEvent({
+          userId: request.userId,
+          eventType: 'request_response_accept',
+          meta: {
+            ref: `response:${responseId}`,
+            requestId,
+            responseId,
+          },
+        })
       }
 
       let chatId = null
@@ -5907,7 +6496,10 @@ app.get('/api/chats', async (req, res) => {
           COALESCE(mp.avatar_path, um.avatar_url) AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
           u.last_name AS "clientLastName",
-          u.username AS "clientUsername"
+          u.username AS "clientUsername",
+          cts.score AS "clientTrustScore",
+          cts.confidence AS "clientTrustConfidence",
+          cts.updated_at AS "clientTrustUpdatedAt"
         FROM chat_members cm
         JOIN chats c ON c.id = cm.chat_id
         LEFT JOIN chat_messages lm ON lm.id = c.last_message_id
@@ -5916,6 +6508,7 @@ app.get('/api/chats', async (req, res) => {
         LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
         LEFT JOIN users um ON um.user_id = c.master_id
         LEFT JOIN users u ON u.user_id = c.client_id
+        LEFT JOIN client_trust_scores cts ON cts.user_id = c.client_id
         WHERE cm.user_id = $1
           AND (
             (c.context_type = 'request' AND sr.status = 'closed')
@@ -5930,6 +6523,13 @@ app.get('/api/chats', async (req, res) => {
     const payload = result.rows.map((row) => {
       const isClient = row.clientId === normalizedUserId
       const isSupportChat = row.contextType === 'support'
+      const counterpartTrust = !isClient
+        ? buildTrustPayload(row, {
+            scoreKey: 'clientTrustScore',
+            confidenceKey: 'clientTrustConfidence',
+            updatedAtKey: 'clientTrustUpdatedAt',
+          })
+        : null
       const counterpartName = isSupportChat
         ? isClient
           ? 'Поддержка'
@@ -5985,6 +6585,7 @@ app.get('/api/chats', async (req, res) => {
           role: isClient ? 'master' : 'client',
           name: counterpartName,
           avatarUrl: counterpartAvatarUrl,
+          trust: counterpartTrust ?? undefined,
         },
         request: row.requestId
           ? {
@@ -6065,13 +6666,17 @@ app.get('/api/chats/:id', async (req, res) => {
           COALESCE(mp.avatar_path, um.avatar_url) AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
           u.last_name AS "clientLastName",
-          u.username AS "clientUsername"
+          u.username AS "clientUsername",
+          cts.score AS "clientTrustScore",
+          cts.confidence AS "clientTrustConfidence",
+          cts.updated_at AS "clientTrustUpdatedAt"
         FROM chats c
         LEFT JOIN service_requests sr ON sr.id = c.request_id
         LEFT JOIN service_bookings sb ON sb.id = c.booking_id
         LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
         LEFT JOIN users um ON um.user_id = c.master_id
         LEFT JOIN users u ON u.user_id = c.client_id
+        LEFT JOIN client_trust_scores cts ON cts.user_id = c.client_id
         WHERE c.id = $1
       `,
       [chatId]
@@ -6099,6 +6704,13 @@ app.get('/api/chats/:id', async (req, res) => {
 
     const isClient = row.clientId === normalizedUserId
     const isSupportChat = row.contextType === 'support'
+    const counterpartTrust = !isClient
+      ? buildTrustPayload(row, {
+          scoreKey: 'clientTrustScore',
+          confidenceKey: 'clientTrustConfidence',
+          updatedAtKey: 'clientTrustUpdatedAt',
+        })
+      : null
     const counterpartName = isSupportChat
       ? isClient
         ? 'Поддержка'
@@ -6140,6 +6752,7 @@ app.get('/api/chats/:id', async (req, res) => {
           isSupportChat || !isClient
             ? null
             : buildPublicUrl(req, row.masterAvatarPath),
+        trust: counterpartTrust ?? undefined,
       },
       request: row.requestId
         ? {
@@ -6685,10 +7298,229 @@ app.post('/api/requests', async (req, res) => {
   }
 })
 
+const backfillClientTrustScores = async () => {
+  const affectedUsers = new Set()
+  let insertedEvents = 0
+
+  const trackEvent = async (payload) => {
+    const result = await logClientTrustEvent({
+      ...payload,
+      skipRefresh: true,
+    })
+    if (result.inserted) {
+      insertedEvents += 1
+      affectedUsers.add(payload.userId)
+    }
+  }
+
+  const profileResult = await pool.query(
+    `
+      SELECT ua.user_id AS "userId"
+      FROM user_addresses ua
+      JOIN user_locations ul ON ul.user_id = ua.user_id
+      WHERE ua.address IS NOT NULL
+        AND ua.address <> ''
+        AND ua.city_id IS NOT NULL
+        AND ua.district_id IS NOT NULL
+        AND ul.lat IS NOT NULL
+        AND ul.lng IS NOT NULL
+    `
+  )
+
+  for (const row of profileResult.rows) {
+    await trackEvent({
+      userId: row.userId,
+      eventType: 'profile_complete',
+      meta: { ref: 'profile_complete' },
+    })
+  }
+
+  const confirmedBookings = await pool.query(
+    `
+      SELECT
+        id,
+        client_id AS "clientId",
+        scheduled_at AS "scheduledAt",
+        updated_at AS "updatedAt"
+      FROM service_bookings
+      WHERE status = 'confirmed'
+    `
+  )
+
+  for (const row of confirmedBookings.rows) {
+    await trackEvent({
+      userId: row.clientId,
+      eventType: 'booking_confirmed',
+      meta: {
+        ref: `booking:${row.id}`,
+        bookingId: row.id,
+        scheduledAt: row.scheduledAt,
+      },
+      occurredAt: row.updatedAt,
+    })
+  }
+
+  const completedBookings = await pool.query(
+    `
+      SELECT
+        id,
+        client_id AS "clientId",
+        scheduled_at AS "scheduledAt"
+      FROM service_bookings
+      WHERE status = 'confirmed'
+        AND scheduled_at < NOW()
+        AND (outcome IS NULL OR outcome = 'completed')
+    `
+  )
+
+  for (const row of completedBookings.rows) {
+    await trackEvent({
+      userId: row.clientId,
+      eventType: 'booking_completed',
+      meta: {
+        ref: `booking:${row.id}`,
+        bookingId: row.id,
+        scheduledAt: row.scheduledAt,
+      },
+      occurredAt: row.scheduledAt,
+    })
+  }
+
+  const cancelledBookings = await pool.query(
+    `
+      SELECT
+        id,
+        client_id AS "clientId",
+        scheduled_at AS "scheduledAt",
+        cancelled_at AS "cancelledAt"
+      FROM service_bookings
+      WHERE status = 'cancelled'
+        AND cancelled_by = 'client'
+        AND cancelled_at IS NOT NULL
+    `
+  )
+
+  for (const row of cancelledBookings.rows) {
+    const eventType = resolveCancelEventType(row.scheduledAt, row.cancelledAt)
+    if (!eventType) continue
+    await trackEvent({
+      userId: row.clientId,
+      eventType,
+      meta: {
+        ref: `booking:${row.id}`,
+        bookingId: row.id,
+        scheduledAt: row.scheduledAt,
+      },
+      occurredAt: row.cancelledAt,
+    })
+  }
+
+  const lateCancelBookings = await pool.query(
+    `
+      SELECT
+        id,
+        client_id AS "clientId",
+        scheduled_at AS "scheduledAt",
+        COALESCE(cancelled_at, updated_at) AS "eventAt"
+      FROM service_bookings
+      WHERE outcome = 'late_cancel'
+    `
+  )
+
+  for (const row of lateCancelBookings.rows) {
+    await trackEvent({
+      userId: row.clientId,
+      eventType: 'client_cancel_<24h',
+      meta: {
+        ref: `booking:${row.id}`,
+        bookingId: row.id,
+        scheduledAt: row.scheduledAt,
+        source: 'outcome',
+      },
+      occurredAt: row.eventAt,
+    })
+  }
+
+  const noShowBookings = await pool.query(
+    `
+      SELECT
+        id,
+        client_id AS "clientId",
+        scheduled_at AS "scheduledAt",
+        updated_at AS "updatedAt"
+      FROM service_bookings
+      WHERE outcome = 'no_show'
+    `
+  )
+
+  for (const row of noShowBookings.rows) {
+    await trackEvent({
+      userId: row.clientId,
+      eventType: 'client_no_show',
+      meta: {
+        ref: `booking:${row.id}`,
+        bookingId: row.id,
+        scheduledAt: row.scheduledAt,
+      },
+      occurredAt: row.updatedAt,
+    })
+  }
+
+  const acceptedResponses = await pool.query(
+    `
+      SELECT
+        rr.id AS "responseId",
+        rr.request_id AS "requestId",
+        rr.updated_at AS "updatedAt",
+        sr.user_id AS "clientId"
+      FROM request_responses rr
+      JOIN service_requests sr ON sr.id = rr.request_id
+      WHERE rr.status = 'accepted'
+    `
+  )
+
+  for (const row of acceptedResponses.rows) {
+    await trackEvent({
+      userId: row.clientId,
+      eventType: 'request_response_accept',
+      meta: {
+        ref: `response:${row.responseId}`,
+        requestId: row.requestId,
+        responseId: row.responseId,
+      },
+      occurredAt: row.updatedAt,
+    })
+  }
+
+  for (const userId of affectedUsers) {
+    await refreshClientTrustScore(userId)
+  }
+
+  return {
+    insertedEvents,
+    usersUpdated: affectedUsers.size,
+  }
+}
+
 const start = async () => {
+  const shouldBackfillTrust =
+    normalizeText(process.env.TRUST_BACKFILL) === '1' ||
+    normalizeText(process.env.TRUST_BACKFILL).toLowerCase() === 'true'
+
   await ensureSchema()
   await seedLocations()
   await fs.mkdir(uploadsRoot, { recursive: true })
+
+  if (shouldBackfillTrust) {
+    try {
+      console.log('Running trust backfill...')
+      const summary = await backfillClientTrustScores()
+      console.log('Trust backfill complete:', summary)
+    } catch (error) {
+      console.error('Trust backfill failed:', error)
+    }
+  }
+
   const server = app.listen(port, () => {
     console.log(`API listening on :${port}`)
   })
