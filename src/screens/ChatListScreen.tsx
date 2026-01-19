@@ -44,6 +44,49 @@ const formatChatTimestamp = (value?: string | null) => {
   }).format(date)
 }
 
+const formatContextTimestamp = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const dayDiff = Math.round((target.getTime() - today.getTime()) / 86400000)
+  const timeLabel = new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+  if (dayDiff === 0) return `Сегодня, ${timeLabel}`
+  if (dayDiff === 1) return `Завтра, ${timeLabel}`
+  if (dayDiff === -1) return `Вчера, ${timeLabel}`
+  const dateLabel = new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  }).format(date)
+  return `${dateLabel}, ${timeLabel}`
+}
+
+const bookingStatusLabels: Record<string, string> = {
+  pending: 'Ожидает подтверждения',
+  price_pending: 'Ожидает цену',
+  price_proposed: 'Предложена цена',
+  confirmed: 'Подтверждено',
+  declined: 'Отказ',
+  cancelled: 'Отменено',
+}
+
+const requestStatusLabels: Record<string, string> = {
+  open: 'Ожидает отклика',
+  closed: 'Согласовано',
+}
+
+const bookingOutcomeLabels: Record<string, string> = {
+  on_time: 'Вовремя',
+  late: 'Опоздал',
+  no_show: 'Не пришёл',
+  late_cancel: 'Поздняя отмена',
+}
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'Ч'
@@ -70,6 +113,105 @@ const getMessagePreview = (message?: ChatSummary['lastMessage'] | null) => {
     default:
       return ''
   }
+}
+
+const getLatestContext = (chat: ChatSummary) => {
+  if (Array.isArray(chat.contexts) && chat.contexts.length > 0) {
+    return chat.contexts[0]
+  }
+  if (chat.contextType === 'booking' && chat.booking) {
+    return {
+      contextType: 'booking' as const,
+      contextId: chat.booking.id,
+      serviceName: chat.booking.serviceName ?? null,
+      status: chat.booking.status ?? null,
+      scheduledAt: chat.booking.scheduledAt ?? null,
+      serviceDuration: chat.booking.serviceDuration ?? null,
+      servicePrice: chat.booking.servicePrice ?? null,
+      outcome: chat.booking.outcome ?? null,
+      lateMinutes: chat.booking.lateMinutes ?? null,
+      createdAt: chat.booking.createdAt ?? null,
+    }
+  }
+  if (chat.contextType === 'request' && chat.request) {
+    return {
+      contextType: 'request' as const,
+      contextId: chat.request.id,
+      serviceName: chat.request.serviceName ?? null,
+      status: chat.request.status ?? null,
+      locationType: chat.request.locationType ?? null,
+      dateOption: chat.request.dateOption ?? null,
+      dateTime: chat.request.dateTime ?? null,
+      createdAt: chat.request.createdAt ?? null,
+    }
+  }
+  return null
+}
+
+const getContextStatusLabel = (
+  context: ReturnType<typeof getLatestContext>
+) => {
+  if (!context) return ''
+  if (context.contextType === 'booking') {
+    if (context.outcome) {
+      return bookingOutcomeLabels[context.outcome] ?? context.outcome
+    }
+    if (context.status) {
+      return bookingStatusLabels[context.status] ?? context.status
+    }
+    return 'Запись'
+  }
+  if (context.status) {
+    return requestStatusLabels[context.status] ?? context.status
+  }
+  return 'Заявка'
+}
+
+const getContextTimeLabel = (context: ReturnType<typeof getLatestContext>) => {
+  if (!context) return ''
+  if (context.contextType === 'booking') {
+    return formatContextTimestamp(context.scheduledAt ?? context.createdAt ?? null)
+  }
+  if (context.dateOption === 'today') return 'Сегодня'
+  if (context.dateOption === 'tomorrow') return 'Завтра'
+  if (context.dateOption === 'choose' && context.dateTime) {
+    return formatContextTimestamp(context.dateTime)
+  }
+  if (context.dateTime) {
+    return formatContextTimestamp(context.dateTime)
+  }
+  return context.createdAt ? formatContextTimestamp(context.createdAt) : 'По договоренности'
+}
+
+const getContextTypeLabel = (context: ReturnType<typeof getLatestContext>) => {
+  if (!context) return 'Диалог'
+  return context.contextType === 'booking' ? 'Запись' : 'Заявка'
+}
+
+const getChatBucket = (chat: ChatSummary) => {
+  if (chat.contextType === 'support') return 'active'
+  const context = getLatestContext(chat)
+  if (!context) return 'waiting'
+  if (context.contextType === 'booking') {
+    const status = context.status ?? ''
+    if (context.outcome || status === 'cancelled' || status === 'declined') {
+      return 'archived'
+    }
+    if (['pending', 'price_pending', 'price_proposed'].includes(status)) {
+      return 'waiting'
+    }
+    if (context.scheduledAt) {
+      const scheduledMs = new Date(context.scheduledAt).getTime()
+      if (Number.isFinite(scheduledMs) && scheduledMs < Date.now() - 2 * 60 * 60 * 1000) {
+        return 'waiting'
+      }
+    }
+    return 'active'
+  }
+  const requestStatus = context.status ?? ''
+  if (requestStatus === 'open') return 'waiting'
+  if (requestStatus === 'closed') return 'active'
+  return 'archived'
 }
 
 export const ChatListScreen = ({
@@ -110,45 +252,39 @@ export const ChatListScreen = ({
         ? 'is-syncing'
         : 'is-offline'
 
-  const confirmedItems = useMemo(
-    () =>
-      items.filter((item) => {
-        if (item.contextType === 'request') {
-          return item.request?.status === 'closed'
-        }
-        if (item.contextType === 'booking') {
-          return item.booking?.status === 'confirmed'
-        }
-        return true
-      }),
-    [items]
-  )
-
   const supportChat = useMemo(
-    () => confirmedItems.find((item) => item.contextType === 'support') ?? null,
-    [confirmedItems]
+    () => items.find((item) => item.contextType === 'support') ?? null,
+    [items]
   )
 
   const regularItems = useMemo(
     () =>
-      isSupportAgent
-        ? confirmedItems
-        : confirmedItems.filter((item) => item.contextType !== 'support'),
-    [confirmedItems, isSupportAgent]
+      isSupportAgent ? items : items.filter((item) => item.contextType !== 'support'),
+    [items, isSupportAgent]
   )
 
   const totalUnread = useMemo(
-    () => confirmedItems.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
-    [confirmedItems]
+    () => items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
+    [items]
   )
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     const byQuery = query
       ? regularItems.filter((item) => {
+          const latestContext = getLatestContext(item)
           const serviceName =
-            item.request?.serviceName || item.booking?.serviceName || ''
-          const haystack = `${item.counterpart.name} ${serviceName}`.toLowerCase()
+            latestContext?.serviceName ||
+            item.request?.serviceName ||
+            item.booking?.serviceName ||
+            ''
+          const contextNames = Array.isArray(item.contexts)
+            ? item.contexts
+                .map((context) => context.serviceName)
+                .filter(Boolean)
+                .join(' ')
+            : ''
+          const haystack = `${item.counterpart.name} ${serviceName} ${contextNames}`.toLowerCase()
           return haystack.includes(query)
         })
       : regularItems
@@ -159,12 +295,33 @@ export const ChatListScreen = ({
     return byQuery
   }, [filter, regularItems, searchQuery])
 
+  const chatSections = useMemo(() => {
+    const active: ChatSummary[] = []
+    const waiting: ChatSummary[] = []
+    const archived: ChatSummary[] = []
+    filteredItems.forEach((chat) => {
+      const bucket = getChatBucket(chat)
+      if (bucket === 'archived') {
+        archived.push(chat)
+      } else if (bucket === 'waiting') {
+        waiting.push(chat)
+      } else {
+        active.push(chat)
+      }
+    })
+    return { active, waiting, archived }
+  }, [filteredItems])
+
   const supportPreview = supportChat
     ? getMessagePreview(supportChat.lastMessage) || 'Откройте чат поддержки'
     : 'Ответим по записи, оплате и сервису'
   const supportTime = formatChatTimestamp(supportChat?.lastMessage?.createdAt ?? null)
   const supportUnread = supportChat?.unreadCount ?? 0
   const hasRegularChats = regularItems.length > 0
+  const filteredCount =
+    chatSections.active.length +
+    chatSections.waiting.length +
+    chatSections.archived.length
 
   const loadChats = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -299,6 +456,20 @@ export const ChatListScreen = ({
         if (!handled) {
           scheduleReload()
         }
+        if (incoming.type === 'system') {
+          const meta =
+            incoming.meta && typeof incoming.meta === 'object'
+              ? (incoming.meta as Record<string, unknown>)
+              : null
+          const event = typeof meta?.event === 'string' ? meta.event : ''
+          if (
+            ['request_accepted', 'request_updated', 'booking_confirmed', 'booking_updated'].includes(
+              event
+            )
+          ) {
+            scheduleReload()
+          }
+        }
         return
       }
       if (payload?.type === 'trust:update') {
@@ -366,6 +537,110 @@ export const ChatListScreen = ({
     }, 15000)
     return () => window.clearInterval(timer)
   }, [loadChats, streamStatus])
+
+  const renderChatCard = (chat: ChatSummary) => {
+    const counterpart = chat.counterpart
+    const latestContext = getLatestContext(chat)
+    const isSupportChat = chat.contextType === 'support'
+    const contextLabel = isSupportChat
+      ? 'Поддержка'
+      : getContextTypeLabel(latestContext)
+    const contextStatus = isSupportChat ? '' : getContextStatusLabel(latestContext)
+    const contextTime = isSupportChat ? '' : getContextTimeLabel(latestContext)
+    const contextType = isSupportChat
+      ? 'support'
+      : latestContext?.contextType ?? chat.contextType
+    const serviceName = isSupportChat
+      ? 'Поддержка'
+      : latestContext?.serviceName || 'Диалог'
+    const lastMessage = chat.lastMessage
+    const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
+    const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
+    const unreadCount = chat.unreadCount ?? 0
+    const showTrust =
+      role === 'pro' && counterpart.role === 'client' && !isSupportChat
+    const statusPrefix =
+      latestContext?.contextType === 'booking' && latestContext.outcome
+        ? 'Итог: '
+        : ''
+
+    return (
+      <button
+        className={`chat-card${
+          unreadCount > 0 ? ' is-unread' : ''
+        }${chat.contextType === 'support' ? ' is-support' : ''}`}
+        key={chat.id}
+        type="button"
+        role="listitem"
+        onClick={() => onOpenChat(chat.id)}
+      >
+        <span className="chat-avatar" aria-hidden="true">
+          {counterpart.avatarUrl ? (
+            <img src={counterpart.avatarUrl} alt="" loading="lazy" />
+          ) : (
+            <span>{getInitials(counterpart.name)}</span>
+          )}
+        </span>
+        <span className="chat-card-main">
+          <span className="chat-card-top">
+            <span className="chat-card-name-row">
+              <span className="chat-card-name">{counterpart.name}</span>
+              {showTrust && (
+                <TrustBadge
+                  trust={counterpart.trust ?? null}
+                  size="sm"
+                  className="chat-card-trust"
+                />
+              )}
+            </span>
+            <span className="chat-card-time">{lastTime}</span>
+          </span>
+          <span className="chat-card-context-row">
+            <span className={`chat-card-context is-${contextType}`}>
+              {contextLabel}
+            </span>
+            <span className="chat-card-context-title">{serviceName}</span>
+          </span>
+          <span className="chat-card-context-meta">
+            {contextStatus && (
+              <span className="chat-card-context-status">
+                {statusPrefix}
+                {contextStatus}
+              </span>
+            )}
+            {contextTime && (
+              <span className="chat-card-context-time">{contextTime}</span>
+            )}
+          </span>
+          <span className="chat-card-preview">{lastLabel}</span>
+        </span>
+        <span className="chat-card-meta">
+          {unreadCount > 0 && (
+            <span className="chat-unread">{unreadCount}</span>
+          )}
+        </span>
+      </button>
+    )
+  }
+
+  const renderSection = (
+    title: string,
+    items: ChatSummary[],
+    tone: 'active' | 'waiting' | 'archived'
+  ) => {
+    if (items.length === 0) return null
+    return (
+      <section className={`chat-section is-${tone}`}>
+        <div className="chat-section-header">
+          <span className="chat-section-title">{title}</span>
+          <span className="chat-section-count">{items.length}</span>
+        </div>
+        <div className="chat-list" role="list">
+          {items.map(renderChatCard)}
+        </div>
+      </section>
+    )
+  }
 
   return (
     <div className="screen screen--chat-list">
@@ -519,84 +794,20 @@ export const ChatListScreen = ({
         {!isLoading &&
           !loadError &&
           hasRegularChats &&
-          filteredItems.length === 0 && (
+          filteredCount === 0 && (
             <div className="chat-empty is-compact">
               <h2>Ничего не найдено</h2>
               <p>Попробуйте изменить фильтр или запрос.</p>
             </div>
           )}
 
-        <div className="chat-list" role="list">
-          {filteredItems.map((chat) => {
-            const counterpart = chat.counterpart
-            const isSupportChat = chat.contextType === 'support'
-            const serviceName = isSupportChat
-              ? 'Поддержка'
-              : chat.request?.serviceName || chat.booking?.serviceName || 'Диалог'
-            const contextLabel = isSupportChat
-              ? 'Поддержка'
-              : chat.contextType === 'booking'
-                ? 'Запись'
-                : 'Заявка'
-            const statusLabel = isSupportChat
-              ? 'На связи'
-              : chat.contextType === 'booking'
-                ? 'Подтверждено'
-                : 'Согласовано'
-            const lastMessage = chat.lastMessage
-            const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
-            const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
-            const unreadCount = chat.unreadCount ?? 0
-            const showTrust =
-              role === 'pro' && counterpart.role === 'client' && !isSupportChat
-
-            return (
-              <button
-                className={`chat-card${
-                  unreadCount > 0 ? ' is-unread' : ''
-                }${isSupportChat ? ' is-support' : ''}`}
-                key={chat.id}
-                type="button"
-                role="listitem"
-                onClick={() => onOpenChat(chat.id)}
-              >
-                <span className="chat-avatar" aria-hidden="true">
-                  {counterpart.avatarUrl ? (
-                    <img src={counterpart.avatarUrl} alt="" loading="lazy" />
-                  ) : (
-                    <span>{getInitials(counterpart.name)}</span>
-                  )}
-                </span>
-                <span className="chat-card-main">
-                  <span className="chat-card-top">
-                    <span className="chat-card-name-row">
-                      <span className="chat-card-name">{counterpart.name}</span>
-                      {showTrust && (
-                        <TrustBadge
-                          trust={counterpart.trust ?? null}
-                          size="sm"
-                          className="chat-card-trust"
-                        />
-                      )}
-                    </span>
-                    <span className="chat-card-time">{lastTime}</span>
-                  </span>
-                  <span className="chat-card-service">{serviceName}</span>
-                  <span className="chat-card-preview">{lastLabel}</span>
-                </span>
-                <span className="chat-card-meta">
-                  <span className={`chat-card-context is-${chat.contextType}`}>
-                    {contextLabel}
-                  </span>
-                  <span className="chat-card-status">{statusLabel}</span>
-                  {unreadCount > 0 && (
-                    <span className="chat-unread">{unreadCount}</span>
-                  )}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        {!isLoading && !loadError && filteredCount > 0 && (
+          <div className="chat-sections">
+            {renderSection('Активные', chatSections.active, 'active')}
+            {renderSection('Ожидают', chatSections.waiting, 'waiting')}
+            {renderSection('Архив', chatSections.archived, 'archived')}
+          </div>
+        )}
       </div>
 
       {role === 'client' && (

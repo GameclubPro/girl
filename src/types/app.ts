@@ -246,6 +246,22 @@ export type ChatMessage = {
   createdAt: string
 }
 
+export type ChatContextSummary = {
+  contextType: Exclude<ChatContextType, 'support'>
+  contextId: number
+  serviceName?: string | null
+  status?: string | null
+  createdAt?: string | null
+  dateOption?: ServiceRequest['dateOption']
+  dateTime?: string | null
+  locationType?: ServiceRequest['locationType']
+  scheduledAt?: string | null
+  serviceDuration?: number | null
+  servicePrice?: number | null
+  outcome?: string | null
+  lateMinutes?: number | null
+}
+
 export type ChatSummary = {
   id: number
   contextType: ChatContextType
@@ -275,14 +291,24 @@ export type ChatSummary = {
     serviceName?: string | null
     categoryId?: string | null
     locationType?: ServiceRequest['locationType']
+    dateOption?: ServiceRequest['dateOption']
+    dateTime?: string | null
     status?: string | null
+    createdAt?: string | null
   } | null
   booking?: {
     id: number
     serviceName?: string | null
     categoryId?: string | null
     status?: string | null
+    scheduledAt?: string | null
+    serviceDuration?: number | null
+    servicePrice?: number | null
+    outcome?: string | null
+    lateMinutes?: number | null
+    createdAt?: string | null
   } | null
+  contexts?: ChatContextSummary[]
 }
 
 export type ChatDetail = {
@@ -318,6 +344,7 @@ export type ChatDetail = {
     details?: string | null
     photoUrls?: string[]
     status?: string | null
+    createdAt?: string | null
   } | null
   booking?: {
     id: number
@@ -331,5 +358,7 @@ export type ChatDetail = {
     outcome?: string | null
     lateMinutes?: number | null
     attendanceAt?: string | null
+    createdAt?: string | null
   } | null
+  contexts?: ChatContextSummary[]
 }

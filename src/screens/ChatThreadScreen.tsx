@@ -39,6 +39,20 @@ const bookingOutcomeLabelMap: Record<string, string> = {
   late_cancel: 'Поздняя отмена',
 }
 
+const bookingStatusLabelMap: Record<string, string> = {
+  pending: 'Ожидает подтверждения',
+  price_pending: 'Ожидает цену',
+  price_proposed: 'Предложена цена',
+  confirmed: 'Подтверждено',
+  declined: 'Отказ',
+  cancelled: 'Отменено',
+}
+
+const requestStatusLabelMap: Record<string, string> = {
+  open: 'Ожидает отклика',
+  closed: 'Согласовано',
+}
+
 const lateMinuteOptions = [5, 10, 15, 20, 30]
 
 const formatDurationLabel = (value?: number | null) => {
@@ -223,6 +237,7 @@ export const ChatThreadScreen = ({
   const [outcomeErrorBookingId, setOutcomeErrorBookingId] = useState<number | null>(
     null
   )
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const screenRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
@@ -272,6 +287,91 @@ export const ChatThreadScreen = ({
     typeof booking?.servicePrice === 'number'
       ? `Стоимость: ${formatPrice(booking.servicePrice)}`
       : null
+  const bookingDurationLabel = formatDurationLabel(booking?.serviceDuration)
+  const requestTimeLabel =
+    request?.dateOption === 'choose'
+      ? formatDateTime(request.dateTime) || 'По договоренности'
+      : request?.dateOption === 'tomorrow'
+        ? 'Завтра'
+        : request?.dateOption === 'today'
+          ? 'Сегодня'
+          : request?.dateTime
+            ? formatDateTime(request.dateTime)
+            : 'По договоренности'
+  const requestBudgetLabel = request?.budget ? `Бюджет: ${request.budget}` : null
+  const activeTitle = booking?.serviceName ?? request?.serviceName ?? 'Диалог'
+  const activeStatusLabel = isBookingChat
+    ? booking?.outcome
+      ? `Итог: ${bookingOutcomeLabelMap[booking.outcome] ?? booking.outcome}`
+      : booking?.status
+        ? bookingStatusLabelMap[booking.status] ?? bookingStatusLabel
+        : bookingStatusLabel
+    : request?.status
+      ? requestStatusLabelMap[request.status] ?? 'Заявка'
+      : 'Заявка'
+
+  const visibleMessages = useMemo(() => {
+    if (isProViewer) return messages
+    return messages.filter((message) => {
+      const meta = message.meta as Record<string, unknown> | null | undefined
+      const visibility =
+        typeof meta?.visibility === 'string'
+          ? meta.visibility
+          : typeof meta?.audience === 'string'
+            ? meta.audience
+            : null
+      return visibility !== 'master_only'
+    })
+  }, [isProViewer, messages])
+
+  const contextHistory = useMemo(() => {
+    const contexts = detail?.contexts ?? []
+    if (contexts.length === 0) return []
+    const activeType = detail?.chat?.contextType ?? null
+    const activeId = detail?.chat?.contextId ?? null
+    return contexts.filter(
+      (context) =>
+        !(
+          context.contextType === activeType &&
+          context.contextId === activeId
+        )
+    )
+  }, [detail?.chat?.contextId, detail?.chat?.contextType, detail?.contexts])
+
+  const getHistoryStatusLabel = (
+    context: NonNullable<ChatDetail['contexts']>[number]
+  ) => {
+    if (context.contextType === 'booking') {
+      if (context.outcome) {
+        return bookingOutcomeLabelMap[context.outcome] ?? context.outcome
+      }
+      if (context.status) {
+        return bookingStatusLabelMap[context.status] ?? context.status
+      }
+      return 'Запись'
+    }
+    if (context.status) {
+      return requestStatusLabelMap[context.status] ?? context.status
+    }
+    return 'Заявка'
+  }
+
+  const getHistoryTimeLabel = (
+    context: NonNullable<ChatDetail['contexts']>[number]
+  ) => {
+    if (context.contextType === 'booking') {
+      return formatDateTime(context.scheduledAt ?? context.createdAt ?? null)
+    }
+    if (context.dateOption === 'today') return 'Сегодня'
+    if (context.dateOption === 'tomorrow') return 'Завтра'
+    if (context.dateOption === 'choose' && context.dateTime) {
+      return formatDateTime(context.dateTime)
+    }
+    if (context.dateTime) {
+      return formatDateTime(context.dateTime)
+    }
+    return context.createdAt ? formatDateTime(context.createdAt) : ''
+  }
 
   const connectionLabel =
     streamStatus === 'connected'
@@ -679,6 +779,10 @@ export const ChatThreadScreen = ({
     void loadDetail({ silent: Boolean(cachedDetail) })
     void loadMessages(undefined, { silent: Boolean(cachedMessages?.length) })
   }, [apiBase, chatId, loadDetail, loadMessages, userId])
+
+  useEffect(() => {
+    setIsHistoryOpen(false)
+  }, [chatId])
 
   useLayoutEffect(() => {
     if (hasInitialScrollRef.current) return
@@ -1273,20 +1377,47 @@ export const ChatThreadScreen = ({
     window.setTimeout(() => scrollToBottom('auto'), 120)
   }
 
+  const applyComposerTemplate = useCallback(
+    (template: string) => {
+      if (sendError) {
+        setSendError('')
+      }
+      setComposerText((current) =>
+        current.trim() ? `${current.trim()}\n${template}` : template
+      )
+      requestAnimationFrame(() => {
+        const input = composerInputRef.current
+        if (!input) return
+        input.focus()
+        const length = input.value.length
+        input.setSelectionRange(length, length)
+      })
+    },
+    [sendError]
+  )
+
   const handleSupportTopic = (template: string) => {
-    if (sendError) {
-      setSendError('')
+    applyComposerTemplate(template)
+  }
+
+  const buildQuickTemplate = (
+    action: 'reschedule' | 'clarify' | 'update'
+  ) => {
+    const serviceLabel = booking?.serviceName ?? request?.serviceName ?? null
+    const subject = booking ? 'запись' : 'заявку'
+    if (action === 'reschedule') {
+      return serviceLabel
+        ? `Можем перенести ${subject} «${serviceLabel}»? Предлагаю другое время.`
+        : `Можем перенести ${subject}? Предлагаю другое время.`
     }
-    setComposerText((current) =>
-      current.trim() ? `${current.trim()}\n${template}` : template
-    )
-    requestAnimationFrame(() => {
-      const input = composerInputRef.current
-      if (!input) return
-      input.focus()
-      const length = input.value.length
-      input.setSelectionRange(length, length)
-    })
+    if (action === 'clarify') {
+      return serviceLabel
+        ? `Хочу уточнить детали по ${subject} «${serviceLabel}».`
+        : 'Хочу уточнить детали.'
+    }
+    return serviceLabel
+      ? `Обновляю детали по ${subject} «${serviceLabel}»: `
+      : 'Обновляю детали: '
   }
 
   const openTrustSheet = useCallback(() => {
@@ -1305,15 +1436,15 @@ export const ChatThreadScreen = ({
   }
 
   const groupedMessages = useMemo(() => {
-    return messages.map((message, index) => {
-      const previous = messages[index - 1]
+    return visibleMessages.map((message, index) => {
+      const previous = visibleMessages[index - 1]
       const showDate =
         !previous ||
         new Date(previous.createdAt).toDateString() !==
           new Date(message.createdAt).toDateString()
       return { message, showDate }
     })
-  }, [messages])
+  }, [visibleMessages])
 
   return (
     <div className="screen screen--chat-thread" ref={screenRef}>
@@ -1381,61 +1512,145 @@ export const ChatThreadScreen = ({
               ))}
             </div>
           </section>
-        ) : request ? (
-          <section className="chat-request-card">
-            <div className="chat-request-top">
-              <span className="chat-request-title">{request.serviceName}</span>
-              <span className="chat-request-pill">Согласовано</span>
-            </div>
-            <div className="chat-request-meta">
-              <span>
-                <IconPin /> {locationLabelMap[request.locationType ?? 'any']}
-              </span>
-              <span>
-                <IconClock />{' '}
-                {request.dateOption === 'choose'
-                  ? formatDateTime(request.dateTime) || 'По договоренности'
-                  : request.dateOption === 'tomorrow'
-                    ? 'Завтра'
-                    : 'Сегодня'}
-              </span>
-              {request.budget && <span>Бюджет: {request.budget}</span>}
-            </div>
-            {request.details && (
-              <p className="chat-request-details">{request.details}</p>
+        ) : request || booking ? (
+          <>
+            <section className="chat-active-card">
+              <div className="chat-active-top">
+                <div>
+                  <p className="chat-active-kicker">
+                    {isBookingChat ? 'Запись' : 'Заявка'}
+                  </p>
+                  <h2 className="chat-active-title">{activeTitle}</h2>
+                </div>
+                <span
+                  className={`chat-active-pill is-${
+                    isBookingChat ? 'booking' : 'request'
+                  }`}
+                >
+                  {activeStatusLabel}
+                </span>
+              </div>
+              <div className="chat-active-meta">
+                {isBookingChat && booking ? (
+                  <>
+                    <span>
+                      <IconPin /> {locationLabelMap[booking.locationType ?? 'client']}
+                    </span>
+                    <span>
+                      <IconClock /> {bookingTimeLabel}
+                    </span>
+                    {bookingDurationLabel && (
+                      <span>Длительность: {bookingDurationLabel}</span>
+                    )}
+                    {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
+                  </>
+                ) : request ? (
+                  <>
+                    <span>
+                      <IconPin /> {locationLabelMap[request.locationType ?? 'any']}
+                    </span>
+                    <span>
+                      <IconClock /> {requestTimeLabel}
+                    </span>
+                    {requestBudgetLabel && <span>{requestBudgetLabel}</span>}
+                  </>
+                ) : null}
+              </div>
+              {request?.details && (
+                <p className="chat-active-details">{request.details}</p>
+              )}
+              <div className="chat-active-actions">
+                <button
+                  className="chat-active-action"
+                  type="button"
+                  onClick={() =>
+                    applyComposerTemplate(buildQuickTemplate('reschedule'))
+                  }
+                >
+                  Перенести
+                </button>
+                <button
+                  className="chat-active-action"
+                  type="button"
+                  onClick={() => applyComposerTemplate(buildQuickTemplate('clarify'))}
+                >
+                  Уточнить
+                </button>
+                <button
+                  className="chat-active-action is-strong"
+                  type="button"
+                  onClick={() => applyComposerTemplate(buildQuickTemplate('update'))}
+                >
+                  Обновить
+                </button>
+              </div>
+            </section>
+
+            {contextHistory.length > 0 && (
+              <section
+                className={`chat-history${isHistoryOpen ? ' is-open' : ''}`}
+              >
+                <button
+                  className="chat-history-toggle"
+                  type="button"
+                  onClick={() => setIsHistoryOpen((prev) => !prev)}
+                  aria-expanded={isHistoryOpen}
+                >
+                  <span className="chat-history-title">История контекстов</span>
+                  <span className="chat-history-count">{contextHistory.length}</span>
+                  <span
+                    className={`chat-history-chevron${
+                      isHistoryOpen ? ' is-open' : ''
+                    }`}
+                    aria-hidden="true"
+                  >
+                    ⌄
+                  </span>
+                </button>
+                <div className="chat-history-panel">
+                  <div className="chat-history-list">
+                    {contextHistory.map((context) => {
+                      const timeLabel = getHistoryTimeLabel(context)
+                      const statusLabel = getHistoryStatusLabel(context)
+                      const label =
+                        context.contextType === 'booking' ? 'Запись' : 'Заявка'
+                      return (
+                        <div
+                          key={`${context.contextType}-${context.contextId}`}
+                          className="chat-history-item"
+                        >
+                          <span
+                            className={`chat-history-badge is-${context.contextType}`}
+                          >
+                            {label}
+                          </span>
+                          <div className="chat-history-main">
+                            <span className="chat-history-service">
+                              {context.serviceName ?? label}
+                            </span>
+                            <span className="chat-history-meta">
+                              {statusLabel && <span>{statusLabel}</span>}
+                              {timeLabel && <span>{timeLabel}</span>}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </section>
             )}
-          </section>
-        ) : booking ? (
-          <section className="chat-request-card">
-            <div className="chat-request-top">
-              <span className="chat-request-title">
-                {booking.serviceName ?? 'Запись'}
-              </span>
-              <span className="chat-request-pill">{bookingStatusLabel}</span>
-            </div>
-            <div className="chat-request-meta">
-              <span>
-                <IconPin /> {locationLabelMap[booking.locationType ?? 'client']}
-              </span>
-              <span>
-                <IconClock /> {bookingTimeLabel}
-              </span>
-              {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
-            </div>
-          </section>
+          </>
         ) : (
           isDetailLoading && (
-            <section
-              className="chat-request-card is-skeleton"
-              aria-hidden="true"
-            >
-              <span className="chat-request-skeleton-line is-title" />
-              <div className="chat-request-skeleton-row">
-                <span className="chat-request-skeleton-line is-chip" />
-                <span className="chat-request-skeleton-line is-chip" />
-                <span className="chat-request-skeleton-line is-chip" />
+            <section className="chat-active-card is-skeleton" aria-hidden="true">
+              <span className="chat-active-skeleton-line is-title" />
+              <div className="chat-active-skeleton-row">
+                <span className="chat-active-skeleton-line is-chip" />
+                <span className="chat-active-skeleton-line is-chip" />
+                <span className="chat-active-skeleton-line is-chip" />
               </div>
-              <span className="chat-request-skeleton-line is-body" />
+              <span className="chat-active-skeleton-line is-body" />
             </section>
           )
         )}
@@ -1445,12 +1660,12 @@ export const ChatThreadScreen = ({
             {loadError}
           </p>
         )}
-        {isLoading && messages.length === 0 && (
+        {isLoading && visibleMessages.length === 0 && (
           <p className="chat-status" role="status" aria-live="polite">
             Загружаем сообщения...
           </p>
         )}
-        {!isLoading && messages.length === 0 && !loadError && (
+        {!isLoading && visibleMessages.length === 0 && !loadError && (
           <p className="chat-status" role="status" aria-live="polite">
             Сообщений пока нет.
           </p>

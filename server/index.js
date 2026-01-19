@@ -660,19 +660,37 @@ const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl }) => {
   }
 }
 
-const sendChatNotification = async ({ chatId, senderId, preview, title, text }) => {
+const sendChatNotification = async ({
+  chatId,
+  senderId,
+  preview,
+  title,
+  text,
+  audience,
+}) => {
   if (!telegramBotToken || !telegramWebAppUrl) return
+  const normalizedAudience = normalizeText(audience)
   const result = await pool.query(
     `
-      SELECT user_id AS "userId"
+      SELECT user_id AS "userId", role
       FROM chat_members
       WHERE chat_id = $1
     `,
     [chatId]
   )
   const recipients = result.rows
+    .filter((row) => {
+      if (!row.userId || row.userId === senderId) return false
+      if (!normalizedAudience || normalizedAudience === 'all') return true
+      if (normalizedAudience === 'master' || normalizedAudience === 'master_only') {
+        return row.role === 'master'
+      }
+      if (normalizedAudience === 'client' || normalizedAudience === 'client_only') {
+        return row.role === 'client'
+      }
+      return true
+    })
     .map((row) => row.userId)
-    .filter((id) => id && id !== senderId)
   if (recipients.length === 0) return
 
   const senderName = senderId ? await resolveUserDisplayName(senderId) : ''
@@ -981,10 +999,16 @@ const broadcastToUser = (userId, payload) => {
   })
 }
 
-const notifyChatMembers = async (chatId, payload, excludeUserId) => {
+const notifyChatMembers = async (chatId, payload, options) => {
+  const resolved =
+    typeof options === 'string'
+      ? { excludeUserId: options }
+      : options ?? {}
+  const excludeUserId = resolved.excludeUserId
+  const normalizedAudience = normalizeText(resolved.audience)
   const result = await pool.query(
     `
-      SELECT user_id AS "userId"
+      SELECT user_id AS "userId", role
       FROM chat_members
       WHERE chat_id = $1
     `,
@@ -992,6 +1016,22 @@ const notifyChatMembers = async (chatId, payload, excludeUserId) => {
   )
   result.rows.forEach((row) => {
     if (excludeUserId && row.userId === excludeUserId) return
+    if (normalizedAudience && normalizedAudience !== 'all') {
+      if (
+        (normalizedAudience === 'master' ||
+          normalizedAudience === 'master_only') &&
+        row.role !== 'master'
+      ) {
+        return
+      }
+      if (
+        (normalizedAudience === 'client' ||
+          normalizedAudience === 'client_only') &&
+        row.role !== 'client'
+      ) {
+        return
+      }
+    }
     broadcastToUser(row.userId, payload)
   })
 }
@@ -1023,6 +1063,87 @@ const loadChatAccess = async (chatId, userId) => {
   return result.rows[0] ?? null
 }
 
+const lockChatPair = async (db, clientId, masterId) => {
+  const key = `${clientId}:${masterId}`
+  await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key])
+}
+
+const findExistingChat = async (
+  { clientId, masterId, contextType, contextId },
+  options = {}
+) => {
+  const db = options.client ?? pool
+  const exact = await db.query(
+    `
+      SELECT
+        id,
+        context_type AS "contextType",
+        context_id AS "contextId"
+      FROM chats
+      WHERE client_id = $1
+        AND master_id = $2
+        AND context_type = $3
+        AND context_id = $4
+      ORDER BY updated_at DESC
+      LIMIT 1
+      FOR UPDATE
+    `,
+    [clientId, masterId, contextType, contextId]
+  )
+  if (exact.rows[0]) return exact.rows[0]
+  const fallback = await db.query(
+    `
+      SELECT
+        id,
+        context_type AS "contextType",
+        context_id AS "contextId"
+      FROM chats
+      WHERE client_id = $1
+        AND master_id = $2
+        AND context_type <> 'support'
+      ORDER BY last_message_at DESC NULLS LAST, updated_at DESC
+      LIMIT 1
+      FOR UPDATE
+    `,
+    [clientId, masterId]
+  )
+  return fallback.rows[0] ?? null
+}
+
+const upsertChatContext = async (
+  { chatId, contextType, contextId, requestId, bookingId, responseId },
+  options = {}
+) => {
+  const db = options.client ?? pool
+  await db.query(
+    `
+      INSERT INTO chat_contexts (
+        chat_id,
+        context_type,
+        context_id,
+        request_id,
+        booking_id,
+        response_id
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (chat_id, context_type, context_id)
+      DO UPDATE SET
+        request_id = COALESCE(EXCLUDED.request_id, chat_contexts.request_id),
+        booking_id = COALESCE(EXCLUDED.booking_id, chat_contexts.booking_id),
+        response_id = COALESCE(EXCLUDED.response_id, chat_contexts.response_id),
+        updated_at = NOW()
+    `,
+    [
+      chatId,
+      contextType,
+      contextId,
+      requestId ?? null,
+      bookingId ?? null,
+      responseId ?? null,
+    ]
+  )
+}
+
 const createChatForRequest = async ({
   requestId,
   responseId,
@@ -1031,36 +1152,59 @@ const createChatForRequest = async ({
   serviceName,
   actorId,
 }) => {
-  await pool.query('BEGIN')
+  const client = await pool.connect()
   try {
-    const insertResult = await pool.query(
-      `
-        INSERT INTO chats (
-          context_type,
-          context_id,
-          request_id,
-          response_id,
-          client_id,
-          master_id,
-          status
-        )
-        VALUES ('request', $1, $1, $2, $3, $4, 'active')
-        ON CONFLICT (context_type, context_id, client_id, master_id)
-        DO UPDATE SET response_id = EXCLUDED.response_id,
-                      updated_at = NOW()
-        RETURNING id, (xmax = 0) AS "isNew"
-      `,
-      [requestId, responseId, clientId, masterId]
-    )
+    await client.query('BEGIN')
+    await lockChatPair(client, clientId, masterId)
 
-    const chatId = insertResult.rows[0]?.id ?? null
-    const isNew = Boolean(insertResult.rows[0]?.isNew)
-    if (!chatId) {
-      await pool.query('ROLLBACK')
-      return null
+    const existingChat = await findExistingChat(
+      { clientId, masterId, contextType: 'request', contextId: requestId },
+      { client }
+    )
+    const previousContextType = existingChat?.contextType ?? null
+    const previousContextId = existingChat?.contextId ?? null
+
+    let chatId = existingChat?.id ?? null
+    let isNew = false
+    if (chatId) {
+      await client.query(
+        `
+          UPDATE chats
+          SET context_type = 'request',
+              context_id = $1,
+              request_id = $1,
+              response_id = $2,
+              booking_id = NULL,
+              updated_at = NOW()
+          WHERE id = $3
+        `,
+        [requestId, responseId, chatId]
+      )
+    } else {
+      const insertResult = await client.query(
+        `
+          INSERT INTO chats (
+            context_type,
+            context_id,
+            request_id,
+            response_id,
+            client_id,
+            master_id,
+            status
+          )
+          VALUES ('request', $1, $1, $2, $3, $4, 'active')
+          RETURNING id
+        `,
+        [requestId, responseId, clientId, masterId]
+      )
+      chatId = insertResult.rows[0]?.id ?? null
+      if (!chatId) {
+        throw new Error('chat_insert_failed')
+      }
+      isNew = true
     }
 
-    await pool.query(
+    await client.query(
       `
         INSERT INTO chat_members (chat_id, user_id, role)
         VALUES ($1, $2, 'client')
@@ -1068,7 +1212,7 @@ const createChatForRequest = async ({
       `,
       [chatId, clientId]
     )
-    await pool.query(
+    await client.query(
       `
         INSERT INTO chat_members (chat_id, user_id, role)
         VALUES ($1, $2, 'master')
@@ -1077,67 +1221,69 @@ const createChatForRequest = async ({
       [chatId, masterId]
     )
 
+    const contextChanged =
+      !isNew &&
+      (previousContextType !== 'request' || previousContextId !== requestId)
+
+    if (chatId && contextChanged && previousContextType && previousContextId) {
+      await upsertChatContext(
+        {
+          chatId,
+          contextType: previousContextType,
+          contextId: previousContextId,
+          requestId: previousContextType === 'request' ? previousContextId : null,
+          bookingId: previousContextType === 'booking' ? previousContextId : null,
+        },
+        { client }
+      )
+    }
+
+    await upsertChatContext(
+      {
+        chatId,
+        contextType: 'request',
+        contextId: requestId,
+        requestId,
+        responseId,
+      },
+      { client }
+    )
+
     let systemMessageId = null
     let systemMessageCreatedAt = null
     let systemMessage = null
-
-    if (isNew) {
-      const body = serviceName
-        ? `Заявка согласована по услуге «${serviceName}». Обсудите детали.`
-        : 'Заявка согласована. Обсудите детали.'
-      const meta = { event: 'request_accepted', serviceName: serviceName ?? null }
-      const messageResult = await pool.query(
-        `
-          INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
-          VALUES ($1, NULL, 'system', $2, $3)
-          RETURNING id, created_at AS "createdAt"
-        `,
-        [chatId, body, meta]
+    if (isNew || contextChanged) {
+      const body = isNew
+        ? serviceName
+          ? `Заявка согласована по услуге «${serviceName}». Обсудите детали.`
+          : 'Заявка согласована. Обсудите детали.'
+        : serviceName
+          ? `Заявка обновлена по услуге «${serviceName}».`
+          : 'Заявка обновлена.'
+      const meta = {
+        event: isNew ? 'request_accepted' : 'request_updated',
+        serviceName: serviceName ?? null,
+        requestId,
+      }
+      const messageResult = await insertSystemMessage(
+        { chatId, body, meta, actorId },
+        { client }
       )
-      const messageId = messageResult.rows[0]?.id ?? null
-      systemMessageId = messageId
-      systemMessageCreatedAt = messageResult.rows[0]?.createdAt ?? null
-      if (messageId) {
-        systemMessage = {
-          id: messageId,
-          chatId,
-          senderId: null,
-          type: 'system',
-          body,
-          meta,
-          attachmentUrl: null,
-          createdAt: systemMessageCreatedAt,
-        }
-        await pool.query(
-          `
-            UPDATE chats
-            SET last_message_id = $2,
-                last_message_at = NOW(),
-                updated_at = NOW()
-            WHERE id = $1
-          `,
-          [chatId, messageId]
-        )
-        await pool.query(
-          `
-            UPDATE chat_members
-            SET unread_count = CASE
-                  WHEN user_id = $2 THEN 0
-                  ELSE unread_count + 1
-                END,
-                last_read_message_id = CASE
-                  WHEN user_id = $2 THEN $3
-                  ELSE last_read_message_id
-                END,
-                updated_at = NOW()
-            WHERE chat_id = $1
-          `,
-          [chatId, actorId ?? clientId, messageId]
-        )
+      systemMessageId = messageResult.id
+      systemMessageCreatedAt = messageResult.createdAt
+      systemMessage = {
+        id: systemMessageId,
+        chatId,
+        senderId: null,
+        type: 'system',
+        body,
+        meta,
+        attachmentUrl: null,
+        createdAt: systemMessageCreatedAt,
       }
     }
 
-    await pool.query('COMMIT')
+    await client.query('COMMIT')
     return {
       chatId,
       isNew,
@@ -1146,8 +1292,10 @@ const createChatForRequest = async ({
       systemMessage,
     }
   } catch (error) {
-    await pool.query('ROLLBACK')
+    await client.query('ROLLBACK')
     throw error
+  } finally {
+    client.release()
   }
 }
 
@@ -1155,41 +1303,62 @@ const createChatForBooking = async (
   { bookingId, clientId, masterId, serviceName, actorId },
   options = {}
 ) => {
-  const db = options.client ?? pool
-  const shouldManageTransaction = !options.client
+  const externalClient = options.client
+  const client = externalClient ?? (await pool.connect())
+  const shouldManageTransaction = !externalClient
   if (shouldManageTransaction) {
-    await db.query('BEGIN')
+    await client.query('BEGIN')
   }
   try {
-    const insertResult = await db.query(
-      `
-        INSERT INTO chats (
-          context_type,
-          context_id,
-          booking_id,
-          client_id,
-          master_id,
-          status
-        )
-        VALUES ('booking', $1, $1, $2, $3, 'active')
-        ON CONFLICT (context_type, context_id, client_id, master_id)
-        DO UPDATE SET booking_id = EXCLUDED.booking_id,
-                      updated_at = NOW()
-        RETURNING id, (xmax = 0) AS "isNew"
-      `,
-      [bookingId, clientId, masterId]
-    )
+    await lockChatPair(client, clientId, masterId)
 
-    const chatId = insertResult.rows[0]?.id ?? null
-    const isNew = Boolean(insertResult.rows[0]?.isNew)
-    if (!chatId) {
-      if (shouldManageTransaction) {
-        await db.query('ROLLBACK')
+    const existingChat = await findExistingChat(
+      { clientId, masterId, contextType: 'booking', contextId: bookingId },
+      { client }
+    )
+    const previousContextType = existingChat?.contextType ?? null
+    const previousContextId = existingChat?.contextId ?? null
+
+    let chatId = existingChat?.id ?? null
+    let isNew = false
+    if (chatId) {
+      await client.query(
+        `
+          UPDATE chats
+          SET context_type = 'booking',
+              context_id = $1,
+              booking_id = $1,
+              request_id = NULL,
+              response_id = NULL,
+              updated_at = NOW()
+          WHERE id = $2
+        `,
+        [bookingId, chatId]
+      )
+    } else {
+      const insertResult = await client.query(
+        `
+          INSERT INTO chats (
+            context_type,
+            context_id,
+            booking_id,
+            client_id,
+            master_id,
+            status
+          )
+          VALUES ('booking', $1, $1, $2, $3, 'active')
+          RETURNING id
+        `,
+        [bookingId, clientId, masterId]
+      )
+      chatId = insertResult.rows[0]?.id ?? null
+      if (!chatId) {
+        throw new Error('chat_insert_failed')
       }
-      return null
+      isNew = true
     }
 
-    await db.query(
+    await client.query(
       `
         INSERT INTO chat_members (chat_id, user_id, role)
         VALUES ($1, $2, 'client')
@@ -1197,7 +1366,7 @@ const createChatForBooking = async (
       `,
       [chatId, clientId]
     )
-    await db.query(
+    await client.query(
       `
         INSERT INTO chat_members (chat_id, user_id, role)
         VALUES ($1, $2, 'master')
@@ -1206,68 +1375,70 @@ const createChatForBooking = async (
       [chatId, masterId]
     )
 
+    const contextChanged =
+      !isNew &&
+      (previousContextType !== 'booking' || previousContextId !== bookingId)
+
+    if (chatId && contextChanged && previousContextType && previousContextId) {
+      await upsertChatContext(
+        {
+          chatId,
+          contextType: previousContextType,
+          contextId: previousContextId,
+          requestId: previousContextType === 'request' ? previousContextId : null,
+          bookingId: previousContextType === 'booking' ? previousContextId : null,
+        },
+        { client }
+      )
+    }
+
+    await upsertChatContext(
+      {
+        chatId,
+        contextType: 'booking',
+        contextId: bookingId,
+        bookingId,
+      },
+      { client }
+    )
+
     let systemMessageId = null
     let systemMessageCreatedAt = null
     let systemMessage = null
 
-    if (isNew) {
-      const body = serviceName
-        ? `Запись подтверждена по услуге «${serviceName}». Можно обсудить детали.`
-        : 'Запись подтверждена. Можно обсудить детали.'
-      const meta = { event: 'booking_confirmed', serviceName: serviceName ?? null }
-      const messageResult = await db.query(
-        `
-          INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
-          VALUES ($1, NULL, 'system', $2, $3)
-          RETURNING id, created_at AS "createdAt"
-        `,
-        [chatId, body, meta]
+    if (isNew || contextChanged) {
+      const body = isNew
+        ? serviceName
+          ? `Запись подтверждена по услуге «${serviceName}». Можно обсудить детали.`
+          : 'Запись подтверждена. Можно обсудить детали.'
+        : serviceName
+          ? `Запись обновлена по услуге «${serviceName}».`
+          : 'Запись обновлена.'
+      const meta = {
+        event: isNew ? 'booking_confirmed' : 'booking_updated',
+        serviceName: serviceName ?? null,
+        bookingId,
+      }
+      const messageResult = await insertSystemMessage(
+        { chatId, body, meta, actorId },
+        { client }
       )
-      const messageId = messageResult.rows[0]?.id ?? null
-      systemMessageId = messageId
-      systemMessageCreatedAt = messageResult.rows[0]?.createdAt ?? null
-      if (messageId) {
-        systemMessage = {
-          id: messageId,
-          chatId,
-          senderId: null,
-          type: 'system',
-          body,
-          meta,
-          attachmentUrl: null,
-          createdAt: systemMessageCreatedAt,
-        }
-        await db.query(
-          `
-            UPDATE chats
-            SET last_message_id = $2,
-                last_message_at = NOW(),
-                updated_at = NOW()
-            WHERE id = $1
-          `,
-          [chatId, messageId]
-        )
-        await db.query(
-          `
-            UPDATE chat_members
-            SET unread_count = CASE
-                  WHEN user_id = $2 THEN 0
-                  ELSE unread_count + 1
-                END,
-                last_read_message_id = CASE
-                  WHEN user_id = $2 THEN $3
-                  ELSE last_read_message_id
-                END,
-                updated_at = NOW()
-            WHERE chat_id = $1
-          `,
-          [chatId, actorId ?? clientId, messageId]
-        )
+      systemMessageId = messageResult.id
+      systemMessageCreatedAt = messageResult.createdAt
+      systemMessage = {
+        id: systemMessageId,
+        chatId,
+        senderId: null,
+        type: 'system',
+        body,
+        meta,
+        attachmentUrl: null,
+        createdAt: systemMessageCreatedAt,
       }
     }
 
     if (shouldManageTransaction) {
-      await db.query('COMMIT')
+      await client.query('COMMIT')
     }
     return {
       chatId,
@@ -1278,14 +1449,18 @@ const createChatForBooking = async (
     }
   } catch (error) {
     if (shouldManageTransaction) {
-      await db.query('ROLLBACK')
+      await client.query('ROLLBACK')
     }
     throw error
+  } finally {
+    if (shouldManageTransaction) {
+      client.release()
+    }
   }
 }
 
 const insertSystemMessage = async (
-  { chatId, body, meta, actorId },
+  { chatId, body, meta, actorId, audience },
   options = {}
 ) => {
   const db = options.client ?? pool
@@ -1294,6 +1469,13 @@ const insertSystemMessage = async (
     await db.query('BEGIN')
   }
   try {
+    const normalizedAudience = normalizeText(audience)
+    const audienceKey =
+      normalizedAudience === 'master_only'
+        ? 'master'
+        : normalizedAudience === 'client_only'
+          ? 'client'
+          : normalizedAudience || 'all'
     const messageResult = await db.query(
       `
         INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
@@ -1324,7 +1506,10 @@ const insertSystemMessage = async (
         UPDATE chat_members
         SET unread_count = CASE
               WHEN user_id = $2 THEN 0
-              ELSE unread_count + 1
+              WHEN $4 = 'all' THEN unread_count + 1
+              WHEN $4 = 'master' AND role = 'master' THEN unread_count + 1
+              WHEN $4 = 'client' AND role = 'client' THEN unread_count + 1
+              ELSE unread_count
             END,
             last_read_message_id = CASE
               WHEN user_id = $2 THEN $3
@@ -1333,7 +1518,7 @@ const insertSystemMessage = async (
             updated_at = NOW()
         WHERE chat_id = $1
       `,
-      [chatId, actorId ?? null, messageId]
+      [chatId, actorId ?? null, messageId, audienceKey]
     )
 
     if (shouldManageTransaction) {
@@ -1878,6 +2063,8 @@ const runBookingOutcomePromptCycle = async () => {
         )
         const meta = {
           event: 'booking_outcome_prompt',
+          visibility: 'master_only',
+          audience: 'master_only',
           bookingId: booking.id,
           serviceName: booking.serviceName ?? null,
           scheduledAt: booking.scheduledAt ?? null,
@@ -1886,7 +2073,13 @@ const runBookingOutcomePromptCycle = async () => {
         }
         const body = 'Как прошла запись? Отметьте явку/вовремя.'
         const messageResult = await insertSystemMessage(
-          { chatId: chatPayload.chatId, body, meta, actorId: null },
+          {
+            chatId: chatPayload.chatId,
+            body,
+            meta,
+            actorId: null,
+            audience: 'master',
+          },
           { client }
         )
 
@@ -1937,10 +2130,11 @@ const runBookingOutcomePromptCycle = async () => {
           type: 'message:new',
           chatId: chatPayload.chatId,
           message: messagePayload,
-        })
+        }, { audience: 'master' })
         void sendChatNotification({
           chatId: chatPayload.chatId,
-          senderId: booking.clientId,
+          audience: 'master',
+          title: 'Итог визита',
           text: 'Как прошла запись? Отметьте явку/вовремя.',
         })
       } catch (error) {
@@ -2487,6 +2681,26 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_contexts (
+      id SERIAL PRIMARY KEY,
+      chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+      context_type TEXT NOT NULL,
+      context_id INTEGER NOT NULL,
+      request_id INTEGER REFERENCES service_requests(id) ON DELETE SET NULL,
+      response_id INTEGER REFERENCES request_responses(id) ON DELETE SET NULL,
+      booking_id INTEGER REFERENCES service_bookings(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (chat_id, context_type, context_id)
+    );
+  `)
+
+  await pool.query(`
+    ALTER TABLE chat_contexts
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `)
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS chats_client_idx
     ON chats (client_id);
   `)
@@ -2509,6 +2723,26 @@ const ensureSchema = async () => {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS chat_messages_chat_idx
     ON chat_messages (chat_id, id DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chat_contexts_chat_idx
+    ON chat_contexts (chat_id, created_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chat_contexts_context_idx
+    ON chat_contexts (context_type, context_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chat_contexts_request_idx
+    ON chat_contexts (request_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS chat_contexts_booking_idx
+    ON chat_contexts (booking_id);
   `)
 }
 
@@ -3061,7 +3295,16 @@ app.get('/api/masters', async (req, res) => {
       `,
       values
     )
-    const payload = result.rows.map((row) => {
+    const seenPairs = new Set()
+    const rows = (result.rows ?? []).filter((row) => {
+      if (row.contextType === 'support') return true
+      const key = `${row.clientId}:${row.masterId}`
+      if (seenPairs.has(key)) return false
+      seenPairs.add(key)
+      return true
+    })
+
+    const payload = rows.map((row) => {
       const distanceKm =
         hasClientLocation &&
         row.shareToClients &&
@@ -4527,7 +4770,7 @@ app.get('/api/pro/requests', async (req, res) => {
           rr.comment AS "responseComment",
           rr.proposed_time AS "responseProposedTime",
           rr.created_at AS "responseCreatedAt",
-          ch.id AS "chatId",
+          COALESCE(ch.id, legacy_ch.id) AS "chatId",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
           ul.share_to_masters AS "clientShareToMasters",
@@ -4543,10 +4786,26 @@ app.get('/api/pro/requests', async (req, res) => {
         LEFT JOIN request_responses rr
           ON rr.request_id = r.id AND rr.master_id = rd.master_id
         LEFT JOIN client_trust_scores cts ON cts.user_id = r.user_id
-        LEFT JOIN chats ch
-          ON ch.request_id = r.id
-          AND ch.master_id = rd.master_id
-          AND ch.context_type = 'request'
+        LEFT JOIN LATERAL (
+          SELECT ch.id
+          FROM chat_contexts cc
+          JOIN chats ch ON ch.id = cc.chat_id
+          WHERE cc.context_type = 'request'
+            AND cc.context_id = r.id
+            AND ch.master_id = rd.master_id
+            AND ch.client_id = r.user_id
+          ORDER BY ch.updated_at DESC NULLS LAST
+          LIMIT 1
+        ) ch ON true
+        LEFT JOIN LATERAL (
+          SELECT id
+          FROM chats
+          WHERE request_id = r.id
+            AND master_id = rd.master_id
+            AND context_type = 'request'
+          ORDER BY updated_at DESC NULLS LAST
+          LIMIT 1
+        ) legacy_ch ON true
         WHERE rd.master_id = $1
           AND (
             (rd.status = 'sent' AND rd.expires_at > NOW())
@@ -4649,12 +4908,29 @@ app.get('/api/bookings', async (req, res) => {
           b.outcome_prompted_at AS "outcomePromptedAt",
           b.created_at AS "createdAt",
           mr.id AS "reviewId",
-          bc.id AS "chatId"
+          COALESCE(bc.id, legacy_bc.id) AS "chatId"
         FROM service_bookings b
         LEFT JOIN master_profiles mp ON mp.user_id = b.master_id
         LEFT JOIN users u ON u.user_id = b.master_id
         LEFT JOIN master_reviews mr ON mr.booking_id = b.id
-        LEFT JOIN chats bc ON bc.booking_id = b.id
+        LEFT JOIN LATERAL (
+          SELECT ch.id
+          FROM chat_contexts cc
+          JOIN chats ch ON ch.id = cc.chat_id
+          WHERE cc.context_type = 'booking'
+            AND cc.context_id = b.id
+            AND ch.client_id = b.client_id
+            AND ch.master_id = b.master_id
+          ORDER BY ch.updated_at DESC NULLS LAST
+          LIMIT 1
+        ) bc ON true
+        LEFT JOIN LATERAL (
+          SELECT id
+          FROM chats
+          WHERE booking_id = b.id
+          ORDER BY updated_at DESC NULLS LAST
+          LIMIT 1
+        ) legacy_bc ON true
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
         WHERE b.client_id = $1
@@ -4715,7 +4991,7 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.late_minutes AS "lateMinutes",
           b.outcome_prompted_at AS "outcomePromptedAt",
           b.created_at AS "createdAt",
-          bc.id AS "chatId",
+          COALESCE(bc.id, legacy_bc.id) AS "chatId",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
           ul.share_to_masters AS "clientShareToMasters",
@@ -4727,7 +5003,24 @@ app.get('/api/pro/bookings', async (req, res) => {
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
         LEFT JOIN user_locations ul ON ul.user_id = b.client_id
-        LEFT JOIN chats bc ON bc.booking_id = b.id
+        LEFT JOIN LATERAL (
+          SELECT ch.id
+          FROM chat_contexts cc
+          JOIN chats ch ON ch.id = cc.chat_id
+          WHERE cc.context_type = 'booking'
+            AND cc.context_id = b.id
+            AND ch.client_id = b.client_id
+            AND ch.master_id = b.master_id
+          ORDER BY ch.updated_at DESC NULLS LAST
+          LIMIT 1
+        ) bc ON true
+        LEFT JOIN LATERAL (
+          SELECT id
+          FROM chats
+          WHERE booking_id = b.id
+          ORDER BY updated_at DESC NULLS LAST
+          LIMIT 1
+        ) legacy_bc ON true
         LEFT JOIN client_trust_scores cts ON cts.user_id = b.client_id
         WHERE b.master_id = $1
         ORDER BY b.created_at DESC
@@ -5759,6 +6052,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
       const systemBody = `Мастер отметил: ${outcomeDetail}.`
       const systemMeta = {
         event: 'booking_outcome_marked',
+        visibility: 'master_only',
+        audience: 'master_only',
         bookingId,
         outcome: normalizedOutcome,
         lateMinutes: normalizedOutcome === 'late' ? parsedLateMinutes : null,
@@ -5800,6 +6095,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
             body: systemBody,
             meta: systemMeta,
             actorId: normalizedUserId,
+            audience: 'master',
           },
           { client }
         )
@@ -5876,7 +6172,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
             type: 'message:new',
             chatId: chatPayload.chatId,
             message: systemMessagePayload,
-          })
+          }, { audience: 'master' })
         }
         void notifyChatMembers(chatPayload.chatId, {
           type: 'trust:update',
@@ -6263,17 +6559,32 @@ app.get('/api/requests/:id/responses', async (req, res) => {
           rr.proposed_time AS "proposedTime",
           rr.status,
           rr.created_at AS "createdAt",
-          ch.id AS "chatId",
+          COALESCE(ch.id, legacy_ch.id) AS "chatId",
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage"
         FROM request_responses rr
         LEFT JOIN master_profiles mp ON mp.user_id = rr.master_id
         LEFT JOIN users u ON u.user_id = rr.master_id
         LEFT JOIN master_showcases ms ON ms.user_id = rr.master_id
-        LEFT JOIN chats ch
-          ON ch.request_id = rr.request_id
-          AND ch.master_id = rr.master_id
-          AND ch.context_type = 'request'
+        LEFT JOIN LATERAL (
+          SELECT ch.id
+          FROM chat_contexts cc
+          JOIN chats ch ON ch.id = cc.chat_id
+          WHERE cc.context_type = 'request'
+            AND cc.context_id = rr.request_id
+            AND ch.master_id = rr.master_id
+          ORDER BY ch.updated_at DESC NULLS LAST
+          LIMIT 1
+        ) ch ON true
+        LEFT JOIN LATERAL (
+          SELECT id
+          FROM chats
+          WHERE request_id = rr.request_id
+            AND master_id = rr.master_id
+            AND context_type = 'request'
+          ORDER BY updated_at DESC NULLS LAST
+          LIMIT 1
+        ) legacy_ch ON true
         LEFT JOIN (
           SELECT
             master_id,
@@ -6787,7 +7098,9 @@ app.get('/api/chats', async (req, res) => {
           c.client_id AS "clientId",
           c.master_id AS "masterId",
           c.status,
-          c.last_message_at AS "lastMessageAt",
+          c.created_at AS "chatCreatedAt",
+          c.updated_at AS "chatUpdatedAt",
+          cm.role AS "memberRole",
           cm.unread_count AS "unreadCount",
           cm.last_read_message_id AS "lastReadMessageId",
           lm.id AS "lastMessageId",
@@ -6800,9 +7113,18 @@ app.get('/api/chats', async (req, res) => {
           sr.category_id AS "categoryId",
           sr.location_type AS "locationType",
           sr.status AS "requestStatus",
+          sr.date_option AS "requestDateOption",
+          sr.date_time AS "requestDateTime",
+          sr.created_at AS "requestCreatedAt",
           sb.service_name AS "bookingServiceName",
           sb.category_id AS "bookingCategoryId",
           sb.status AS "bookingStatus",
+          sb.scheduled_at AS "bookingScheduledAt",
+          sb.service_duration AS "bookingServiceDuration",
+          sb.service_price AS "bookingServicePrice",
+          sb.outcome AS "bookingOutcome",
+          sb.late_minutes AS "bookingLateMinutes",
+          sb.created_at AS "bookingCreatedAt",
           mp.display_name AS "masterName",
           COALESCE(mp.avatar_path, um.avatar_url) AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
@@ -6813,7 +7135,23 @@ app.get('/api/chats', async (req, res) => {
           cts.updated_at AS "clientTrustUpdatedAt"
         FROM chat_members cm
         JOIN chats c ON c.id = cm.chat_id
-        LEFT JOIN chat_messages lm ON lm.id = c.last_message_id
+        LEFT JOIN LATERAL (
+          SELECT
+            id,
+            sender_id,
+            type,
+            body,
+            attachment_path,
+            created_at
+          FROM chat_messages
+          WHERE chat_id = c.id
+            AND (
+              cm.role = 'master'
+              OR COALESCE(meta->>'visibility', meta->>'audience', '') <> 'master_only'
+            )
+          ORDER BY id DESC
+          LIMIT 1
+        ) lm ON true
         LEFT JOIN service_requests sr ON sr.id = c.request_id
         LEFT JOIN service_bookings sb ON sb.id = c.booking_id
         LEFT JOIN master_profiles mp ON mp.user_id = c.master_id
@@ -6821,12 +7159,7 @@ app.get('/api/chats', async (req, res) => {
         LEFT JOIN users u ON u.user_id = c.client_id
         LEFT JOIN client_trust_scores cts ON cts.user_id = c.client_id
         WHERE cm.user_id = $1
-          AND (
-            (c.context_type = 'request' AND sr.status = 'closed')
-            OR (c.context_type = 'booking' AND sb.status = 'confirmed')
-            OR (c.context_type NOT IN ('request', 'booking'))
-          )
-        ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+        ORDER BY lm.created_at DESC NULLS LAST, c.updated_at DESC
       `,
       [normalizedUserId]
     )
@@ -6871,6 +7204,34 @@ app.get('/api/chats', async (req, res) => {
             : '')
       const serviceName = row.serviceName || row.bookingServiceName || ''
       const categoryId = row.categoryId || row.bookingCategoryId || null
+      const activeRequest =
+        row.contextType === 'request' && row.requestId
+          ? {
+              id: row.requestId,
+              serviceName,
+              categoryId,
+              locationType: row.locationType,
+              status: row.requestStatus,
+              dateOption: row.requestDateOption,
+              dateTime: row.requestDateTime,
+              createdAt: row.requestCreatedAt,
+            }
+          : null
+      const activeBooking =
+        row.contextType === 'booking' && row.bookingId
+          ? {
+              id: row.bookingId,
+              serviceName,
+              categoryId,
+              status: row.bookingStatus,
+              scheduledAt: row.bookingScheduledAt,
+              serviceDuration: row.bookingServiceDuration,
+              servicePrice: row.bookingServicePrice,
+              outcome: row.bookingOutcome,
+              lateMinutes: row.bookingLateMinutes,
+              createdAt: row.bookingCreatedAt,
+            }
+          : null
 
       return {
         id: row.id,
@@ -6898,25 +7259,136 @@ app.get('/api/chats', async (req, res) => {
           avatarUrl: counterpartAvatarUrl,
           trust: counterpartTrust ?? undefined,
         },
-        request: row.requestId
-          ? {
-              id: row.requestId,
-              serviceName,
-              categoryId,
-              locationType: row.locationType,
-              status: row.requestStatus,
-            }
-          : null,
-        booking: row.bookingId
-          ? {
-              id: row.bookingId,
-              serviceName,
-              categoryId,
-              status: row.bookingStatus,
-            }
-          : null,
+        request: activeRequest,
+        booking: activeBooking,
       }
     })
+
+    const chatIds = payload.map((item) => item.id).filter((id) => Number.isInteger(id))
+    if (chatIds.length > 0) {
+      const contextsResult = await pool.query(
+        `
+          SELECT
+            cc.chat_id AS "chatId",
+            cc.context_type AS "contextType",
+            cc.context_id AS "contextId",
+            cc.created_at AS "contextCreatedAt",
+            sr.service_name AS "requestServiceName",
+            sr.status AS "requestStatus",
+            sr.location_type AS "requestLocationType",
+            sr.date_option AS "requestDateOption",
+            sr.date_time AS "requestDateTime",
+            sr.created_at AS "requestCreatedAt",
+            sb.service_name AS "bookingServiceName",
+            sb.status AS "bookingStatus",
+            sb.scheduled_at AS "bookingScheduledAt",
+            sb.service_duration AS "bookingServiceDuration",
+            sb.service_price AS "bookingServicePrice",
+            sb.outcome AS "bookingOutcome",
+            sb.late_minutes AS "bookingLateMinutes",
+            sb.created_at AS "bookingCreatedAt"
+          FROM chat_contexts cc
+          LEFT JOIN service_requests sr ON sr.id = cc.request_id
+          LEFT JOIN service_bookings sb ON sb.id = cc.booking_id
+          WHERE cc.chat_id = ANY($1::int[])
+          ORDER BY cc.created_at DESC
+        `,
+        [chatIds]
+      )
+      const contextsByChatId = new Map()
+      contextsResult.rows.forEach((row) => {
+        const context =
+          row.contextType === 'booking'
+            ? {
+                contextType: 'booking',
+                contextId: row.contextId,
+                serviceName: row.bookingServiceName ?? null,
+                status: row.bookingStatus ?? null,
+                scheduledAt: row.bookingScheduledAt ?? null,
+                serviceDuration: row.bookingServiceDuration ?? null,
+                servicePrice: row.bookingServicePrice ?? null,
+                outcome: row.bookingOutcome ?? null,
+                lateMinutes: row.bookingLateMinutes ?? null,
+                createdAt: row.contextCreatedAt ?? row.bookingCreatedAt ?? null,
+              }
+            : {
+                contextType: 'request',
+                contextId: row.contextId,
+                serviceName: row.requestServiceName ?? null,
+                status: row.requestStatus ?? null,
+                locationType: row.requestLocationType ?? null,
+                dateOption: row.requestDateOption ?? null,
+                dateTime: row.requestDateTime ?? null,
+                createdAt: row.contextCreatedAt ?? row.requestCreatedAt ?? null,
+              }
+        const bucket = contextsByChatId.get(row.chatId) ?? []
+        bucket.push(context)
+        contextsByChatId.set(row.chatId, bucket)
+      })
+      payload.forEach((item) => {
+        const contexts = contextsByChatId.get(item.id) ?? []
+        if (contexts.length === 0) {
+          if (item.request) {
+            contexts.push({
+              contextType: 'request',
+              contextId: item.request.id,
+              serviceName: item.request.serviceName ?? null,
+              status: item.request.status ?? null,
+              locationType: item.request.locationType ?? null,
+              dateOption: item.request.dateOption ?? null,
+              dateTime: item.request.dateTime ?? null,
+              createdAt: item.request.createdAt ?? null,
+            })
+          } else if (item.booking) {
+            contexts.push({
+              contextType: 'booking',
+              contextId: item.booking.id,
+              serviceName: item.booking.serviceName ?? null,
+              status: item.booking.status ?? null,
+              scheduledAt: item.booking.scheduledAt ?? null,
+              serviceDuration: item.booking.serviceDuration ?? null,
+              servicePrice: item.booking.servicePrice ?? null,
+              outcome: item.booking.outcome ?? null,
+              lateMinutes: item.booking.lateMinutes ?? null,
+              createdAt: item.booking.createdAt ?? null,
+            })
+          }
+        }
+        item.contexts = contexts.slice(0, 6)
+      })
+    } else {
+      payload.forEach((item) => {
+        if (item.request) {
+          item.contexts = [
+            {
+              contextType: 'request',
+              contextId: item.request.id,
+              serviceName: item.request.serviceName ?? null,
+              status: item.request.status ?? null,
+              locationType: item.request.locationType ?? null,
+              dateOption: item.request.dateOption ?? null,
+              dateTime: item.request.dateTime ?? null,
+              createdAt: item.request.createdAt ?? null,
+            },
+          ]
+        } else if (item.booking) {
+          item.contexts = [
+            {
+              contextType: 'booking',
+              contextId: item.booking.id,
+              serviceName: item.booking.serviceName ?? null,
+              status: item.booking.status ?? null,
+              scheduledAt: item.booking.scheduledAt ?? null,
+              serviceDuration: item.booking.serviceDuration ?? null,
+              servicePrice: item.booking.servicePrice ?? null,
+              outcome: item.booking.outcome ?? null,
+              lateMinutes: item.booking.lateMinutes ?? null,
+              createdAt: item.booking.createdAt ?? null,
+            },
+          ]
+        }
+      })
+    }
 
     res.json(payload)
   } catch (error) {
@@ -6967,6 +7439,7 @@ app.get('/api/chats/:id', async (req, res) => {
           sr.details,
           sr.photo_urls AS "photoUrls",
           sr.status AS "requestStatus",
+          sr.created_at AS "requestCreatedAt",
           sb.service_name AS "bookingServiceName",
           sb.category_id AS "bookingCategoryId",
           sb.location_type AS "bookingLocationType",
@@ -6977,6 +7450,7 @@ app.get('/api/chats/:id', async (req, res) => {
           sb.outcome AS "bookingOutcome",
           sb.late_minutes AS "bookingLateMinutes",
           sb.attendance_at AS "bookingAttendanceAt",
+          sb.created_at AS "bookingCreatedAt",
           mp.display_name AS "masterName",
           COALESCE(mp.avatar_path, um.avatar_url) AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
@@ -7044,6 +7518,90 @@ app.get('/api/chats/:id', async (req, res) => {
             'Клиент'
           )
 
+    const contextsResult = await pool.query(
+      `
+        SELECT
+          cc.context_type AS "contextType",
+          cc.context_id AS "contextId",
+          cc.created_at AS "contextCreatedAt",
+          sr.service_name AS "requestServiceName",
+          sr.status AS "requestStatus",
+          sr.location_type AS "requestLocationType",
+          sr.date_option AS "requestDateOption",
+          sr.date_time AS "requestDateTime",
+          sr.created_at AS "requestCreatedAt",
+          sb.service_name AS "bookingServiceName",
+          sb.status AS "bookingStatus",
+          sb.scheduled_at AS "bookingScheduledAt",
+          sb.service_duration AS "bookingServiceDuration",
+          sb.service_price AS "bookingServicePrice",
+          sb.outcome AS "bookingOutcome",
+          sb.late_minutes AS "bookingLateMinutes",
+          sb.created_at AS "bookingCreatedAt"
+        FROM chat_contexts cc
+        LEFT JOIN service_requests sr ON sr.id = cc.request_id
+        LEFT JOIN service_bookings sb ON sb.id = cc.booking_id
+        WHERE cc.chat_id = $1
+        ORDER BY cc.created_at DESC
+      `,
+      [chatId]
+    )
+    const contexts = contextsResult.rows.map((contextRow) =>
+      contextRow.contextType === 'booking'
+        ? {
+            contextType: 'booking',
+            contextId: contextRow.contextId,
+            serviceName: contextRow.bookingServiceName ?? null,
+            status: contextRow.bookingStatus ?? null,
+            scheduledAt: contextRow.bookingScheduledAt ?? null,
+            serviceDuration: contextRow.bookingServiceDuration ?? null,
+            servicePrice: contextRow.bookingServicePrice ?? null,
+            outcome: contextRow.bookingOutcome ?? null,
+            lateMinutes: contextRow.bookingLateMinutes ?? null,
+            createdAt:
+              contextRow.contextCreatedAt ?? contextRow.bookingCreatedAt ?? null,
+          }
+        : {
+            contextType: 'request',
+            contextId: contextRow.contextId,
+            serviceName: contextRow.requestServiceName ?? null,
+            status: contextRow.requestStatus ?? null,
+            locationType: contextRow.requestLocationType ?? null,
+            dateOption: contextRow.requestDateOption ?? null,
+            dateTime: contextRow.requestDateTime ?? null,
+            createdAt:
+              contextRow.contextCreatedAt ?? contextRow.requestCreatedAt ?? null,
+          }
+    )
+
+    if (contexts.length === 0) {
+      if (row.requestId) {
+        contexts.push({
+          contextType: 'request',
+          contextId: row.requestId,
+          serviceName: row.serviceName ?? null,
+          status: row.requestStatus ?? null,
+          locationType: row.locationType ?? null,
+          dateOption: row.dateOption ?? null,
+          dateTime: row.dateTime ?? null,
+          createdAt: row.requestCreatedAt ?? null,
+        })
+      } else if (row.bookingId) {
+        contexts.push({
+          contextType: 'booking',
+          contextId: row.bookingId,
+          serviceName: row.bookingServiceName ?? null,
+          status: row.bookingStatus ?? null,
+          scheduledAt: row.bookingScheduledAt ?? null,
+          serviceDuration: row.bookingServiceDuration ?? null,
+          servicePrice: row.bookingServicePrice ?? null,
+          outcome: row.bookingOutcome ?? null,
+          lateMinutes: row.bookingLateMinutes ?? null,
+          createdAt: row.bookingCreatedAt ?? null,
+        })
+      }
+    }
+
     res.json({
       chat: {
         id: row.id,
@@ -7069,35 +7627,40 @@ app.get('/api/chats/:id', async (req, res) => {
             : buildPublicUrl(req, row.masterAvatarPath),
         trust: counterpartTrust ?? undefined,
       },
-      request: row.requestId
-        ? {
-            id: row.requestId,
-            serviceName: row.serviceName,
-            categoryId: row.categoryId,
-            locationType: row.locationType,
-            dateOption: row.dateOption,
-            dateTime: row.dateTime,
-            budget: row.budget,
-            details: row.details,
-            photoUrls: Array.isArray(row.photoUrls) ? row.photoUrls : [],
-            status: row.requestStatus,
-          }
-        : null,
-      booking: row.bookingId
-        ? {
-            id: row.bookingId,
-            serviceName: row.bookingServiceName,
-            categoryId: row.bookingCategoryId,
-            locationType: row.bookingLocationType,
-            scheduledAt: row.bookingScheduledAt,
-            serviceDuration: row.bookingServiceDuration,
-            servicePrice: row.bookingServicePrice,
-            status: row.bookingStatus,
-            outcome: row.bookingOutcome,
-            lateMinutes: row.bookingLateMinutes,
-            attendanceAt: row.bookingAttendanceAt,
-          }
-        : null,
+      request:
+        row.contextType === 'request' && row.requestId
+          ? {
+              id: row.requestId,
+              serviceName: row.serviceName,
+              categoryId: row.categoryId,
+              locationType: row.locationType,
+              dateOption: row.dateOption,
+              dateTime: row.dateTime,
+              budget: row.budget,
+              details: row.details,
+              photoUrls: Array.isArray(row.photoUrls) ? row.photoUrls : [],
+              status: row.requestStatus,
+              createdAt: row.requestCreatedAt,
+            }
+          : null,
+      booking:
+        row.contextType === 'booking' && row.bookingId
+          ? {
+              id: row.bookingId,
+              serviceName: row.bookingServiceName,
+              categoryId: row.bookingCategoryId,
+              locationType: row.bookingLocationType,
+              scheduledAt: row.bookingScheduledAt,
+              serviceDuration: row.bookingServiceDuration,
+              servicePrice: row.bookingServicePrice,
+              status: row.bookingStatus,
+              outcome: row.bookingOutcome,
+              lateMinutes: row.bookingLateMinutes,
+              attendanceAt: row.bookingAttendanceAt,
+              createdAt: row.bookingCreatedAt,
+            }
+          : null,
+      contexts,
     })
   } catch (error) {
     console.error('GET /api/chats/:id failed:', error)
@@ -7132,6 +7695,7 @@ app.get('/api/chats/:id/messages', async (req, res) => {
       return
     }
 
+    const isMasterViewer = access.memberRole === 'master'
     const result = await pool.query(
       `
         SELECT
@@ -7146,10 +7710,14 @@ app.get('/api/chats/:id/messages', async (req, res) => {
         FROM chat_messages
         WHERE chat_id = $1
           AND ($2::int IS NULL OR id < $2)
+          AND (
+            $3::boolean
+            OR COALESCE(meta->>'visibility', meta->>'audience', '') <> 'master_only'
+          )
         ORDER BY id DESC
-        LIMIT $3
+        LIMIT $4
       `,
-      [chatId, beforeId, limit]
+      [chatId, beforeId, isMasterViewer, limit]
     )
 
     const items = result.rows
