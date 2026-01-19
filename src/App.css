@@ -12194,7 +12194,7 @@
   flex-direction: column;
   gap: 6px;
   box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
-  min-height: 72px;
+  min-height: 62px;
 }
 
 .pro-slot-row {
