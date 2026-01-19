@@ -32,6 +32,65 @@ const locationLabelMap = {
   any: 'Не важно',
 } as const
 
+const bookingOutcomeLabelMap: Record<string, string> = {
+  on_time: 'Вовремя',
+  late: 'Опоздал',
+  no_show: 'Не пришёл',
+  late_cancel: 'Поздняя отмена',
+}
+
+const lateMinuteOptions = [5, 10, 15, 20, 30]
+
+const formatDurationLabel = (value?: number | null) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return ''
+  }
+  return `${Math.round(value)} мин`
+}
+
+const parseOutcomePromptMeta = (meta: ChatMessage['meta']) => {
+  if (!meta || typeof meta !== 'object') return null
+  const payload = meta as Record<string, unknown>
+  if (payload.event !== 'booking_outcome_prompt') return null
+  const rawId = payload.bookingId
+  const bookingId = typeof rawId === 'number' ? rawId : Number(rawId)
+  if (!Number.isInteger(bookingId)) return null
+  return {
+    bookingId,
+    serviceName: typeof payload.serviceName === 'string' ? payload.serviceName : null,
+    scheduledAt: typeof payload.scheduledAt === 'string' ? payload.scheduledAt : null,
+    serviceDuration:
+      typeof payload.serviceDuration === 'number' ? payload.serviceDuration : null,
+    actionExpiresAt:
+      typeof payload.actionExpiresAt === 'string' ? payload.actionExpiresAt : null,
+  }
+}
+
+const parseOutcomeMarkedMeta = (meta: ChatMessage['meta']) => {
+  if (!meta || typeof meta !== 'object') return null
+  const payload = meta as Record<string, unknown>
+  if (payload.event !== 'booking_outcome_marked') return null
+  const rawId = payload.bookingId
+  const bookingId = typeof rawId === 'number' ? rawId : Number(rawId)
+  if (!Number.isInteger(bookingId)) return null
+  const outcome = typeof payload.outcome === 'string' ? payload.outcome : ''
+  const lateMinutes =
+    typeof payload.lateMinutes === 'number' ? payload.lateMinutes : null
+  return {
+    bookingId,
+    outcome,
+    lateMinutes,
+  }
+}
+
+const formatOutcomeSummary = (outcome?: string | null, lateMinutes?: number | null) => {
+  if (!outcome) return ''
+  if (outcome === 'late' && typeof lateMinutes === 'number') {
+    return `Опоздал на ${lateMinutes} мин.`
+  }
+  return bookingOutcomeLabelMap[outcome] ?? outcome
+}
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
   const parsed = new Date(value)
@@ -151,6 +210,19 @@ export const ChatThreadScreen = ({
   >(null)
   const [quickValue, setQuickValue] = useState('')
   const [isTrustSheetOpen, setIsTrustSheetOpen] = useState(false)
+  const [outcomeSheetBookingId, setOutcomeSheetBookingId] = useState<number | null>(
+    null
+  )
+  const [outcomeSheetMinutes, setOutcomeSheetMinutes] = useState(
+    lateMinuteOptions[1] ?? 10
+  )
+  const [outcomeSubmittingId, setOutcomeSubmittingId] = useState<number | null>(
+    null
+  )
+  const [outcomeError, setOutcomeError] = useState('')
+  const [outcomeErrorBookingId, setOutcomeErrorBookingId] = useState<number | null>(
+    null
+  )
   const screenRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
@@ -213,6 +285,83 @@ export const ChatThreadScreen = ({
       : streamStatus === 'connecting' || streamStatus === 'reconnecting'
         ? 'is-syncing'
         : 'is-offline'
+
+  const outcomeByBookingId = useMemo(() => {
+    const map = new Map<
+      number,
+      { outcome: string; lateMinutes: number | null }
+    >()
+    messages.forEach((message) => {
+      if (message.type !== 'system') return
+      const meta = parseOutcomeMarkedMeta(message.meta)
+      if (!meta?.bookingId) return
+      map.set(meta.bookingId, {
+        outcome: meta.outcome,
+        lateMinutes: meta.lateMinutes ?? null,
+      })
+    })
+    if (detail?.booking?.id && detail.booking.outcome) {
+      map.set(detail.booking.id, {
+        outcome: detail.booking.outcome,
+        lateMinutes: detail.booking.lateMinutes ?? null,
+      })
+    }
+    return map
+  }, [
+    messages,
+    detail?.booking?.id,
+    detail?.booking?.lateMinutes,
+    detail?.booking?.outcome,
+  ])
+
+  const updateCounterpartTrust = useCallback(
+    (nextTrust) => {
+      if (!nextTrust) return
+      setDetail((current) => {
+        if (!current) return current
+        const next = {
+          ...current,
+          counterpart: {
+            ...current.counterpart,
+            trust: nextTrust,
+          },
+        }
+        setCachedChatDetail(apiBase, userId, chatId, next)
+        return next
+      })
+    },
+    [apiBase, chatId, userId]
+  )
+
+  const updateBookingOutcome = useCallback(
+    (bookingId: number, outcome: string, lateMinutes: number | null) => {
+      setDetail((current) => {
+        if (!current?.booking || current.booking.id !== bookingId) return current
+        const next = {
+          ...current,
+          booking: {
+            ...current.booking,
+            outcome,
+            lateMinutes,
+          },
+        }
+        setCachedChatDetail(apiBase, userId, chatId, next)
+        return next
+      })
+    },
+    [apiBase, chatId, userId]
+  )
+
+  const closeOutcomeSheet = useCallback(() => {
+    setOutcomeSheetBookingId(null)
+  }, [])
+
+  const openLateOutcomeSheet = useCallback((bookingId: number) => {
+    setOutcomeError('')
+    setOutcomeErrorBookingId(null)
+    setOutcomeSheetMinutes(lateMinuteOptions[1] ?? 10)
+    setOutcomeSheetBookingId(bookingId)
+  }, [])
 
   const getScrollElement = useCallback(() => {
     const container = messagesContainerRef.current
@@ -670,6 +819,14 @@ export const ChatThreadScreen = ({
         const exists = messagesRef.current.some((item) => item.id === incoming.id)
         if (exists) return
         mergeMessages([incoming])
+        const outcomeMeta = parseOutcomeMarkedMeta(incoming.meta)
+        if (outcomeMeta?.bookingId) {
+          updateBookingOutcome(
+            outcomeMeta.bookingId,
+            outcomeMeta.outcome,
+            outcomeMeta.lateMinutes ?? null
+          )
+        }
         const isOwn = incoming.senderId === userId
         if (isOwn || isNearBottomRef.current) {
           scrollToBottom()
@@ -680,6 +837,21 @@ export const ChatThreadScreen = ({
         if (!isOwn && isNearBottomRef.current) {
           void markRead(incoming.id)
         }
+        return
+      }
+
+      if (payload?.type === 'trust:update') {
+        const chatIdFromEvent =
+          typeof payload.chatId === 'number' ? payload.chatId : null
+        const trustUserId =
+          typeof payload.userId === 'string' ? payload.userId : null
+        const trust =
+          payload.trust && typeof payload.trust === 'object'
+            ? (payload.trust as ChatDetail['counterpart']['trust'])
+            : null
+        if (!chatIdFromEvent || chatIdFromEvent !== chatId) return
+        if (!trustUserId || trustUserId !== counterpart?.id || !trust) return
+        updateCounterpartTrust(trust)
         return
       }
 
@@ -725,7 +897,17 @@ export const ChatThreadScreen = ({
       unsubscribe()
       unsubscribeStatus()
     }
-  }, [chatId, markRead, mergeMessages, scrollToBottom, stream, userId])
+  }, [
+    chatId,
+    counterpart?.id,
+    markRead,
+    mergeMessages,
+    scrollToBottom,
+    stream,
+    updateBookingOutcome,
+    updateCounterpartTrust,
+    userId,
+  ])
 
   const handleSendMessage = async (payload: {
     type: ChatMessage['type']
@@ -909,6 +1091,74 @@ export const ChatThreadScreen = ({
       })
     }
   }
+
+  const submitBookingOutcome = useCallback(
+    async (bookingId: number, outcome: string, lateMinutes?: number | null) => {
+      setOutcomeError('')
+      setOutcomeErrorBookingId(null)
+      setOutcomeSubmittingId(bookingId)
+      try {
+        const response = await fetch(`${apiBase}/api/bookings/${bookingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            action: 'set-outcome',
+            outcome,
+            lateMinutes: lateMinutes ?? null,
+          }),
+        })
+        const data = (await response.json()) as {
+          ok?: boolean
+          error?: string
+          outcome?: string
+          lateMinutes?: number | null
+          trust?: ChatDetail['counterpart']['trust']
+          systemMessage?: ChatMessage
+        }
+        if (!response.ok) {
+          const message =
+            data?.error === 'outcome_locked'
+              ? 'Визит уже отмечен.'
+              : data?.error === 'late_minutes_required'
+                ? 'Укажите минуты опоздания.'
+                : 'Не удалось отметить визит.'
+          throw new Error(message)
+        }
+        if (data?.systemMessage) {
+          mergeMessages([data.systemMessage as ChatMessage])
+        }
+        if (data?.trust) {
+          updateCounterpartTrust(data.trust)
+        }
+        if (data?.outcome) {
+          updateBookingOutcome(
+            bookingId,
+            data.outcome,
+            data.lateMinutes ?? null
+          )
+        }
+        closeOutcomeSheet()
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : 'Не удалось отметить визит.'
+        setOutcomeError(message)
+        setOutcomeErrorBookingId(bookingId)
+      } finally {
+        setOutcomeSubmittingId(null)
+      }
+    },
+    [
+      apiBase,
+      closeOutcomeSheet,
+      mergeMessages,
+      updateBookingOutcome,
+      updateCounterpartTrust,
+      userId,
+    ]
+  )
 
   const handleLocationSend = async (value: 'master' | 'client' | 'any') => {
     setQuickMode(null)
@@ -1227,6 +1477,10 @@ export const ChatThreadScreen = ({
             const isSystem = message.type === 'system'
             const isOffer = message.type.startsWith('offer_')
             const showStatus = isMine && !isSystem
+            const outcomePrompt = isSystem ? parseOutcomePromptMeta(message.meta) : null
+            const outcomeStatus = outcomePrompt
+              ? outcomeByBookingId.get(outcomePrompt.bookingId) ?? null
+              : null
             const offerMeta = (message.meta ?? {}) as Record<string, unknown>
             const offerTitle =
               message.type === 'offer_price'
@@ -1247,6 +1501,160 @@ export const ChatThreadScreen = ({
                         offerMeta.locationType as keyof typeof locationLabelMap
                       ]
                     : null
+
+            if (outcomePrompt) {
+              const scheduledLabel = formatDateTime(
+                outcomePrompt.scheduledAt ?? booking?.scheduledAt ?? null
+              )
+              const durationLabel = formatDurationLabel(
+                outcomePrompt.serviceDuration ?? booking?.serviceDuration ?? null
+              )
+              const actionExpiresAt = outcomePrompt.actionExpiresAt
+              const expiresLabel = actionExpiresAt
+                ? formatDateTime(actionExpiresAt)
+                : ''
+              const isExpired =
+                actionExpiresAt &&
+                new Date(actionExpiresAt).getTime() < Date.now()
+              const canAct = isProViewer && !outcomeStatus && !isExpired
+              const showActions = isProViewer && !outcomeStatus
+              const isSubmitting = outcomeSubmittingId === outcomePrompt.bookingId
+              const statusLabel = outcomeStatus
+                ? formatOutcomeSummary(
+                    outcomeStatus.outcome,
+                    outcomeStatus.lateMinutes
+                  )
+                : ''
+              const outcomeSubtitle =
+                message.body ||
+                'Отметьте явку, чтобы обновить доверие клиента.'
+              const serviceName = outcomePrompt.serviceName ?? booking?.serviceName ?? null
+              const showError =
+                outcomeError &&
+                outcomeErrorBookingId === outcomePrompt.bookingId
+
+              return (
+                <div key={message.id} className="chat-message-group">
+                  {showDate && (
+                    <div className="chat-date">
+                      {formatDayLabel(message.createdAt)}
+                    </div>
+                  )}
+                  <div className="chat-message is-system">
+                    <div className="chat-outcome-card">
+                      <div className="chat-outcome-top">
+                        <div>
+                          <p className="chat-outcome-kicker">Итог визита</p>
+                          <h3 className="chat-outcome-title">
+                            Как прошла запись?
+                          </h3>
+                        </div>
+                        <span className="chat-outcome-pill">post-visit</span>
+                      </div>
+                      <p className="chat-outcome-subtitle">{outcomeSubtitle}</p>
+                      <div className="chat-outcome-meta">
+                        {serviceName && (
+                          <span>Услуга: {serviceName}</span>
+                        )}
+                        {scheduledLabel && (
+                          <span>Время: {scheduledLabel}</span>
+                        )}
+                        {durationLabel && (
+                          <span>Длительность: {durationLabel}</span>
+                        )}
+                      </div>
+                      {expiresLabel && !isExpired && !outcomeStatus && (
+                        <div className="chat-outcome-expiry">
+                          Отметьте до {expiresLabel}
+                        </div>
+                      )}
+                      {isExpired && !outcomeStatus && (
+                        <div className="chat-outcome-expired">
+                          Срок отметки истёк
+                        </div>
+                      )}
+                      {outcomeStatus && (
+                        <div className="chat-outcome-status">
+                          <span className="chat-outcome-status-label">
+                            Отмечено
+                          </span>
+                          <span className="chat-outcome-status-value">
+                            {statusLabel}
+                          </span>
+                        </div>
+                      )}
+                      {showActions ? (
+                        <div className="chat-outcome-actions">
+                          <button
+                            className="chat-outcome-action is-positive"
+                            type="button"
+                            disabled={!canAct || isSubmitting}
+                            onClick={() =>
+                              void submitBookingOutcome(
+                                outcomePrompt.bookingId,
+                                'on_time'
+                              )
+                            }
+                          >
+                            Вовремя
+                          </button>
+                          <button
+                            className="chat-outcome-action is-warning"
+                            type="button"
+                            disabled={!canAct || isSubmitting}
+                            onClick={() =>
+                              openLateOutcomeSheet(outcomePrompt.bookingId)
+                            }
+                          >
+                            Опоздал
+                          </button>
+                          <button
+                            className="chat-outcome-action is-danger"
+                            type="button"
+                            disabled={!canAct || isSubmitting}
+                            onClick={() =>
+                              void submitBookingOutcome(
+                                outcomePrompt.bookingId,
+                                'no_show'
+                              )
+                            }
+                          >
+                            Не пришёл
+                          </button>
+                          <button
+                            className="chat-outcome-action is-neutral"
+                            type="button"
+                            disabled={!canAct || isSubmitting}
+                            onClick={() =>
+                              void submitBookingOutcome(
+                                outcomePrompt.bookingId,
+                                'late_cancel'
+                              )
+                            }
+                          >
+                            Поздняя отмена
+                          </button>
+                        </div>
+                      ) : !isProViewer ? (
+                        <div className="chat-outcome-note">
+                          Доступно мастеру
+                        </div>
+                      ) : null}
+                      {isSubmitting && (
+                        <div className="chat-outcome-loading">
+                          Фиксируем отметку...
+                        </div>
+                      )}
+                      {showError && (
+                        <p className="chat-outcome-error" role="alert">
+                          {outcomeError}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
 
             return (
               <div key={message.id} className="chat-message-group">
@@ -1516,6 +1924,74 @@ export const ChatThreadScreen = ({
               onClick={closeTrustSheet}
             >
               Понятно
+            </button>
+          </div>
+        </div>
+      )}
+
+      {outcomeSheetBookingId !== null && (
+        <div
+          className="outcome-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="outcome-sheet-title"
+          onClick={closeOutcomeSheet}
+        >
+          <div
+            className="outcome-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="outcome-sheet-handle" aria-hidden="true" />
+            <div className="outcome-sheet-head">
+              <div>
+                <p className="outcome-sheet-kicker">Опоздание</p>
+                <h3 className="outcome-sheet-title" id="outcome-sheet-title">
+                  На сколько минут?
+                </h3>
+                <p className="outcome-sheet-subtitle">
+                  Выберите интервал — это влияет на доверие клиента.
+                </p>
+              </div>
+              <button
+                className="outcome-sheet-close"
+                type="button"
+                onClick={closeOutcomeSheet}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <div className="outcome-minute-grid">
+              {lateMinuteOptions.map((minutes) => (
+                <button
+                  key={minutes}
+                  className={`outcome-minute-chip${
+                    outcomeSheetMinutes === minutes ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => setOutcomeSheetMinutes(minutes)}
+                >
+                  {minutes} мин
+                </button>
+              ))}
+            </div>
+            <button
+              className="outcome-sheet-confirm"
+              type="button"
+              disabled={outcomeSubmittingId === outcomeSheetBookingId}
+              onClick={() =>
+                outcomeSheetBookingId !== null
+                  ? submitBookingOutcome(
+                      outcomeSheetBookingId,
+                      'late',
+                      outcomeSheetMinutes
+                    )
+                  : undefined
+              }
+            >
+              {outcomeSubmittingId === outcomeSheetBookingId
+                ? 'Фиксируем...'
+                : 'Подтвердить'}
             </button>
           </div>
         </div>

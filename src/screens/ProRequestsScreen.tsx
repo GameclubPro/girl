@@ -18,6 +18,7 @@ import type {
   ServiceRequest,
 } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
+import { getChatStream } from '../utils/chatStream'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -55,6 +56,13 @@ const bookingStatusToneMap = {
   declined: 'is-cancelled',
   cancelled: 'is-cancelled',
 } as const
+
+const bookingOutcomeLabelMap: Record<string, string> = {
+  on_time: 'Вовремя',
+  late: 'Опоздал',
+  no_show: 'Не пришёл',
+  late_cancel: 'Поздняя отмена',
+}
 
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -185,6 +193,28 @@ const formatMinutes = (value: number) => {
   const hours = Math.floor(value / 60)
   const minutes = value % 60
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const formatOutcomeLabel = (
+  outcome?: string | null,
+  lateMinutes?: number | null
+) => {
+  if (!outcome) return ''
+  if (outcome === 'late' && typeof lateMinutes === 'number') {
+    return `Опоздал на ${lateMinutes} мин.`
+  }
+  return bookingOutcomeLabelMap[outcome] ?? outcome
+}
+
+const isOutcomePending = (booking: Booking) => {
+  if (booking.status !== 'confirmed' || booking.outcome) return false
+  const scheduledAt = new Date(booking.scheduledAt)
+  if (Number.isNaN(scheduledAt.getTime())) return false
+  const duration =
+    typeof booking.serviceDuration === 'number' && booking.serviceDuration > 0
+      ? booking.serviceDuration
+      : BOOKING_DURATION_MIN
+  return scheduledAt.getTime() + duration * 60 * 1000 <= Date.now()
 }
 
 const parseTimeMinutes = (value: string | null | undefined) => {
@@ -517,6 +547,7 @@ export const ProRequestsScreen = ({
     },
     [bookingStartParam, shareBase, shareMode, selectedDateKey]
   )
+  const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
 
   useEffect(() => {
     if (!initialTab) return
@@ -695,6 +726,52 @@ export const ProRequestsScreen = ({
       cancelled = true
     }
   }, [apiBase, userId])
+
+  useEffect(() => {
+    const unsubscribe = stream.subscribe((payload) => {
+      if (payload?.type === 'trust:update') {
+        const trustUserId =
+          typeof payload.userId === 'string' ? payload.userId : null
+        const trust =
+          payload.trust && typeof payload.trust === 'object'
+            ? (payload.trust as Booking['clientTrust'])
+            : null
+        if (!trustUserId || !trust) return
+        setBookings((current) =>
+          current.map((booking) =>
+            booking.clientId === trustUserId
+              ? { ...booking, clientTrust: trust }
+              : booking
+          )
+        )
+        return
+      }
+      if (payload?.type === 'message:new') {
+        const message = payload.message as { meta?: Record<string, unknown> } | undefined
+        const meta = message?.meta
+        if (!meta || typeof meta !== 'object') return
+        if (meta.event !== 'booking_outcome_marked') return
+        const rawId = meta.bookingId
+        const bookingId = typeof rawId === 'number' ? rawId : Number(rawId)
+        if (!Number.isInteger(bookingId)) return
+        const outcome = typeof meta.outcome === 'string' ? meta.outcome : ''
+        const lateMinutes =
+          typeof meta.lateMinutes === 'number' ? meta.lateMinutes : null
+        if (!outcome) return
+        setBookings((current) =>
+          current.map((booking) =>
+            booking.id === bookingId
+              ? { ...booking, outcome, lateMinutes }
+              : booking
+          )
+        )
+      }
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [stream])
 
   useEffect(() => {
     return () => {
@@ -1665,6 +1742,8 @@ export const ProRequestsScreen = ({
     const draftPrice = bookingDrafts[booking.id] ?? ''
     const clientName = booking.clientName ?? 'Клиент'
     const clientInitials = getInitials(clientName)
+    const outcomeLabel = formatOutcomeLabel(booking.outcome, booking.lateMinutes)
+    const canMarkOutcome = isOutcomePending(booking)
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
@@ -1711,6 +1790,9 @@ export const ProRequestsScreen = ({
           </div>
         )}
         <div className="booking-item-price">{priceLabel}</div>
+        {outcomeLabel && (
+          <div className="booking-item-outcome">Итог: {outcomeLabel}</div>
+        )}
         {booking.comment && (
           <div className="booking-item-comment">
             {booking.comment}
@@ -1786,6 +1868,24 @@ export const ProRequestsScreen = ({
                 Отказать
               </button>
             )}
+          </div>
+        )}
+        {canMarkOutcome && (
+          <div className="booking-outcome-cta">
+            <div className="booking-outcome-main">
+              <span className="booking-outcome-title">Отметить визит</span>
+              <span className="booking-outcome-subtitle">
+                Обновим доверие клиента после отметки.
+              </span>
+            </div>
+            <button
+              className="booking-action is-primary booking-outcome-button"
+              type="button"
+              onClick={() => handleOutcomeOpen(booking)}
+              disabled={isActionLoading}
+            >
+              Отметить
+            </button>
           </div>
         )}
         {bookingActionError[booking.id] && (
@@ -1893,6 +1993,17 @@ export const ProRequestsScreen = ({
     } finally {
       setBookingActionId((current) => (current === bookingId ? null : current))
     }
+  }
+
+  const handleOutcomeOpen = (booking: Booking) => {
+    if (typeof booking.chatId === 'number') {
+      onOpenChat(booking.chatId)
+      return
+    }
+    setBookingActionError((current) => ({
+      ...current,
+      [booking.id]: 'Чат ещё создаётся. Откройте список чатов.',
+    }))
   }
 
   const handleSubmit = async (requestId: number) => {

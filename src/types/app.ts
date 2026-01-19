@@ -195,6 +195,11 @@ export type Booking = {
   address?: string | null
   scheduledAt: string
   status: BookingStatus
+  outcome?: string | null
+  attendanceAt?: string | null
+  lateMinutes?: number | null
+  outcomePromptedAt?: string | null
+  chatId?: number | null
   photoUrls: string[]
   comment?: string | null
   createdAt: string
@@ -320,7 +325,11 @@ export type ChatDetail = {
     categoryId?: string | null
     locationType?: ServiceRequest['locationType']
     scheduledAt?: string | null
+    serviceDuration?: number | null
     servicePrice?: number | null
     status?: string | null
+    outcome?: string | null
+    lateMinutes?: number | null
+    attendanceAt?: string | null
   } | null
 }

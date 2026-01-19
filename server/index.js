@@ -25,6 +25,10 @@ const REQUEST_EXPANDED_BATCH_SIZE = 20
 const REQUEST_RESPONSE_WINDOW_MINUTES = 30
 const REQUEST_DISPATCH_SCAN_INTERVAL_MS = 60_000
 const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
+const OUTCOME_PROMPT_SCAN_INTERVAL_MS = 90_000
+const OUTCOME_PROMPT_BATCH_LIMIT = 20
+const OUTCOME_PROMPT_ACTION_WINDOW_HOURS = 48
+const BOOKING_DURATION_FALLBACK_MINUTES = 60
 const CHAT_MESSAGE_DEFAULT_LIMIT = 30
 const CHAT_MESSAGE_MAX_LIMIT = 80
 const CHAT_STREAM_PATH = '/api/chats/stream'
@@ -37,11 +41,18 @@ const TRUST_LEVEL_THRESHOLDS = {
 }
 const TRUST_EVENT_WEIGHTS = {
   visit_on_time: 5,
+  visit_late: -5,
   visit_rescheduled: -3,
   visit_no_show: -30,
 }
 const TRUST_EVENT_TYPE_LIST = Object.keys(TRUST_EVENT_WEIGHTS)
 const TRUST_EVENT_TYPES = new Set(TRUST_EVENT_TYPE_LIST)
+const BOOKING_OUTCOME_LABELS = {
+  on_time: 'Вовремя',
+  late: 'Опоздал',
+  no_show: 'Не пришёл',
+  late_cancel: 'Поздняя отмена',
+}
 const MAX_CERTIFICATES = 12
 const SUPPORT_AGENT_IDS = Array.from(
   new Set(
@@ -119,6 +130,12 @@ const parseOptionalInt = (value) => {
   return Number.isInteger(parsed) ? parsed : null
 }
 
+const resolveBookingDurationMinutes = (value) => {
+  const parsed = parseOptionalInt(value)
+  if (!parsed || parsed <= 0) return BOOKING_DURATION_FALLBACK_MINUTES
+  return parsed
+}
+
 const clampStoryHours = (value) => {
   const parsed = parseOptionalInt(value)
   if (!parsed) return STORY_DEFAULT_TTL_HOURS
@@ -160,6 +177,16 @@ const parseRangeDays = (value) => {
   const numeric = parseOptionalInt(normalized)
   if (numeric && numeric > 0 && numeric <= 365) return numeric
   return 30
+}
+
+const buildOutcomePromptActionExpiresAt = (scheduledAt, durationMinutes) => {
+  const scheduledMs = new Date(scheduledAt).getTime()
+  if (Number.isNaN(scheduledMs)) return null
+  const safeDuration = resolveBookingDurationMinutes(durationMinutes)
+  const endMs = scheduledMs + safeDuration * 60 * 1000
+  const expiresMs =
+    endMs + OUTCOME_PROMPT_ACTION_WINDOW_HOURS * 60 * 60 * 1000
+  return new Date(expiresMs).toISOString()
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -633,7 +660,7 @@ const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl }) => {
   }
 }
 
-const sendChatNotification = async ({ chatId, senderId, preview }) => {
+const sendChatNotification = async ({ chatId, senderId, preview, title, text }) => {
   if (!telegramBotToken || !telegramWebAppUrl) return
   const result = await pool.query(
     `
@@ -649,13 +676,21 @@ const sendChatNotification = async ({ chatId, senderId, preview }) => {
   if (recipients.length === 0) return
 
   const senderName = senderId ? await resolveUserDisplayName(senderId) : ''
-  const title = senderName ? `Новое сообщение от ${senderName}` : 'Новое сообщение'
-  const text = preview ? `${title}\n${preview}` : title
+  const fallbackTitle = senderName
+    ? `Новое сообщение от ${senderName}`
+    : 'Новое сообщение'
+  const titleText = title ?? fallbackTitle
+  const messageText = text ?? (preview ? `${titleText}\n${preview}` : titleText)
   const link = buildStartAppUrl(telegramWebAppUrl, `chat_${chatId}`)
 
   await Promise.all(
     recipients.map((recipientId) =>
-      sendTelegramMessage({ recipientId, text, webAppUrl: link, url: link })
+      sendTelegramMessage({
+        recipientId,
+        text: messageText,
+        webAppUrl: link,
+        url: link,
+      })
     )
   )
 }
@@ -1116,16 +1151,17 @@ const createChatForRequest = async ({
   }
 }
 
-const createChatForBooking = async ({
-  bookingId,
-  clientId,
-  masterId,
-  serviceName,
-  actorId,
-}) => {
-  await pool.query('BEGIN')
+const createChatForBooking = async (
+  { bookingId, clientId, masterId, serviceName, actorId },
+  options = {}
+) => {
+  const db = options.client ?? pool
+  const shouldManageTransaction = !options.client
+  if (shouldManageTransaction) {
+    await db.query('BEGIN')
+  }
   try {
-    const insertResult = await pool.query(
+    const insertResult = await db.query(
       `
         INSERT INTO chats (
           context_type,
@@ -1147,11 +1183,13 @@ const createChatForBooking = async ({
     const chatId = insertResult.rows[0]?.id ?? null
     const isNew = Boolean(insertResult.rows[0]?.isNew)
     if (!chatId) {
-      await pool.query('ROLLBACK')
+      if (shouldManageTransaction) {
+        await db.query('ROLLBACK')
+      }
       return null
     }
 
-    await pool.query(
+    await db.query(
       `
         INSERT INTO chat_members (chat_id, user_id, role)
         VALUES ($1, $2, 'client')
@@ -1159,7 +1197,7 @@ const createChatForBooking = async ({
       `,
       [chatId, clientId]
     )
-    await pool.query(
+    await db.query(
       `
         INSERT INTO chat_members (chat_id, user_id, role)
         VALUES ($1, $2, 'master')
@@ -1177,7 +1215,7 @@ const createChatForBooking = async ({
         ? `Запись подтверждена по услуге «${serviceName}». Можно обсудить детали.`
         : 'Запись подтверждена. Можно обсудить детали.'
       const meta = { event: 'booking_confirmed', serviceName: serviceName ?? null }
-      const messageResult = await pool.query(
+      const messageResult = await db.query(
         `
           INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
           VALUES ($1, NULL, 'system', $2, $3)
@@ -1199,7 +1237,7 @@ const createChatForBooking = async ({
           attachmentUrl: null,
           createdAt: systemMessageCreatedAt,
         }
-        await pool.query(
+        await db.query(
           `
             UPDATE chats
             SET last_message_id = $2,
@@ -1209,7 +1247,7 @@ const createChatForBooking = async ({
           `,
           [chatId, messageId]
         )
-        await pool.query(
+        await db.query(
           `
             UPDATE chat_members
             SET unread_count = CASE
@@ -1228,7 +1266,9 @@ const createChatForBooking = async ({
       }
     }
 
-    await pool.query('COMMIT')
+    if (shouldManageTransaction) {
+      await db.query('COMMIT')
+    }
     return {
       chatId,
       isNew,
@@ -1237,7 +1277,74 @@ const createChatForBooking = async ({
       systemMessage,
     }
   } catch (error) {
-    await pool.query('ROLLBACK')
+    if (shouldManageTransaction) {
+      await db.query('ROLLBACK')
+    }
+    throw error
+  }
+}
+
+const insertSystemMessage = async (
+  { chatId, body, meta, actorId },
+  options = {}
+) => {
+  const db = options.client ?? pool
+  const shouldManageTransaction = !options.client
+  if (shouldManageTransaction) {
+    await db.query('BEGIN')
+  }
+  try {
+    const messageResult = await db.query(
+      `
+        INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
+        VALUES ($1, NULL, 'system', $2, $3)
+        RETURNING id, created_at AS "createdAt"
+      `,
+      [chatId, body ?? null, meta ?? null]
+    )
+    const messageId = messageResult.rows[0]?.id ?? null
+    const createdAt = messageResult.rows[0]?.createdAt ?? null
+    if (!messageId) {
+      throw new Error('system_message_insert_failed')
+    }
+
+    await db.query(
+      `
+        UPDATE chats
+        SET last_message_id = $2,
+            last_message_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [chatId, messageId]
+    )
+
+    await db.query(
+      `
+        UPDATE chat_members
+        SET unread_count = CASE
+              WHEN user_id = $2 THEN 0
+              ELSE unread_count + 1
+            END,
+            last_read_message_id = CASE
+              WHEN user_id = $2 THEN $3
+              ELSE last_read_message_id
+            END,
+            updated_at = NOW()
+        WHERE chat_id = $1
+      `,
+      [chatId, actorId ?? null, messageId]
+    )
+
+    if (shouldManageTransaction) {
+      await db.query('COMMIT')
+    }
+
+    return { id: messageId, createdAt }
+  } catch (error) {
+    if (shouldManageTransaction) {
+      await db.query('ROLLBACK')
+    }
     throw error
   }
 }
@@ -1699,6 +1806,157 @@ const runRequestDispatchCycle = async () => {
   }
 }
 
+let outcomePromptCycleRunning = false
+
+const runBookingOutcomePromptCycle = async () => {
+  if (outcomePromptCycleRunning) return
+  outcomePromptCycleRunning = true
+
+  try {
+    const candidatesResult = await pool.query(
+      `
+        SELECT id
+        FROM service_bookings
+        WHERE status = 'confirmed'
+          AND outcome IS NULL
+          AND outcome_prompted_at IS NULL
+          AND scheduled_at + make_interval(mins => COALESCE(service_duration, $1)) <= NOW()
+        ORDER BY scheduled_at ASC
+        LIMIT $2
+      `,
+      [BOOKING_DURATION_FALLBACK_MINUTES, OUTCOME_PROMPT_BATCH_LIMIT]
+    )
+
+    for (const row of candidatesResult.rows) {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const bookingResult = await client.query(
+          `
+            SELECT
+              id,
+              client_id AS "clientId",
+              master_id AS "masterId",
+              service_name AS "serviceName",
+              scheduled_at AS "scheduledAt",
+              service_duration AS "serviceDuration"
+            FROM service_bookings
+            WHERE id = $1
+              AND status = 'confirmed'
+              AND outcome IS NULL
+              AND outcome_prompted_at IS NULL
+              AND scheduled_at + make_interval(mins => COALESCE(service_duration, $2)) <= NOW()
+            FOR UPDATE
+          `,
+          [row.id, BOOKING_DURATION_FALLBACK_MINUTES]
+        )
+        const booking = bookingResult.rows[0]
+        if (!booking) {
+          await client.query('ROLLBACK')
+          continue
+        }
+
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId: booking.id,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: booking.masterId,
+          },
+          { client }
+        )
+
+        if (!chatPayload?.chatId) {
+          await client.query('ROLLBACK')
+          continue
+        }
+
+        const actionExpiresAt = buildOutcomePromptActionExpiresAt(
+          booking.scheduledAt,
+          booking.serviceDuration
+        )
+        const meta = {
+          event: 'booking_outcome_prompt',
+          bookingId: booking.id,
+          serviceName: booking.serviceName ?? null,
+          scheduledAt: booking.scheduledAt ?? null,
+          serviceDuration: booking.serviceDuration ?? null,
+          actionExpiresAt,
+        }
+        const body = 'Как прошла запись? Отметьте явку/вовремя.'
+        const messageResult = await insertSystemMessage(
+          { chatId: chatPayload.chatId, body, meta, actorId: null },
+          { client }
+        )
+
+        await client.query(
+          `
+            UPDATE service_bookings
+            SET outcome_prompted_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [booking.id]
+        )
+
+        await client.query('COMMIT')
+
+        if (chatPayload.isNew) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
+            bookingId: booking.id,
+          })
+          if (chatPayload.systemMessage) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              message: chatPayload.systemMessage,
+            })
+          } else if (chatPayload.systemMessageId) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              messageId: chatPayload.systemMessageId,
+            })
+          }
+        }
+
+        const messagePayload = {
+          id: messageResult.id,
+          chatId: chatPayload.chatId,
+          senderId: null,
+          type: 'system',
+          body,
+          meta,
+          attachmentUrl: null,
+          createdAt: messageResult.createdAt,
+        }
+        void notifyChatMembers(chatPayload.chatId, {
+          type: 'message:new',
+          chatId: chatPayload.chatId,
+          message: messagePayload,
+        })
+        void sendChatNotification({
+          chatId: chatPayload.chatId,
+          senderId: booking.clientId,
+          text: 'Как прошла запись? Отметьте явку/вовремя.',
+        })
+      } catch (error) {
+        await client.query('ROLLBACK')
+        console.error('Booking outcome prompt failed:', error)
+      } finally {
+        client.release()
+      }
+    }
+  } catch (error) {
+    console.error('Outcome prompt cycle failed:', error)
+  } finally {
+    outcomePromptCycleRunning = false
+  }
+}
+
 const ensureSchema = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -2020,6 +2278,9 @@ const ensureSchema = async () => {
       cancelled_by TEXT,
       cancelled_at TIMESTAMPTZ,
       outcome TEXT,
+      outcome_prompted_at TIMESTAMPTZ,
+      attendance_at TIMESTAMPTZ,
+      late_minutes INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -2038,6 +2299,21 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS outcome TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS outcome_prompted_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS attendance_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS late_minutes INTEGER;
   `)
 
   await pool.query(`
@@ -4367,12 +4643,18 @@ app.get('/api/bookings', async (req, res) => {
           b.status,
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
+          b.outcome,
+          b.attendance_at AS "attendanceAt",
+          b.late_minutes AS "lateMinutes",
+          b.outcome_prompted_at AS "outcomePromptedAt",
           b.created_at AS "createdAt",
-          mr.id AS "reviewId"
+          mr.id AS "reviewId",
+          bc.id AS "chatId"
         FROM service_bookings b
         LEFT JOIN master_profiles mp ON mp.user_id = b.master_id
         LEFT JOIN users u ON u.user_id = b.master_id
         LEFT JOIN master_reviews mr ON mr.booking_id = b.id
+        LEFT JOIN chats bc ON bc.booking_id = b.id
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
         WHERE b.client_id = $1
@@ -4428,7 +4710,12 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.status,
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
+          b.outcome,
+          b.attendance_at AS "attendanceAt",
+          b.late_minutes AS "lateMinutes",
+          b.outcome_prompted_at AS "outcomePromptedAt",
           b.created_at AS "createdAt",
+          bc.id AS "chatId",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
           ul.share_to_masters AS "clientShareToMasters",
@@ -4440,6 +4727,7 @@ app.get('/api/pro/bookings', async (req, res) => {
         LEFT JOIN cities c ON c.id = b.city_id
         LEFT JOIN districts d ON d.id = b.district_id
         LEFT JOIN user_locations ul ON ul.user_id = b.client_id
+        LEFT JOIN chats bc ON bc.booking_id = b.id
         LEFT JOIN client_trust_scores cts ON cts.user_id = b.client_id
         WHERE b.master_id = $1
         ORDER BY b.created_at DESC
@@ -5119,11 +5407,12 @@ app.patch('/api/bookings/:id', async (req, res) => {
     return
   }
 
-  const { userId, action, price, outcome } = req.body ?? {}
+  const { userId, action, price, outcome, lateMinutes } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
   const normalizedAction = normalizeText(action)
   const parsedPrice = parseOptionalInt(price)
   const normalizedOutcome = normalizeText(outcome)
+  const parsedLateMinutes = parseOptionalInt(lateMinutes)
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -5421,7 +5710,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
-      if (!['completed', 'late_cancel', 'no_show'].includes(normalizedOutcome)) {
+      if (!['on_time', 'late', 'no_show', 'late_cancel'].includes(normalizedOutcome)) {
         res.status(400).json({ error: 'outcome_invalid' })
         return
       }
@@ -5431,57 +5720,180 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
+      if (booking.outcome) {
+        res.status(409).json({ error: 'outcome_locked' })
+        return
+      }
+
+      if (normalizedOutcome === 'late' && (!parsedLateMinutes || parsedLateMinutes <= 0)) {
+        res.status(400).json({ error: 'late_minutes_required' })
+        return
+      }
+
       const updates = ['outcome = $2', 'updated_at = NOW()']
       const values = [bookingId, normalizedOutcome]
+      const pushValue = (value) => {
+        values.push(value)
+        return `$${values.length}`
+      }
+
+      if (normalizedOutcome === 'late') {
+        updates.push(`late_minutes = ${pushValue(parsedLateMinutes)}`)
+        updates.push('attendance_at = NOW()')
+      } else {
+        updates.push('late_minutes = NULL')
+        updates.push(normalizedOutcome === 'on_time' ? 'attendance_at = NOW()' : 'attendance_at = NULL')
+      }
 
       if (normalizedOutcome === 'late_cancel') {
         updates.push(`cancelled_by = COALESCE(cancelled_by, 'client')`)
         updates.push(`cancelled_at = COALESCE(cancelled_at, NOW())`)
       }
 
-      await pool.query(
-        `
-          UPDATE service_bookings
-          SET ${updates.join(', ')}
-          WHERE id = $1
-        `,
-        values
-      )
+      const outcomeLabel =
+        BOOKING_OUTCOME_LABELS[normalizedOutcome] ?? normalizedOutcome
+      const outcomeDetail =
+        normalizedOutcome === 'late' && parsedLateMinutes
+          ? `Опоздал на ${parsedLateMinutes} мин.`
+          : outcomeLabel
+      const systemBody = `Мастер отметил: ${outcomeDetail}.`
+      const systemMeta = {
+        event: 'booking_outcome_marked',
+        bookingId,
+        outcome: normalizedOutcome,
+        lateMinutes: normalizedOutcome === 'late' ? parsedLateMinutes : null,
+        scheduledAt: booking.scheduledAt ?? null,
+        serviceName: booking.serviceName ?? null,
+      }
 
-      if (normalizedOutcome === 'completed') {
-        await logClientTrustEvent({
-          userId: booking.clientId,
-          eventType: 'visit_on_time',
-          meta: {
-            ref: `booking:${bookingId}`,
+      let chatPayload = null
+      let systemMessagePayload = null
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        chatPayload = await createChatForBooking(
+          {
             bookingId,
-            scheduledAt: booking.scheduledAt,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
           },
-        })
-      } else if (normalizedOutcome === 'no_show') {
-        await logClientTrustEvent({
-          userId: booking.clientId,
-          eventType: 'visit_no_show',
-          meta: {
-            ref: `booking:${bookingId}`,
+          { client }
+        )
+        if (!chatPayload?.chatId) {
+          throw new Error('chat_unavailable')
+        }
+
+        await client.query(
+          `
+            UPDATE service_bookings
+            SET ${updates.join(', ')}
+            WHERE id = $1
+          `,
+          values
+        )
+
+        const messageResult = await insertSystemMessage(
+          {
+            chatId: chatPayload.chatId,
+            body: systemBody,
+            meta: systemMeta,
+            actorId: normalizedUserId,
+          },
+          { client }
+        )
+        systemMessagePayload = {
+          id: messageResult.id,
+          chatId: chatPayload.chatId,
+          senderId: null,
+          type: 'system',
+          body: systemBody,
+          meta: systemMeta,
+          attachmentUrl: null,
+          createdAt: messageResult.createdAt,
+        }
+
+        await client.query('COMMIT')
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
+      }
+
+      const trustMeta = {
+        ref: `booking:${bookingId}`,
+        bookingId,
+        scheduledAt: booking.scheduledAt,
+        ...(normalizedOutcome === 'late'
+          ? { lateMinutes: parsedLateMinutes }
+          : {}),
+        ...(normalizedOutcome === 'late_cancel'
+          ? { source: 'outcome' }
+          : {}),
+      }
+      const trustEventType =
+        normalizedOutcome === 'on_time'
+          ? 'visit_on_time'
+          : normalizedOutcome === 'late'
+            ? 'visit_late'
+            : normalizedOutcome === 'no_show'
+              ? 'visit_no_show'
+              : 'visit_rescheduled'
+
+      await logClientTrustEvent({
+        userId: booking.clientId,
+        eventType: trustEventType,
+        meta: trustMeta,
+        skipRefresh: true,
+      })
+      const trust = await refreshClientTrustScore(booking.clientId)
+
+      if (chatPayload?.chatId) {
+        if (chatPayload.isNew) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
             bookingId,
-            scheduledAt: booking.scheduledAt,
-          },
-        })
-      } else if (normalizedOutcome === 'late_cancel') {
-        await logClientTrustEvent({
+          })
+          if (chatPayload.systemMessage) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              message: chatPayload.systemMessage,
+            })
+          } else if (chatPayload.systemMessageId) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              messageId: chatPayload.systemMessageId,
+            })
+          }
+        }
+        if (systemMessagePayload) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'message:new',
+            chatId: chatPayload.chatId,
+            message: systemMessagePayload,
+          })
+        }
+        void notifyChatMembers(chatPayload.chatId, {
+          type: 'trust:update',
+          chatId: chatPayload.chatId,
           userId: booking.clientId,
-          eventType: 'visit_rescheduled',
-          meta: {
-            ref: `booking:${bookingId}`,
-            bookingId,
-            scheduledAt: booking.scheduledAt,
-            source: 'outcome',
-          },
+          trust,
         })
       }
 
-      res.json({ ok: true, outcome: normalizedOutcome })
+      res.json({
+        ok: true,
+        outcome: normalizedOutcome,
+        lateMinutes: normalizedOutcome === 'late' ? parsedLateMinutes : null,
+        trust,
+        systemMessage: systemMessagePayload,
+        chatId: chatPayload?.chatId ?? null,
+      })
       return
     }
 
@@ -5617,7 +6029,7 @@ app.post('/api/bookings/:id/review', async (req, res) => {
     await pool.query(
       `
         UPDATE service_bookings
-        SET outcome = COALESCE(outcome, 'completed'),
+        SET outcome = COALESCE(outcome, 'on_time'),
             updated_at = NOW()
         WHERE id = $1
       `,
@@ -6559,8 +6971,12 @@ app.get('/api/chats/:id', async (req, res) => {
           sb.category_id AS "bookingCategoryId",
           sb.location_type AS "bookingLocationType",
           sb.scheduled_at AS "bookingScheduledAt",
+          sb.service_duration AS "bookingServiceDuration",
           sb.service_price AS "bookingServicePrice",
           sb.status AS "bookingStatus",
+          sb.outcome AS "bookingOutcome",
+          sb.late_minutes AS "bookingLateMinutes",
+          sb.attendance_at AS "bookingAttendanceAt",
           mp.display_name AS "masterName",
           COALESCE(mp.avatar_path, um.avatar_url) AS "masterAvatarPath",
           u.first_name AS "clientFirstName",
@@ -6674,8 +7090,12 @@ app.get('/api/chats/:id', async (req, res) => {
             categoryId: row.bookingCategoryId,
             locationType: row.bookingLocationType,
             scheduledAt: row.bookingScheduledAt,
+            serviceDuration: row.bookingServiceDuration,
             servicePrice: row.bookingServicePrice,
             status: row.bookingStatus,
+            outcome: row.bookingOutcome,
+            lateMinutes: row.bookingLateMinutes,
+            attendanceAt: row.bookingAttendanceAt,
           }
         : null,
     })
@@ -7221,7 +7641,7 @@ const backfillClientTrustScores = async () => {
       FROM service_bookings
       WHERE status = 'confirmed'
         AND scheduled_at < NOW()
-        AND (outcome IS NULL OR outcome = 'completed')
+        AND (outcome IS NULL OR outcome IN ('completed', 'on_time'))
     `
   )
 
@@ -7235,6 +7655,33 @@ const backfillClientTrustScores = async () => {
         scheduledAt: row.scheduledAt,
       },
       occurredAt: row.scheduledAt,
+    })
+  }
+
+  const lateBookings = await pool.query(
+    `
+      SELECT
+        id,
+        client_id AS "clientId",
+        scheduled_at AS "scheduledAt",
+        updated_at AS "updatedAt",
+        late_minutes AS "lateMinutes"
+      FROM service_bookings
+      WHERE outcome = 'late'
+    `
+  )
+
+  for (const row of lateBookings.rows) {
+    await trackEvent({
+      userId: row.clientId,
+      eventType: 'visit_late',
+      meta: {
+        ref: `booking:${row.id}`,
+        bookingId: row.id,
+        scheduledAt: row.scheduledAt,
+        lateMinutes: row.lateMinutes,
+      },
+      occurredAt: row.updatedAt,
     })
   }
 
@@ -7390,6 +7837,10 @@ const start = async () => {
   setInterval(() => {
     void runRequestDispatchCycle()
   }, REQUEST_DISPATCH_SCAN_INTERVAL_MS)
+  void runBookingOutcomePromptCycle()
+  setInterval(() => {
+    void runBookingOutcomePromptCycle()
+  }, OUTCOME_PROMPT_SCAN_INTERVAL_MS)
 }
 
 start().catch((error) => {

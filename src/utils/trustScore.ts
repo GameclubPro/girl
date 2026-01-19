@@ -8,6 +8,7 @@ const TRUST_SCORE_THRESHOLDS = { low: 45, high: 70 }
 
 const trustEventLabelMap: Record<string, string> = {
   visit_on_time: 'Визиты вовремя',
+  visit_late: 'Опоздания',
   visit_rescheduled: 'Переносы записи',
   visit_no_show: 'Неявки',
 }
@@ -94,6 +95,9 @@ export const buildTrustTips = (trust?: ClientTrust | null) => {
 
   if (negativeTypes.has('visit_no_show')) {
     tips.push('Не пропускайте запись без предупреждения.')
+  }
+  if (negativeTypes.has('visit_late')) {
+    tips.push('Предупреждайте об опоздании и приходите вовремя.')
   }
   if (negativeTypes.has('visit_rescheduled')) {
     tips.push('Переносите запись заранее и подтверждайте новое время.')

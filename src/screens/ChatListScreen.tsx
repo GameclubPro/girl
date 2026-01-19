@@ -301,6 +301,38 @@ export const ChatListScreen = ({
         }
         return
       }
+      if (payload?.type === 'trust:update') {
+        const chatIdFromEvent =
+          typeof payload.chatId === 'number' ? payload.chatId : null
+        const trustUserId =
+          typeof payload.userId === 'string' ? payload.userId : null
+        const trust =
+          payload.trust && typeof payload.trust === 'object'
+            ? (payload.trust as ChatSummary['counterpart']['trust'])
+            : null
+        if (!trust || (!chatIdFromEvent && !trustUserId)) return
+        listUpdateTokenRef.current += 1
+        setItems((current) => {
+          const next = current.map((item) => {
+            if (
+              (chatIdFromEvent && item.id === chatIdFromEvent) ||
+              (trustUserId && item.counterpart.id === trustUserId)
+            ) {
+              return {
+                ...item,
+                counterpart: {
+                  ...item.counterpart,
+                  trust,
+                },
+              }
+            }
+            return item
+          })
+          setCachedChatList(apiBase, userId, next)
+          return next
+        })
+        return
+      }
       if (payload?.type === 'chat:read') {
         const chatId = typeof payload.chatId === 'number' ? payload.chatId : null
         const readerId =
