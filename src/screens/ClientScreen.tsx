@@ -396,8 +396,13 @@ export const ClientScreen = ({
       const scaleX = targetRect.width / sourceRect.width
       const scaleY = targetRect.height / sourceRect.height
 
-      const scaleAt = (t: number) =>
-        `scale(${1 + (scaleX - 1) * t}, ${1 + (scaleY - 1) * t})`
+      const scaleAt = (t: number) => {
+        const progress = Math.sin(Math.PI * t)
+        const shrinkFactor = 1 - 0.2 * progress
+        const nextScaleX = (1 + (scaleX - 1) * t) * shrinkFactor
+        const nextScaleY = (1 + (scaleY - 1) * t) * shrinkFactor
+        return `scale(${nextScaleX}, ${nextScaleY})`
+      }
 
       const sourceStyles = window.getComputedStyle(morph)
       const targetStyles = window.getComputedStyle(targetEl)
