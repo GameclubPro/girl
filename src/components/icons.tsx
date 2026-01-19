@@ -599,3 +599,60 @@ export const IconChevron = () => (
     />
   </svg>
 )
+
+export const IconTrash = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6 7h12M9 7V5h6v2M8 7l.6 12h6.8L16 7"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconLock = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="6"
+      y="11"
+      width="12"
+      height="8"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M8.5 11V8a3.5 3.5 0 1 1 7 0v3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconUnlock = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="6"
+      y="11"
+      width="12"
+      height="8"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M9 11V8a3.5 3.5 0 0 1 6.6-1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)

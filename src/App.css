@@ -12201,7 +12201,6 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  position: relative;
 }
 
 .pro-slot-time {
@@ -12273,7 +12272,8 @@
   scrollbar-width: none;
   flex: 1 1 auto;
   min-width: 0;
-  padding-right: 36px;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .pro-slot-actions::-webkit-scrollbar {
@@ -12293,17 +12293,14 @@
 }
 
 .pro-slot-action--icon {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  z-index: 2;
+  flex: 0 0 auto;
 }
 
 .pro-slot-action--icon svg {

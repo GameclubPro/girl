@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
-import { IconChevron } from '../components/icons'
+import {
+  IconChevron,
+  IconClose,
+  IconLock,
+  IconSwap,
+  IconTrash,
+  IconUnlock,
+} from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type {
   Booking,
@@ -2544,16 +2551,18 @@ export const ProRequestsScreen = ({
                                   <div className="pro-slot-actions">
                                     {slot.status === 'free' && (
                                       <>
-                                        <button
-                                          className="pro-slot-action"
+                                      <button
+                                          className="pro-slot-action pro-slot-action--icon"
                                           type="button"
+                                          aria-label="Закрыть окно"
                                           onClick={() => handleCloseSlot(slot.id)}
                                         >
-                                          Закрыть
+                                          <IconLock />
                                         </button>
                                         <button
-                                          className="pro-slot-action is-danger"
+                                          className="pro-slot-action pro-slot-action--icon is-danger"
                                           type="button"
+                                          aria-label="Удалить окно"
                                           onClick={() =>
                                             setSlotConfirm({
                                               type: 'delete',
@@ -2562,7 +2571,7 @@ export const ProRequestsScreen = ({
                                             })
                                           }
                                         >
-                                          Удалить
+                                          <IconTrash />
                                         </button>
                                       </>
                                     )}
@@ -2590,19 +2599,21 @@ export const ProRequestsScreen = ({
                                           <IconChevron />
                                         </button>
                                         <button
-                                          className="pro-slot-action"
+                                          className="pro-slot-action pro-slot-action--icon"
                                           type="button"
+                                          aria-label="Перенести запись"
                                           onClick={() =>
                                             handleOpenAddSlots({
                                               rescheduleBookingId: booking.id,
                                             })
                                           }
                                         >
-                                          Перенести
+                                          <IconSwap />
                                         </button>
                                         <button
-                                          className="pro-slot-action is-danger"
+                                          className="pro-slot-action pro-slot-action--icon is-danger"
                                           type="button"
+                                          aria-label="Отменить запись"
                                           onClick={() =>
                                             setSlotConfirm({
                                               type: 'cancel-booking',
@@ -2611,17 +2622,18 @@ export const ProRequestsScreen = ({
                                             })
                                           }
                                         >
-                                          Отменить
+                                          <IconClose />
                                         </button>
                                       </>
                                     )}
                                     {slot.status === 'closed' && (
                                       <button
-                                        className="pro-slot-action"
+                                        className="pro-slot-action pro-slot-action--icon"
                                         type="button"
+                                        aria-label="Открыть окно"
                                         onClick={() => handleOpenSlot(slot.id)}
                                       >
-                                        Открыть
+                                        <IconUnlock />
                                       </button>
                                     )}
                                   </div>
