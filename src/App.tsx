@@ -1,30 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { AddressScreen } from './screens/AddressScreen'
-import { ChatListScreen } from './screens/ChatListScreen'
-import { ChatThreadScreen } from './screens/ChatThreadScreen'
-import { ClientRequestsScreen } from './screens/ClientRequestsScreen'
-import { ClientProfileScreen } from './screens/ClientProfileScreen'
-import { ClientScreen } from './screens/ClientScreen'
-import {
-  ClientShowcaseDetailScreen,
-  ClientShowcaseGalleryScreen,
-  ClientShowcaseScreen,
-  type ShowcaseMedia,
-} from './screens/ClientShowcaseScreen'
-import { ClientMasterProfileScreen } from './screens/ClientMasterProfileScreen'
-import { BookingScreen } from './screens/BookingScreen'
-import { ProAnalyticsScreen } from './screens/ProAnalyticsScreen'
-import { ProCabinetScreen } from './screens/ProCabinetScreen'
-import { ProCampaignsScreen } from './screens/ProCampaignsScreen'
-import { ProClientsScreen } from './screens/ProClientsScreen'
-import { ProProfileScreen } from './screens/ProProfileScreen'
-import { ProRequestsScreen } from './screens/ProRequestsScreen'
-import { ProRemindersScreen } from './screens/ProRemindersScreen'
-import { ProStoriesScreen } from './screens/ProStoriesScreen'
-import { RequestScreen } from './screens/RequestScreen'
-import { StartScreen } from './screens/StartScreen'
+import { Suspense, lazy, useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { ScreenLoader } from './components/ScreenLoader'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
+import { useTelegramTheme } from './hooks/useTelegramTheme'
 import type {
   City,
   District,
@@ -40,13 +18,144 @@ import {
   toggleFavorite,
   type FavoriteMaster,
 } from './utils/favorites'
+import type { ShowcaseMedia } from './screens/ClientShowcaseScreen'
 import './App.css'
+
+const AddressScreen = lazy(() =>
+  import('./screens/AddressScreen').then((module) => ({
+    default: module.AddressScreen,
+  }))
+)
+const ChatListScreen = lazy(() =>
+  import('./screens/ChatListScreen').then((module) => ({
+    default: module.ChatListScreen,
+  }))
+)
+const ChatThreadScreen = lazy(() =>
+  import('./screens/ChatThreadScreen').then((module) => ({
+    default: module.ChatThreadScreen,
+  }))
+)
+const ClientRequestsScreen = lazy(() =>
+  import('./screens/ClientRequestsScreen').then((module) => ({
+    default: module.ClientRequestsScreen,
+  }))
+)
+const ClientProfileScreen = lazy(() =>
+  import('./screens/ClientProfileScreen').then((module) => ({
+    default: module.ClientProfileScreen,
+  }))
+)
+const ClientScreen = lazy(() =>
+  import('./screens/ClientScreen').then((module) => ({
+    default: module.ClientScreen,
+  }))
+)
+const loadClientShowcase = () => import('./screens/ClientShowcaseScreen')
+const ClientShowcaseScreen = lazy(() =>
+  loadClientShowcase().then((module) => ({
+    default: module.ClientShowcaseScreen,
+  }))
+)
+const ClientShowcaseGalleryScreen = lazy(() =>
+  loadClientShowcase().then((module) => ({
+    default: module.ClientShowcaseGalleryScreen,
+  }))
+)
+const ClientShowcaseDetailScreen = lazy(() =>
+  loadClientShowcase().then((module) => ({
+    default: module.ClientShowcaseDetailScreen,
+  }))
+)
+const ClientMasterProfileScreen = lazy(() =>
+  import('./screens/ClientMasterProfileScreen').then((module) => ({
+    default: module.ClientMasterProfileScreen,
+  }))
+)
+const BookingScreen = lazy(() =>
+  import('./screens/BookingScreen').then((module) => ({
+    default: module.BookingScreen,
+  }))
+)
+const ProAnalyticsScreen = lazy(() =>
+  import('./screens/ProAnalyticsScreen').then((module) => ({
+    default: module.ProAnalyticsScreen,
+  }))
+)
+const ProCabinetScreen = lazy(() =>
+  import('./screens/ProCabinetScreen').then((module) => ({
+    default: module.ProCabinetScreen,
+  }))
+)
+const ProCampaignsScreen = lazy(() =>
+  import('./screens/ProCampaignsScreen').then((module) => ({
+    default: module.ProCampaignsScreen,
+  }))
+)
+const ProClientsScreen = lazy(() =>
+  import('./screens/ProClientsScreen').then((module) => ({
+    default: module.ProClientsScreen,
+  }))
+)
+const ProProfileScreen = lazy(() =>
+  import('./screens/ProProfileScreen').then((module) => ({
+    default: module.ProProfileScreen,
+  }))
+)
+const ProRequestsScreen = lazy(() =>
+  import('./screens/ProRequestsScreen').then((module) => ({
+    default: module.ProRequestsScreen,
+  }))
+)
+const ProRemindersScreen = lazy(() =>
+  import('./screens/ProRemindersScreen').then((module) => ({
+    default: module.ProRemindersScreen,
+  }))
+)
+const ProStoriesScreen = lazy(() =>
+  import('./screens/ProStoriesScreen').then((module) => ({
+    default: module.ProStoriesScreen,
+  }))
+)
+const RequestScreen = lazy(() =>
+  import('./screens/RequestScreen').then((module) => ({
+    default: module.RequestScreen,
+  }))
+)
+const StartScreen = lazy(() =>
+  import('./screens/StartScreen').then((module) => ({
+    default: module.StartScreen,
+  }))
+)
 
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(
   /\/$/,
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
+type View =
+  | 'start'
+  | 'address'
+  | 'client'
+  | 'client-profile'
+  | 'client-showcase'
+  | 'client-gallery'
+  | 'client-gallery-detail'
+  | 'client-master-profile'
+  | 'chats'
+  | 'chat-thread'
+  | 'booking'
+  | 'request'
+  | 'requests'
+  | 'pro-cabinet'
+  | 'pro-profile'
+  | 'pro-analytics'
+  | 'pro-clients'
+  | 'pro-campaigns'
+  | 'pro-reminders'
+  | 'pro-stories'
+  | 'pro-requests'
+
 type BookingReturnView =
   | 'client'
   | 'client-profile'
@@ -63,6 +172,40 @@ type ChatReturnView =
   | 'client-profile'
   | 'pro-requests'
   | 'pro-cabinet'
+
+type NavState = {
+  view: View
+  stack: View[]
+}
+
+type NavAction =
+  | { type: 'GO'; view: View; replace?: boolean; reset?: boolean }
+  | { type: 'BACK'; fallback?: View }
+
+const navReducer = (state: NavState, action: NavAction): NavState => {
+  switch (action.type) {
+    case 'GO': {
+      const nextStack = action.reset
+        ? []
+        : action.replace
+          ? state.stack
+          : [...state.stack, state.view]
+      return { view: action.view, stack: nextStack }
+    }
+    case 'BACK': {
+      if (state.stack.length === 0) {
+        return { view: action.fallback ?? 'start', stack: [] }
+      }
+      const nextView = state.stack[state.stack.length - 1] ?? 'start'
+      return {
+        view: nextView,
+        stack: state.stack.slice(0, -1),
+      }
+    }
+    default:
+      return state
+  }
+}
 
 const formatGeoError = (error: unknown) => {
   if (!isGeoFailure(error)) {
@@ -91,29 +234,25 @@ const formatGeoError = (error: unknown) => {
 }
 
 function App() {
-  const [view, setView] = useState<
-    | 'start'
-    | 'address'
-    | 'client'
-    | 'client-profile'
-    | 'client-showcase'
-    | 'client-gallery'
-    | 'client-gallery-detail'
-    | 'client-master-profile'
-    | 'chats'
-    | 'chat-thread'
-    | 'booking'
-    | 'request'
-    | 'requests'
-    | 'pro-cabinet'
-    | 'pro-profile'
-    | 'pro-analytics'
-    | 'pro-clients'
-    | 'pro-campaigns'
-    | 'pro-reminders'
-    | 'pro-stories'
-    | 'pro-requests'
-  >('start')
+  const [nav, dispatchNav] = useReducer(navReducer, {
+    view: 'start',
+    stack: [],
+  })
+  const view = nav.view
+  const navStack = nav.stack
+  const navigate = useCallback(
+    (next: View, options?: { replace?: boolean; reset?: boolean }) => {
+      dispatchNav({ type: 'GO', view: next, ...options })
+    },
+    []
+  )
+  const goBack = useCallback(
+    (fallback?: View) => {
+      dispatchNav({ type: 'BACK', fallback })
+    },
+    []
+  )
+  useTelegramTheme()
   const [role, setRole] = useState<Role>('client')
   const [proProfileSection, setProProfileSection] =
     useState<ProProfileSection | null>(null)
@@ -182,6 +321,7 @@ function App() {
   const [supportChatId, setSupportChatId] = useState<number | null>(null)
   const supportChatPromiseRef = useRef<Promise<number | null> | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
+  const screenBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
@@ -220,7 +360,7 @@ function App() {
       deepLinkHandledRef.current = true
       setSelectedChatId(parsedChatNumber)
       setChatReturnView('chats')
-      setView('chat-thread')
+      navigate('chat-thread', { reset: true })
       return
     }
 
@@ -233,8 +373,8 @@ function App() {
     setBookingPreferredCategoryId(null)
     setBookingReturnView('client-master-profile')
     setRescheduleBookingId(null)
-    setView('booking')
-  }, [])
+    navigate('booking', { reset: true })
+  }, [navigate])
 
   const handleDistrictChange = (value: number | null) => {
     setDistrictId(value)
@@ -389,13 +529,13 @@ function App() {
       }
 
       setAddress(address.trim())
-      setView(role === 'pro' ? 'pro-profile' : 'client')
+      navigate(role === 'pro' ? 'pro-profile' : 'client', { reset: true })
     } catch (error) {
       setSaveError('Не удалось сохранить город и район. Попробуйте еще раз.')
     } finally {
       setIsSaving(false)
     }
-  }, [address, cityId, districtId, role, userId])
+  }, [address, cityId, districtId, navigate, role, userId])
 
   useEffect(() => {
     if (!telegramUser?.id) return
@@ -437,9 +577,6 @@ function App() {
     webApp.expand()
     webApp.requestFullscreen?.()
     webApp.disableVerticalSwipes?.()
-    const themeColor = '#ffffff'
-    webApp.setHeaderColor?.(themeColor)
-    webApp.setBackgroundColor?.(themeColor)
   }, [view])
 
   useEffect(() => {
@@ -639,61 +776,46 @@ function App() {
     const backButton = window.Telegram?.WebApp?.BackButton
     if (!backButton) return
 
-    const shouldShow =
-      view === 'address' ||
-      view === 'client-showcase' ||
-      view === 'client-gallery' ||
-      view === 'client-gallery-detail' ||
-      view === 'client-master-profile' ||
-      view === 'chats' ||
-      view === 'chat-thread' ||
-      view === 'booking' ||
-      view === 'request' ||
-      view === 'requests' ||
-      view === 'pro-cabinet' ||
-      view === 'pro-profile' ||
-      view === 'pro-requests' ||
-      view === 'pro-analytics' ||
-      view === 'pro-clients' ||
-      view === 'pro-campaigns' ||
-      view === 'pro-reminders' ||
-      view === 'pro-stories'
+    const shouldShow = view !== 'start' && (view !== 'client' || navStack.length > 0)
 
     const handleBack = () => {
+      if (screenBackHandlerRef.current?.()) {
+        return
+      }
       switch (view) {
         case 'address':
-          setView('start')
+          goBack('start')
           break
         case 'request':
         case 'requests':
-          setView('client')
+          goBack('client')
           break
         case 'client-showcase':
         case 'client-gallery':
-          setView('client')
+          goBack('client')
           break
         case 'client-gallery-detail':
           setSelectedShowcaseItem(null)
-          setView('client-gallery')
+          goBack('client-gallery')
           break
         case 'client-master-profile':
           setSelectedMasterId(null)
-          setView('client-showcase')
+          goBack('client-showcase')
           break
         case 'booking':
           setBookingMasterId(null)
           setBookingPhotoUrls([])
           setBookingPreferredCategoryId(null)
-          setView(bookingReturnView ?? 'client-showcase')
+          goBack(bookingReturnView ?? 'client-showcase')
           setBookingReturnView(null)
           break
         case 'chat-thread':
           setSelectedChatId(null)
-          setView(chatReturnView ?? 'chats')
+          goBack(chatReturnView ?? 'chats')
           setChatReturnView(null)
           break
         case 'chats':
-          setView(role === 'pro' ? 'pro-cabinet' : 'client')
+          goBack(role === 'pro' ? 'pro-cabinet' : 'client')
           break
         case 'pro-profile':
           if (proProfileBackHandlerRef.current?.()) {
@@ -701,20 +823,20 @@ function App() {
           }
           setProProfileSection(null)
           setProProfilePortfolioView(null)
-          setView('pro-cabinet')
+          goBack('pro-cabinet')
           break
         case 'pro-requests':
-          setView('pro-cabinet')
+          goBack('pro-cabinet')
           break
         case 'pro-analytics':
         case 'pro-clients':
         case 'pro-campaigns':
         case 'pro-reminders':
         case 'pro-stories':
-          setView('pro-cabinet')
+          goBack('pro-cabinet')
           break
         case 'pro-cabinet':
-          setView('start')
+          goBack('start')
           break
         default:
           break
@@ -731,19 +853,26 @@ function App() {
     return () => {
       backButton.offClick(handleBack)
     }
-  }, [view])
+  }, [
+    bookingReturnView,
+    chatReturnView,
+    goBack,
+    navStack.length,
+    role,
+    view,
+  ])
 
   useEffect(() => {
     if (view === 'client-master-profile' && !selectedMasterId) {
-      setView('client-showcase')
+      navigate('client-showcase', { replace: true })
     }
-  }, [selectedMasterId, view])
+  }, [navigate, selectedMasterId, view])
 
   useEffect(() => {
     if (view === 'client-gallery-detail' && !selectedShowcaseItem) {
-      setView('client-gallery')
+      navigate('client-gallery', { replace: true })
     }
-  }, [selectedShowcaseItem, view])
+  }, [navigate, selectedShowcaseItem, view])
 
   useEffect(() => {
     if (view === 'booking' && !bookingMasterId) {
@@ -753,15 +882,15 @@ function App() {
       setBookingInitialLocationType(null)
       setBookingInitialDetails(null)
       setBookingReturnView(null)
-      setView(bookingReturnView ?? 'client-showcase')
+      navigate(bookingReturnView ?? 'client-showcase', { replace: true })
     }
-  }, [bookingMasterId, bookingReturnView, view])
+  }, [bookingMasterId, bookingReturnView, navigate, view])
 
   useEffect(() => {
     if (view === 'chat-thread' && !selectedChatId) {
-      setView('chats')
+      navigate('chats', { replace: true })
     }
-  }, [selectedChatId, view])
+  }, [navigate, selectedChatId, view])
 
   useEffect(() => {
     saveFavorites(favorites)
@@ -770,6 +899,13 @@ function App() {
   const registerProProfileBackHandler = useCallback(
     (handler: (() => boolean) | null) => {
       proProfileBackHandlerRef.current = handler
+    },
+    []
+  )
+
+  const registerScreenBackHandler = useCallback(
+    (handler: (() => boolean) | null) => {
+      screenBackHandlerRef.current = handler
     },
     []
   )
@@ -795,22 +931,22 @@ function App() {
       setBookingInitialDetails(options?.initialDetails ?? null)
       setBookingReturnView(options?.returnView ?? 'client-showcase')
       setRescheduleBookingId(options?.rescheduleBookingId ?? null)
-      setView('booking')
+      navigate('booking')
     },
-    []
+    [navigate]
   )
 
   const openRequests = useCallback((tab?: 'requests' | 'bookings') => {
     setRequestsInitialTab(tab ?? 'requests')
-    setView('requests')
-  }, [])
+    navigate('requests')
+  }, [navigate])
 
   const openProRequests = useCallback(
     (tab?: 'requests' | 'bookings') => {
       setProRequestsInitialTab(tab ?? 'requests')
-      setView('pro-requests')
+      navigate('pro-requests')
     },
-    []
+    [navigate]
   )
 
   const openProProfile = useCallback(
@@ -820,32 +956,32 @@ function App() {
     }) => {
       setProProfileSection(options?.section ?? null)
       setProProfilePortfolioView(options?.portfolioView ?? null)
-      setView('pro-profile')
+      navigate('pro-profile')
     },
-    []
+    [navigate]
   )
 
   const openProStories = useCallback(
     (returnView: 'pro-cabinet' | 'pro-profile') => {
       setProStoriesReturnView(returnView)
-      setView('pro-stories')
+      navigate('pro-stories')
     },
-    []
+    [navigate]
   )
 
   const openChatList = useCallback(() => {
     setSelectedChatId(null)
     setChatReturnView(null)
-    setView('chats')
-  }, [])
+    navigate('chats')
+  }, [navigate])
 
   const openChatThread = useCallback(
     (chatId: number, returnView?: ChatReturnView) => {
       setSelectedChatId(chatId)
       setChatReturnView(returnView ?? 'chats')
-      setView('chat-thread')
+      navigate('chat-thread')
     },
-    []
+    [navigate]
   )
 
   const ensureSupportChat = useCallback(async () => {
@@ -889,9 +1025,9 @@ function App() {
       if (!chatId) return
       setSelectedChatId(chatId)
       setChatReturnView(returnView)
-      setView('chat-thread')
+      navigate('chat-thread')
     },
-    [ensureSupportChat]
+    [ensureSupportChat, navigate]
   )
 
   const syncFollowWithFavorite = useCallback(
@@ -981,46 +1117,50 @@ function App() {
     [apiBase, rescheduleBookingId, userId]
   )
 
+  const renderScreen = (screen: JSX.Element) => (
+    <Suspense fallback={<ScreenLoader />}>{screen}</Suspense>
+  )
+
   if (view === 'client') {
-    return (
+    return renderScreen(
       <ClientScreen
         apiBase={apiBase}
         userId={userId}
         displayName={clientName}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
-        onViewShowcase={() => setView('client-gallery')}
-        onViewMasters={() => setView('client-showcase')}
+        onViewShowcase={() => navigate('client-gallery')}
+        onViewMasters={() => navigate('client-showcase')}
         onViewChats={openChatList}
         onViewRequests={(tab) => openRequests(tab)}
-        onViewProfile={() => setView('client-profile')}
+        onViewProfile={() => navigate('client-profile')}
         onViewMasterProfile={(masterId) => {
           setSelectedMasterId(masterId)
-          setView('client-master-profile')
+          navigate('client-master-profile')
         }}
         onCreateRequest={(categoryId) => {
           setRequestCategoryId(
             categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
           )
-          setView('request')
+          navigate('request')
         }}
       />
     )
   }
 
   if (view === 'client-profile') {
-    return (
+    return renderScreen(
       <ClientProfileScreen
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onViewHome={() => setView('client')}
-        onViewMasters={() => setView('client-showcase')}
+        onViewHome={() => navigate('client', { reset: true })}
+        onViewMasters={() => navigate('client-showcase')}
         onViewRequests={(tab) => openRequests(tab)}
         onViewChats={openChatList}
         onCreateRequest={() => {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
-          setView('request')
+          navigate('request')
         }}
         onOpenSupport={() => void openSupportChat('client-profile')}
         onCreateBooking={(payload) =>
@@ -1033,10 +1173,10 @@ function App() {
             returnView: 'client-profile',
           })
         }
-        onEditAddress={() => setView('address')}
+        onEditAddress={() => navigate('address')}
         onViewMasterProfile={(masterId) => {
           setSelectedMasterId(masterId)
-          setView('client-master-profile')
+          navigate('client-master-profile')
         }}
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}
@@ -1046,20 +1186,20 @@ function App() {
   }
 
   if (view === 'client-showcase') {
-    return (
+    return renderScreen(
       <ClientShowcaseScreen
         apiBase={apiBase}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
-        onBack={() => setView('client')}
+        onBack={() => goBack('client')}
         onViewRequests={(tab) => openRequests(tab)}
         onViewChats={openChatList}
-        onViewClientProfile={() => setView('client-profile')}
+        onViewClientProfile={() => navigate('client-profile')}
         onCreateRequest={(categoryId) => {
           setRequestCategoryId(
             categoryId ?? clientCategoryId ?? categoryItems[0]?.id ?? ''
           )
-          setView('request')
+          navigate('request')
         }}
         clientLocation={clientLocation}
         isLocating={isLocating}
@@ -1073,21 +1213,21 @@ function App() {
         }
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)
-          setView('client-master-profile')
+          navigate('client-master-profile')
         }}
       />
     )
   }
 
   if (view === 'client-master-profile' && selectedMasterId) {
-    return (
+    return renderScreen(
       <ClientMasterProfileScreen
         apiBase={apiBase}
         masterId={selectedMasterId}
         userId={userId}
         onViewHome={() => {
           setSelectedMasterId(null)
-          setView('client')
+          navigate('client', { reset: true })
         }}
         onViewRequests={() => {
           setSelectedMasterId(null)
@@ -1095,11 +1235,11 @@ function App() {
         }}
         onViewChats={() => {
           setSelectedMasterId(null)
-          setView('chats')
+          navigate('chats')
         }}
         onViewProfile={() => {
           setSelectedMasterId(null)
-          setView('client-profile')
+          navigate('client-profile')
         }}
         favorites={favorites}
         onToggleFavorite={handleToggleFavorite}
@@ -1115,17 +1255,17 @@ function App() {
   }
 
   if (view === 'client-gallery-detail' && selectedShowcaseItem) {
-    return (
+    return renderScreen(
       <ClientShowcaseDetailScreen
         item={selectedShowcaseItem}
         activeCategoryId={clientCategoryId}
         onBack={() => {
           setSelectedShowcaseItem(null)
-          setView('client-gallery')
+          goBack('client-gallery')
         }}
         onViewHome={() => {
           setSelectedShowcaseItem(null)
-          setView('client')
+          navigate('client', { reset: true })
         }}
         onViewRequests={() => {
           setSelectedShowcaseItem(null)
@@ -1133,16 +1273,16 @@ function App() {
         }}
         onViewChats={() => {
           setSelectedShowcaseItem(null)
-          setView('chats')
+          navigate('chats')
         }}
         onViewClientProfile={() => {
           setSelectedShowcaseItem(null)
-          setView('client-profile')
+          navigate('client-profile')
         }}
         onViewProfile={(masterId) => {
           setSelectedShowcaseItem(null)
           setSelectedMasterId(masterId)
-          setView('client-master-profile')
+          navigate('client-master-profile')
         }}
         favorites={favorites}
         onToggleFavorite={handleToggleFavorite}
@@ -1160,45 +1300,45 @@ function App() {
   }
 
   if (view === 'client-gallery') {
-    return (
+    return renderScreen(
       <ClientShowcaseGalleryScreen
         apiBase={apiBase}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
-        onBack={() => setView('client')}
+        onBack={() => goBack('client')}
         onViewRequests={(tab) => openRequests(tab)}
         onViewChats={openChatList}
-        onViewClientProfile={() => setView('client-profile')}
+        onViewClientProfile={() => navigate('client-profile')}
         onViewDetail={(item) => {
           setSelectedShowcaseItem(item)
-          setView('client-gallery-detail')
+          navigate('client-gallery-detail')
         }}
       />
     )
   }
 
   if (view === 'chats') {
-    return (
+    return renderScreen(
       <ChatListScreen
         apiBase={apiBase}
         userId={userId}
         role={role}
         onOpenChat={(chatId) => openChatThread(chatId, 'chats')}
         onOpenSupport={() => void openSupportChat('chats')}
-        onViewHome={() => setView('client')}
+        onViewHome={() => navigate('client', { reset: true })}
         onViewRequests={() =>
           role === 'pro' ? openProRequests() : openRequests()
         }
         onViewProfile={() =>
-          role === 'pro' ? openProProfile() : setView('client-profile')
+          role === 'pro' ? openProProfile() : navigate('client-profile')
         }
-        onViewCabinet={() => setView('pro-cabinet')}
+        onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
       />
     )
   }
 
   if (view === 'chat-thread' && selectedChatId) {
-    return (
+    return renderScreen(
       <ChatThreadScreen
         key={selectedChatId}
         apiBase={apiBase}
@@ -1206,7 +1346,7 @@ function App() {
         chatId={selectedChatId}
         onBack={() => {
           setSelectedChatId(null)
-          setView(chatReturnView ?? 'chats')
+          goBack(chatReturnView ?? 'chats')
           setChatReturnView(null)
         }}
       />
@@ -1218,7 +1358,7 @@ function App() {
     const districtName =
       districts.find((item) => item.id === districtId)?.name ?? ''
 
-    return (
+    return renderScreen(
       <RequestScreen
         apiBase={apiBase}
         userId={userId}
@@ -1228,6 +1368,8 @@ function App() {
         cityName={cityName}
         districtName={districtName}
         address={address}
+        onBack={() => goBack('client')}
+        onBackHandlerChange={registerScreenBackHandler}
       />
     )
   }
@@ -1237,7 +1379,7 @@ function App() {
     const districtName =
       districts.find((item) => item.id === districtId)?.name ?? ''
 
-    return (
+    return renderScreen(
       <BookingScreen
         apiBase={apiBase}
         userId={userId}
@@ -1256,30 +1398,31 @@ function App() {
           setBookingMasterId(null)
           setBookingPhotoUrls([])
           setBookingPreferredCategoryId(null)
-          setView(bookingReturnView ?? 'client-showcase')
+          goBack(bookingReturnView ?? 'client-showcase')
           setBookingReturnView(null)
           setRescheduleBookingId(null)
         }}
+        onBackHandlerChange={registerScreenBackHandler}
         onBookingCreated={handleBookingCreated}
       />
     )
   }
 
   if (view === 'requests') {
-    return (
+    return renderScreen(
       <ClientRequestsScreen
         apiBase={apiBase}
         userId={userId}
         initialTab={requestsInitialTab}
         onCreateRequest={() => {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
-          setView('request')
+          navigate('request')
         }}
-        onViewHome={() => setView('client')}
+        onViewHome={() => navigate('client', { reset: true })}
         onViewChats={openChatList}
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)
-          setView('client-master-profile')
+          navigate('client-master-profile')
         }}
         onOpenChat={(chatId) => openChatThread(chatId, 'requests')}
         onRescheduleBooking={(booking) => {
@@ -1298,7 +1441,7 @@ function App() {
   }
 
   if (view === 'pro-profile') {
-    return (
+    return renderScreen(
       <ProProfileScreen
         apiBase={apiBase}
         userId={userId}
@@ -1307,7 +1450,7 @@ function App() {
         onBack={() => {
           setProProfileSection(null)
           setProProfilePortfolioView(null)
-          setView('pro-cabinet')
+          goBack('pro-cabinet')
         }}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
@@ -1320,12 +1463,12 @@ function App() {
   }
 
   if (view === 'pro-requests') {
-    return (
+    return renderScreen(
       <ProRequestsScreen
         apiBase={apiBase}
         userId={userId}
         initialTab={proRequestsInitialTab}
-        onBack={() => setView('pro-cabinet')}
+        onBack={() => goBack('pro-cabinet')}
         onEditProfile={(section) => {
           openProProfile({ section: section ?? null })
         }}
@@ -1336,11 +1479,11 @@ function App() {
   }
 
   if (view === 'pro-analytics') {
-    return (
+    return renderScreen(
       <ProAnalyticsScreen
         apiBase={apiBase}
         userId={userId}
-        onBack={() => setView('pro-cabinet')}
+        onBack={() => goBack('pro-cabinet')}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
@@ -1351,11 +1494,11 @@ function App() {
   }
 
   if (view === 'pro-clients') {
-    return (
+    return renderScreen(
       <ProClientsScreen
         apiBase={apiBase}
         userId={userId}
-        onBack={() => setView('pro-cabinet')}
+        onBack={() => goBack('pro-cabinet')}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
@@ -1366,12 +1509,12 @@ function App() {
   }
 
   if (view === 'pro-campaigns') {
-    return (
+    return renderScreen(
       <ProCampaignsScreen
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onBack={() => setView('pro-cabinet')}
+        onBack={() => goBack('pro-cabinet')}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
@@ -1382,12 +1525,12 @@ function App() {
   }
 
   if (view === 'pro-reminders') {
-    return (
+    return renderScreen(
       <ProRemindersScreen
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onBack={() => setView('pro-cabinet')}
+        onBack={() => goBack('pro-cabinet')}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
@@ -1398,12 +1541,12 @@ function App() {
   }
 
   if (view === 'pro-stories') {
-    return (
+    return renderScreen(
       <ProStoriesScreen
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}
-        onBack={() => setView(proStoriesReturnView)}
+        onBack={() => navigate(proStoriesReturnView, { replace: true })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onViewProfile={() => openProProfile()}
@@ -1413,7 +1556,7 @@ function App() {
   }
 
   if (view === 'pro-cabinet') {
-    return (
+    return renderScreen(
       <ProCabinetScreen
         apiBase={apiBase}
         userId={userId}
@@ -1422,9 +1565,9 @@ function App() {
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onOpenSupport={() => void openSupportChat('pro-cabinet')}
-        onOpenAnalytics={() => setView('pro-analytics')}
-        onOpenClients={() => setView('pro-clients')}
-        onOpenCampaigns={() => setView('pro-campaigns')}
+        onOpenAnalytics={() => navigate('pro-analytics')}
+        onOpenClients={() => navigate('pro-clients')}
+        onOpenCampaigns={() => navigate('pro-campaigns')}
         onOpenCalendar={() => openProRequests('bookings')}
         onOpenShowcase={() =>
           openProProfile({ section: 'portfolio', portfolioView: 'showcase' })
@@ -1435,7 +1578,7 @@ function App() {
   }
 
   if (view === 'address') {
-    return (
+    return renderScreen(
       <AddressScreen
         role={role}
         cities={cities}
@@ -1466,14 +1609,14 @@ function App() {
     )
   }
 
-  return (
+  return renderScreen(
     <StartScreen
       onRoleSelect={(nextRole) => {
         setRole(nextRole)
         if (nextRole === 'pro') {
           setProProfileSection(null)
         }
-        setView(nextRole === 'pro' ? 'pro-profile' : 'address')
+        navigate(nextRole === 'pro' ? 'pro-profile' : 'address', { reset: true })
       }}
     />
   )

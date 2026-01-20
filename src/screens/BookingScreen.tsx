@@ -1,7 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+} from 'react'
 import { IconClock, IconPin, IconPhoto } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
+import { useTelegramMainButton } from '../hooks/useTelegramMainButton'
 import type {
   BookingStatus,
   MasterProfile,
@@ -12,6 +21,11 @@ import {
   loadClientPreferences,
   updateClientPreferences,
 } from '../utils/clientPreferences'
+import {
+  hapticImpact,
+  hapticNotification,
+  hapticSelection,
+} from '../utils/haptics'
 import { parseServiceItems } from '../utils/profileContent'
 
 type BookingScreenProps = {
@@ -29,6 +43,7 @@ type BookingScreenProps = {
   initialLocationType?: 'master' | 'client'
   initialDetails?: string
   onBack: () => void
+  onBackHandlerChange?: ((handler: (() => boolean) | null) => void) | undefined
   onBookingCreated?: (payload: { id: number | null; status?: BookingStatus }) => void
 }
 
@@ -57,6 +72,12 @@ const scheduleLabels: Record<string, string> = {
   sat: 'Сб',
   sun: 'Вс',
 }
+
+const bookingSteps = [
+  { id: 'service', title: 'Услуга' },
+  { id: 'time', title: 'Время' },
+  { id: 'details', title: 'Детали' },
+] as const
 
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
@@ -149,6 +170,7 @@ export const BookingScreen = ({
   initialLocationType,
   initialDetails,
   onBack,
+  onBackHandlerChange,
   onBookingCreated,
 }: BookingScreenProps) => {
   const preferencesRef = useRef(loadClientPreferences())
@@ -180,9 +202,18 @@ export const BookingScreen = ({
   )
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
+  const [step, setStep] = useState(0)
+  const [hasTelegramMainButton, setHasTelegramMainButton] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const maxPhotos = 5
   const maxUploadBytes = 6 * 1024 * 1024
+  const stepCount = bookingSteps.length
+  const safeStep = Math.min(Math.max(step, 0), stepCount - 1)
+  const currentStep = bookingSteps[safeStep] ?? bookingSteps[0]
+
+  useEffect(() => {
+    setHasTelegramMainButton(Boolean(window.Telegram?.WebApp?.MainButton))
+  }, [])
 
   useEffect(() => {
     if (!masterId) return
@@ -539,6 +570,13 @@ export const BookingScreen = ({
     )
   }, [availableDays, selectedDayKey])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const prefersReducedMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' })
+  }, [safeStep])
+
   const selectedDay = availableDays.find((item) => item.key === selectedDayKey) ?? null
 
   const masterCityId =
@@ -570,6 +608,10 @@ export const BookingScreen = ({
   const hasLocation = Boolean(masterCityId && masterDistrictId)
   const hasSlots = Boolean(selectedDay && selectedTime)
   const isUploading = uploadingCount > 0
+  const canContinueService =
+    Boolean(categoryId) && Boolean(serviceName) && hasLocation && hasServices
+  const canContinueTime = hasSlots
+  const isFinalStep = safeStep >= stepCount - 1
   const canSubmit =
     Boolean(categoryId) &&
     Boolean(serviceName) &&
@@ -577,9 +619,30 @@ export const BookingScreen = ({
     hasSlots &&
     !isSubmitting &&
     !isUploading
+  const canContinue = isFinalStep
+    ? canSubmit
+    : safeStep === 0
+      ? canContinueService
+      : canContinueTime
 
   const canAddPhotos =
     photos.length < maxPhotos && !isSubmitting && !isUploading
+
+  const selectedCategoryLabel =
+    categoryItems.find((item) => item.id === categoryId)?.label ?? 'Категория'
+  const serviceSummary = serviceName
+    ? `${selectedCategoryLabel} · ${serviceName}`
+    : 'Услуга не выбрана'
+  const locationLabel =
+    locationOptions.find((option) => option.value === locationType)?.label ??
+    'Формат'
+  const locationSummary = `${locationLabel} · ${masterCityName}${
+    hasDistrictName ? `, ${masterDistrictName}` : ''
+  }`
+  const timeSummary =
+    selectedDay && selectedTime
+      ? `${selectedDay.label} · ${selectedTime}`
+      : 'Время не выбрано'
 
   const readFileAsDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -597,6 +660,7 @@ export const BookingScreen = ({
     })
 
   const handleAddPhotos = () => {
+    hapticImpact('light')
     fileInputRef.current?.click()
   }
 
@@ -683,7 +747,7 @@ export const BookingScreen = ({
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (isSubmitting) return
     setSubmitError('')
     setSubmitSuccess('')
@@ -804,21 +868,107 @@ export const BookingScreen = ({
         },
       }))
       setSubmitSuccess('Запись отправлена мастеру.')
+      hapticNotification('success')
     } catch (error) {
       setSubmitError('Не удалось создать запись. Попробуйте еще раз.')
+      hapticNotification('error')
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [
+    address,
+    apiBase,
+    categoryId,
+    details,
+    isSubmitting,
+    isUploading,
+    locationType,
+    masterCityId,
+    masterDistrictId,
+    masterId,
+    onBookingCreated,
+    photos,
+    selectedDay,
+    selectedTime,
+    serviceName,
+    userId,
+  ])
+
+  const handleStepBack = useCallback(() => {
+    if (safeStep > 0) {
+      setStep((current) => Math.max(0, current - 1))
+      hapticSelection()
+      return true
+    }
+    return false
+  }, [safeStep])
+
+  const handleBackPress = useCallback(() => {
+    if (handleStepBack()) return
+    onBack()
+  }, [handleStepBack, onBack])
+
+  const handleStepNext = useCallback(() => {
+    if (!canContinue) {
+      hapticImpact('light')
+      return
+    }
+    if (isFinalStep) {
+      void handleSubmit()
+      return
+    }
+    setStep((current) => Math.min(stepCount - 1, current + 1))
+    hapticImpact('medium')
+  }, [canContinue, handleSubmit, isFinalStep, stepCount])
+
+  useEffect(() => {
+    onBackHandlerChange?.(handleStepBack)
+    return () => onBackHandlerChange?.(null)
+  }, [handleStepBack, onBackHandlerChange])
+
+  useTelegramMainButton({
+    text: isFinalStep ? 'Записаться' : 'Далее',
+    isVisible: hasTelegramMainButton,
+    isEnabled: canContinue,
+    isLoading: isSubmitting,
+    onClick: handleStepNext,
+  })
 
   return (
-    <div className="screen screen--request screen--booking">
+    <div
+      className={`screen screen--request screen--booking${
+        hasTelegramMainButton ? ' is-main-button' : ''
+      }`}
+    >
       <div className="request-shell booking-shell">
         <header className="request-header booking-header animate delay-1">
-          <button className="request-back" type="button" onClick={onBack}>
+          <button
+            className="request-back"
+            type="button"
+            onClick={handleBackPress}
+            aria-label="Назад"
+          >
             ←
           </button>
+          <div className="request-header-body">
+            <h1 className="request-title">Запись</h1>
+            <p className="request-subtitle">
+              Шаг {safeStep + 1} из {stepCount} · {currentStep.title}
+            </p>
+          </div>
         </header>
+
+        <div
+          className="request-progress"
+          style={
+            {
+              '--progress': `${Math.round(((safeStep + 1) / stepCount) * 100)}%`,
+            } as CSSProperties
+          }
+          aria-hidden="true"
+        >
+          <span className="request-progress-bar" />
+        </div>
 
         {loadError && <p className="request-error">{loadError}</p>}
 
@@ -867,357 +1017,408 @@ export const BookingScreen = ({
                   </p>
                 </div>
               </div>
-              <div className="booking-master-reviews">
-                <div className="booking-master-reviews-header">
-                  <span className="booking-master-reviews-title">Отзывы</span>
-                  {hasReviews && (
-                    <span className="booking-master-reviews-average">
-                      ★ {reviewsAverage.toFixed(1)}
-                    </span>
-                  )}
-                </div>
-                {isReviewsLoading && (
-                  <p className="booking-master-reviews-state">
-                    Загружаем отзывы...
-                  </p>
-                )}
-                {reviewsError && (
-                  <p className="booking-master-reviews-state is-error">
-                    {reviewsError}
-                  </p>
-                )}
-                {!isReviewsLoading && !reviewsError && reviews.length === 0 && (
-                  <p className="booking-master-reviews-empty">
-                    Пока нет отзывов.
-                  </p>
-                )}
-                {!isReviewsLoading && !reviewsError && reviews.length > 0 && (
-                  <div className="booking-master-reviews-list">
-                    {reviews.slice(0, 2).map((review) => {
-                      const metaParts = [
-                        review.serviceName,
-                        formatReviewDate(review.createdAt),
-                      ].filter(Boolean)
-                      const metaLabel = metaParts.join(' • ')
-                      return (
-                        <article className="booking-review-card" key={review.id}>
-                          <div className="booking-review-head">
-                            <span className="booking-review-author">
-                              {formatReviewName(review)}
-                            </span>
-                            <span className="booking-review-rating">
-                              ★ {review.rating}
-                            </span>
-                          </div>
-                          <p className="booking-review-text">
-                            {review.comment?.trim() || 'Без текста'}
-                          </p>
-                          {metaLabel && (
-                            <span className="booking-review-meta">{metaLabel}</span>
-                          )}
-                        </article>
-                      )
-                    })}
+              {safeStep === 0 && (
+                <div className="booking-master-reviews">
+                  <div className="booking-master-reviews-header">
+                    <span className="booking-master-reviews-title">Отзывы</span>
+                    {hasReviews && (
+                      <span className="booking-master-reviews-average">
+                        ★ {reviewsAverage.toFixed(1)}
+                      </span>
+                    )}
                   </div>
-                )}
-              </div>
-            </section>
-
-            <section className="request-card booking-card animate delay-2">
-              <h2 className="request-card-title">Услуга</h2>
-              {!hasServices ? (
-                <p className="request-helper">
-                  Мастер еще не добавил услуги для записи.
-                </p>
-              ) : !hasCategoryChoice && !hasServiceChoice ? (
-                <div className="booking-summary">
-                  <span className="booking-summary-label">
-                    {categoryItems.find((item) => item.id === categoryId)?.label ??
-                      'Категория'}
-                  </span>
-                  <span className="booking-summary-value">{serviceName}</span>
-                </div>
-              ) : (
-                <>
-                  {hasCategoryChoice && (
-                    <div className="request-field">
-                      <select
-                        className="request-select-input"
-                        value={categoryId}
-                        onChange={(event) => setCategoryId(event.target.value)}
-                        aria-label="Категория"
-                      >
-                        {availableCategoryIds.map((id) => {
-                          const category = categoryItems.find((item) => item.id === id)
-                          return (
-                            <option key={id} value={id}>
-                              {category?.label ?? id}
-                            </option>
-                          )
-                        })}
-                      </select>
-                    </div>
-                  )}
-                  {hasServiceChoice && (
-                    <div className="request-field">
-                      <div className="request-service-grid" role="list">
-                        {serviceOptions.map((option) => {
-                          const isSelected = option.name === serviceName
-                          return (
-                            <button
-                              className={`request-service-card${
-                                isSelected ? ' is-active' : ''
-                              }`}
-                              key={option.name}
-                              type="button"
-                              onClick={() => setServiceName(option.name)}
-                              aria-pressed={isSelected}
-                            >
-                              <span className="request-service-text">
-                                <span className="request-service-title">
-                                  {option.name}
-                                </span>
-                                {option.duration ? (
-                                  <span className="request-service-subtitle">
-                                    {option.duration} мин
-                                  </span>
-                                ) : null}
-                              </span>
-                              <span
-                                className="request-service-indicator"
-                                aria-hidden="true"
-                              />
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-              {hasServices && (
-                <>
-                  {priceLabel ? (
-                    <div className="booking-price">Стоимость: {priceLabel}</div>
-                  ) : (
-                    <p className="booking-price is-muted">
-                      Цена согласуется с мастером.
+                  {isReviewsLoading && (
+                    <p className="booking-master-reviews-state">
+                      Загружаем отзывы...
                     </p>
                   )}
-                </>
+                  {reviewsError && (
+                    <p className="booking-master-reviews-state is-error">
+                      {reviewsError}
+                    </p>
+                  )}
+                  {!isReviewsLoading && !reviewsError && reviews.length === 0 && (
+                    <p className="booking-master-reviews-empty">
+                      Пока нет отзывов.
+                    </p>
+                  )}
+                  {!isReviewsLoading && !reviewsError && reviews.length > 0 && (
+                    <div className="booking-master-reviews-list">
+                      {reviews.slice(0, 2).map((review) => {
+                        const metaParts = [
+                          review.serviceName,
+                          formatReviewDate(review.createdAt),
+                        ].filter(Boolean)
+                        const metaLabel = metaParts.join(' • ')
+                        return (
+                          <article className="booking-review-card" key={review.id}>
+                            <div className="booking-review-head">
+                              <span className="booking-review-author">
+                                {formatReviewName(review)}
+                              </span>
+                              <span className="booking-review-rating">
+                                ★ {review.rating}
+                              </span>
+                            </div>
+                            <p className="booking-review-text">
+                              {review.comment?.trim() || 'Без текста'}
+                            </p>
+                            {metaLabel && (
+                              <span className="booking-review-meta">{metaLabel}</span>
+                            )}
+                          </article>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
             </section>
 
-            <section className="request-card booking-card animate delay-3">
-              <h2 className="request-card-title">Где делать</h2>
-              {locationOptions.length > 1 ? (
-                <div className="request-segment">
-                  {locationOptions.map((option) => (
-                    <button
-                      className={`request-segment-button${
-                        option.value === locationType ? ' is-active' : ''
-                      }`}
-                      key={option.value}
-                      type="button"
-                      onClick={() => setLocationType(option.value)}
-                      aria-pressed={option.value === locationType}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+            {safeStep > 0 && (
+              <div className="request-summary">
+                <div className="request-summary-item">
+                  <span className="request-summary-label">Услуга</span>
+                  <span className="request-summary-value">{serviceSummary}</span>
                 </div>
-              ) : (
-                <div className="booking-summary">
-                  <span className="booking-summary-label">Формат</span>
-                  <span className="booking-summary-value">
-                    {locationOptions[0]?.label ?? 'Не указан'}
-                  </span>
+                <div className="request-summary-item">
+                  <span className="request-summary-label">Локация</span>
+                  <span className="request-summary-value">{locationSummary}</span>
                 </div>
-              )}
-              <div className="request-field">
-                <span className="request-label">Город мастера *</span>
-                <div className="request-select request-select--icon request-select--static">
-                  <span className="request-select-main">
-                    <span className="request-select-icon" aria-hidden="true">
-                      <IconPin />
-                    </span>
-                    {masterCityName}
-                  </span>
+                <div className="request-summary-item">
+                  <span className="request-summary-label">Когда</span>
+                  <span className="request-summary-value">{timeSummary}</span>
                 </div>
               </div>
-              <div className="request-field">
-                <span className="request-label">Район / метро мастера *</span>
-                <div className="request-select request-select--icon request-select--static">
-                  <span className="request-select-main">
-                    <span className="request-select-icon" aria-hidden="true">
-                      <IconPin />
-                    </span>
-                    {masterDistrictName}
-                  </span>
-                </div>
-              </div>
-              {locationType === 'client' && (
-                <div className="request-field">
-                  <span className="request-label">Адрес для выезда</span>
-                  <div className="request-select request-select--static">
-                    {address.trim() || 'Адрес уточняется после подтверждения'}
-                  </div>
-                </div>
-              )}
-              {!hasLocation && (
-                <p className="request-helper">
-                  Мастер еще не указал город и район.
-                </p>
-              )}
-            </section>
+            )}
 
-            <section className="request-card booking-card animate delay-4">
-              <h2 className="request-card-title">Когда</h2>
-              {bookingError && <p className="request-helper">{bookingError}</p>}
-              {isBookingLoading && (
-                <p className="request-helper">Загружаем свободное время...</p>
-              )}
-              {!isBookingLoading && availableDays.length > 0 ? (
-                <>
-                  <div className="booking-days">
-                    {availableDays.map((day) => (
-                      <button
-                        className={`booking-day${
-                          day.key === selectedDayKey ? ' is-active' : ''
-                        }`}
-                        key={day.key}
-                        type="button"
-                        onClick={() => setSelectedDayKey(day.key)}
-                      >
-                        <span className="booking-day-title">{day.label}</span>
-                        <span className="booking-day-count">
-                          {day.slots.length} слота
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  {selectedDay && (
-                    <div className="booking-slots">
-                      {selectedDay.slots.map((slot) => (
+            {safeStep === 0 && (
+              <>
+                <section className="request-card booking-card animate delay-2">
+                  <h2 className="request-card-title">Услуга</h2>
+                  {!hasServices ? (
+                    <p className="request-helper">
+                      Мастер еще не добавил услуги для записи.
+                    </p>
+                  ) : !hasCategoryChoice && !hasServiceChoice ? (
+                    <div className="booking-summary">
+                      <span className="booking-summary-label">
+                        {categoryItems.find((item) => item.id === categoryId)
+                          ?.label ?? 'Категория'}
+                      </span>
+                      <span className="booking-summary-value">{serviceName}</span>
+                    </div>
+                  ) : (
+                    <>
+                      {hasCategoryChoice && (
+                        <div className="request-field">
+                          <select
+                            className="request-select-input"
+                            value={categoryId}
+                            onChange={(event) => {
+                              setCategoryId(event.target.value)
+                              hapticSelection()
+                            }}
+                            aria-label="Категория"
+                          >
+                            {availableCategoryIds.map((id) => {
+                              const category = categoryItems.find(
+                                (item) => item.id === id
+                              )
+                              return (
+                                <option key={id} value={id}>
+                                  {category?.label ?? id}
+                                </option>
+                              )
+                            })}
+                          </select>
+                        </div>
+                      )}
+                      {hasServiceChoice && (
+                        <div className="request-field">
+                          <div className="request-service-grid" role="list">
+                            {serviceOptions.map((option) => {
+                              const isSelected = option.name === serviceName
+                              return (
+                                <button
+                                  className={`request-service-card${
+                                    isSelected ? ' is-active' : ''
+                                  }`}
+                                  key={option.name}
+                                  type="button"
+                                  onClick={() => {
+                                    setServiceName(option.name)
+                                    hapticSelection()
+                                  }}
+                                  aria-pressed={isSelected}
+                                >
+                                  <span className="request-service-text">
+                                    <span className="request-service-title">
+                                      {option.name}
+                                    </span>
+                                    {option.duration ? (
+                                      <span className="request-service-subtitle">
+                                        {option.duration} мин
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  <span
+                                    className="request-service-indicator"
+                                    aria-hidden="true"
+                                  />
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {hasServices && (
+                    <>
+                      {priceLabel ? (
+                        <div className="booking-price">
+                          Стоимость: {priceLabel}
+                        </div>
+                      ) : (
+                        <p className="booking-price is-muted">
+                          Цена согласуется с мастером.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </section>
+
+                <section className="request-card booking-card animate delay-3">
+                  <h2 className="request-card-title">Где делать</h2>
+                  {locationOptions.length > 1 ? (
+                    <div className="request-segment">
+                      {locationOptions.map((option) => (
                         <button
-                          className={`booking-slot${
-                            slot === selectedTime ? ' is-active' : ''
+                          className={`request-segment-button${
+                            option.value === locationType ? ' is-active' : ''
                           }`}
-                          key={`${selectedDay.key}-${slot}`}
+                          key={option.value}
                           type="button"
-                          onClick={() => setSelectedTime(slot)}
+                          onClick={() => {
+                            setLocationType(option.value)
+                            hapticSelection()
+                          }}
+                          aria-pressed={option.value === locationType}
                         >
-                          {slot}
+                          {option.label}
                         </button>
                       ))}
                     </div>
-                  )}
-                </>
-              ) : (
-                !isBookingLoading && (
-                  <div className="request-select request-select--icon request-select--static">
-                    <span className="request-select-main">
-                      <span className="request-select-icon" aria-hidden="true">
-                        <IconClock />
+                  ) : (
+                    <div className="booking-summary">
+                      <span className="booking-summary-label">Формат</span>
+                      <span className="booking-summary-value">
+                        {locationOptions[0]?.label ?? 'Не указан'}
                       </span>
-                      Нет свободного времени
-                    </span>
-                  </div>
-                )
-              )}
-            </section>
-
-            <section className="request-card booking-card animate delay-5">
-              <h2 className="request-card-title">Детали</h2>
-              <div className="request-field">
-                <span className="request-label">Комментарий</span>
-                <textarea
-                  className="request-textarea"
-                  placeholder="Пожелания и детали"
-                  value={details}
-                  onChange={(event) => setDetails(event.target.value)}
-                  rows={3}
-                />
-              </div>
-              <div className="request-field">
-                <span className="request-label">Фото примера</span>
-                <input
-                  ref={fileInputRef}
-                  className="request-upload-input"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotoChange}
-                />
-                <div className="request-upload">
-                  <div className="request-upload-media" aria-hidden="true">
-                    <IconPhoto />
-                  </div>
-                  <div className="request-upload-body">
-                    <div className="request-upload-title">
-                      {photos.length > 0 ? 'Фото добавлены' : 'Добавить фото'}
                     </div>
-                    <div className="request-upload-meta">
-                      {photos.length > 0
-                        ? `Добавлено ${photos.length}/${maxPhotos}`
-                        : '1-5 фото • до 6 МБ'}
+                  )}
+                  <div className="request-field">
+                    <span className="request-label">Город мастера *</span>
+                    <div className="request-select request-select--icon request-select--static">
+                      <span className="request-select-main">
+                        <span className="request-select-icon" aria-hidden="true">
+                          <IconPin />
+                        </span>
+                        {masterCityName}
+                      </span>
                     </div>
                   </div>
-                  <button
-                    className="request-upload-button"
-                    type="button"
-                    onClick={handleAddPhotos}
-                    disabled={!canAddPhotos}
-                  >
-                    {photos.length > 0 ? 'Добавить еще' : 'Добавить'}
-                  </button>
-                </div>
-                {uploadingCount > 0 && (
-                  <p className="request-upload-status">
-                    Загружаем фото: {uploadingCount}
-                  </p>
-                )}
-                {uploadError && (
-                  <p className="request-upload-error">{uploadError}</p>
-                )}
-                {photos.length > 0 && (
-                  <div className="request-upload-grid" role="list">
-                    {photos.map((photo) => (
-                      <div
-                        className="request-upload-thumb"
-                        role="listitem"
-                        key={photo.url}
-                      >
-                        <img src={photo.url} alt="" loading="lazy" />
-                        <button
-                          className="request-upload-remove"
-                          type="button"
-                          onClick={() => handleRemovePhoto(photo)}
-                          aria-label="Удалить фото"
-                        >
-                          x
-                        </button>
+                  <div className="request-field">
+                    <span className="request-label">Район / метро мастера *</span>
+                    <div className="request-select request-select--icon request-select--static">
+                      <span className="request-select-main">
+                        <span className="request-select-icon" aria-hidden="true">
+                          <IconPin />
+                        </span>
+                        {masterDistrictName}
+                      </span>
+                    </div>
+                  </div>
+                  {locationType === 'client' && (
+                    <div className="request-field">
+                      <span className="request-label">Адрес для выезда</span>
+                      <div className="request-select request-select--static">
+                        {address.trim() || 'Адрес уточняется после подтверждения'}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
+                    </div>
+                  )}
+                  {!hasLocation && (
+                    <p className="request-helper">
+                      Мастер еще не указал город и район.
+                    </p>
+                  )}
+                </section>
+              </>
+            )}
 
-            {submitError && <p className="request-error">{submitError}</p>}
-            {submitSuccess && <p className="request-success">{submitSuccess}</p>}
+            {safeStep === 1 && (
+              <section className="request-card booking-card animate delay-2">
+                <h2 className="request-card-title">Когда</h2>
+                {bookingError && <p className="request-helper">{bookingError}</p>}
+                {isBookingLoading && (
+                  <p className="request-helper">Загружаем свободное время...</p>
+                )}
+                {!isBookingLoading && availableDays.length > 0 ? (
+                  <>
+                    <div className="booking-days">
+                      {availableDays.map((day) => (
+                        <button
+                          className={`booking-day${
+                            day.key === selectedDayKey ? ' is-active' : ''
+                          }`}
+                          key={day.key}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDayKey(day.key)
+                            hapticSelection()
+                          }}
+                        >
+                          <span className="booking-day-title">{day.label}</span>
+                          <span className="booking-day-count">
+                            {day.slots.length} слота
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedDay && (
+                      <div className="booking-slots">
+                        {selectedDay.slots.map((slot) => (
+                          <button
+                            className={`booking-slot${
+                              slot === selectedTime ? ' is-active' : ''
+                            }`}
+                            key={`${selectedDay.key}-${slot}`}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTime(slot)
+                              hapticSelection()
+                            }}
+                          >
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  !isBookingLoading && (
+                    <div className="request-select request-select--icon request-select--static">
+                      <span className="request-select-main">
+                        <span className="request-select-icon" aria-hidden="true">
+                          <IconClock />
+                        </span>
+                        Нет свободного времени
+                      </span>
+                    </div>
+                  )
+                )}
+              </section>
+            )}
+
+            {safeStep === 2 && (
+              <section className="request-card booking-card animate delay-2">
+                <h2 className="request-card-title">Детали</h2>
+                <div className="request-field">
+                  <span className="request-label">Комментарий</span>
+                  <textarea
+                    className="request-textarea"
+                    placeholder="Пожелания и детали"
+                    value={details}
+                    onChange={(event) => setDetails(event.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className="request-field">
+                  <span className="request-label">Фото примера</span>
+                  <input
+                    ref={fileInputRef}
+                    className="request-upload-input"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoChange}
+                  />
+                  <div className="request-upload">
+                    <div className="request-upload-media" aria-hidden="true">
+                      <IconPhoto />
+                    </div>
+                    <div className="request-upload-body">
+                      <div className="request-upload-title">
+                        {photos.length > 0 ? 'Фото добавлены' : 'Добавить фото'}
+                      </div>
+                      <div className="request-upload-meta">
+                        {photos.length > 0
+                          ? `Добавлено ${photos.length}/${maxPhotos}`
+                          : '1-5 фото • до 6 МБ'}
+                      </div>
+                    </div>
+                    <button
+                      className="request-upload-button"
+                      type="button"
+                      onClick={handleAddPhotos}
+                      disabled={!canAddPhotos}
+                    >
+                      {photos.length > 0 ? 'Добавить еще' : 'Добавить'}
+                    </button>
+                  </div>
+                  {uploadingCount > 0 && (
+                    <p className="request-upload-status">
+                      Загружаем фото: {uploadingCount}
+                    </p>
+                  )}
+                  {uploadError && (
+                    <p className="request-upload-error">{uploadError}</p>
+                  )}
+                  {photos.length > 0 && (
+                    <div className="request-upload-grid" role="list">
+                      {photos.map((photo) => (
+                        <div
+                          className="request-upload-thumb"
+                          role="listitem"
+                          key={photo.url}
+                        >
+                          <img src={photo.url} alt="" loading="lazy" />
+                          <button
+                            className="request-upload-remove"
+                            type="button"
+                            onClick={() => handleRemovePhoto(photo)}
+                            aria-label="Удалить фото"
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {submitError && <p className="request-error">{submitError}</p>}
+                {submitSuccess && (
+                  <p className="request-success">{submitSuccess}</p>
+                )}
+              </section>
+            )}
           </>
         ) : null}
       </div>
 
-      <div className="request-submit-bar">
+      <div
+        className={`request-submit-bar${
+          hasTelegramMainButton ? ' is-hidden' : ''
+        }`}
+      >
         <button
           className="request-submit"
           type="button"
-          onClick={handleSubmit}
-          disabled={!canSubmit}
+          onClick={handleStepNext}
+          disabled={!canContinue}
         >
-          {isSubmitting ? 'Отправляем...' : 'Записаться'}
+          {isFinalStep ? (isSubmitting ? 'Отправляем...' : 'Записаться') : 'Далее'}
         </button>
       </div>
     </div>
