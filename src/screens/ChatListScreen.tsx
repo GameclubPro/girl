@@ -239,19 +239,6 @@ export const ChatListScreen = ({
   const listUpdateTokenRef = useRef(0)
   const isSupportAgent = SUPPORT_AGENT_IDS.has(userId)
 
-  const connectionLabel =
-    streamStatus === 'connected'
-      ? 'Онлайн'
-      : streamStatus === 'connecting' || streamStatus === 'reconnecting'
-        ? 'Соединяем...'
-        : 'Нет связи'
-  const connectionTone =
-    streamStatus === 'connected'
-      ? 'is-online'
-      : streamStatus === 'connecting' || streamStatus === 'reconnecting'
-        ? 'is-syncing'
-        : 'is-offline'
-
   const supportChat = useMemo(
     () => items.find((item) => item.contextType === 'support') ?? null,
     [items]
@@ -261,11 +248,6 @@ export const ChatListScreen = ({
     () =>
       isSupportAgent ? items : items.filter((item) => item.contextType !== 'support'),
     [items, isSupportAgent]
-  )
-
-  const totalUnread = useMemo(
-    () => items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
-    [items]
   )
 
   const filteredItems = useMemo(() => {
@@ -645,24 +627,6 @@ export const ChatListScreen = ({
   return (
     <div className="screen screen--chat-list">
       <div className="chat-shell">
-        <header className="chat-header">
-          <div>
-            <p className="chat-eyebrow">Сообщения</p>
-            <h1 className="chat-title">Чаты</h1>
-            <span
-              className={`chat-connection ${connectionTone}`}
-              role="status"
-              aria-live="polite"
-            >
-              {connectionLabel}
-            </span>
-          </div>
-          <div className="chat-summary">
-            <span className="chat-summary-count">{totalUnread}</span>
-            <span className="chat-summary-label">непрочит.</span>
-          </div>
-        </header>
-
         {!isSupportAgent && onOpenSupport && (
           <button
             className={`chat-support-card${supportUnread > 0 ? ' is-unread' : ''}`}

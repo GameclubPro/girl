@@ -20769,13 +20769,6 @@ h2 {
   gap: 16px;
 }
 
-.chat-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .chat-connection {
   display: inline-flex;
   align-items: center;
@@ -20818,46 +20811,6 @@ h2 {
   margin-top: 0;
   padding: 4px 6px;
   font-size: 9px;
-}
-
-.chat-eyebrow {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.chat-title {
-  margin: 6px 0 0;
-  font-family: var(--font-title);
-  font-size: clamp(24px, 6.2vw, 30px);
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.chat-summary {
-  min-width: 58px;
-  border-radius: 16px;
-  padding: 10px 12px;
-  background: rgba(var(--accent-rgb), 0.12);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  color: var(--accent-strong);
-  font-weight: 700;
-}
-
-.chat-summary-count {
-  font-size: 18px;
-}
-
-.chat-summary-label {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .chat-filters {
