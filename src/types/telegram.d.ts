@@ -13,6 +13,38 @@ declare global {
         setHeaderColor?: (color: string) => void
         setBackgroundColor?: (color: string) => void
         disableVerticalSwipes?: () => void
+        colorScheme?: 'light' | 'dark'
+        themeParams?: {
+          bg_color?: string
+          secondary_bg_color?: string
+          text_color?: string
+          hint_color?: string
+          link_color?: string
+          button_color?: string
+          button_text_color?: string
+        }
+        MainButton?: {
+          show: () => void
+          hide: () => void
+          enable: () => void
+          disable: () => void
+          showProgress: () => void
+          hideProgress: () => void
+          onClick: (callback: () => void) => void
+          offClick: (callback: () => void) => void
+          setText: (text: string) => void
+          color?: string
+          textColor?: string
+        }
+        HapticFeedback?: {
+          impactOccurred?: (
+            style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
+          ) => void
+          notificationOccurred?: (
+            style: 'success' | 'warning' | 'error'
+          ) => void
+          selectionChanged?: () => void
+        }
         BackButton?: {
           show: () => void
           hide: () => void

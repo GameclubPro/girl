@@ -1,4 +1,13 @@
-import { Suspense, lazy, useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react'
 import { ScreenLoader } from './components/ScreenLoader'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
@@ -1117,7 +1126,7 @@ function App() {
     [apiBase, rescheduleBookingId, userId]
   )
 
-  const renderScreen = (screen: JSX.Element) => (
+  const renderScreen = (screen: ReactElement) => (
     <Suspense fallback={<ScreenLoader />}>{screen}</Suspense>
   )
 
