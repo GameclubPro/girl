@@ -10,19 +10,7 @@ declare global {
         requestFullscreen?: () => void
         openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
         openTelegramLink?: (url: string) => void
-        setHeaderColor?: (color: string) => void
-        setBackgroundColor?: (color: string) => void
         disableVerticalSwipes?: () => void
-        colorScheme?: 'light' | 'dark'
-        themeParams?: {
-          bg_color?: string
-          secondary_bg_color?: string
-          text_color?: string
-          hint_color?: string
-          link_color?: string
-          button_color?: string
-          button_text_color?: string
-        }
         MainButton?: {
           show: () => void
           hide: () => void

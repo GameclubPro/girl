@@ -11,7 +11,6 @@ import {
 import { ScreenLoader } from './components/ScreenLoader'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
-import { useTelegramTheme } from './hooks/useTelegramTheme'
 import type {
   City,
   District,
@@ -261,7 +260,6 @@ function App() {
     },
     []
   )
-  useTelegramTheme()
   const [role, setRole] = useState<Role>('client')
   const [proProfileSection, setProProfileSection] =
     useState<ProProfileSection | null>(null)
