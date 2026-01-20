@@ -8314,6 +8314,10 @@
   color: var(--pro-muted);
 }
 
+.pro-profile-fact-card.is-muted .pro-profile-fact-icon img {
+  opacity: 0.6;
+}
+
 .pro-profile-fact-info {
   display: flex;
   flex-direction: column;

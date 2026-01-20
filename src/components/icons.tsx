@@ -1,3 +1,6 @@
+import locationPin from '../assets/location-pin.webp'
+import priceTag from '../assets/price-tag.webp'
+
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -288,6 +291,10 @@ export const IconUser = () => (
 
 export const IconPin = () => (
   <img src={locationPin} alt="" aria-hidden="true" />
+)
+
+export const IconPrice = () => (
+  <img src={priceTag} alt="" aria-hidden="true" />
 )
 
 export const IconClock = () => (
@@ -594,4 +601,3 @@ export const IconUnlock = () => (
     />
   </svg>
 )
-import locationPin from '../assets/location-pin.webp'

@@ -12,6 +12,7 @@ import {
   IconHome,
   IconList,
   IconPin,
+  IconPrice,
   IconStar,
   IconCheck,
   IconUser,
@@ -724,7 +725,7 @@ export const ClientMasterProfileScreen = ({
       id: 'price',
       label: 'Цена',
       value: priceLabel,
-      icon: <IconList />,
+      icon: <IconPrice />,
       isMuted: !hasPrice,
     },
     {

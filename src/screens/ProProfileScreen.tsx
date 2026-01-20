@@ -8,6 +8,7 @@ import {
   IconHome,
   IconList,
   IconPin,
+  IconPrice,
   IconSettings,
   IconUser,
 } from '../components/icons'
@@ -653,7 +654,7 @@ export const ProProfileScreen = ({
       id: 'price',
       label: 'Цена',
       value: priceLabel,
-      icon: <IconList />,
+      icon: <IconPrice />,
       isMuted: !hasPrice,
     },
     {
