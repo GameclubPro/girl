@@ -6,7 +6,7 @@ import {
   IconCertificate,
   IconClock,
   IconExperience,
-  IconHome,
+  IconFormat,
   IconList,
   IconPin,
   IconPrice,
@@ -648,7 +648,7 @@ export const ProProfileScreen = ({
       id: 'format',
       label: 'Формат',
       value: workFormatLabel,
-      icon: <IconHome />,
+      icon: <IconFormat />,
       isMuted: !hasWorkFormat,
     },
     {

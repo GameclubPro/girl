@@ -9,6 +9,7 @@ import {
 import {
   IconChat,
   IconExperience,
+  IconFormat,
   IconHome,
   IconList,
   IconPin,
@@ -718,7 +719,7 @@ export const ClientMasterProfileScreen = ({
       id: 'format',
       label: 'Формат',
       value: workFormatLabel,
-      icon: <IconHome />,
+      icon: <IconFormat />,
       isMuted: !hasWorkFormat,
     },
     {
