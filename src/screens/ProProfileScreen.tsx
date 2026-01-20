@@ -236,6 +236,15 @@ const profileSettingsItems = [
   { id: 'certificates', label: 'Сертификаты', icon: IconCertificate },
 ] as const
 
+const editorTitleMap: Record<InlineSection, string> = {
+  basic: 'О себе',
+  location: 'Локация',
+  availability: 'График',
+  services: 'Услуги',
+  certificates: 'Сертификаты',
+  media: 'Фото профиля',
+}
+
 type ProfilePayload = {
   userId: string
   displayName: string
@@ -528,6 +537,7 @@ export const ProProfileScreen = ({
   const experienceValue = parseNumber(experienceYears)
   const saveButtonLabel = isSaving ? 'Сохраняем...' : 'Готово'
   const canSave = Boolean(profilePayload) && !isSaving
+  const editorTitle = editingSection ? editorTitleMap[editingSection] : ''
   const priceLabel =
     priceFromValue !== null && priceToValue !== null
       ? `${priceFromValue}–${priceToValue} ₽`
@@ -4198,80 +4208,19 @@ export const ProProfileScreen = ({
           aria-modal="true"
         >
           <div className="pro-profile-editor-shell">
-            {editingSection !== 'media' && (
-              <div className="pro-profile-editor-tabs" role="tablist">
-                <button
-                  className={`pro-profile-editor-tab${
-                    editingSection === 'basic' ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={editingSection === 'basic'}
-                  onClick={() => openEditor('basic')}
-                >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconUser />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">О себе</span>
-                </button>
-                <button
-                  className={`pro-profile-editor-tab${
-                    editingSection === 'location' ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={editingSection === 'location'}
-                  onClick={() => openEditor('location')}
-                >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconPin />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">Локация</span>
-                </button>
-                <button
-                  className={`pro-profile-editor-tab${
-                    editingSection === 'availability' ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={editingSection === 'availability'}
-                  onClick={() => openEditor('availability')}
-                >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconClock />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">График</span>
-                </button>
-                <button
-                  className={`pro-profile-editor-tab${
-                    editingSection === 'services' ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={editingSection === 'services'}
-                  onClick={() => openEditor('services')}
-                >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconList />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">Услуги</span>
-                </button>
-                <button
-                  className={`pro-profile-editor-tab${
-                    editingSection === 'certificates' ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  role="tab"
-                  aria-selected={editingSection === 'certificates'}
-                  onClick={() => openEditor('certificates')}
-                >
-                  <span className="pro-profile-editor-tab-icon" aria-hidden="true">
-                    <IconCertificate />
-                  </span>
-                  <span className="pro-profile-editor-tab-label">Сертификаты</span>
-                </button>
+            <div className="pro-profile-editor-head">
+              <button
+                className="pro-profile-editor-back"
+                type="button"
+                onClick={closeEditor}
+              >
+                Назад
+              </button>
+              <div className="pro-profile-editor-title-block">
+                <p className="pro-profile-editor-kicker">Редактор</p>
+                <h2 className="pro-profile-editor-title">{editorTitle}</h2>
               </div>
-            )}
+            </div>
             <section className="pro-profile-editor-card">
               {editingSection === 'media' && (
                 <div className="pro-profile-editor-media">
