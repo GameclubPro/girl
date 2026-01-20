@@ -8270,7 +8270,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(var(--paper-rgb), 0.95);
+  background: transparent;
   border: none;
   color: var(--pro-ink);
   flex-shrink: 0;
@@ -8286,32 +8286,28 @@
 }
 
 .pro-profile-fact-icon.is-location {
-  background: rgba(var(--accent-rgb), 0.18);
-  border-color: rgba(var(--accent-rgb), 0.35);
+  background: transparent;
   color: var(--ink);
 }
 
 .pro-profile-fact-icon.is-format {
-  background: rgba(var(--accent-rgb), 0.22);
-  border-color: rgba(var(--accent-rgb), 0.45);
+  background: transparent;
   color: var(--ink);
 }
 
 .pro-profile-fact-icon.is-price {
-  background: rgba(var(--accent-rgb), 0.18);
-  border-color: rgba(var(--accent-rgb), 0.45);
+  background: transparent;
   color: var(--accent-strong);
 }
 
 .pro-profile-fact-icon.is-experience {
-  background: rgba(var(--accent-rgb), 0.14);
-  border-color: rgba(var(--accent-rgb), 0.3);
+  background: transparent;
   color: var(--ink);
 }
 
 .pro-profile-fact-card.is-muted .pro-profile-fact-icon {
-  background: rgba(var(--shadow-rgb), 0.05);
-  border-color: rgba(var(--shadow-rgb), 0.08);
+  background: transparent;
+  border-color: transparent;
   color: var(--pro-muted);
 }
 
@@ -9134,8 +9130,8 @@
 }
 
 .pro-shell--hybrid .pro-profile-card-icon {
-  background: rgba(var(--paper-rgb), 0.96);
-  border-color: rgba(var(--shadow-rgb), 0.1);
+  background: transparent;
+  border-color: transparent;
 }
 
 .pro-shell--hybrid .pro-profile-reviews-summary {
@@ -10694,7 +10690,7 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: rgba(var(--paper-rgb), 0.9);
+  background: transparent;
   border: none;
   display: inline-flex;
   align-items: center;
@@ -11386,7 +11382,7 @@
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: rgba(var(--accent-rgb), 0.12);
+  background: transparent;
   color: var(--accent-strong);
   display: inline-flex;
   align-items: center;
@@ -14580,7 +14576,7 @@ h2 {
   height: 38px;
   border-radius: 14px;
   border: none;
-  background: rgba(var(--paper-rgb), 0.85);
+  background: transparent;
   color: var(--ink);
   display: inline-flex;
   align-items: center;
@@ -15593,7 +15589,7 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(var(--surface-muted-rgb), 0.9);
+  background: transparent;
   border: none;
   color: var(--ink);
   box-shadow: none;
@@ -16092,7 +16088,7 @@ h2 {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: rgba(var(--paper-rgb), 0.9);
+  background: transparent;
   border: none;
   display: inline-flex;
   align-items: center;
