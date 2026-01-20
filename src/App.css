@@ -8243,7 +8243,7 @@
 
 .pro-profile-fact-card {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
@@ -8264,23 +8264,24 @@
 }
 
 .pro-profile-fact-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: rgba(var(--paper-rgb), 0.95);
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  border: none;
   color: var(--pro-ink);
   flex-shrink: 0;
-  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.65);
+  box-shadow: none;
+  padding: 0;
 }
 
 .pro-profile-fact-icon svg,
 .pro-profile-fact-icon img {
-  width: 16px;
-  height: 16px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -10690,17 +10691,25 @@
 }
 
 .pro-profile-card-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   background: rgba(var(--paper-rgb), 0.9);
-  border: 1px solid var(--pro-border);
+  border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
-  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
+  box-shadow: none;
   flex-shrink: 0;
+  padding: 0;
+}
+
+.pro-profile-card-icon svg,
+.pro-profile-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .pro-profile-card-content {
@@ -14570,19 +14579,20 @@ h2 {
   width: 38px;
   height: 38px;
   border-radius: 14px;
-  border: 1px solid var(--border);
+  border: none;
   background: rgba(var(--paper-rgb), 0.85);
   color: var(--ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  padding: 0;
 }
 
 .client-profile-header-action svg,
 .client-profile-header-action img {
-  width: 18px;
-  height: 18px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
 }
 
@@ -15577,22 +15587,23 @@ h2 {
 }
 
 .client-profile-card-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: rgba(var(--surface-muted-rgb), 0.9);
-  border: 1px solid rgba(var(--shadow-rgb), 0.08);
+  border: none;
   color: var(--ink);
-  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
+  box-shadow: none;
+  padding: 0;
 }
 
 .client-profile-card-icon svg,
 .client-profile-card-icon img {
-  width: 18px;
-  height: 18px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -16078,22 +16089,23 @@ h2 {
 .client-profile-location-map-pin {
   position: relative;
   z-index: 1;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   background: rgba(var(--paper-rgb), 0.9);
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--accent-strong);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.16);
+  box-shadow: none;
+  padding: 0;
 }
 
 .client-profile-location-map-pin svg,
 .client-profile-location-map-pin img {
-  width: 18px;
-  height: 18px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -20345,20 +20357,21 @@ h2 {
   }
 
   .pro-profile-fact-card {
-    grid-template-columns: 24px minmax(0, 1fr);
+    grid-template-columns: 28px minmax(0, 1fr);
     gap: 6px;
     padding: 7px 8px;
   }
 
   .pro-profile-fact-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
   }
 
-  .pro-profile-fact-icon svg {
-    width: 14px;
-    height: 14px;
+  .pro-profile-fact-icon svg,
+  .pro-profile-fact-icon img {
+    width: 100%;
+    height: 100%;
   }
 
   .pro-profile-fact-value {
