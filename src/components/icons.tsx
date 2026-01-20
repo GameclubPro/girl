@@ -287,23 +287,7 @@ export const IconUser = () => (
 )
 
 export const IconPin = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M12 21c-3.9-5.2-6.2-8.3-6.2-11a6.2 6.2 0 1 1 12.4 0c0 2.7-2.3 5.8-6.2 11Z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-    <circle
-      cx="12"
-      cy="10"
-      r="2.4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-  </svg>
+  <img src={locationPin} alt="" aria-hidden="true" />
 )
 
 export const IconClock = () => (
@@ -451,57 +435,11 @@ export const IconStories = () => (
 )
 
 export const IconCity = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="4"
-      y="6"
-      width="9"
-      height="14"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <rect
-      x="13"
-      y="4"
-      width="7"
-      height="16"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M7 9h3M7 12h3M7 15h3M15.5 8h2M15.5 11h2M15.5 14h2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    />
-  </svg>
+  <img src={locationPin} alt="" aria-hidden="true" />
 )
 
 export const IconDistrict = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="4"
-      y="4"
-      width="16"
-      height="16"
-      rx="2.2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M12 4v16M4 12h16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    />
-  </svg>
+  <img src={locationPin} alt="" aria-hidden="true" />
 )
 
 export const IconSettings = () => (
@@ -656,3 +594,4 @@ export const IconUnlock = () => (
     />
   </svg>
 )
+import locationPin from '../assets/location-pin.webp'
