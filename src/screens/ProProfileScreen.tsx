@@ -228,6 +228,14 @@ type CategoryId = (typeof categoryItems)[number]['id']
 const isCategoryId = (value: string): value is CategoryId =>
   categoryItems.some((item) => item.id === value)
 
+const profileSettingsItems = [
+  { id: 'basic', label: 'О себе', icon: IconUser },
+  { id: 'location', label: 'Локация', icon: IconPin },
+  { id: 'availability', label: 'График', icon: IconClock },
+  { id: 'services', label: 'Услуги', icon: IconList },
+  { id: 'certificates', label: 'Сертификаты', icon: IconCertificate },
+] as const
+
 type ProfilePayload = {
   userId: string
   displayName: string
@@ -414,6 +422,9 @@ export const ProProfileScreen = ({
   const portfolioLongPressTriggeredRef = useRef(false)
   const portfolioLongPressStartRef = useRef<{ x: number; y: number } | null>(null)
   const followersRequestIdRef = useRef(0)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const settingsOpenRef = useRef(false)
+  const settingsReturnRef = useRef(false)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection && focusSection !== 'portfolio' ? focusSection : null
   )
@@ -827,7 +838,13 @@ export const ProProfileScreen = ({
     setPortfolioQuickActionIndex(index)
   }
   const openAvatarActions = () => {
-    if (isAvatarUploading || isCoverUploading || editingSection || cropperState) {
+    if (
+      isAvatarUploading ||
+      isCoverUploading ||
+      isSettingsOpen ||
+      editingSection ||
+      cropperState
+    ) {
       return
     }
     setIsAvatarActionsOpen(true)
@@ -839,11 +856,34 @@ export const ProProfileScreen = ({
     if (isAvatarUploading || isCoverUploading) return
     setCropperState(null)
   }
+  const openSettings = () => {
+    if (isAvatarUploading || isCoverUploading || editingSection || cropperState) {
+      return
+    }
+    settingsReturnRef.current = false
+    setIsAvatarActionsOpen(false)
+    setIsSettingsOpen(true)
+  }
+  const closeSettings = () => {
+    settingsReturnRef.current = false
+    setIsSettingsOpen(false)
+  }
   const openMediaEditor = () => {
     if (isAvatarUploading || isCoverUploading) return
+    setIsSettingsOpen(false)
+    settingsReturnRef.current = false
     setEditingSection('media')
   }
-  const openEditor = (section: ProProfileSection) => {
+  const openEditor = (
+    section: ProProfileSection,
+    options?: { returnToSettings?: boolean }
+  ) => {
+    if (typeof options?.returnToSettings === 'boolean') {
+      settingsReturnRef.current = options.returnToSettings
+    } else if (!editingSection) {
+      settingsReturnRef.current = false
+    }
+    setIsSettingsOpen(false)
     if (section === 'portfolio') {
       portfolioPanelRef.current?.scrollIntoView({
         behavior: 'smooth',
@@ -852,6 +892,13 @@ export const ProProfileScreen = ({
       return
     }
     setEditingSection(section)
+  }
+  const closeEditor = () => {
+    setEditingSection(null)
+    if (settingsReturnRef.current) {
+      settingsReturnRef.current = false
+      setIsSettingsOpen(true)
+    }
   }
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
@@ -1089,6 +1136,18 @@ export const ProProfileScreen = ({
   }, [editingSection])
 
   useEffect(() => {
+    if (editingSection && isSettingsOpen) {
+      setIsSettingsOpen(false)
+    }
+  }, [editingSection, isSettingsOpen])
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setIsAvatarActionsOpen(false)
+    }
+  }, [isSettingsOpen])
+
+  useEffect(() => {
     if (cropperState) {
       setIsAvatarActionsOpen(false)
     }
@@ -1105,6 +1164,10 @@ export const ProProfileScreen = ({
   useEffect(() => {
     editingSectionRef.current = editingSection
   }, [editingSection])
+
+  useEffect(() => {
+    settingsOpenRef.current = isSettingsOpen
+  }, [isSettingsOpen])
 
   useEffect(() => {
     portfolioLightboxIndexRef.current = portfolioLightboxIndex
@@ -1137,6 +1200,10 @@ export const ProProfileScreen = ({
         closeFollowersSheet()
         return true
       }
+      if (settingsOpenRef.current) {
+        closeSettings()
+        return true
+      }
       if (showcaseFocusIndexRef.current !== null) {
         closeShowcaseFocusEditor()
         return true
@@ -1162,7 +1229,7 @@ export const ProProfileScreen = ({
         return true
       }
       if (editingSectionRef.current) {
-        setEditingSection(null)
+        closeEditor()
         return true
       }
       return false
@@ -1172,7 +1239,9 @@ export const ProProfileScreen = ({
       onBackHandlerChange(null)
     }
   }, [
+    closeEditor,
     closeFollowersSheet,
+    closeSettings,
     isFollowersOpen,
     isPortfolioPickerOpen,
     onBackHandlerChange,
@@ -1204,6 +1273,15 @@ export const ProProfileScreen = ({
       document.body.style.overflow = previousOverflow
     }
   }, [editingSection])
+
+  useEffect(() => {
+    if (!isSettingsOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isSettingsOpen])
 
   useEffect(() => {
     if (!cropperState) return
@@ -1624,7 +1702,7 @@ export const ProProfileScreen = ({
     if (!profilePayload) return
     const saved = await saveProfile(profilePayload)
     if (saved) {
-      setEditingSection(null)
+      closeEditor()
     }
   }
 
@@ -2681,7 +2759,7 @@ export const ProProfileScreen = ({
               aria-label="Настройки профиля"
               onClick={(event) => {
                 event.stopPropagation()
-                openEditor('basic')
+                openSettings()
               }}
             >
               <span className="pro-profile-ig-button-icon" aria-hidden="true">
@@ -4046,6 +4124,71 @@ export const ProProfileScreen = ({
         />
       )}
 
+      {isSettingsOpen && (
+        <div
+          className="pro-profile-editor-screen pro-profile-settings-screen"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pro-profile-settings-title"
+        >
+          <div className="pro-profile-editor-shell">
+            <div className="pro-profile-settings-head">
+              <p className="pro-profile-settings-kicker">Профиль</p>
+              <div className="pro-profile-settings-title-row">
+                <h2
+                  className="pro-profile-settings-title"
+                  id="pro-profile-settings-title"
+                >
+                  Настройки
+                </h2>
+                <button
+                  className="pro-profile-settings-close"
+                  type="button"
+                  onClick={closeSettings}
+                >
+                  Закрыть
+                </button>
+              </div>
+              <p className="pro-profile-settings-subtitle">
+                Выберите раздел для редактирования.
+              </p>
+            </div>
+            <div className="pro-profile-editor-card pro-profile-settings-card">
+              <div className="pro-profile-settings-list" role="list">
+                {profileSettingsItems.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <button
+                      className="pro-profile-settings-item"
+                      type="button"
+                      key={item.id}
+                      role="listitem"
+                      onClick={() => openEditor(item.id, { returnToSettings: true })}
+                    >
+                      <span
+                        className="pro-profile-settings-icon"
+                        aria-hidden="true"
+                      >
+                        <Icon />
+                      </span>
+                      <span className="pro-profile-settings-label">
+                        {item.label}
+                      </span>
+                      <span
+                        className="pro-profile-settings-arrow"
+                        aria-hidden="true"
+                      >
+                        &gt;
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingSection && (
         <div
           className={`pro-profile-editor-screen${
@@ -4969,7 +5112,7 @@ export const ProProfileScreen = ({
         </div>
       )}
 
-      {!editingSection && (
+      {!editingSection && !isSettingsOpen && (
         <ProBottomNav
           active="profile"
           onCabinet={onBack}

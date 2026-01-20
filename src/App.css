@@ -11059,6 +11059,130 @@
   gap: 12px;
 }
 
+.pro-profile-settings-screen {
+  --pro-editor-savebar: 0px;
+}
+
+.pro-profile-settings-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pro-profile-settings-kicker {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-profile-settings-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pro-profile-settings-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  font-family: var(--font-title);
+}
+
+.pro-profile-settings-close {
+  border: 1px solid var(--pro-border);
+  background: rgba(var(--paper-rgb), 0.92);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pro-profile-settings-close:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.3);
+  outline-offset: 2px;
+}
+
+.pro-profile-settings-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pro-muted);
+}
+
+.pro-profile-settings-card {
+  padding: 12px;
+}
+
+.pro-profile-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pro-profile-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid var(--pro-border);
+  background: rgba(var(--paper-rgb), 0.98);
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  cursor: pointer;
+  box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.12);
+  text-align: left;
+  appearance: none;
+  font-family: inherit;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.pro-profile-settings-item:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.3);
+  outline-offset: 2px;
+}
+
+.pro-profile-settings-item:active {
+  transform: translateY(1px);
+  box-shadow: 0 6px 14px rgba(var(--shadow-rgb), 0.14);
+}
+
+.pro-profile-settings-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pro-profile-settings-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pro-profile-settings-label {
+  flex: 1;
+}
+
+.pro-profile-settings-arrow {
+  color: var(--pro-muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .pro-profile-editor-certificates {
   display: flex;
   flex-direction: column;
