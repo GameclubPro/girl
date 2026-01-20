@@ -5,6 +5,7 @@ import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
   IconClock,
+  IconExperience,
   IconHome,
   IconList,
   IconPin,
@@ -661,7 +662,7 @@ export const ProProfileScreen = ({
       id: 'experience',
       label: 'Опыт',
       value: experienceLabel,
-      icon: <IconClock />,
+      icon: <IconExperience />,
       isMuted: !hasExperience,
     },
   ]

@@ -8,7 +8,7 @@ import {
 } from 'react'
 import {
   IconChat,
-  IconClock,
+  IconExperience,
   IconHome,
   IconList,
   IconPin,
@@ -732,7 +732,7 @@ export const ClientMasterProfileScreen = ({
       id: 'experience',
       label: 'Опыт',
       value: experienceLabel,
-      icon: <IconClock />,
+      icon: <IconExperience />,
       isMuted: !hasExperience,
     },
   ]

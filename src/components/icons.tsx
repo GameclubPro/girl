@@ -1,5 +1,6 @@
 import locationPin from '../assets/location-pin.webp'
 import priceTag from '../assets/price-tag.webp'
+import experienceIcon from '../assets/experience-icon.webp'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -295,6 +296,10 @@ export const IconPin = () => (
 
 export const IconPrice = () => (
   <img src={priceTag} alt="" aria-hidden="true" />
+)
+
+export const IconExperience = () => (
+  <img src={experienceIcon} alt="" aria-hidden="true" />
 )
 
 export const IconClock = () => (
