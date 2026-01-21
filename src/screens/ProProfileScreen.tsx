@@ -17,9 +17,9 @@ import {
   IconHomeMaster,
   IconList,
   IconPin,
+  IconProfileAbout,
   IconPrice,
   IconSettings,
-  IconUser,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
@@ -237,7 +237,7 @@ const isCategoryId = (value: string): value is CategoryId =>
   categoryItems.some((item) => item.id === value)
 
 const profileSettingsItems = [
-  { id: 'basic', label: 'О себе', icon: IconUser },
+  { id: 'basic', label: 'О себе', icon: IconProfileAbout },
   { id: 'location', label: 'Локация', icon: IconPin },
   { id: 'availability', label: 'График', icon: IconClock },
   { id: 'services', label: 'Услуги', icon: IconList },

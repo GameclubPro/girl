@@ -5,6 +5,7 @@ import workFormatIcon from '../assets/work-format.webp'
 import homeMasterIcon from '../assets/home-master.webp'
 import clientVisitIcon from '../assets/client-visit.webp'
 import settingsGear from '../assets/settings-gear.webp'
+import profileAboutIcon from '../assets/profile-about.webp'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -472,6 +473,10 @@ export const IconDistrict = () => (
 
 export const IconSettings = () => (
   <img src={settingsGear} alt="" aria-hidden="true" />
+)
+
+export const IconProfileAbout = () => (
+  <img src={profileAboutIcon} alt="" aria-hidden="true" />
 )
 
 export const IconAddress = () => (
