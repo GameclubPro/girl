@@ -2941,7 +2941,7 @@ export const ProProfileScreen = ({
                   )}
                 </div>
               </div>
-              {certificateItems.length > 0 ? (
+              {certificateItems.length > 0 && (
                 <div
                   className={`pro-profile-certificates-list${
                     isCertificatesExpanded ? ' is-expanded' : ''
@@ -3004,10 +3004,6 @@ export const ProProfileScreen = ({
                       </button>
                     )
                   })}
-                </div>
-              ) : (
-                <div className="pro-profile-certificates-empty">
-                  <span>Добавьте сертификаты, чтобы усилить доверие клиентов.</span>
                 </div>
               )}
             </div>
