@@ -786,14 +786,17 @@ export const ClientMasterProfileScreen = ({
       scheduleEndMinutes = range.end
     }
   }
-  const hasScheduleTimebar =
+  const scheduleTimeRange =
     scheduleStartMinutes !== null &&
     scheduleEndMinutes !== null &&
     scheduleEndMinutes > scheduleStartMinutes
-  const scheduleTimeStyle = hasScheduleTimebar
+      ? { start: scheduleStartMinutes, end: scheduleEndMinutes }
+      : null
+  const hasScheduleTimebar = Boolean(scheduleTimeRange)
+  const scheduleTimeStyle = scheduleTimeRange
     ? ({
-        '--schedule-start': `${(scheduleStartMinutes / 1440) * 100}%`,
-        '--schedule-width': `${((scheduleEndMinutes - scheduleStartMinutes) / 1440) * 100}%`,
+        '--schedule-start': `${(scheduleTimeRange.start / 1440) * 100}%`,
+        '--schedule-width': `${((scheduleTimeRange.end - scheduleTimeRange.start) / 1440) * 100}%`,
       } as CSSProperties)
     : undefined
   const hasScheduleRange = scheduleRange !== 'Время не указано'

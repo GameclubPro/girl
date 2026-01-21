@@ -97,6 +97,7 @@ export const parseScheduleTimeToMinutes = (value?: string | null) => {
     minutes = Number(minutesRaw)
   }
 
+  if (hours === null || minutes === null) return null
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
   return hours * 60 + minutes
