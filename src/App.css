@@ -7984,9 +7984,9 @@
 
 .pro-profile-ig-stats {
   --ig-stats-radius: 22px;
-  --ig-stats-bg: linear-gradient(160deg, #0f131a 0%, #171c24 45%, #0f1217 100%);
+  --ig-stats-bg: linear-gradient(160deg, #0b1424 0%, #112a4a 48%, #0a0f1a 100%);
   --ig-stats-shadow: none;
-  --ig-stats-border: rgba(255, 255, 255, 0.08);
+  --ig-stats-border: rgba(88, 160, 255, 0.16);
   flex: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -8007,8 +8007,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 15% 0%, rgba(255, 255, 255, 0.12), transparent 45%),
-    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.06), transparent 40%);
+    radial-gradient(circle at 18% 0%, rgba(88, 160, 255, 0.28), transparent 48%),
+    radial-gradient(circle at 82% 18%, rgba(18, 90, 190, 0.25), transparent 46%);
   opacity: 0.9;
   pointer-events: none;
   z-index: 0;
@@ -8019,7 +8019,7 @@
   position: absolute;
   inset: 1px;
   border-radius: calc(var(--ig-stats-radius) - 2px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(88, 160, 255, 0.12);
   pointer-events: none;
   z-index: 0;
 }
@@ -8055,7 +8055,7 @@
 }
 
 .pro-profile-ig-stat-button.is-active {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(88, 160, 255, 0.18);
   box-shadow: none;
   transform: none;
 }
@@ -8072,7 +8072,7 @@
 .pro-profile-ig-stat-value {
   font-size: clamp(15px, 4vw, 17px);
   font-weight: 700;
-  color: #f5f7fb;
+  color: #e9f3ff;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -8083,7 +8083,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(200, 224, 255, 0.7);
 }
 
 
