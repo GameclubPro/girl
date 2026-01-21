@@ -10,7 +10,6 @@ import { ProBottomNav } from '../components/ProBottomNav'
 import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
-  IconClock,
   IconClientVisit,
   IconExperience,
   IconFormat,
@@ -19,6 +18,7 @@ import {
   IconPin,
   IconProfileAbout,
   IconPrice,
+  IconSchedule,
   IconSettings,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
@@ -239,7 +239,7 @@ const isCategoryId = (value: string): value is CategoryId =>
 const profileSettingsItems = [
   { id: 'basic', label: 'О себе', icon: IconProfileAbout },
   { id: 'location', label: 'Локация', icon: IconPin },
-  { id: 'availability', label: 'График', icon: IconClock },
+  { id: 'availability', label: 'График', icon: IconSchedule },
   { id: 'services', label: 'Услуги', icon: IconList },
   { id: 'certificates', label: 'Сертификаты', icon: IconCertificate },
 ] as const

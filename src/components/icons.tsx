@@ -6,6 +6,7 @@ import homeMasterIcon from '../assets/home-master.webp'
 import clientVisitIcon from '../assets/client-visit.webp'
 import settingsGear from '../assets/settings-gear.webp'
 import profileAboutIcon from '../assets/profile-about.webp'
+import scheduleIcon from '../assets/schedule-icon.webp'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -477,6 +478,10 @@ export const IconSettings = () => (
 
 export const IconProfileAbout = () => (
   <img src={profileAboutIcon} alt="" aria-hidden="true" />
+)
+
+export const IconSchedule = () => (
+  <img src={scheduleIcon} alt="" aria-hidden="true" />
 )
 
 export const IconAddress = () => (
