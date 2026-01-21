@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties, DragEvent, PointerEvent } from 'react'
+import type {
+  ChangeEvent,
+  CSSProperties,
+  DragEvent,
+  PointerEvent,
+  ReactElement,
+} from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { MediaCropper } from '../components/MediaCropper'
 import {
@@ -644,7 +650,7 @@ export const ProProfileScreen = ({
     id: string
     label: string
     value: string
-    icon: JSX.Element
+    icon: ReactElement
     isMuted: boolean
     section: ProProfileSection
   }
