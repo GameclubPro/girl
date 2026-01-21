@@ -14,10 +14,10 @@ import {
   IconExperience,
   IconFormat,
   IconHomeMaster,
-  IconList,
   IconPin,
   IconProfileAbout,
   IconPrice,
+  IconServices,
   IconSchedule,
   IconSettings,
 } from '../components/icons'
@@ -240,7 +240,7 @@ const profileSettingsItems = [
   { id: 'basic', label: 'О себе', icon: IconProfileAbout },
   { id: 'location', label: 'Локация', icon: IconPin },
   { id: 'availability', label: 'График', icon: IconSchedule },
-  { id: 'services', label: 'Услуги', icon: IconList },
+  { id: 'services', label: 'Услуги', icon: IconServices },
   { id: 'certificates', label: 'Сертификаты', icon: IconCertificate },
 ] as const
 

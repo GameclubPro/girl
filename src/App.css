@@ -11622,7 +11622,7 @@
   border: 1px solid var(--pro-border);
   background: rgba(var(--paper-rgb), 0.98);
   border-radius: 18px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   font-size: 13px;
   font-weight: 700;
   color: var(--pro-ink);
@@ -11645,9 +11645,9 @@
 }
 
 .pro-profile-settings-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
   background: transparent;
   color: var(--accent-strong);
   display: inline-flex;
@@ -11658,8 +11658,8 @@
 
 .pro-profile-settings-icon svg,
 .pro-profile-settings-icon img {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
 }
 
