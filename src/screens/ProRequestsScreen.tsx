@@ -3114,9 +3114,10 @@ export const ProRequestsScreen = ({
       <ProBottomNav
         active="requests"
         onCabinet={onBack}
-        onRequests={() => {}}
+        onRequests={() => setActiveTab('requests')}
         onChats={onViewChats}
         onProfile={() => onEditProfile()}
+        allowActiveClick
       />
     </div>
   )

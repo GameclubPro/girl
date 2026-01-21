@@ -414,6 +414,7 @@ export const ProStoriesScreen = ({
         onRequests={onViewRequests}
         onChats={onViewChats}
         onProfile={onViewProfile}
+        allowActiveClick
       />
 
       {previewIndex !== null && storyGroup && (
