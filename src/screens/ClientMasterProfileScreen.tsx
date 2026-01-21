@@ -34,7 +34,11 @@ import {
 } from '../utils/profileContent'
 import type { PortfolioItem } from '../utils/profileContent'
 import type { FavoriteMaster } from '../utils/favorites'
-import { normalizeScheduleDays } from '../utils/schedule'
+import {
+  normalizeScheduleDays,
+  parseScheduleRange,
+  parseScheduleTimeToMinutes,
+} from '../utils/schedule'
 
 type ClientMasterProfileScreenProps = {
   apiBase: string
@@ -138,17 +142,6 @@ const buildScheduleRange = (start?: string | null, end?: string | null) => {
   if (normalizedStart) return `с ${normalizedStart}`
   if (normalizedEnd) return `до ${normalizedEnd}`
   return 'Время не указано'
-}
-
-const parseTimeToMinutes = (value?: string | null) => {
-  const normalized = typeof value === 'string' ? value.trim() : ''
-  if (!normalized) return null
-  const [hoursRaw, minutesRaw] = normalized.split(':')
-  const hours = Number(hoursRaw)
-  const minutes = Number(minutesRaw)
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
-  return hours * 60 + minutes
 }
 
 const buildScheduleLabel = (days: string[]) =>
@@ -782,8 +775,17 @@ export const ClientMasterProfileScreen = ({
     profile?.scheduleStart,
     profile?.scheduleEnd
   )
-  const scheduleStartMinutes = parseTimeToMinutes(profile?.scheduleStart)
-  const scheduleEndMinutes = parseTimeToMinutes(profile?.scheduleEnd)
+  const rawScheduleStart = profile?.scheduleStart ?? null
+  const rawScheduleEnd = profile?.scheduleEnd ?? null
+  let scheduleStartMinutes = parseScheduleTimeToMinutes(rawScheduleStart)
+  let scheduleEndMinutes = parseScheduleTimeToMinutes(rawScheduleEnd)
+  if (scheduleEndMinutes === null && typeof rawScheduleStart === 'string') {
+    const range = parseScheduleRange(rawScheduleStart)
+    if (range) {
+      scheduleStartMinutes = range.start
+      scheduleEndMinutes = range.end
+    }
+  }
   const hasScheduleTimebar =
     scheduleStartMinutes !== null &&
     scheduleEndMinutes !== null &&

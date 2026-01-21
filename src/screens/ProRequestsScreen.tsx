@@ -19,7 +19,11 @@ import type {
 } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
 import { getChatStream } from '../utils/chatStream'
-import { normalizeScheduleDays } from '../utils/schedule'
+import {
+  normalizeScheduleDays,
+  parseScheduleRange,
+  parseScheduleTimeToMinutes,
+} from '../utils/schedule'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -216,17 +220,6 @@ const isOutcomePending = (booking: Booking) => {
       ? booking.serviceDuration
       : BOOKING_DURATION_MIN
   return scheduledAt.getTime() + duration * 60 * 1000 <= Date.now()
-}
-
-const parseTimeMinutes = (value: string | null | undefined) => {
-  const normalized = value?.trim() ?? ''
-  if (!normalized) return null
-  const [hoursRaw, minutesRaw] = normalized.split(':')
-  const hours = Number(hoursRaw)
-  const minutes = Number(minutesRaw)
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
-  return hours * 60 + minutes
 }
 
 const getMinutesFromDateTime = (value?: string | null) => {
@@ -429,7 +422,7 @@ const parseSlotText = (input: string, baseYear: number) => {
     const times = Array.from(
       new Set(
         timeMatches
-          .map((time) => parseTimeMinutes(time))
+          .map((time) => parseScheduleTimeToMinutes(time))
           .filter((time): time is number => time !== null)
       )
     ).sort((a, b) => a - b)
@@ -581,8 +574,19 @@ export const ProRequestsScreen = ({
           Array.isArray(data.scheduleDays) ? data.scheduleDays : []
         )
         setProfileScheduleDays(days)
-        setProfileScheduleStart(parseTimeMinutes(data.scheduleStart ?? ''))
-        setProfileScheduleEnd(parseTimeMinutes(data.scheduleEnd ?? ''))
+        const rawScheduleStart = data.scheduleStart ?? ''
+        const rawScheduleEnd = data.scheduleEnd ?? ''
+        let startMinutes = parseScheduleTimeToMinutes(rawScheduleStart)
+        let endMinutes = parseScheduleTimeToMinutes(rawScheduleEnd)
+        if (endMinutes === null && rawScheduleStart) {
+          const range = parseScheduleRange(rawScheduleStart)
+          if (range) {
+            startMinutes = range.start
+            endMinutes = range.end
+          }
+        }
+        setProfileScheduleStart(startMinutes)
+        setProfileScheduleEnd(endMinutes)
       } catch (error) {
         if (!cancelled) {
           setProfileScheduleDays([])
@@ -923,7 +927,7 @@ export const ProRequestsScreen = ({
     })
   }
   const seedSlotsFromSchedule = useCallback(
-    (options?: { force?: boolean }) => {
+    (options?: { force?: boolean; replaceClosed?: boolean }) => {
       if (!userId || typeof window === 'undefined') return 0
       if (!scheduleLoaded) return 0
       if (!options?.force && hasSeededSlots && slots.length > 0) return 0
@@ -970,7 +974,9 @@ export const ProRequestsScreen = ({
             )
         )
         if (filtered.length > 0) {
-          applySlotTimes(dateKey, filtered)
+          applySlotTimes(dateKey, filtered, {
+            replaceClosed: options?.replaceClosed ?? false,
+          })
           added += filtered.length
         }
       }
@@ -1222,7 +1228,7 @@ export const ProRequestsScreen = ({
       setSlotMessage('Загружаем записи...')
       return
     }
-    const added = seedSlotsFromSchedule({ force: true })
+    const added = seedSlotsFromSchedule({ force: true, replaceClosed: true })
     if (added > 0) {
       setSlotMessage('Окна заполнены по графику.')
     } else {

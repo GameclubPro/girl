@@ -27,6 +27,11 @@ import {
   hapticSelection,
 } from '../utils/haptics'
 import { parseServiceItems } from '../utils/profileContent'
+import {
+  normalizeScheduleDays,
+  parseScheduleRange,
+  parseScheduleTimeToMinutes,
+} from '../utils/schedule'
 
 type BookingScreenProps = {
   apiBase: string
@@ -82,17 +87,6 @@ const bookingSteps = [
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const getDayKey = (date: Date) => dayKeyOrder[date.getDay()] ?? 'mon'
-
-const parseTimeToMinutes = (value: string | null | undefined) => {
-  const normalized = value?.trim() ?? ''
-  if (!normalized) return null
-  const [hoursRaw, minutesRaw] = normalized.split(':')
-  const hours = Number(hoursRaw)
-  const minutes = Number(minutesRaw)
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
-  return hours * 60 + minutes
-}
 
 const formatTime = (minutes: number) => {
   const hours = String(Math.floor(minutes / 60)).padStart(2, '0')
@@ -467,11 +461,20 @@ export const BookingScreen = ({
 
   const availableDays = useMemo(() => {
     if (!profile) return []
-    const scheduleDays = Array.isArray(profile.scheduleDays)
-      ? profile.scheduleDays.map((day) => day.trim().toLowerCase())
-      : []
-    const startMinutes = parseTimeToMinutes(profile.scheduleStart ?? null)
-    const endMinutes = parseTimeToMinutes(profile.scheduleEnd ?? null)
+    const scheduleDays = normalizeScheduleDays(
+      Array.isArray(profile.scheduleDays) ? profile.scheduleDays : []
+    )
+    const rawScheduleStart = profile.scheduleStart ?? null
+    const rawScheduleEnd = profile.scheduleEnd ?? null
+    let startMinutes = parseScheduleTimeToMinutes(rawScheduleStart)
+    let endMinutes = parseScheduleTimeToMinutes(rawScheduleEnd)
+    if (endMinutes === null && typeof rawScheduleStart === 'string') {
+      const range = parseScheduleRange(rawScheduleStart)
+      if (range) {
+        startMinutes = range.start
+        endMinutes = range.end
+      }
+    }
     if (!scheduleDays.length || startMinutes === null || endMinutes === null) {
       return []
     }
