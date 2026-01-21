@@ -7995,7 +7995,10 @@
   border-radius: var(--ig-stats-radius);
   background: var(--ig-stats-bg);
   border: 1px solid var(--ig-stats-border);
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 12px 20px rgba(88, 160, 255, 0.1),
+    inset 0 -18px 28px rgba(4, 10, 22, 0.6);
   grid-column: 1 / -1;
   position: relative;
   overflow: hidden;
