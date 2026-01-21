@@ -8007,8 +8007,9 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 18% 0%, rgba(88, 160, 255, 0.28), transparent 48%),
-    radial-gradient(circle at 82% 18%, rgba(18, 90, 190, 0.25), transparent 46%);
+    radial-gradient(circle at 14% 0%, rgba(120, 185, 255, 0.38), transparent 50%),
+    radial-gradient(circle at 88% 18%, rgba(24, 110, 220, 0.32), transparent 48%),
+    radial-gradient(circle at 30% 80%, rgba(10, 40, 90, 0.45), transparent 55%);
   opacity: 0.9;
   pointer-events: none;
   z-index: 0;
@@ -8017,9 +8018,16 @@
 .pro-profile-ig-stats::after {
   content: '';
   position: absolute;
-  inset: 1px;
-  border-radius: calc(var(--ig-stats-radius) - 2px);
-  border: 1px solid rgba(88, 160, 255, 0.12);
+  inset: 0;
+  border-radius: var(--ig-stats-radius);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18),
+      rgba(255, 255, 255, 0.04) 32%,
+      transparent 60%
+    );
+  border: 1px solid rgba(88, 160, 255, 0.18);
   pointer-events: none;
   z-index: 0;
 }
