@@ -244,6 +244,8 @@ const profileSettingsItems = [
   { id: 'certificates', label: 'Сертификаты', icon: IconCertificate },
 ] as const
 
+type SettingsItemId = (typeof profileSettingsItems)[number]['id']
+
 const editorTitleMap: Record<InlineSection, string> = {
   basic: 'О себе',
   location: 'Локация',
@@ -716,6 +718,73 @@ export const ProProfileScreen = ({
     () => serviceItems.filter((item) => item.name.trim()).map((item) => item.name),
     [serviceItems]
   )
+  const scheduleDayLabels = scheduleDayOptions
+    .filter((day) => scheduleDays.includes(day.id))
+    .map((day) => day.label)
+  let scheduleDaysLabel = ''
+  if (scheduleDayLabels.length === 7) {
+    scheduleDaysLabel = 'Каждый день'
+  } else if (scheduleDayLabels.length > 3) {
+    scheduleDaysLabel = `${scheduleDayLabels.slice(0, 3).join(', ')} +${
+      scheduleDayLabels.length - 3
+    }`
+  } else if (scheduleDayLabels.length > 0) {
+    scheduleDaysLabel = scheduleDayLabels.join(', ')
+  }
+  const scheduleStartValue = scheduleStart.trim()
+  const scheduleEndValue = scheduleEnd.trim()
+  const scheduleTimeLabel =
+    scheduleStartValue && scheduleEndValue
+      ? `${scheduleStartValue}–${scheduleEndValue}`
+      : scheduleStartValue || scheduleEndValue
+        ? `${scheduleStartValue || scheduleEndValue}`
+        : ''
+  const availabilitySummary =
+    scheduleDaysLabel || scheduleTimeLabel
+      ? [scheduleDaysLabel, scheduleTimeLabel].filter(Boolean).join(' · ')
+      : 'График не задан'
+  const servicesCount = serviceNames.length
+  const servicesPriceLabel =
+    priceFromValue !== null && priceToValue !== null
+      ? `${priceFromValue}–${priceToValue} ₽`
+      : priceFromValue !== null
+        ? `от ${priceFromValue} ₽`
+        : priceToValue !== null
+          ? `до ${priceToValue} ₽`
+          : ''
+  const servicesSummary =
+    servicesCount > 0
+      ? [formatCount(servicesCount, 'услуга', 'услуги', 'услуг'), servicesPriceLabel]
+          .filter(Boolean)
+          .join(' · ')
+      : 'Услуги не добавлены'
+  const certificatesSummary =
+    certificateCount > 0
+      ? formatCount(certificateCount, 'сертификат', 'сертификата', 'сертификатов')
+      : 'Сертификатов нет'
+  const aboutSnippet = about.trim()
+  const aboutSummary =
+    aboutSnippet.length > 44 ? `${aboutSnippet.slice(0, 44)}...` : aboutSnippet
+  const experienceSummary =
+    experienceValue !== null ? `Опыт ${experienceValue} лет` : ''
+  const basicSummary =
+    aboutSummary ||
+    [experienceSummary, servicesPriceLabel].filter(Boolean).join(' · ') ||
+    'Имя, опыт, статус'
+  const settingsStatusLabel = isActive ? 'Принимаете заявки' : 'Пауза'
+  const settingsHeroMetaParts = [settingsStatusLabel]
+  if (locationLabel && locationLabel !== 'Город не указан') {
+    settingsHeroMetaParts.push(locationLabel)
+  }
+  const settingsHeroMeta = settingsHeroMetaParts.join(' · ')
+  const settingsAvatarActionLabel = avatarDisplayUrl ? 'Сменить фото' : 'Добавить фото'
+  const settingsHints: Record<SettingsItemId, string> = {
+    basic: basicSummary,
+    location: locationLabel,
+    availability: availabilitySummary,
+    services: servicesSummary,
+    certificates: certificatesSummary,
+  }
   const portfolioGridItems = useMemo(
     () =>
       portfolioItems
@@ -4171,18 +4240,67 @@ export const ProProfileScreen = ({
           aria-modal="true"
           aria-labelledby="pro-profile-settings-title"
         >
-          <div className="pro-profile-editor-shell">
-            <div className="pro-profile-settings-head">
-              <div className="pro-profile-settings-title-row">
+          <div className="pro-profile-editor-shell pro-profile-settings-shell">
+            <section className="pro-profile-settings-hero animate">
+              <div className="pro-profile-settings-toolbar">
+                <button
+                  className="pro-profile-settings-close"
+                  type="button"
+                  onClick={closeSettings}
+                >
+                  Назад
+                </button>
                 <h2
                   className="pro-profile-settings-title"
                   id="pro-profile-settings-title"
                 >
-                  Настройки
+                  Настройки профиля
                 </h2>
+                <span
+                  className="pro-profile-settings-toolbar-spacer"
+                  aria-hidden="true"
+                />
               </div>
-            </div>
-            <div className="pro-profile-editor-card pro-profile-settings-card">
+              <div className="pro-profile-settings-identity">
+                <button
+                  className="pro-profile-settings-avatar-button"
+                  type="button"
+                  onClick={() =>
+                    openEditor('media', { returnToSettings: true })
+                  }
+                  disabled={isAvatarUploading || isCoverUploading}
+                  aria-label="Редактировать фото профиля"
+                >
+                  <span
+                    className={`pro-profile-settings-avatar${
+                      isAvatarUploading ? ' is-loading' : ''
+                    }`}
+                  >
+                    {avatarDisplayUrl ? (
+                      <img
+                        src={avatarDisplayUrl}
+                        alt={`Аватар ${displayNameValue}`}
+                      />
+                    ) : (
+                      <span
+                        className="pro-profile-settings-avatar-initials"
+                        aria-hidden="true"
+                      >
+                        {profileInitials}
+                      </span>
+                    )}
+                  </span>
+                  <span className="pro-profile-settings-avatar-label">
+                    {settingsAvatarActionLabel}
+                  </span>
+                </button>
+                <div className="pro-profile-settings-identity-body">
+                  <p className="pro-profile-settings-name">{displayNameValue}</p>
+                  <p className="pro-profile-settings-meta">{settingsHeroMeta}</p>
+                </div>
+              </div>
+            </section>
+            <section className="pro-profile-settings-group animate delay-1">
               <div className="pro-profile-settings-list" role="list">
                 {profileSettingsItems.map((item) => {
                   const Icon = item.icon
@@ -4192,7 +4310,9 @@ export const ProProfileScreen = ({
                       type="button"
                       key={item.id}
                       role="listitem"
-                      onClick={() => openEditor(item.id, { returnToSettings: true })}
+                      onClick={() =>
+                        openEditor(item.id, { returnToSettings: true })
+                      }
                     >
                       <span
                         className="pro-profile-settings-icon"
@@ -4200,8 +4320,13 @@ export const ProProfileScreen = ({
                       >
                         <Icon />
                       </span>
-                      <span className="pro-profile-settings-label">
-                        {item.label}
+                      <span className="pro-profile-settings-content">
+                        <span className="pro-profile-settings-label">
+                          {item.label}
+                        </span>
+                        <span className="pro-profile-settings-hint">
+                          {settingsHints[item.id]}
+                        </span>
                       </span>
                       <span
                         className="pro-profile-settings-arrow"
@@ -4213,7 +4338,7 @@ export const ProProfileScreen = ({
                   )
                 })}
               </div>
-            </div>
+            </section>
           </div>
         </div>
       )}
