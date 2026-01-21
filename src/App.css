@@ -1211,6 +1211,7 @@
   align-items: center;
   gap: 2px;
   min-height: 54px;
+  position: relative;
   cursor: pointer;
   font-family: inherit;
   appearance: none;
@@ -1223,6 +1224,9 @@
   color: #ffffff;
   box-shadow: 0 14px 20px rgba(var(--accent-rgb), 0.28);
   transform: translateY(-1px);
+  padding: 6px 4px 5px;
+  min-height: 48px;
+  gap: 1px;
 }
 
 .booking-calendar-day.is-today {
@@ -1271,9 +1275,13 @@
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-count {
-  background: rgba(255, 255, 255, 0.18);
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff3b30;
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.32);
+  border-color: rgba(255, 59, 48, 0.7);
+  box-shadow: 0 8px 12px rgba(255, 59, 48, 0.35);
 }
 
 .booking-calendar-summary {
