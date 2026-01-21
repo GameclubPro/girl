@@ -2681,6 +2681,11 @@ export const ProRequestsScreen = ({
                               : 'Закрыто'
                         const booking = slot.booking
                         const hasDetails = booking && slotDetailId === booking.id
+                        const isConfirmTarget = slotConfirm
+                          ? slotConfirm.type === 'cancel-booking'
+                            ? booking?.id === slotConfirm.bookingId
+                            : slotConfirm.slotId === slot.id
+                          : false
                         return (
                           <div className="pro-slot-card" key={`${slot.id}-${timeLabel}`}>
                             <div className="pro-slot-row">
@@ -2798,35 +2803,36 @@ export const ProRequestsScreen = ({
                                 {renderBookingItem(booking)}
                               </div>
                             )}
+                            {isConfirmTarget && slotConfirmContent && (
+                              <div className="pro-slots-confirm">
+                                <p className="pro-slots-confirm-title">
+                                  {slotConfirmContent.title}
+                                </p>
+                                <div className="pro-slots-confirm-actions">
+                                  <button
+                                    className={`pro-slots-confirm-primary ${
+                                      slotConfirmContent.tone === 'is-danger'
+                                        ? 'is-danger'
+                                        : ''
+                                    }`}
+                                    type="button"
+                                    onClick={handleConfirmSlotAction}
+                                  >
+                                    {slotConfirmContent.confirmLabel}
+                                  </button>
+                                  <button
+                                    className="pro-slots-confirm-secondary"
+                                    type="button"
+                                    onClick={() => setSlotConfirm(null)}
+                                  >
+                                    {slotConfirmContent.cancelLabel}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
-                    </div>
-                  )}
-
-                  {slotConfirmContent && (
-                    <div className="pro-slots-confirm">
-                      <p className="pro-slots-confirm-title">
-                        {slotConfirmContent.title}
-                      </p>
-                      <div className="pro-slots-confirm-actions">
-                        <button
-                          className={`pro-slots-confirm-primary ${
-                            slotConfirmContent.tone === 'is-danger' ? 'is-danger' : ''
-                          }`}
-                          type="button"
-                          onClick={handleConfirmSlotAction}
-                        >
-                          {slotConfirmContent.confirmLabel}
-                        </button>
-                        <button
-                          className="pro-slots-confirm-secondary"
-                          type="button"
-                          onClick={() => setSlotConfirm(null)}
-                        >
-                          {slotConfirmContent.cancelLabel}
-                        </button>
-                      </div>
                     </div>
                   )}
 
