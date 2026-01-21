@@ -930,11 +930,10 @@ export const ProRequestsScreen = ({
       return next
     })
   }
-  const seedSlotsFromSchedule = useCallback(
-    (options?: { force?: boolean; replaceClosed?: boolean }) => {
+  const seedSlotsFromSchedule = useCallback(() => {
       if (!userId || typeof window === 'undefined') return 0
       if (!scheduleLoaded) return 0
-      if (!options?.force && hasSeededSlots && slots.length > 0) return 0
+      if (hasSeededSlots && slots.length > 0) return 0
       if (profileScheduleDays.length === 0) return 0
       if (profileScheduleStart === null || profileScheduleEnd === null) return 0
       if (profileScheduleEnd <= profileScheduleStart) return 0
@@ -982,9 +981,7 @@ export const ProRequestsScreen = ({
             )
         )
         if (filtered.length > 0) {
-          applySlotTimes(dateKey, filtered, {
-            replaceClosed: options?.replaceClosed ?? false,
-          })
+          applySlotTimes(dateKey, filtered)
           added += filtered.length
         }
       }
@@ -1213,55 +1210,6 @@ export const ProRequestsScreen = ({
     slotNoticeTimerRef.current = window.setTimeout(() => {
       setSlotNotice('')
     }, 2400)
-  }
-
-  const handleAutoFillSlots = () => {
-    if (!scheduleLoaded) {
-      setSlotMessage('Загружаем график...')
-      return
-    }
-    if (profileScheduleDays.length === 0) {
-      setSlotMessage('Заполните график в профиле.')
-      return
-    }
-    if (
-      profileScheduleStart === null ||
-      profileScheduleEnd === null ||
-      profileScheduleEnd <= profileScheduleStart
-    ) {
-      setSlotMessage('Проверьте время графика в профиле.')
-      return
-    }
-    if (isBookingsLoading) {
-      setSlotMessage('Загружаем записи...')
-      return
-    }
-    const added = seedSlotsFromSchedule({ force: true, replaceClosed: true })
-    if (added > 0) {
-      setSlotMessage('Окна заполнены по графику.')
-    } else {
-      setSlotMessage('Свободных окон по графику нет.')
-    }
-    scrollToSlots()
-  }
-
-  const handleResetLocalSlots = () => {
-    if (!userId || typeof window === 'undefined') {
-      setSlotMessage('Недоступно на этом устройстве.')
-      return
-    }
-    try {
-      window.localStorage.removeItem(buildSlotStorageKey(userId))
-      window.localStorage.removeItem(buildSlotSeedKey(userId))
-    } catch (error) {
-      // ignore storage errors
-    }
-    setSlots([])
-    setSelectedTimes([])
-    setSlotConfirm(null)
-    setSlotDetailId(null)
-    setHasSeededSlots(false)
-    handleAutoFillSlots()
   }
 
   const handleCopyLink = async () => {
@@ -2638,27 +2586,6 @@ export const ProRequestsScreen = ({
                   >
                     Добавить окна
                   </button>
-                  <button
-                    className="booking-calendar-auto"
-                    type="button"
-                    aria-label="Заполнить окна по графику"
-                    onClick={handleAutoFillSlots}
-                  >
-                    По графику
-                  </button>
-                  <button
-                    className="booking-calendar-reset"
-                    type="button"
-                    aria-label="Сбросить локальные окна"
-                    onClick={handleResetLocalSlots}
-                  >
-                    Сбросить
-                  </button>
-                  {slotNotice && (
-                    <span className="booking-calendar-notice" role="status">
-                      {slotNotice}
-                    </span>
-                  )}
                 </div>
               </section>
 
