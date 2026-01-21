@@ -640,7 +640,16 @@ export const ProProfileScreen = ({
       : worksAtClient && !worksAtMaster
         ? <IconClientVisit />
         : <IconFormat />
-  const profileFacts = [
+  type ProfileFact = {
+    id: string
+    label: string
+    value: string
+    icon: JSX.Element
+    isMuted: boolean
+    section: ProProfileSection
+  }
+
+  const profileFacts: ProfileFact[] = [
     {
       id: 'location',
       label: 'Локация',
