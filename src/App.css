@@ -8374,6 +8374,23 @@
   min-width: 0;
 }
 
+.pro-profile-fact-card.is-action {
+  cursor: pointer;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  touch-action: manipulation;
+}
+
+.pro-profile-fact-card.is-action:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.pro-profile-fact-card.is-action:active {
+  transform: translateY(1px);
+}
+
 .screen--pro-profile .pro-profile-fact-card {
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(var(--accent-rgb), 0.12);

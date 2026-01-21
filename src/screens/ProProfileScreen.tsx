@@ -647,6 +647,7 @@ export const ProProfileScreen = ({
       value: locationLabel,
       icon: <IconPin />,
       isMuted: !hasLocation,
+      section: 'location',
     },
     {
       id: 'format',
@@ -654,6 +655,7 @@ export const ProProfileScreen = ({
       value: workFormatLabel,
       icon: formatIcon,
       isMuted: !hasWorkFormat,
+      section: 'location',
     },
     {
       id: 'price',
@@ -661,6 +663,7 @@ export const ProProfileScreen = ({
       value: priceLabel,
       icon: <IconPrice />,
       isMuted: !hasPrice,
+      section: 'services',
     },
     {
       id: 'experience',
@@ -668,6 +671,7 @@ export const ProProfileScreen = ({
       value: experienceLabel,
       icon: <IconExperience />,
       isMuted: !hasExperience,
+      section: 'location',
     },
   ]
   const hasGeoLocation =
@@ -2879,11 +2883,15 @@ export const ProProfileScreen = ({
                 id="pro-profile-facts-grid"
               >
                 {profileFacts.map((fact) => (
-                  <div
-                    className={`pro-profile-fact-card${
+                  <button
+                    className={`pro-profile-fact-card is-action${
                       fact.isMuted ? ' is-muted' : ''
                     }`}
                     key={fact.label}
+                    type="button"
+                    onClick={() => openEditor(fact.section)}
+                    aria-label={`Открыть настройки: ${fact.label}`}
+                    aria-haspopup="dialog"
                   >
                     <span
                       className={`pro-profile-fact-icon is-${fact.id}`}
@@ -2895,7 +2903,7 @@ export const ProProfileScreen = ({
                       <span className="pro-profile-fact-value">{fact.value}</span>
                       <span className="pro-profile-fact-label">{fact.label}</span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
