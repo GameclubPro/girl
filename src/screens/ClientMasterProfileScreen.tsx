@@ -1127,9 +1127,6 @@ export const ClientMasterProfileScreen = ({
                         </h3>
                       </div>
                       <div className="pro-profile-certificates-actions">
-                        <span className="pro-profile-certificates-count">
-                          {certificateCountLabel}
-                        </span>
                         {certificateItems.length > 0 && (
                           <button
                             className="pro-profile-certificates-action is-toggle"
