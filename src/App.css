@@ -2342,40 +2342,40 @@
 }
 
 .screen--pro-profile {
-  --pro-ink: #1f2340;
-  --pro-muted: #6b738c;
-  --pro-border: rgba(45, 55, 92, 0.14);
+  --pro-ink: #0d2333;
+  --pro-muted: #4b6b7a;
+  --pro-border: rgba(13, 35, 51, 0.16);
   --pro-surface: rgba(255, 255, 255, 0.94);
   --pro-surface-strong: #ffffff;
-  --pro-accent: #4f6fff;
-  --pro-accent-2: #6fa3ff;
-  --pro-accent-3: #55c3ff;
+  --pro-accent: #1e8ba5;
+  --pro-accent-2: #39b8c8;
+  --pro-accent-3: #7ad7e8;
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
-  --ink: #1f2340;
-  --ink-rgb: 31, 35, 64;
-  --muted: #6b738c;
-  --muted-rgb: 107, 115, 140;
-  --accent: #4f6fff;
-  --accent-rgb: 79, 111, 255;
-  --accent-strong: #3656e0;
-  --accent-soft: rgba(79, 111, 255, 0.18);
-  --surface: #f2f6ff;
-  --surface-rgb: 242, 246, 255;
-  --surface-muted: #edf2ff;
-  --surface-muted-rgb: 237, 242, 255;
+  --ink: #0d2333;
+  --ink-rgb: 13, 35, 51;
+  --muted: #4b6b7a;
+  --muted-rgb: 75, 107, 122;
+  --accent: #1e8ba5;
+  --accent-rgb: 30, 139, 165;
+  --accent-strong: #11667d;
+  --accent-soft: rgba(30, 139, 165, 0.18);
+  --surface: #e9f7fb;
+  --surface-rgb: 233, 247, 251;
+  --surface-muted: #e2f3f8;
+  --surface-muted-rgb: 226, 243, 248;
   background:
     radial-gradient(
-      120% 120% at 10% -10%,
-      rgba(122, 136, 255, 0.18),
+      120% 120% at 12% -10%,
+      rgba(90, 200, 215, 0.18),
       transparent 55%
     ),
     radial-gradient(
-      130% 130% at 100% 0%,
-      rgba(110, 160, 255, 0.16),
+      140% 140% at 100% 0%,
+      rgba(30, 120, 150, 0.16),
       transparent 60%
     ),
-    linear-gradient(180deg, #f2f6ff 0%, #ffffff 55%, #ffffff 100%);
+    linear-gradient(180deg, #e9f7fb 0%, #ffffff 55%, #ffffff 100%);
 }
 
 .screen--pro::before {
@@ -7877,28 +7877,34 @@
   height: 170px;
   background: linear-gradient(
     135deg,
-    #7f9dff 0%,
-    #6fa6ff 42%,
-    #dfe8ff 100%
+    #0f3d54 0%,
+    #1f7a98 42%,
+    #7ad7e8 100%
   );
   box-shadow: 0 18px 26px rgba(var(--shadow-rgb), 0.14);
   filter: none;
 }
 
 .screen--pro-profile .pro-profile-ig-cover::after {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.4) 0%,
-    rgba(255, 255, 255, 0.08) 45%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(255, 255, 255, 0.14) 48%,
+      rgba(13, 35, 51, 0.08) 100%
+    ),
+    repeating-linear-gradient(
+      -12deg,
+      rgba(255, 255, 255, 0.2) 0 6px,
+      rgba(255, 255, 255, 0) 6px 16px
+    );
 }
 
 .screen--pro-profile .pro-profile-ig-cover-glow {
   background-image:
     radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.6), transparent 55%),
-    radial-gradient(circle at 78% 16%, rgba(138, 196, 255, 0.55), transparent 60%),
-    radial-gradient(circle at 80% 80%, rgba(173, 209, 255, 0.45), transparent 58%);
+    radial-gradient(circle at 78% 16%, rgba(94, 220, 235, 0.55), transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(16, 120, 150, 0.4), transparent 58%);
   opacity: 1;
 }
 
@@ -7982,7 +7988,7 @@
 }
 
 .screen--pro-profile .pro-profile-ig-avatar {
-  background: linear-gradient(145deg, #6f8eff 0%, #6fa6ff 45%, #5cc9ff 100%);
+  background: linear-gradient(145deg, #1a6b86 0%, #2db4c5 45%, #7ad7e8 100%);
   border-color: rgba(255, 255, 255, 0.98);
   box-shadow: 0 20px 30px rgba(var(--shadow-rgb), 0.22);
 }
@@ -8012,9 +8018,9 @@
 }
 
 .screen--pro-profile .pro-profile-ig-avatar-badge {
-  background: linear-gradient(160deg, #3f6dff, #6ec3ff);
+  background: linear-gradient(160deg, #1e8ba5, #53d6e4);
   border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 10px 18px rgba(63, 109, 255, 0.28);
+  box-shadow: 0 10px 18px rgba(var(--accent-rgb), 0.28);
 }
 
 .pro-profile-ig-avatar::before {
@@ -8036,8 +8042,8 @@
   background: radial-gradient(
     circle at 20% 20%,
     rgba(255, 255, 255, 0.7),
-    rgba(128, 166, 255, 0.55),
-    rgba(96, 150, 255, 0.35)
+    rgba(65, 180, 200, 0.55),
+    rgba(23, 130, 155, 0.35)
   );
 }
 
@@ -8266,9 +8272,9 @@
   --pro-ig-card-bg: linear-gradient(
     160deg,
     rgba(255, 255, 255, 0.98),
-    rgba(239, 242, 255, 0.94)
+    rgba(226, 246, 251, 0.94)
   );
-  --pro-ig-card-border: rgba(70, 82, 140, 0.12);
+  --pro-ig-card-border: rgba(var(--accent-rgb), 0.12);
   --pro-ig-card-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.12);
   --pro-ig-card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
@@ -8297,7 +8303,7 @@
   --status-bubble-bg: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.98),
-    rgba(236, 241, 255, 0.92)
+    rgba(227, 243, 248, 0.92)
   );
   --status-bubble-border: rgba(var(--accent-rgb), 0.2);
   --status-bubble-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.12);
@@ -8396,7 +8402,7 @@
   background: linear-gradient(
     160deg,
     rgba(255, 255, 255, 0.98),
-    rgba(240, 244, 255, 0.94)
+    rgba(230, 245, 250, 0.94)
   );
   border-color: rgba(var(--accent-rgb), 0.14);
   box-shadow:
@@ -8543,7 +8549,7 @@
   background: linear-gradient(
     160deg,
     rgba(255, 255, 255, 0.98),
-    rgba(239, 242, 255, 0.95)
+    rgba(228, 244, 249, 0.95)
   );
   border-color: rgba(var(--accent-rgb), 0.14);
   box-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.12);
@@ -9167,8 +9173,8 @@
 }
 
 .screen--pro-profile .pro-profile-ig-button--primary {
-  background: linear-gradient(135deg, #3f7bff 0%, #5fc8ff 100%);
-  box-shadow: 0 16px 24px rgba(63, 123, 255, 0.3);
+  background: linear-gradient(135deg, #1e8ba5 0%, #52d6e4 100%);
+  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.3);
 }
 
 .pro-profile-ig-button:focus-visible {
