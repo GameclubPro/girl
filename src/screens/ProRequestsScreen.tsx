@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import {
@@ -19,6 +19,7 @@ import type {
 } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
 import { getChatStream } from '../utils/chatStream'
+import { normalizeScheduleDays } from '../utils/schedule'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -576,9 +577,9 @@ export const ProRequestsScreen = ({
         }
         const data = (await response.json()) as MasterProfile
         if (cancelled) return
-        const days = Array.isArray(data.scheduleDays)
-          ? data.scheduleDays.map((day) => day.trim().toLowerCase()).filter(Boolean)
-          : []
+        const days = normalizeScheduleDays(
+          Array.isArray(data.scheduleDays) ? data.scheduleDays : []
+        )
         setProfileScheduleDays(days)
         setProfileScheduleStart(parseTimeMinutes(data.scheduleStart ?? ''))
         setProfileScheduleEnd(parseTimeMinutes(data.scheduleEnd ?? ''))
@@ -921,67 +922,77 @@ export const ProRequestsScreen = ({
       return next
     })
   }
-  useEffect(() => {
-    if (!userId || typeof window === 'undefined') return
-    if (!scheduleLoaded || (hasSeededSlots && slots.length > 0)) return
-    if (profileScheduleDays.length === 0) return
-    if (profileScheduleStart === null || profileScheduleEnd === null) return
-    if (profileScheduleEnd <= profileScheduleStart) return
-    if (isBookingsLoading) return
+  const seedSlotsFromSchedule = useCallback(
+    (options?: { force?: boolean }) => {
+      if (!userId || typeof window === 'undefined') return 0
+      if (!scheduleLoaded) return 0
+      if (!options?.force && hasSeededSlots && slots.length > 0) return 0
+      if (profileScheduleDays.length === 0) return 0
+      if (profileScheduleStart === null || profileScheduleEnd === null) return 0
+      if (profileScheduleEnd <= profileScheduleStart) return 0
+      if (isBookingsLoading) return 0
 
-    const daySet = new Set(profileScheduleDays)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const availableCount = Math.floor(
-      (profileScheduleEnd - profileScheduleStart) / SLOT_TIME_STEP
-    )
-    if (availableCount <= 0) return
-
-    window.localStorage.setItem(buildSlotSeedKey(userId), '1')
-    setHasSeededSlots(true)
-
-    for (let offset = 0; offset < DEFAULT_SLOT_RANGE_DAYS; offset += 1) {
-      const date = addDays(today, offset)
-      const dayKey = getDayKey(date)
-      if (!daySet.has(dayKey)) continue
-      const dateKey = toDateKey(date)
-      const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
-      const times: number[] = []
-      for (
-        let time = profileScheduleStart;
-        time + SLOT_TIME_STEP <= profileScheduleEnd;
-        time += SLOT_TIME_STEP
-      ) {
-        times.push(time)
-      }
-      const filtered = times.filter(
-        (time) =>
-          !bookedRanges.some((range) =>
-            rangesOverlap(
-              time,
-              SLOT_DURATION_MIN,
-              range.startMinutes,
-              range.durationMinutes
-            )
-          )
+      const daySet = new Set(profileScheduleDays)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const availableCount = Math.floor(
+        (profileScheduleEnd - profileScheduleStart) / SLOT_TIME_STEP
       )
-      if (filtered.length > 0) {
-        applySlotTimes(dateKey, filtered)
+      if (availableCount <= 0) return 0
+
+      window.localStorage.setItem(buildSlotSeedKey(userId), '1')
+      setHasSeededSlots(true)
+
+      let added = 0
+      for (let offset = 0; offset < DEFAULT_SLOT_RANGE_DAYS; offset += 1) {
+        const date = addDays(today, offset)
+        const dayKey = getDayKey(date)
+        if (!daySet.has(dayKey)) continue
+        const dateKey = toDateKey(date)
+        const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
+        const times: number[] = []
+        for (
+          let time = profileScheduleStart;
+          time + SLOT_TIME_STEP <= profileScheduleEnd;
+          time += SLOT_TIME_STEP
+        ) {
+          times.push(time)
+        }
+        const filtered = times.filter(
+          (time) =>
+            !bookedRanges.some((range) =>
+              rangesOverlap(
+                time,
+                SLOT_DURATION_MIN,
+                range.startMinutes,
+                range.durationMinutes
+              )
+            )
+        )
+        if (filtered.length > 0) {
+          applySlotTimes(dateKey, filtered)
+          added += filtered.length
+        }
       }
-    }
-  }, [
-    applySlotTimes,
-    bookingRangesByDate,
-    hasSeededSlots,
-    isBookingsLoading,
-    profileScheduleDays,
-    profileScheduleEnd,
-    profileScheduleStart,
-    scheduleLoaded,
-    slots.length,
-    slotsByDate,
-    userId,
-  ])
+      return added
+    },
+    [
+      applySlotTimes,
+      bookingRangesByDate,
+      hasSeededSlots,
+      isBookingsLoading,
+      profileScheduleDays,
+      profileScheduleEnd,
+      profileScheduleStart,
+      scheduleLoaded,
+      slots.length,
+      userId,
+    ]
+  )
+
+  useEffect(() => {
+    seedSlotsFromSchedule()
+  }, [seedSlotsFromSchedule])
   const selectedBookings = useMemo(
     () => bookingsByDate.get(selectedDateKey) ?? [],
     [bookingsByDate, selectedDateKey]
@@ -1188,6 +1199,36 @@ export const ProRequestsScreen = ({
     slotNoticeTimerRef.current = window.setTimeout(() => {
       setSlotNotice('')
     }, 2400)
+  }
+
+  const handleAutoFillSlots = () => {
+    if (!scheduleLoaded) {
+      setSlotMessage('Загружаем график...')
+      return
+    }
+    if (profileScheduleDays.length === 0) {
+      setSlotMessage('Заполните график в профиле.')
+      return
+    }
+    if (
+      profileScheduleStart === null ||
+      profileScheduleEnd === null ||
+      profileScheduleEnd <= profileScheduleStart
+    ) {
+      setSlotMessage('Проверьте время графика в профиле.')
+      return
+    }
+    if (isBookingsLoading) {
+      setSlotMessage('Загружаем записи...')
+      return
+    }
+    const added = seedSlotsFromSchedule({ force: true })
+    if (added > 0) {
+      setSlotMessage('Окна заполнены по графику.')
+    } else {
+      setSlotMessage('Свободных окон по графику нет.')
+    }
+    scrollToSlots()
   }
 
   const handleCopyLink = async () => {
@@ -2564,6 +2605,14 @@ export const ProRequestsScreen = ({
                   >
                     Добавить окна
                   </button>
+                  <button
+                    className="booking-calendar-auto"
+                    type="button"
+                    aria-label="Заполнить окна по графику"
+                    onClick={handleAutoFillSlots}
+                  >
+                    По графику
+                  </button>
                 </div>
               </section>
 
@@ -2612,7 +2661,7 @@ export const ProRequestsScreen = ({
                         На выбранный день окон нет.
                       </p>
                       <p className="pro-slots-empty-hint">
-                        Добавьте окна — они появятся в записи у клиентов.
+                        Добавьте окна вручную или заполните по графику.
                       </p>
                     </div>
                   ) : (

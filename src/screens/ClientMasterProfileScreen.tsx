@@ -34,6 +34,7 @@ import {
 } from '../utils/profileContent'
 import type { PortfolioItem } from '../utils/profileContent'
 import type { FavoriteMaster } from '../utils/favorites'
+import { normalizeScheduleDays } from '../utils/schedule'
 
 type ClientMasterProfileScreenProps = {
   apiBase: string
@@ -746,10 +747,7 @@ export const ClientMasterProfileScreen = ({
   ]
   const scheduleDays = Array.isArray(profile?.scheduleDays) ? profile?.scheduleDays : []
   const scheduleDayKeys = useMemo(
-    () =>
-      scheduleDays
-        .map((day) => day.trim().toLowerCase())
-        .filter((day) => Boolean(day)),
+    () => normalizeScheduleDays(scheduleDays),
     [scheduleDays]
   )
   const scheduleDaySet = useMemo(() => new Set(scheduleDayKeys), [scheduleDayKeys])

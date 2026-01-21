@@ -16,6 +16,7 @@ import {
 } from '../utils/profileContent'
 import type { ServiceItem } from '../utils/profileContent'
 import type { FavoriteMaster } from '../utils/favorites'
+import { normalizeScheduleDay } from '../utils/schedule'
 
 type ClientShowcaseScreenProps = {
   apiBase: string
@@ -260,21 +261,6 @@ const weekDays = [
   { id: 'sat', label: 'Сб' },
   { id: 'sun', label: 'Вс' },
 ] as const
-
-const scheduleDayAliases: Record<string, string> = {
-  пн: 'mon',
-  вт: 'tue',
-  ср: 'wed',
-  чт: 'thu',
-  пт: 'fri',
-  сб: 'sat',
-  вс: 'sun',
-}
-
-const normalizeScheduleDay = (value: string) => {
-  const normalized = value.trim().toLowerCase()
-  return scheduleDayAliases[normalized] ?? normalized
-}
 
 const formatRecencyChip = (updatedAtTs: number) => {
   if (!updatedAtTs) return 'Недавно'

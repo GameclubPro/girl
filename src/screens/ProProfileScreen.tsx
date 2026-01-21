@@ -38,6 +38,7 @@ import {
 import type { PortfolioItem, ServiceItem } from '../utils/profileContent'
 import { getProfileStatusSummary } from '../utils/profileStatus'
 import { isGeoFailure, requestPreciseLocation } from '../utils/geo'
+import { normalizeScheduleDays } from '../utils/schedule'
 
 type ProProfileScreenProps = {
   apiBase: string
@@ -1487,7 +1488,9 @@ export const ProProfileScreen = ({
             ? String(data.experienceYears)
             : ''
         const nextIsActive = data.isActive ?? true
-        const nextScheduleDays = data.scheduleDays ?? []
+        const nextScheduleDays = normalizeScheduleDays(
+          Array.isArray(data.scheduleDays) ? data.scheduleDays : []
+        )
         const nextScheduleStart = data.scheduleStart ?? ''
         const nextScheduleEnd = data.scheduleEnd ?? ''
         const nextWorksAtClient = data.worksAtClient

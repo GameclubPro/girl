@@ -1288,13 +1288,30 @@
   padding: 6px 10px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--accent-strong);
-  background: rgba(var(--accent-rgb), 0.16);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.3);
+  color: #ffffff;
+  background: var(--accent-strong);
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.2);
   cursor: pointer;
 }
 
 .booking-calendar-add:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.booking-calendar-auto {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--accent);
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.18);
+  cursor: pointer;
+}
+
+.booking-calendar-auto:focus-visible {
   outline: 3px solid rgba(var(--accent-rgb), 0.28);
   outline-offset: 2px;
 }
