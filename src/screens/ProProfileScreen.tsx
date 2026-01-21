@@ -4243,23 +4243,12 @@ export const ProProfileScreen = ({
           <div className="pro-profile-editor-shell pro-profile-settings-shell">
             <section className="pro-profile-settings-hero animate">
               <div className="pro-profile-settings-toolbar">
-                <button
-                  className="pro-profile-settings-close"
-                  type="button"
-                  onClick={closeSettings}
-                >
-                  Назад
-                </button>
                 <h2
                   className="pro-profile-settings-title"
                   id="pro-profile-settings-title"
                 >
                   Настройки профиля
                 </h2>
-                <span
-                  className="pro-profile-settings-toolbar-spacer"
-                  aria-hidden="true"
-                />
               </div>
               <div className="pro-profile-settings-identity">
                 <button
@@ -4340,6 +4329,23 @@ export const ProProfileScreen = ({
               </div>
             </section>
           </div>
+          <ProBottomNav
+            active="profile"
+            allowActiveClick
+            onCabinet={() => {
+              closeSettings()
+              onBack()
+            }}
+            onRequests={() => {
+              closeSettings()
+              onViewRequests()
+            }}
+            onChats={() => {
+              closeSettings()
+              onViewChats()
+            }}
+            onProfile={closeSettings}
+          />
         </div>
       )}
 

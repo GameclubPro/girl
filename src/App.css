@@ -11560,6 +11560,7 @@
 .pro-profile-settings-shell {
   width: min(420px, 100%);
   gap: 16px;
+  padding-bottom: calc(120px + var(--safe-bottom));
 }
 
 .pro-profile-settings-hero {
@@ -11592,34 +11593,10 @@
 }
 
 .pro-profile-settings-toolbar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
   margin-bottom: 14px;
-}
-
-.pro-profile-settings-close {
-  border: none;
-  background: rgba(var(--paper-rgb), 0.92);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--pro-ink);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  font-family: inherit;
-}
-
-.pro-profile-settings-close:focus-visible {
-  outline: 3px solid rgba(var(--accent-rgb), 0.3);
-  outline-offset: 2px;
-}
-
-.pro-profile-settings-toolbar-spacer {
-  min-width: 44px;
 }
 
 .pro-profile-settings-title {
@@ -11824,6 +11801,13 @@
   color: var(--pro-muted);
   font-size: 18px;
   font-weight: 700;
+}
+
+.pro-profile-settings-screen .pro-bottom-nav {
+  z-index: 8;
+  background: rgba(var(--paper-rgb), 0.98);
+  border-color: rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 -16px 26px rgba(var(--shadow-rgb), 0.16);
 }
 
 .pro-profile-editor-certificates {
