@@ -8129,7 +8129,11 @@
       transparent 70%
     ),
     radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.9), transparent 55%),
-    radial-gradient(circle at 90% 18%, rgba(90, 107, 255, 0.16), transparent 58%);
+    radial-gradient(
+      circle at 90% 18%,
+      rgba(var(--accent-rgb), 0.16),
+      transparent 58%
+    );
   opacity: 0.9;
 }
 
@@ -8155,7 +8159,7 @@
     rgba(255, 255, 255, 0.65),
     transparent 62%
   );
-  border-color: rgba(90, 107, 255, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.08);
 }
 
 .pro-profile-ig-stat {
@@ -8295,7 +8299,7 @@
     rgba(255, 255, 255, 0.98),
     rgba(236, 241, 255, 0.92)
   );
-  --status-bubble-border: rgba(90, 107, 255, 0.2);
+  --status-bubble-border: rgba(var(--accent-rgb), 0.2);
   --status-bubble-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.12);
 }
 
@@ -8321,11 +8325,11 @@
   background:
     radial-gradient(
       circle at 10% 0%,
-      rgba(90, 107, 255, 0.22),
+      rgba(var(--accent-rgb), 0.22),
       transparent 60%
     ),
     linear-gradient(180deg, rgba(255, 255, 255, 0.85), transparent 60%),
-    linear-gradient(180deg, transparent 60%, rgba(90, 107, 255, 0.08));
+    linear-gradient(180deg, transparent 60%, rgba(var(--accent-rgb), 0.08));
 }
 
 .pro-profile-status-head {
@@ -9174,7 +9178,7 @@
 }
 
 .screen--pro-profile .pro-profile-ig-button {
-  border-color: rgba(90, 107, 255, 0.16);
+  border-color: rgba(var(--accent-rgb), 0.16);
   background: rgba(255, 255, 255, 0.92);
   color: var(--pro-ink);
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
