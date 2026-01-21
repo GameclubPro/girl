@@ -594,8 +594,6 @@ export const ProProfileScreen = ({
     [certificates]
   )
   const certificateCount = certificateItems.length
-  const certificateCountLabel =
-    certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
   const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Показать'
   const isCertificatesCollapsed = certificateCount > 0 && !isCertificatesExpanded
   const handleCertificateImageLoad = (

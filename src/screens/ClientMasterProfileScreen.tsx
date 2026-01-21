@@ -816,8 +816,6 @@ export const ClientMasterProfileScreen = ({
     [profile]
   )
   const certificateCount = certificateItems.length
-  const certificateCountLabel =
-    certificateCount > 0 ? formatCertificateCount(certificateCount) : 'Нет сертификатов'
   const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Показать'
   const isCertificatesCollapsed = certificateCount > 0 && !isCertificatesExpanded
   const certificatesListId = `client-master-certificates-list-${masterId}`
