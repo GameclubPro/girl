@@ -8,6 +8,7 @@ import settingsGear from '../assets/settings-gear.webp'
 import profileAboutIcon from '../assets/profile-about.webp'
 import scheduleIcon from '../assets/schedule-icon.webp'
 import servicesIcon from '../assets/services-icon.webp'
+import certificatesIcon from '../assets/certificates-icon.webp'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -128,42 +129,7 @@ export const IconList = () => (
 )
 
 export const IconCertificate = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="4"
-      y="4"
-      width="16"
-      height="12.5"
-      rx="2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M8 8h8M8 11h5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-    <circle
-      cx="15.5"
-      cy="15.5"
-      r="2.2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M14.4 17.3l-1 3 2.1-1.2 2.1 1.2-1-3"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
+  <img src={certificatesIcon} alt="" aria-hidden="true" />
 )
 
 export const IconInbox = () => (
