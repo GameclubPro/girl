@@ -7985,9 +7985,7 @@
 .pro-profile-ig-stats {
   --ig-stats-radius: 22px;
   --ig-stats-bg: #ffffff;
-  --ig-stats-shadow:
-    0 26px 44px rgba(var(--shadow-rgb), 0.22),
-    0 10px 24px rgba(var(--shadow-rgb), 0.14);
+  --ig-stats-shadow: none;
   flex: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -7996,9 +7994,7 @@
   border-radius: var(--ig-stats-radius);
   background: var(--ig-stats-bg);
   border: 1px solid rgba(var(--shadow-rgb), 0.06);
-  box-shadow:
-    var(--ig-stats-shadow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: none;
   grid-column: 1 / -1;
   position: relative;
   overflow: hidden;
@@ -8114,10 +8110,7 @@
   border-radius: var(--pro-ig-card-radius);
   background: var(--pro-ig-card-bg);
   border: 1px solid var(--pro-ig-card-border);
-  box-shadow:
-    0 18px 26px rgba(var(--shadow-rgb), 0.14),
-    0 6px 14px rgba(var(--shadow-rgb), 0.08),
-    var(--pro-ig-card-inset);
+  box-shadow: none;
   overflow: hidden;
 }
 
