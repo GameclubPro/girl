@@ -7984,16 +7984,6 @@
 
 .pro-profile-ig-stats {
   --ig-stats-radius: 22px;
-  --ig-stats-shape: polygon(
-    0% 0%,
-    0% 100%,
-    100% 100%,
-    100% 0%,
-    96% 10%,
-    92% 12%,
-    8% 12%,
-    4% 10%
-  );
   --ig-stats-bg: #ffffff;
   --ig-stats-shadow: none;
   --ig-stats-border: rgba(var(--shadow-rgb), 0.08);
@@ -8011,26 +8001,11 @@
     inset 0 -16px 22px rgba(var(--shadow-rgb), 0.18);
   grid-column: 1 / -1;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   backdrop-filter: none;
-  clip-path: var(--ig-stats-shape);
 }
 
 .pro-profile-ig-stats::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.85), transparent 48%),
-    radial-gradient(circle at 88% 18%, rgba(var(--shadow-rgb), 0.14), transparent 52%),
-    radial-gradient(circle at 35% 85%, rgba(var(--shadow-rgb), 0.18), transparent 58%);
-  opacity: 0.75;
-  pointer-events: none;
-  z-index: 0;
-  clip-path: var(--ig-stats-shape);
-}
-
-.pro-profile-ig-stats::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -8041,11 +8016,37 @@
       rgba(255, 255, 255, 0.9),
       rgba(255, 255, 255, 0.2) 36%,
       transparent 60%
-    );
-  border: 1px solid rgba(var(--shadow-rgb), 0.06);
+    ),
+    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.85), transparent 48%),
+    radial-gradient(circle at 88% 18%, rgba(var(--shadow-rgb), 0.14), transparent 52%),
+    radial-gradient(circle at 35% 85%, rgba(var(--shadow-rgb), 0.18), transparent 58%);
+  opacity: 0.75;
   pointer-events: none;
   z-index: 0;
-  clip-path: var(--ig-stats-shape);
+}
+
+.pro-profile-ig-stats::after {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background:
+    radial-gradient(
+      26px 18px at 28px 22px,
+      #ffffff 0 60%,
+      rgba(var(--shadow-rgb), 0.08) 62%,
+      transparent 66%
+    ),
+    radial-gradient(
+      26px 18px at calc(100% - 28px) 22px,
+      #ffffff 0 60%,
+      rgba(var(--shadow-rgb), 0.08) 62%,
+      transparent 66%
+    );
+  pointer-events: none;
+  z-index: 0;
 }
 
 .pro-profile-ig-stat {
