@@ -7,6 +7,7 @@ import {
   IconClock,
   IconExperience,
   IconFormat,
+  IconHomeMaster,
   IconList,
   IconPin,
   IconPrice,
@@ -636,6 +637,8 @@ export const ProProfileScreen = ({
   const hasWorkFormat = worksAtClient || worksAtMaster
   const hasPrice = priceFromValue !== null || priceToValue !== null
   const hasExperience = experienceValue !== null
+  const formatIcon =
+    worksAtMaster && !worksAtClient ? <IconHomeMaster /> : <IconFormat />
   const profileFacts = [
     {
       id: 'location',
@@ -648,7 +651,7 @@ export const ProProfileScreen = ({
       id: 'format',
       label: 'Формат',
       value: workFormatLabel,
-      icon: <IconFormat />,
+      icon: formatIcon,
       isMuted: !hasWorkFormat,
     },
     {

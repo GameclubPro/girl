@@ -10,6 +10,7 @@ import {
   IconChat,
   IconExperience,
   IconFormat,
+  IconHomeMaster,
   IconHome,
   IconList,
   IconPin,
@@ -707,6 +708,12 @@ export const ClientMasterProfileScreen = ({
   const hasExperience =
     typeof profile?.experienceYears === 'number' &&
     Number.isFinite(profile.experienceYears)
+  const formatIcon =
+    profile?.worksAtMaster && !profile?.worksAtClient ? (
+      <IconHomeMaster />
+    ) : (
+      <IconFormat />
+    )
   const profileFacts = [
     {
       id: 'location',
@@ -719,7 +726,7 @@ export const ClientMasterProfileScreen = ({
       id: 'format',
       label: 'Формат',
       value: workFormatLabel,
-      icon: <IconFormat />,
+      icon: formatIcon,
       isMuted: !hasWorkFormat,
     },
     {
