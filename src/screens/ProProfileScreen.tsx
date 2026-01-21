@@ -85,9 +85,6 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
 
-const formatCertificateCount = (value: number) =>
-  formatCount(value, 'сертификат', 'сертификата', 'сертификатов')
-
 const CERTIFICATE_RATIO_MIN = 4 / 5
 const CERTIFICATE_RATIO_MAX = 4 / 3
 const clampCertificateRatio = (value: number) =>

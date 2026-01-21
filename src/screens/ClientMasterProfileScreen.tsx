@@ -103,9 +103,6 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
 
-const formatCertificateCount = (value: number) =>
-  formatCount(value, 'сертификат', 'сертификата', 'сертификатов')
-
 const buildCertificateMeta = (certificate: MasterCertificate) => {
   const parts = [certificate.issuer, certificate.year?.toString()]
     .filter((item): item is string => Boolean(item && item.trim()))
