@@ -1316,6 +1316,23 @@
   outline-offset: 2px;
 }
 
+.booking-calendar-reset {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(var(--accent-rgb), 0.75);
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
+  cursor: pointer;
+}
+
+.booking-calendar-reset:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
 .booking-calendar-summary-pill {
   border-radius: 999px;
   padding: 6px 10px;

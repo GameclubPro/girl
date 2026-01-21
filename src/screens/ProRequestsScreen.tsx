@@ -1237,6 +1237,25 @@ export const ProRequestsScreen = ({
     scrollToSlots()
   }
 
+  const handleResetLocalSlots = () => {
+    if (!userId || typeof window === 'undefined') {
+      setSlotMessage('Недоступно на этом устройстве.')
+      return
+    }
+    try {
+      window.localStorage.removeItem(buildSlotStorageKey(userId))
+      window.localStorage.removeItem(buildSlotSeedKey(userId))
+    } catch (error) {
+      // ignore storage errors
+    }
+    setSlots([])
+    setSelectedTimes([])
+    setSlotConfirm(null)
+    setSlotDetailId(null)
+    setHasSeededSlots(false)
+    handleAutoFillSlots()
+  }
+
   const handleCopyLink = async () => {
     if (!shareLink) {
       setShareMessage('Ссылка пока недоступна.')
@@ -2618,6 +2637,14 @@ export const ProRequestsScreen = ({
                     onClick={handleAutoFillSlots}
                   >
                     По графику
+                  </button>
+                  <button
+                    className="booking-calendar-reset"
+                    type="button"
+                    aria-label="Сбросить локальные окна"
+                    onClick={handleResetLocalSlots}
+                  >
+                    Сбросить
                   </button>
                 </div>
               </section>
