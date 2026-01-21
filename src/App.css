@@ -7881,9 +7881,6 @@
     #7b9bff 42%,
     #d7d8ff 100%
   );
-  clip-path: none;
-  -webkit-clip-path: none;
-  border-radius: 0 0 32px 32px;
   box-shadow: 0 18px 26px rgba(var(--shadow-rgb), 0.14);
   filter: none;
 }
