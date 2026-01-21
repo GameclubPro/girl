@@ -145,16 +145,16 @@
   width: 40px;
   height: 40px;
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.22);
-  background: #ffffff;
-  color: var(--muted);
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
   font-size: 22px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.24);
 }
 
 .request-back:focus-visible {
@@ -2240,15 +2240,16 @@
 }
 
 .booking-action {
-  border: 1px solid rgba(var(--shadow-rgb), 0.2);
-  background: #ffffff;
-  color: var(--muted);
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
   font-weight: 700;
   font-size: 12px;
   padding: 7px 10px;
   border-radius: 999px;
   cursor: pointer;
   min-height: 32px;
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
 
 .booking-action.is-primary {
@@ -2259,8 +2260,9 @@
 }
 
 .booking-action.is-ghost {
-  background: transparent;
-  color: var(--muted);
+  background: rgba(var(--accent-rgb), 0.85);
+  color: #ffffff;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
 }
 
 .booking-action:focus-visible {
@@ -2327,9 +2329,9 @@
   --pro-border: rgba(var(--shadow-rgb), 0.16);
   --pro-surface: rgba(var(--paper-rgb), 0.92);
   --pro-surface-strong: rgba(var(--paper-rgb), 0.98);
-  --pro-accent: var(--ink);
-  --pro-accent-2: var(--ink);
-  --pro-accent-3: var(--ink);
+  --pro-accent: var(--accent);
+  --pro-accent-2: #6fa3ff;
+  --pro-accent-3: #55c3ff;
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
   --pro-bottom-nav-offset: 82px;
@@ -3319,25 +3321,27 @@
 
 .pro-cabinet-nav-action {
   border-radius: 12px;
-  border: 1px solid rgba(var(--tile-accent), 0.28);
-  background: rgba(var(--paper-rgb), 0.9);
-  color: var(--pro-ink);
+  border: none;
+  background: rgba(var(--tile-accent), 0.9);
+  color: #ffffff;
   font-size: 11px;
   font-weight: 700;
   padding: 7px 10px;
   cursor: pointer;
+  box-shadow: 0 10px 16px rgba(var(--tile-accent), 0.24);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .pro-cabinet-nav-action.is-primary {
-  border: none;
-  background: rgba(var(--tile-accent), 0.88);
+  background: rgb(var(--tile-accent));
   color: #ffffff;
-  box-shadow: 0 10px 16px rgba(var(--tile-accent), 0.22);
+  box-shadow: 0 12px 18px rgba(var(--tile-accent), 0.28);
 }
 
 .pro-cabinet-nav-action.is-ghost {
-  background: rgba(var(--paper-rgb), 0.82);
+  background: rgba(var(--tile-accent), 0.78);
+  color: #ffffff;
+  box-shadow: 0 8px 12px rgba(var(--tile-accent), 0.18);
 }
 
 .pro-cabinet-nav-action:active {
@@ -3510,20 +3514,21 @@
 
 .pro-detail-action {
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.92);
-  color: var(--pro-ink);
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
   font-size: 12px;
   font-weight: 700;
   padding: 10px 12px;
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .pro-detail-action.is-ghost {
-  background: rgba(var(--paper-rgb), 0.76);
-  color: var(--pro-muted);
+  background: rgba(var(--accent-rgb), 0.85);
+  color: #ffffff;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
 }
 
 .pro-detail-action:active {
@@ -4904,15 +4909,15 @@
 }
 
 .pro-cabinet-share-action {
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.92);
+  border: none;
+  background: var(--accent);
   border-radius: 16px;
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--pro-ink);
+  color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -4924,7 +4929,9 @@
 }
 
 .pro-cabinet-share-action.is-ghost {
-  background: rgba(var(--paper-rgb), 0.88);
+  background: rgba(var(--accent-rgb), 0.85);
+  color: #ffffff;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
 }
 
 .pro-cabinet-share-action:active {
@@ -4993,12 +5000,8 @@
 }
 
 .pro-cabinet-calendar-action {
-  border: 1px solid rgba(var(--accent-rgb), 0.4);
-  background: linear-gradient(
-    160deg,
-    rgba(var(--accent-rgb), 0.18),
-    rgba(var(--paper-rgb), 0.96)
-  );
+  border: none;
+  background: var(--accent);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -5006,11 +5009,11 @@
   padding: 8px 12px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--pro-accent);
+  color: #ffffff;
   cursor: pointer;
   box-shadow:
-    0 10px 18px rgba(var(--accent-rgb), 0.12),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
+    0 10px 18px rgba(var(--accent-rgb), 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   appearance: none;
@@ -5020,19 +5023,18 @@
 }
 
 .pro-cabinet-calendar-action.is-ghost {
-  border-color: var(--pro-border);
-  color: var(--pro-ink);
-  background: rgba(var(--paper-rgb), 0.92);
+  color: #ffffff;
+  background: rgba(var(--accent-rgb), 0.85);
   box-shadow:
-    0 10px 18px rgba(var(--shadow-rgb), 0.08),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
+    0 8px 12px rgba(var(--accent-rgb), 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .pro-cabinet-calendar-action:active {
   transform: translateY(1px);
   box-shadow:
-    0 6px 12px rgba(var(--shadow-rgb), 0.08),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
+    0 6px 12px rgba(var(--accent-rgb), 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .pro-cabinet-calendar-action:focus-visible {
@@ -5675,16 +5677,16 @@
   width: 42px;
   height: 42px;
   border-radius: 16px;
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.86);
-  color: var(--pro-ink);
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
   font-size: 22px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.24);
 }
 
 .pro-back:focus-visible {
@@ -5699,14 +5701,15 @@
 }
 
 .pro-ghost {
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.7);
+  border: none;
+  background: rgba(var(--accent-rgb), 0.85);
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--pro-ink);
+  color: #ffffff;
   cursor: pointer;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -9112,15 +9115,15 @@
 }
 
 .pro-profile-ig-button {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  background: rgba(var(--paper-rgb), 0.92);
+  border: none;
+  background: var(--accent);
   border-radius: 14px;
   padding: 9px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink);
+  color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
   appearance: none;
   font-family: inherit;
   display: inline-flex;
@@ -9160,10 +9163,10 @@
 }
 
 .screen--pro-profile .pro-profile-ig-button {
-  border-color: rgba(var(--accent-rgb), 0.16);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--pro-ink);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
+  border: none;
+  background: rgba(var(--accent-rgb), 0.85);
+  color: #ffffff;
+  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.22);
 }
 
 .screen--pro-profile .pro-profile-ig-button--primary {
@@ -9825,21 +9828,17 @@
 }
 
 .pro-profile-portfolio-panel-action {
-  border: 1px solid rgba(var(--accent-rgb), 0.5);
-  background: linear-gradient(
-    160deg,
-    rgba(var(--accent-rgb), 0.18),
-    rgba(var(--paper-rgb), 0.96)
-  );
+  border: none;
+  background: var(--accent);
   border-radius: 999px;
   padding: 7px 12px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--accent-strong);
+  color: #ffffff;
   cursor: pointer;
   box-shadow:
-    0 10px 18px rgba(var(--accent-rgb), 0.12),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
+    0 10px 18px rgba(var(--accent-rgb), 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   appearance: none;
@@ -9850,17 +9849,16 @@
 }
 
 .pro-profile-portfolio-panel-action.is-primary {
-  border: none;
   color: #ffffff;
   background: var(--accent-strong);
-  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.22);
+  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.24);
 }
 
 .pro-profile-portfolio-panel-action:active {
   transform: translateY(1px);
   box-shadow:
-    0 6px 12px rgba(var(--accent-rgb), 0.1),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
+    0 6px 12px rgba(var(--accent-rgb), 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .pro-profile-portfolio-panel-action:focus-visible {
@@ -10929,15 +10927,15 @@
 }
 
 .pro-profile-action {
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: none;
+  background: var(--accent);
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--pro-ink);
+  color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
 
 .pro-profile-action:focus-visible {
@@ -13987,14 +13985,15 @@
 }
 
 .response-action {
-  border: 1px solid rgba(var(--shadow-rgb), 0.2);
-  background: #ffffff;
-  color: var(--muted);
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
   font-weight: 700;
   font-size: 11px;
   padding: 6px 10px;
   border-radius: 999px;
   cursor: pointer;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.18);
 }
 
 .response-action.is-primary {
@@ -16866,10 +16865,10 @@ h2 {
 }
 
 .cta--secondary {
-  background: #ffffff;
-  color: var(--ink);
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.14);
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
 
 .cta:disabled {
@@ -18266,14 +18265,14 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid rgba(var(--ink-rgb), 0.18);
+  border: none;
   border-radius: 20px;
   padding: 13px 16px;
   font-size: 15px;
   font-weight: 700;
-  color: var(--ink);
-  background: #ffffff;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.14);
+  color: #ffffff;
+  background: var(--accent-strong);
+  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.28);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -18298,14 +18297,15 @@ h2 {
 }
 
 .client-master-ghost {
-  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  border: none;
   border-radius: 20px;
   padding: 12px 16px;
   font-size: 14px;
   font-weight: 700;
-  color: var(--muted);
-  background: #ffffff;
+  color: #ffffff;
+  background: var(--accent);
   cursor: pointer;
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
 
 .client-master-ghost:focus-visible {
@@ -18321,9 +18321,9 @@ h2 {
   --pro-border: rgba(var(--shadow-rgb), 0.16);
   --pro-surface: rgba(var(--paper-rgb), 0.92);
   --pro-surface-strong: rgba(var(--paper-rgb), 0.98);
-  --pro-accent: var(--ink);
-  --pro-accent-2: var(--ink);
-  --pro-accent-3: var(--ink);
+  --pro-accent: var(--accent);
+  --pro-accent-2: #6fa3ff;
+  --pro-accent-3: #55c3ff;
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
   background: var(--surface);
@@ -21959,12 +21959,13 @@ h2 {
   width: 40px;
   height: 40px;
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.2);
-  background: rgba(var(--paper-rgb), 0.95);
+  border: none;
+  background: var(--accent);
   font-size: 20px;
   font-weight: 700;
-  color: var(--muted);
+  color: #ffffff;
   cursor: pointer;
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
 
 .chat-thread-title {
@@ -23145,13 +23146,14 @@ h2 {
 }
 
 .chat-quick-location-button {
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: none;
+  background: var(--accent);
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink);
+  color: #ffffff;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.18);
 }
 
 .chat-actions {
@@ -23161,19 +23163,20 @@ h2 {
 }
 
 .chat-action {
-  border: 1px solid rgba(var(--shadow-rgb), 0.2);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: none;
+  background: rgba(var(--accent-rgb), 0.85);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--muted);
+  color: #ffffff;
+  box-shadow: 0 6px 10px rgba(var(--accent-rgb), 0.16);
 }
 
 .chat-action.is-active {
-  background: rgba(var(--accent-rgb), 0.18);
-  border-color: rgba(var(--accent-rgb), 0.4);
-  color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #ffffff;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.2);
 }
 
 .chat-input-row {
@@ -23187,12 +23190,13 @@ h2 {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: none;
+  background: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
+  color: #ffffff;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.18);
 }
 
 .chat-attach svg {
@@ -23422,11 +23426,12 @@ h2 {
   border: none;
   border-radius: 999px;
   padding: 10px 16px;
-  background: #fff;
-  color: #111;
+  background: var(--accent);
+  color: #ffffff;
   font-size: 12px;
   font-weight: 700;
   align-self: flex-start;
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
 
 .story-viewer-hint {
@@ -23516,9 +23521,10 @@ h2 {
 }
 
 .pro-stories-upload-button.is-secondary {
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--accent-rgb), 0.85);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.16);
 }
 
 .pro-stories-input {
