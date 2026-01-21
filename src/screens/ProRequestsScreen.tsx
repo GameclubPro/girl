@@ -466,6 +466,7 @@ type ProRequestsScreenProps = {
   userId: string
   initialTab?: 'requests' | 'bookings'
   onBack: () => void
+  onViewCabinet?: () => void
   onEditProfile: (section?: ProProfileSection) => void
   onViewChats: () => void
   onOpenChat: (chatId: number) => void
@@ -476,6 +477,7 @@ export const ProRequestsScreen = ({
   userId,
   initialTab,
   onBack,
+  onViewCabinet,
   onEditProfile,
   onViewChats,
   onOpenChat,
@@ -3113,7 +3115,7 @@ export const ProRequestsScreen = ({
 
       <ProBottomNav
         active="requests"
-        onCabinet={onBack}
+        onCabinet={onViewCabinet ?? onBack}
         onRequests={() => setActiveTab('requests')}
         onChats={onViewChats}
         onProfile={() => onEditProfile()}

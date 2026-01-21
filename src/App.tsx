@@ -1476,6 +1476,7 @@ function App() {
         userId={userId}
         initialTab={proRequestsInitialTab}
         onBack={() => goBack('pro-cabinet')}
+        onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onEditProfile={(section) => {
           openProProfile({ section: section ?? null })
         }}
