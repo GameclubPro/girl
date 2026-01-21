@@ -8114,7 +8114,10 @@
   border-radius: var(--pro-ig-card-radius);
   background: var(--pro-ig-card-bg);
   border: 1px solid var(--pro-ig-card-border);
-  box-shadow: var(--pro-ig-card-shadow), var(--pro-ig-card-inset);
+  box-shadow:
+    0 18px 26px rgba(var(--shadow-rgb), 0.14),
+    0 6px 14px rgba(var(--shadow-rgb), 0.08),
+    var(--pro-ig-card-inset);
   overflow: hidden;
 }
 
