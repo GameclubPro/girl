@@ -349,28 +349,10 @@ export const ClientRequestsScreen = ({
       .sort((a, b) => a.timeMs - b.timeMs)
   }, [bookingItems])
   const bookingSummaryByDate = useMemo(() => {
-    const map = new Map<
-      string,
-      { count: number; hasConfirmed: boolean; hasCancelled: boolean; hasOther: boolean }
-    >()
+    const map = new Map<string, { count: number }>()
     bookingCalendarItems.forEach((item) => {
-      const current = map.get(item.dateKey) ?? {
-        count: 0,
-        hasConfirmed: false,
-        hasCancelled: false,
-        hasOther: false,
-      }
+      const current = map.get(item.dateKey) ?? { count: 0 }
       current.count += 1
-      if (item.booking.status === 'confirmed') {
-        current.hasConfirmed = true
-      } else if (
-        item.booking.status === 'cancelled' ||
-        item.booking.status === 'declined'
-      ) {
-        current.hasCancelled = true
-      } else {
-        current.hasOther = true
-      }
       map.set(item.dateKey, current)
     })
     return map
@@ -762,17 +744,6 @@ export const ClientRequestsScreen = ({
                     const dayKey = toDateKey(day)
                     const summary = bookingSummaryByDate.get(dayKey)
                     const count = summary?.count ?? 0
-                    const countTone = summary
-                      ? summary.hasConfirmed && summary.hasCancelled
-                        ? 'is-mixed'
-                        : summary.hasCancelled
-                          ? 'is-cancelled'
-                          : summary.hasConfirmed
-                            ? 'is-confirmed'
-                            : summary.hasOther
-                              ? 'is-waiting'
-                              : ''
-                      : ''
                     const isSelected = dayKey === selectedDateKey
                     const isToday = dayKey === todayKey
                     return (
@@ -793,13 +764,7 @@ export const ClientRequestsScreen = ({
                           {day.getDate()}
                         </span>
                         {count > 0 && (
-                          <span
-                            className={`booking-calendar-day-count${
-                              countTone ? ` ${countTone}` : ''
-                            }`}
-                          >
-                            {count}
-                          </span>
+                          <span className="booking-calendar-day-count">{count}</span>
                         )}
                       </button>
                     )

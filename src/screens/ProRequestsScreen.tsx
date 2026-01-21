@@ -821,28 +821,10 @@ export const ProRequestsScreen = ({
       .sort((a, b) => a.timeMs - b.timeMs)
   }, [confirmedBookingItems])
   const bookingSummaryByDate = useMemo(() => {
-    const map = new Map<
-      string,
-      { count: number; hasConfirmed: boolean; hasCancelled: boolean; hasOther: boolean }
-    >()
+    const map = new Map<string, { count: number }>()
     bookingCalendarItems.forEach((item) => {
-      const current = map.get(item.dateKey) ?? {
-        count: 0,
-        hasConfirmed: false,
-        hasCancelled: false,
-        hasOther: false,
-      }
+      const current = map.get(item.dateKey) ?? { count: 0 }
       current.count += 1
-      if (item.booking.status === 'confirmed') {
-        current.hasConfirmed = true
-      } else if (
-        item.booking.status === 'cancelled' ||
-        item.booking.status === 'declined'
-      ) {
-        current.hasCancelled = true
-      } else {
-        current.hasOther = true
-      }
       map.set(item.dateKey, current)
     })
     return map
@@ -1000,14 +982,6 @@ export const ProRequestsScreen = ({
     slotsByDate,
     userId,
   ])
-  const freeSlotsByDate = useMemo(() => {
-    const map = new Map<string, number>()
-    slots.forEach((slot) => {
-      if (slot.status !== 'free') return
-      map.set(slot.dateKey, (map.get(slot.dateKey) ?? 0) + 1)
-    })
-    return map
-  }, [slots])
   const selectedBookings = useMemo(
     () => bookingsByDate.get(selectedDateKey) ?? [],
     [bookingsByDate, selectedDateKey]
@@ -2543,8 +2517,7 @@ export const ProRequestsScreen = ({
                   {weekDays.map((day, index) => {
                     const dayKey = toDateKey(day)
                     const summary = bookingSummaryByDate.get(dayKey)
-                    const hasBooked = (summary?.count ?? 0) > 0
-                    const freeCount = freeSlotsByDate.get(dayKey) ?? 0
+                    const bookingCount = summary?.count ?? 0
                     const isSelected = dayKey === selectedDateKey
                     const isToday = dayKey === todayKey
                     return (
@@ -2564,13 +2537,10 @@ export const ProRequestsScreen = ({
                         <span className="booking-calendar-day-number">
                           {day.getDate()}
                         </span>
-                        {freeCount > 0 && (
+                        {bookingCount > 0 && (
                           <span className="booking-calendar-day-count">
-                            {freeCount}
+                            {bookingCount}
                           </span>
-                        )}
-                        {hasBooked && (
-                          <span className="booking-calendar-day-dot" aria-hidden="true" />
                         )}
                       </button>
                     )
