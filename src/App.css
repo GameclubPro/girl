@@ -1254,6 +1254,9 @@
 }
 
 .booking-calendar-day-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   min-width: 18px;
   height: 18px;
   border-radius: 999px;
@@ -1263,10 +1266,11 @@
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  background: rgba(var(--accent-rgb), 0.85);
+  background: #ff3b30;
   color: #ffffff;
-  border: 1px solid rgba(var(--accent-rgb), 0.65);
-  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.18);
+  border: 1px solid rgba(255, 59, 48, 0.7);
+  box-shadow: 0 8px 12px rgba(255, 59, 48, 0.35);
+  line-height: 1;
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-name,
@@ -1275,13 +1279,8 @@
 }
 
 .booking-calendar-day.is-selected .booking-calendar-day-count {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: #ff3b30;
-  color: #ffffff;
-  border-color: rgba(255, 59, 48, 0.7);
-  box-shadow: 0 8px 12px rgba(255, 59, 48, 0.35);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.18);
 }
 
 .booking-calendar-summary {
