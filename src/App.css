@@ -7984,15 +7984,10 @@
 
 .pro-profile-ig-stats {
   --ig-stats-radius: 22px;
-  --ig-stats-bg: linear-gradient(
-    145deg,
-    rgba(var(--paper-rgb), 0.99),
-    rgba(var(--surface-muted-rgb), 0.9) 55%,
-    rgba(var(--accent-rgb), 0.06) 100%
-  );
+  --ig-stats-bg: #ffffff;
   --ig-stats-shadow:
-    0 24px 36px rgba(var(--shadow-rgb), 0.18),
-    0 12px 28px rgba(var(--accent-rgb), 0.08);
+    0 26px 44px rgba(var(--shadow-rgb), 0.22),
+    0 10px 24px rgba(var(--shadow-rgb), 0.14);
   flex: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -8000,56 +7995,22 @@
   padding: 12px;
   border-radius: var(--ig-stats-radius);
   background: var(--ig-stats-bg);
-  border: none;
+  border: 1px solid rgba(var(--shadow-rgb), 0.06);
   box-shadow:
     var(--ig-stats-shadow),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.85),
-    inset 0 -1px 0 rgba(var(--shadow-rgb), 0.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   grid-column: 1 / -1;
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
 }
 
 .pro-profile-ig-stats::before {
-  content: '';
-  position: absolute;
-  inset: -60% -30% auto -30%;
-  height: 130%;
-  background:
-    radial-gradient(
-      circle at 18% 18%,
-      rgba(var(--accent-rgb), 0.32),
-      transparent 55%
-    ),
-    radial-gradient(
-      circle at 90% 12%,
-      rgba(var(--accent-rgb), 0.18),
-      transparent 48%
-    );
-  opacity: 0.95;
-  pointer-events: none;
-  z-index: 0;
+  content: none;
 }
 
 .pro-profile-ig-stats::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(var(--paper-rgb), 0.65),
-      transparent 55%
-    ),
-    radial-gradient(
-      circle at 50% 120%,
-      rgba(var(--accent-rgb), 0.22),
-      transparent 60%
-    );
-  opacity: 0.75;
-  pointer-events: none;
-  z-index: 0;
+  content: none;
 }
 
 .pro-profile-ig-stat {
