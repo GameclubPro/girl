@@ -1111,7 +1111,7 @@
 
 .booking-calendar-card {
   border-radius: 22px;
-  padding: 14px;
+  padding: 12px;
   background: rgba(var(--paper-rgb), 0.92);
   border: 1px solid rgba(var(--paper-rgb), 0.78);
   box-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.14);
@@ -1119,7 +1119,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .booking-calendar-card::before {
@@ -1136,7 +1136,7 @@
 .booking-calendar-top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   position: relative;
   z-index: 1;
 }
@@ -1177,15 +1177,17 @@
 }
 
 .booking-calendar-month-label {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
 }
 
 .booking-calendar-range {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink);
 }
@@ -1193,21 +1195,22 @@
 .booking-calendar-week {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 7px;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 6px;
   position: relative;
   z-index: 1;
 }
 
 .booking-calendar-day {
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid rgba(var(--shadow-rgb), 0.1);
   background: rgba(var(--paper-rgb), 0.96);
-  padding: 9px 4px 8px;
+  padding: 7px 4px 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  min-height: 68px;
+  gap: 2px;
+  min-height: 54px;
   cursor: pointer;
   font-family: inherit;
   appearance: none;
@@ -1233,29 +1236,29 @@
 }
 
 .booking-calendar-day-name {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .booking-calendar-day-number {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
 }
 
 .booking-calendar-day-count {
-  min-width: 20px;
-  height: 20px;
+  min-width: 18px;
+  height: 18px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 5px;
+  padding: 0 4px;
   background: rgba(var(--accent-rgb), 0.85);
   color: #ffffff;
   border: 1px solid rgba(var(--accent-rgb), 0.65);
@@ -1277,7 +1280,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   position: relative;
   z-index: 1;
 }
@@ -1301,10 +1304,10 @@
 
 .booking-calendar-summary-pill {
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 10px;
+  padding: 5px 9px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   background: rgba(var(--paper-rgb), 0.95);
   border: 1px solid rgba(var(--shadow-rgb), 0.1);
@@ -1312,7 +1315,7 @@
 }
 
 .booking-calendar-summary-date {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--ink);
 }

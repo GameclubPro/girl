@@ -49,6 +49,7 @@ const bookingStatusToneMap = {
 } as const
 
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const
+const CALENDAR_RANGE_DAYS = 14
 const twelveHoursMs = 12 * 60 * 60 * 1000
 
 const formatDateTime = (value?: string | null) => {
@@ -162,11 +163,31 @@ const formatLongDate = (value: Date) =>
     month: 'long',
   }).format(value)
 
-const formatMonthTitle = (value: Date) =>
-  new Intl.DateTimeFormat('ru-RU', {
+const formatMonthTitle = (value: Date) => {
+  const raw = new Intl.DateTimeFormat('ru-RU', {
     month: 'long',
     year: 'numeric',
   }).format(value)
+  return raw.replace(/\s?г\.?$/i, '').toUpperCase()
+}
+
+const formatMonthTag = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', { month: 'short' })
+    .format(value)
+    .replace('.', '')
+    .toUpperCase()
+
+const formatMonthRangeTitle = (start: Date, end: Date) => {
+  const sameMonth =
+    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
+  if (sameMonth) return formatMonthTitle(start)
+  const startLabel = formatMonthTag(start)
+  const endLabel = formatMonthTag(end)
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${startLabel} — ${endLabel} ${start.getFullYear()}`
+  }
+  return `${startLabel} ${start.getFullYear()} — ${endLabel} ${end.getFullYear()}`
+}
 
 const getInitials = (value: string) => {
   const normalized = value.trim()
@@ -374,15 +395,26 @@ export const ClientRequestsScreen = ({
     () => bookingsByDate.get(selectedDateKey) ?? [],
     [bookingsByDate, selectedDateKey]
   )
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, index) => addDays(weekStartDate, index)),
+  const calendarDays = useMemo(
+    () =>
+      Array.from({ length: CALENDAR_RANGE_DAYS }, (_, index) =>
+        addDays(weekStartDate, index)
+      ),
     [weekStartDate]
   )
-  const weekRangeLabel = useMemo(() => {
-    const weekEnd = addDays(weekStartDate, 6)
-    return `${formatDayMonth(weekStartDate)} — ${formatDayMonth(weekEnd)}`
-  }, [weekStartDate])
-  const monthLabel = useMemo(() => formatMonthTitle(weekStartDate), [weekStartDate])
+  const calendarRangeEnd = useMemo(
+    () => addDays(weekStartDate, CALENDAR_RANGE_DAYS - 1),
+    [weekStartDate]
+  )
+  const calendarRangeLabel = useMemo(
+    () =>
+      `${formatDayMonth(weekStartDate)} — ${formatDayMonth(calendarRangeEnd)}`,
+    [calendarRangeEnd, weekStartDate]
+  )
+  const monthLabel = useMemo(
+    () => formatMonthRangeTitle(weekStartDate, calendarRangeEnd),
+    [calendarRangeEnd, weekStartDate]
+  )
   const selectedDateLabel = useMemo(
     () => formatLongDate(selectedDate),
     [selectedDate]
@@ -409,9 +441,9 @@ export const ClientRequestsScreen = ({
     setCalendarInitialized(true)
   }
 
-  const handleShiftWeek = (direction: number) => {
-    setWeekStartDate((current) => addDays(current, direction * 7))
-    setSelectedDate((current) => addDays(current, direction * 7))
+  const handleShiftRange = (direction: number) => {
+    setWeekStartDate((current) => addDays(current, direction * CALENDAR_RANGE_DAYS))
+    setSelectedDate((current) => addDays(current, direction * CALENDAR_RANGE_DAYS))
     setCalendarInitialized(true)
   }
 
@@ -718,8 +750,8 @@ export const ClientRequestsScreen = ({
                 <button
                   className="booking-calendar-nav"
                   type="button"
-                  aria-label="Предыдущая неделя"
-                  onClick={() => handleShiftWeek(-1)}
+                  aria-label="Предыдущие две недели"
+                  onClick={() => handleShiftRange(-1)}
                 >
                   ‹
                 </button>
@@ -727,20 +759,22 @@ export const ClientRequestsScreen = ({
                   <span className="booking-calendar-month-label">
                     {monthLabel}
                   </span>
-                  <span className="booking-calendar-range">{weekRangeLabel}</span>
+                  <span className="booking-calendar-range">
+                    {calendarRangeLabel}
+                  </span>
                 </div>
                 <button
                   className="booking-calendar-nav"
                   type="button"
-                  aria-label="Следующая неделя"
-                  onClick={() => handleShiftWeek(1)}
+                  aria-label="Следующие две недели"
+                  onClick={() => handleShiftRange(1)}
                 >
                   ›
                 </button>
               </div>
 
                 <div className="booking-calendar-week" role="tablist">
-                  {weekDays.map((day, index) => {
+                  {calendarDays.map((day, index) => {
                     const dayKey = toDateKey(day)
                     const summary = bookingSummaryByDate.get(dayKey)
                     const count = summary?.count ?? 0
@@ -758,7 +792,7 @@ export const ClientRequestsScreen = ({
                       onClick={() => handleSelectDate(day)}
                     >
                       <span className="booking-calendar-day-name">
-                        {weekDayLabels[index]}
+                        {weekDayLabels[index % weekDayLabels.length]}
                       </span>
                         <span className="booking-calendar-day-number">
                           {day.getDate()}
