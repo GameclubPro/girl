@@ -3,6 +3,7 @@ import priceTag from '../assets/price-tag.webp'
 import experienceIcon from '../assets/experience-icon.webp'
 import workFormatIcon from '../assets/work-format.webp'
 import homeMasterIcon from '../assets/home-master.webp'
+import clientVisitIcon from '../assets/client-visit.webp'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -310,6 +311,10 @@ export const IconFormat = () => (
 
 export const IconHomeMaster = () => (
   <img src={homeMasterIcon} alt="" aria-hidden="true" />
+)
+
+export const IconClientVisit = () => (
+  <img src={clientVisitIcon} alt="" aria-hidden="true" />
 )
 
 export const IconClock = () => (

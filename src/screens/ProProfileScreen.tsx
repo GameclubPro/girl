@@ -5,6 +5,7 @@ import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
   IconClock,
+  IconClientVisit,
   IconExperience,
   IconFormat,
   IconHomeMaster,
@@ -638,7 +639,11 @@ export const ProProfileScreen = ({
   const hasPrice = priceFromValue !== null || priceToValue !== null
   const hasExperience = experienceValue !== null
   const formatIcon =
-    worksAtMaster && !worksAtClient ? <IconHomeMaster /> : <IconFormat />
+    worksAtMaster && !worksAtClient
+      ? <IconHomeMaster />
+      : worksAtClient && !worksAtMaster
+        ? <IconClientVisit />
+        : <IconFormat />
   const profileFacts = [
     {
       id: 'location',

@@ -8,6 +8,7 @@ import {
 } from 'react'
 import {
   IconChat,
+  IconClientVisit,
   IconExperience,
   IconFormat,
   IconHomeMaster,
@@ -711,6 +712,8 @@ export const ClientMasterProfileScreen = ({
   const formatIcon =
     profile?.worksAtMaster && !profile?.worksAtClient ? (
       <IconHomeMaster />
+    ) : profile?.worksAtClient && !profile?.worksAtMaster ? (
+      <IconClientVisit />
     ) : (
       <IconFormat />
     )
