@@ -8363,10 +8363,10 @@
 
 .pro-profile-fact-card {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: var(--pro-ig-card-radius-sm);
   background: rgba(var(--paper-rgb), 0.86);
   border: 1px solid rgba(var(--shadow-rgb), 0.08);
@@ -8390,9 +8390,9 @@
 }
 
 .pro-profile-fact-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8405,14 +8405,15 @@
 }
 
 .screen--pro-profile .pro-profile-fact-icon {
-  background: rgba(var(--accent-rgb), 0.12);
-  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  background: transparent;
+  border: none;
   color: var(--pro-accent);
+  box-shadow: none;
 }
 
 .screen--pro-profile .pro-profile-fact-card.is-muted .pro-profile-fact-icon {
-  background: rgba(120, 130, 165, 0.12);
-  border-color: rgba(120, 130, 165, 0.2);
+  background: transparent;
+  border: none;
   color: var(--pro-muted);
 }
 
@@ -20668,15 +20669,15 @@ h2 {
   }
 
   .pro-profile-fact-card {
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: 32px minmax(0, 1fr);
     gap: 6px;
-    padding: 7px 8px;
+    padding: 5px 8px;
   }
 
   .pro-profile-fact-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 9px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
   }
 
   .pro-profile-fact-icon svg,
