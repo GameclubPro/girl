@@ -6675,9 +6675,11 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.pro-service-settings svg {
+.pro-service-settings svg,
+.pro-service-settings img {
   width: 16px;
   height: 16px;
+  object-fit: contain;
 }
 
 
@@ -9112,9 +9114,11 @@
   justify-content: center;
 }
 
-.pro-profile-ig-button-icon svg {
+.pro-profile-ig-button-icon svg,
+.pro-profile-ig-button-icon img {
   width: 16px;
   height: 16px;
+  object-fit: contain;
 }
 
 .pro-profile-ig-button-label {
@@ -9170,9 +9174,11 @@
   height: 24px;
 }
 
-.screen--pro .pro-profile-ig-button--fab .pro-profile-ig-button-icon svg {
+.screen--pro .pro-profile-ig-button--fab .pro-profile-ig-button-icon svg,
+.screen--pro .pro-profile-ig-button--fab .pro-profile-ig-button-icon img {
   width: 24px;
   height: 24px;
+  object-fit: contain;
 }
 
 
