@@ -4173,7 +4173,6 @@ export const ProProfileScreen = ({
         >
           <div className="pro-profile-editor-shell">
             <div className="pro-profile-settings-head">
-              <p className="pro-profile-settings-kicker">Профиль</p>
               <div className="pro-profile-settings-title-row">
                 <h2
                   className="pro-profile-settings-title"
@@ -4181,17 +4180,7 @@ export const ProProfileScreen = ({
                 >
                   Настройки
                 </h2>
-                <button
-                  className="pro-profile-settings-close"
-                  type="button"
-                  onClick={closeSettings}
-                >
-                  Закрыть
-                </button>
               </div>
-              <p className="pro-profile-settings-subtitle">
-                Выберите раздел для редактирования.
-              </p>
             </div>
             <div className="pro-profile-editor-card pro-profile-settings-card">
               <div className="pro-profile-settings-list" role="list">
