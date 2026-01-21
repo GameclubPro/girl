@@ -7984,6 +7984,20 @@
 
 .pro-profile-ig-stats {
   --ig-stats-radius: 22px;
+  --ig-stats-shape: polygon(
+    0% 16%,
+    6% 0%,
+    42% 0%,
+    48% 7%,
+    52% 7%,
+    58% 0%,
+    94% 0%,
+    100% 16%,
+    100% 84%,
+    94% 100%,
+    8% 100%,
+    0% 86%
+  );
   --ig-stats-bg: #ffffff;
   --ig-stats-shadow: none;
   --ig-stats-border: rgba(var(--shadow-rgb), 0.08);
@@ -8003,6 +8017,7 @@
   position: relative;
   overflow: hidden;
   backdrop-filter: none;
+  clip-path: var(--ig-stats-shape);
 }
 
 .pro-profile-ig-stats::before {
@@ -8016,6 +8031,7 @@
   opacity: 0.75;
   pointer-events: none;
   z-index: 0;
+  clip-path: var(--ig-stats-shape);
 }
 
 .pro-profile-ig-stats::after {
@@ -8033,6 +8049,7 @@
   border: 1px solid rgba(var(--shadow-rgb), 0.06);
   pointer-events: none;
   z-index: 0;
+  clip-path: var(--ig-stats-shape);
 }
 
 .pro-profile-ig-stat {
