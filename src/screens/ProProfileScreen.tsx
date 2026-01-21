@@ -2741,7 +2741,7 @@ export const ProProfileScreen = ({
   }
 
   return (
-    <div className="screen screen--pro">
+    <div className="screen screen--pro screen--pro-profile">
       <div className="pro-shell pro-shell--ig">
         <section className="pro-profile-ig animate delay-1">
           <div
@@ -2856,9 +2856,15 @@ export const ProProfileScreen = ({
                   className={`pro-profile-ig-status${isActive ? '' : ' is-paused'}`}
                   type="button"
                   onClick={() => setIsActive((current) => !current)}
+                  aria-pressed={isActive}
                 >
-                  <span className="pro-profile-social-dot" aria-hidden="true" />
-                  {isActive ? 'Принимаю заявки' : 'Пауза'}
+                  <span className="pro-profile-ig-status-toggle" aria-hidden="true">
+                    <span className="pro-profile-ig-status-knob" />
+                  </span>
+                  <span className="pro-profile-ig-status-label">
+                    {isActive ? 'Принимаю заявки' : 'Пауза'}
+                  </span>
+                  <span className="pro-profile-ig-status-chevron" aria-hidden="true" />
                 </button>
               </div>
               <p
