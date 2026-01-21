@@ -550,7 +550,11 @@ export const ProRequestsScreen = ({
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
     const seedKey = buildSlotSeedKey(userId)
-    setHasSeededSlots(window.localStorage.getItem(seedKey) === '1')
+    try {
+      setHasSeededSlots(window.localStorage.getItem(seedKey) === '1')
+    } catch (error) {
+      setHasSeededSlots(false)
+    }
   }, [userId])
   const shareText =
     'Запись к мастеру\nОткройте ссылку, чтобы выбрать услугу и время.'
@@ -944,7 +948,11 @@ export const ProRequestsScreen = ({
       )
       if (availableCount <= 0) return 0
 
-      window.localStorage.setItem(buildSlotSeedKey(userId), '1')
+      try {
+        window.localStorage.setItem(buildSlotSeedKey(userId), '1')
+      } catch (error) {
+        // ignore storage errors
+      }
       setHasSeededSlots(true)
 
       let added = 0
@@ -2646,6 +2654,11 @@ export const ProRequestsScreen = ({
                   >
                     Сбросить
                   </button>
+                  {slotNotice && (
+                    <span className="booking-calendar-notice" role="status">
+                      {slotNotice}
+                    </span>
+                  )}
                 </div>
               </section>
 
