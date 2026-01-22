@@ -7,6 +7,7 @@ This repository is a Telegram Mini App for smartphones only.
 - Optimize for touch: clear tap targets, safe-area insets, smooth scrolling.
 - Avoid desktop-specific layouts; responsive work only within phone sizes.
 - Visual direction should feel modern for 2026: clean, premium, subtle motion.
+- Editor screens should rely on Telegram UI for back navigation; do not add custom back buttons.
 
 ## Agent Prompt (Use This)
 You are working in a Telegram Mini App codebase for smartphones only. Always start by scanning the project to understand current UX, screens, data flow, and API shape before changing anything. When a task is given:

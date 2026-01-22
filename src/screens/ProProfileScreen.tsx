@@ -4522,14 +4522,6 @@ export const ProProfileScreen = ({
           aria-modal="true"
           aria-label={editorTitle}
         >
-          <button
-            className="pro-profile-editor-back pro-profile-editor-back-floating"
-            type="button"
-            onClick={closeEditor}
-            aria-label={`Назад к настройкам: ${editorTitle}`}
-          >
-            Назад
-          </button>
           <div className="pro-profile-editor-shell">
             <section className="pro-profile-editor-card">
               {editingSection === 'media' && (

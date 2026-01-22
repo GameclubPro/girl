@@ -11301,22 +11301,6 @@
   gap: 12px;
 }
 
-.pro-profile-editor-back {
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.92);
-  border-radius: 12px;
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--pro-ink);
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.pro-profile-editor-back:focus-visible {
-  outline: 3px solid rgba(var(--accent-rgb), 0.3);
-  outline-offset: 2px;
-}
 
 .pro-profile-editor-title-block {
   display: flex;
@@ -24867,51 +24851,6 @@ h2 {
 
 .pro-profile-editor-screen[data-editor-section] .pro-profile-editor-shell {
   gap: 12px;
-  padding-top: 36px;
-}
-
-.pro-profile-editor-screen[data-editor-section] .pro-profile-editor-head {
-  padding: 10px 12px;
-  border-radius: 18px;
-  background: rgba(var(--paper-rgb), 0.92);
-  border: 1px solid rgba(var(--shadow-rgb), 0.1);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.pro-profile-editor-screen[data-editor-section] .pro-profile-editor-back {
-  border: none;
-  background: rgba(var(--accent-rgb), 0.12);
-  color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.18);
-}
-
-.pro-profile-editor-screen[data-editor-section] .pro-profile-editor-back-floating {
-  position: fixed;
-  top: calc(10px + var(--safe-top) + var(--tg-top-offset));
-  left: 16px;
-  z-index: 70;
-  border-radius: 999px;
-  padding: 8px 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(var(--paper-rgb), 0.92);
-  color: var(--pro-ink);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.pro-profile-editor-screen[data-editor-section]
-  .pro-profile-editor-back-floating:focus-visible {
-  outline: 3px solid rgba(var(--accent-rgb), 0.3);
-  outline-offset: 2px;
-}
-
-.pro-profile-editor-screen[data-editor-section] .pro-profile-editor-back-floating:active {
-  transform: translateY(1px);
 }
 
 .pro-profile-editor-screen[data-editor-section] .pro-profile-editor-title {
@@ -25131,6 +25070,30 @@ h2 {
     radial-gradient(120% 120% at 0% 0%, rgba(var(--accent-rgb), 0.14), transparent
         60%),
     rgba(var(--paper-rgb), 0.92);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.pro-profile-editor-screen[data-editor-section="certificates"]
+  .pro-profile-editor-highlight-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.pro-profile-editor-screen[data-editor-section="certificates"]
+  .pro-profile-editor-highlight-icon svg,
+.pro-profile-editor-screen[data-editor-section="certificates"]
+  .pro-profile-editor-highlight-icon img {
+  width: 16px;
+  height: 16px;
+}
+
+.pro-profile-editor-screen[data-editor-section="certificates"]
+  .pro-profile-editor-highlight-pill {
+  grid-column: 1 / -1;
+  justify-self: flex-start;
+  margin-top: 6px;
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
