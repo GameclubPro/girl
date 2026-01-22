@@ -25076,17 +25076,18 @@ h2 {
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-highlight-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 0;
+  background: transparent;
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-highlight-icon svg,
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-highlight-icon img {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
