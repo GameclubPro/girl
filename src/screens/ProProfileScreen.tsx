@@ -617,10 +617,6 @@ export const ProProfileScreen = ({
   const missingPrimary = missingFieldList.slice(0, 2).join(' • ')
   const missingExtra =
     missingFieldList.length > 2 ? ` + ещё ${missingFieldList.length - 2}` : ''
-  const missingSummary =
-    missingFieldList.length > 0
-      ? `Нужно заполнить: ${missingPrimary}${missingExtra}`
-      : 'Профиль заполнен — клиенты видят вас полностью.'
   const progressStyle = {
     '--progress-value': `${profileCompletion}%`,
   } as CSSProperties
