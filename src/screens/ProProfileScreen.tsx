@@ -4517,6 +4517,7 @@ export const ProProfileScreen = ({
           className={`pro-profile-editor-screen${
             editingSection === 'services' ? ' is-inline-save' : ''
           }`}
+          data-editor-section={editingSection}
           role="dialog"
           aria-modal="true"
         >
