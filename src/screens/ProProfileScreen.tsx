@@ -4390,12 +4390,9 @@ export const ProProfileScreen = ({
             </section>
             <section className="pro-profile-settings-summary animate delay-1">
               <div className="pro-profile-settings-summary-head">
-                <div>
+                <div className="pro-profile-settings-summary-info">
                   <p className="pro-profile-settings-kicker">Готовность профиля</p>
                   <div className="pro-profile-settings-progress-row">
-                    <span className="pro-profile-settings-progress-value">
-                      {profileCompletion}%
-                    </span>
                     <span
                       className={`pro-profile-settings-status ${profileStatusTone}`}
                     >
@@ -4406,8 +4403,11 @@ export const ProProfileScreen = ({
                 <div
                   className="pro-profile-settings-progress-ring"
                   style={progressStyle}
-                  aria-hidden="true"
-                />
+                >
+                  <span className="pro-profile-settings-progress-value">
+                    {profileCompletion}%
+                  </span>
+                </div>
               </div>
               <div
                 className="pro-profile-settings-progress-bar"
