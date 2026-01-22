@@ -25076,8 +25076,8 @@ h2 {
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-highlight-icon {
-  width: 42px;
-  height: 42px;
+  width: 60px;
+  height: 60px;
   border-radius: 0;
   background: transparent;
 }
@@ -25086,8 +25086,8 @@ h2 {
   .pro-profile-editor-highlight-icon svg,
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-highlight-icon img {
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
