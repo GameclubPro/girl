@@ -845,29 +845,6 @@ export const ClientMasterProfileScreen = ({
   const previewTagRemainder = previewTagSource.length - previewTags.length
   const isActive = Boolean(profile?.isActive ?? true)
   const statusLabel = isActive ? 'Запись открыта' : 'Пауза'
-  const heroTags = categoryLabels.slice(0, 2)
-  const heroTagRemainder = Math.max(0, categoryLabels.length - heroTags.length)
-  const heroHighlights = [
-    {
-      id: 'location',
-      label: locationLabel,
-      icon: <IconPin />,
-      isVisible: hasLocation || Boolean(distanceLabel),
-    },
-    {
-      id: 'format',
-      label: workFormatLabel,
-      icon: formatIcon,
-      isVisible: hasWorkFormat,
-    },
-    {
-      id: 'price',
-      label: priceLabel,
-      icon: <IconPrice />,
-      isVisible: hasPrice,
-    },
-  ]
-  const visibleHeroHighlights = heroHighlights.filter((item) => item.isVisible)
   const certificateItems = useMemo(
     () =>
       (Array.isArray(profile?.certificates) ? profile?.certificates : []).filter(
@@ -1013,7 +990,7 @@ export const ClientMasterProfileScreen = ({
           </div>
         ) : profile ? (
           <>
-            <section className="pro-profile-ig client-master-hero animate delay-1">
+            <section className="pro-profile-ig animate delay-1">
               <div
                 className={`pro-profile-ig-cover${coverUrl ? ' has-image' : ''}`}
                 style={
@@ -1023,14 +1000,13 @@ export const ClientMasterProfileScreen = ({
                 }
               >
                 <div className="pro-profile-ig-cover-glow" aria-hidden="true" />
-                <div className="client-master-hero-sheen" aria-hidden="true" />
                 {!coverUrl && (
                   <span className="master-profile-cover-fallback" aria-hidden="true">
                     {initials}
                   </span>
                 )}
               </div>
-              <div className="pro-profile-ig-header client-master-hero-header">
+              <div className="pro-profile-ig-header">
                 <div className="pro-profile-ig-avatar">
                   {profile.avatarUrl ? (
                     <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
@@ -1038,67 +1014,46 @@ export const ClientMasterProfileScreen = ({
                     <span aria-hidden="true">{initials}</span>
                   )}
                 </div>
-                <div className="client-master-hero-main">
-                  <div className="client-master-hero-name-row">
-                    <h1 className="pro-profile-ig-name">{displayName}</h1>
-                    <span
-                      className={`client-master-hero-status${
-                        isActive ? ' is-active' : ' is-paused'
-                      }`}
-                    >
-                      {statusLabel}
+                <div className="pro-profile-ig-name-row">
+                  <h1 className="pro-profile-ig-name">{displayName}</h1>
+                  <button
+                    className={`pro-profile-ig-button master-profile-follow-button master-profile-follow-inline${
+                      isFavorite ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    onClick={() => onToggleFavorite(favoritePayload)}
+                    aria-label={followAriaLabel}
+                  >
+                    <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                      {isFavorite ? <IconCheck /> : <IconStar />}
                     </span>
-                  </div>
-                  <div className="client-master-hero-sub">
-                    <div className="client-master-hero-tags">
-                      {heroTags.map((label, index) => (
-                        <span
-                          className="client-master-hero-tag"
-                          key={`${label}-${index}`}
-                        >
-                          {label}
-                        </span>
-                      ))}
-                      {heroTagRemainder > 0 && (
-                        <span className="client-master-hero-tag is-muted">
-                          +{heroTagRemainder}
-                        </span>
-                      )}
-                    </div>
-                    {reviewCount > 0 ? (
-                      <span className="client-master-hero-rating">
-                        ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                    <span className="pro-profile-ig-button-label">
+                      {followActionLabel}
+                    </span>
+                  </button>
+                </div>
+                <div className="pro-profile-ig-stats">
+                  {profileStats.map((stat) => (
+                    <button
+                      className={`pro-profile-ig-stat pro-profile-ig-stat-button${
+                        activeStat === stat.id ? ' is-active' : ''
+                      }`}
+                      type="button"
+                      key={stat.id}
+                      onClick={() => handleStatTap(stat.id)}
+                      aria-label={getStatAriaLabel(stat)}
+                      aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
+                      data-stat={stat.id}
+                    >
+                      <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                      <span className="pro-profile-ig-stat-label">
+                        {stat.label}
                       </span>
-                    ) : (
-                      <span className="client-master-hero-rating is-muted">
-                        Нет отзывов
-                      </span>
-                    )}
-                  </div>
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="client-master-hero-highlights">
-                {visibleHeroHighlights.length > 0 ? (
-                  visibleHeroHighlights.map((item) => (
-                    <span className="client-master-hero-highlight" key={item.id}>
-                      <span
-                        className="client-master-hero-highlight-icon"
-                        aria-hidden="true"
-                      >
-                        {item.icon}
-                      </span>
-                      <span className="client-master-hero-highlight-text">
-                        {item.label}
-                      </span>
-                    </span>
-                  ))
-                ) : (
-                  <span className="client-master-hero-highlight is-muted">
-                    Данные дополняются
-                  </span>
-                )}
-              </div>
-              <div className="pro-profile-ig-actions client-master-hero-actions">
+              <div className="pro-profile-ig-actions">
                 <button
                   className="pro-profile-ig-button pro-profile-ig-button--primary master-profile-booking-cta"
                   type="button"
@@ -1106,41 +1061,6 @@ export const ClientMasterProfileScreen = ({
                 >
                   Записаться
                 </button>
-                <button
-                  className={`pro-profile-ig-button pro-profile-ig-button--secondary master-profile-follow-button${
-                    isFavorite ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  onClick={() => onToggleFavorite(favoritePayload)}
-                  aria-label={followAriaLabel}
-                >
-                  <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                    {isFavorite ? <IconCheck /> : <IconStar />}
-                  </span>
-                  <span className="pro-profile-ig-button-label">
-                    {followActionLabel}
-                  </span>
-                </button>
-              </div>
-              <div className="pro-profile-ig-stats client-master-hero-stats">
-                {profileStats.map((stat) => (
-                  <button
-                    className={`pro-profile-ig-stat pro-profile-ig-stat-button${
-                      activeStat === stat.id ? ' is-active' : ''
-                    }`}
-                    type="button"
-                    key={stat.id}
-                    onClick={() => handleStatTap(stat.id)}
-                    aria-label={getStatAriaLabel(stat)}
-                    aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
-                    data-stat={stat.id}
-                  >
-                    <span className="pro-profile-ig-stat-value">{stat.value}</span>
-                    <span className="pro-profile-ig-stat-label">
-                      {stat.label}
-                    </span>
-                  </button>
-                ))}
               </div>
             </section>
 
