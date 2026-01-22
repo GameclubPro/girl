@@ -604,6 +604,7 @@ export const ProProfileScreen = ({
       : profileStatusSummary.profileStatus === 'ready'
         ? 'is-ready'
         : 'is-draft'
+  const profileCompletionValue = Math.round(profileCompletion)
   const progressStyle = {
     '--progress-value': `${profileCompletion}%`,
   } as CSSProperties
@@ -639,6 +640,12 @@ export const ProProfileScreen = ({
     [certificates]
   )
   const certificateCount = certificateItems.length
+  const certificateCountLabel = formatCount(
+    certificateCount,
+    'сертификат',
+    'сертификата',
+    'сертификатов'
+  )
   const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Показать'
   const isCertificatesCollapsed = certificateCount > 0 && !isCertificatesExpanded
   const handleCertificateImageLoad = (
@@ -1105,6 +1112,41 @@ export const ProProfileScreen = ({
           id: 'availability',
           label: 'Настроить график',
           onClick: () => openEditor('availability', { returnToSettings: true }),
+        }
+      : null,
+  ]
+    .filter(
+      (item): item is { id: string; label: string; onClick: () => void } =>
+        Boolean(item)
+    )
+    .slice(0, 2)
+  const profileQuickActions = [
+    !avatarDisplayUrl
+      ? {
+          id: 'avatar',
+          label: 'Добавить фото',
+          onClick: () => openEditor('media'),
+        }
+      : null,
+    !hasLocation || !hasWorkFormat
+      ? {
+          id: 'location',
+          label: 'Указать локацию',
+          onClick: () => openEditor('location'),
+        }
+      : null,
+    serviceItems.length === 0
+      ? {
+          id: 'services',
+          label: 'Добавить услуги',
+          onClick: () => openEditor('services'),
+        }
+      : null,
+    scheduleDays.length === 0 && !scheduleStartValue && !scheduleEndValue
+      ? {
+          id: 'availability',
+          label: 'Настроить график',
+          onClick: () => openEditor('availability'),
         }
       : null,
   ]
@@ -2928,9 +2970,9 @@ export const ProProfileScreen = ({
   return (
     <div className="screen screen--pro screen--pro-profile">
       <div className="pro-shell pro-shell--ig">
-        <section className="pro-profile-ig animate delay-1">
+        <section className="pro-profile-hero animate delay-1">
           <div
-            className={`pro-profile-ig-cover is-editable${
+            className={`pro-profile-ig-cover pro-profile-hero-cover is-editable${
               coverUrl ? ' has-image' : ''
             }${isCoverUploading ? ' is-loading' : ''}`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
@@ -2947,7 +2989,10 @@ export const ProProfileScreen = ({
               }
             }}
           >
-            <div className="pro-profile-ig-cover-glow" aria-hidden="true" />
+            <div
+              className="pro-profile-ig-cover-glow pro-profile-hero-cover-glow"
+              aria-hidden="true"
+            />
             <input
               ref={coverInputRef}
               className="pro-file-input"
@@ -2959,7 +3004,7 @@ export const ProProfileScreen = ({
               tabIndex={-1}
             />
             <button
-              className="pro-profile-ig-button pro-profile-ig-button--fab"
+              className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
               type="button"
               aria-label="Настройки профиля"
               onClick={(event) => {
@@ -2972,50 +3017,104 @@ export const ProProfileScreen = ({
               </span>
             </button>
           </div>
-          <div className="pro-profile-ig-header">
-            <div
-              className={`pro-profile-ig-avatar is-editable${
-                isAvatarUploading ? ' is-loading' : ''
-              }`}
-              aria-busy={isAvatarUploading}
-              aria-disabled={isAvatarUploading}
-              role="button"
-              tabIndex={0}
-              aria-label="Открыть действия профиля"
-              aria-haspopup="dialog"
-              aria-expanded={isAvatarActionsOpen}
-              aria-controls={avatarActionsId}
-              onClick={openAvatarActions}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  openAvatarActions()
-                }
-              }}
-            >
-              {avatarDisplayUrl ? (
-                <img src={avatarDisplayUrl} alt={`Аватар ${displayNameValue}`} />
+          <div className="pro-profile-hero-card">
+            <div className="pro-profile-hero-identity">
+              <div
+                className={`pro-profile-ig-avatar pro-profile-hero-avatar is-editable${
+                  isAvatarUploading ? ' is-loading' : ''
+                }`}
+                aria-busy={isAvatarUploading}
+                aria-disabled={isAvatarUploading}
+                role="button"
+                tabIndex={0}
+                aria-label="Открыть действия профиля"
+                aria-haspopup="dialog"
+                aria-expanded={isAvatarActionsOpen}
+                aria-controls={avatarActionsId}
+                onClick={openAvatarActions}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openAvatarActions()
+                  }
+                }}
+              >
+                {avatarDisplayUrl ? (
+                  <img src={avatarDisplayUrl} alt={`Аватар ${displayNameValue}`} />
+                ) : (
+                  <span aria-hidden="true">{profileInitials}</span>
+                )}
+                <span className="pro-profile-ig-avatar-badge" aria-hidden="true">
+                  +
+                </span>
+                <input
+                  ref={avatarInputRef}
+                  className="pro-file-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  disabled={isAvatarUploading}
+                  aria-hidden="true"
+                  tabIndex={-1}
+                />
+              </div>
+              <div className="pro-profile-hero-main">
+                <div className="pro-profile-hero-name-row">
+                  <h1 className="pro-profile-hero-name">{displayNameValue}</h1>
+                  <button
+                    className={`pro-profile-ig-status pro-profile-hero-status${
+                      isActive ? '' : ' is-paused'
+                    }`}
+                    type="button"
+                    onClick={() => setIsActive((current) => !current)}
+                    aria-pressed={isActive}
+                  >
+                    <span className="pro-profile-ig-status-toggle" aria-hidden="true">
+                      <span className="pro-profile-ig-status-knob" />
+                    </span>
+                    <span className="pro-profile-ig-status-label">
+                      {isActive ? 'Принимаю заявки' : 'Пауза'}
+                    </span>
+                    <span className="pro-profile-ig-status-chevron" aria-hidden="true" />
+                  </button>
+                </div>
+                <p
+                  className={`pro-profile-hero-about${
+                    about.trim() ? '' : ' is-muted'
+                  }`}
+                >
+                  {aboutPreview}
+                </p>
+              </div>
+            </div>
+            <div className="pro-profile-hero-tags pro-profile-ig-tags">
+              {previewTags.length > 0 ? (
+                <>
+                  {previewTags.map((label, index) => (
+                    <span className="pro-profile-tag" key={`${label}-${index}`}>
+                      {label}
+                    </span>
+                  ))}
+                  {previewTagRemainder > 0 && (
+                    <span className="pro-profile-tag is-muted">
+                      +{previewTagRemainder}
+                    </span>
+                  )}
+                </>
               ) : (
-                <span aria-hidden="true">{profileInitials}</span>
+                <span className="pro-profile-tag is-muted">
+                  Теги появятся здесь
+                </span>
               )}
-              <span className="pro-profile-ig-avatar-badge" aria-hidden="true">
-                +
-              </span>
-              <input
-                ref={avatarInputRef}
-                className="pro-file-input"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                disabled={isAvatarUploading}
-                aria-hidden="true"
-                tabIndex={-1}
-              />
+              {reviewCount > 0 ? (
+                <span className="pro-profile-tag is-review">
+                  ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                </span>
+              ) : (
+                <span className="pro-profile-tag is-muted">Нет отзывов</span>
+              )}
             </div>
-            <div className="pro-profile-ig-name-row">
-              <h1 className="pro-profile-ig-name">{displayNameValue}</h1>
-            </div>
-            <div className="pro-profile-ig-stats">
+            <div className="pro-profile-ig-stats pro-profile-hero-stats">
               {profileStats.map((stat) => (
                 <button
                   className={`pro-profile-ig-stat pro-profile-ig-stat-button${
@@ -3032,33 +3131,109 @@ export const ProProfileScreen = ({
                 </button>
               ))}
             </div>
+            <div className="pro-profile-hero-actions" role="list">
+              <button
+                className="pro-profile-hero-action is-primary"
+                type="button"
+                onClick={handlePortfolioAddClick}
+                disabled={isPortfolioUploading || isPortfolioFull}
+              >
+                Добавить работу
+              </button>
+              <button
+                className="pro-profile-hero-action"
+                type="button"
+                onClick={() => openEditor('basic')}
+              >
+                Редактировать
+              </button>
+              <button
+                className="pro-profile-hero-action is-ghost"
+                type="button"
+                onClick={openSettings}
+              >
+                Настройки
+              </button>
+            </div>
           </div>
           <div className="pro-profile-ig-body">
-            <div className="pro-profile-status-card">
-              <div className="pro-profile-status-head">
-                <span className="pro-profile-status-title">Статус</span>
+            <div className="pro-profile-growth">
+              <div className="pro-profile-growth-head">
+                <div className="pro-profile-growth-info">
+                  <p className="pro-profile-growth-kicker">Рост профиля</p>
+                  <h3 className="pro-profile-growth-title">
+                    {profileStatusLabel}
+                  </h3>
+                </div>
                 <button
-                  className={`pro-profile-ig-status${isActive ? '' : ' is-paused'}`}
+                  className="pro-profile-growth-action"
                   type="button"
-                  onClick={() => setIsActive((current) => !current)}
-                  aria-pressed={isActive}
+                  onClick={openSettings}
                 >
-                  <span className="pro-profile-ig-status-toggle" aria-hidden="true">
-                    <span className="pro-profile-ig-status-knob" />
-                  </span>
-                  <span className="pro-profile-ig-status-label">
-                    {isActive ? 'Принимаю заявки' : 'Пауза'}
-                  </span>
-                  <span className="pro-profile-ig-status-chevron" aria-hidden="true" />
+                  Настроить
                 </button>
               </div>
-              <p
-                className={`pro-profile-status-text${
-                  about.trim() ? '' : ' is-muted'
-                }`}
-              >
-                {aboutPreview}
-              </p>
+              <div className="pro-profile-growth-meter" style={progressStyle}>
+                <span className="pro-profile-growth-meter-value">
+                  {profileCompletionValue}%
+                </span>
+                <div className="pro-profile-growth-meter-track">
+                  <span className="pro-profile-growth-meter-fill" />
+                </div>
+              </div>
+              <div className="pro-profile-growth-grid">
+                <button
+                  className="pro-profile-growth-tile"
+                  type="button"
+                  onClick={() => openEditor('certificates')}
+                >
+                  <span className="pro-profile-growth-tile-label">
+                    Сертификаты
+                  </span>
+                  <span
+                    className={`pro-profile-growth-tile-value${
+                      certificateCount > 0 ? '' : ' is-muted'
+                    }`}
+                  >
+                    {certificateCount > 0
+                      ? certificateCountLabel
+                      : 'Добавить'}
+                  </span>
+                </button>
+                <button
+                  className="pro-profile-growth-tile"
+                  type="button"
+                  onClick={() => handleStatTap('reviews')}
+                >
+                  <span className="pro-profile-growth-tile-label">Отзывы</span>
+                  <span
+                    className={`pro-profile-growth-tile-value${
+                      reviewCount > 0 ? '' : ' is-muted'
+                    }`}
+                  >
+                    {reviewCount > 0
+                      ? `${reviewAverage.toFixed(1)} · ${reviewCountLabel}`
+                      : 'Нет отзывов'}
+                  </span>
+                </button>
+              </div>
+              {profileQuickActions.length > 0 && (
+                <div className="pro-profile-growth-steps">
+                  <p className="pro-profile-growth-steps-label">Быстрые шаги</p>
+                  <div className="pro-profile-growth-actions" role="list">
+                    {profileQuickActions.map((action) => (
+                      <button
+                        className="pro-profile-growth-chip"
+                        key={action.id}
+                        type="button"
+                        onClick={action.onClick}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="pro-profile-facts">
               <div
@@ -3191,33 +3366,6 @@ export const ProProfileScreen = ({
                     )
                   })}
                 </div>
-              )}
-            </div>
-            <div className="pro-profile-ig-tags">
-              {previewTags.length > 0 ? (
-                <>
-                  {previewTags.map((label, index) => (
-                    <span className="pro-profile-tag" key={`${label}-${index}`}>
-                      {label}
-                    </span>
-                  ))}
-                  {previewTagRemainder > 0 && (
-                    <span className="pro-profile-tag is-muted">
-                      +{previewTagRemainder}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="pro-profile-tag is-muted">
-                  Теги появятся здесь
-                </span>
-              )}
-              {reviewCount > 0 ? (
-                <span className="pro-profile-tag is-review">
-                  ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
-                </span>
-              ) : (
-                <span className="pro-profile-tag is-muted">Нет отзывов</span>
               )}
             </div>
           </div>
@@ -3377,7 +3525,7 @@ export const ProProfileScreen = ({
                   })
                 ) : (
                   <div className="pro-profile-portfolio-empty" role="listitem">
-                    Пока нет фото. Добавьте первые работы.
+                    Пока нет работ. Добавьте первые фото в портфолио.
                   </div>
                 )}
                 {!isPortfolioFull && (
@@ -3664,7 +3812,9 @@ export const ProProfileScreen = ({
               </div>
             </>
           ) : (
-            <p className="pro-profile-reviews-empty">Пока нет отзывов.</p>
+            <p className="pro-profile-reviews-empty">
+              Пока нет отзывов. Попросите клиентов оставить оценку.
+            </p>
           )}
         </section>
 
