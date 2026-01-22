@@ -24867,6 +24867,7 @@ h2 {
 
 .pro-profile-editor-screen[data-editor-section] .pro-profile-editor-shell {
   gap: 12px;
+  padding-top: 36px;
 }
 
 .pro-profile-editor-screen[data-editor-section] .pro-profile-editor-head {
@@ -24884,6 +24885,33 @@ h2 {
   background: rgba(var(--accent-rgb), 0.12);
   color: var(--accent-strong);
   box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.18);
+}
+
+.pro-profile-editor-screen[data-editor-section] .pro-profile-editor-back-floating {
+  position: fixed;
+  top: calc(10px + var(--safe-top) + var(--tg-top-offset));
+  left: 16px;
+  z-index: 70;
+  border-radius: 999px;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(var(--paper-rgb), 0.92);
+  color: var(--pro-ink);
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.pro-profile-editor-screen[data-editor-section]
+  .pro-profile-editor-back-floating:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.3);
+  outline-offset: 2px;
+}
+
+.pro-profile-editor-screen[data-editor-section] .pro-profile-editor-back-floating:active {
+  transform: translateY(1px);
 }
 
 .pro-profile-editor-screen[data-editor-section] .pro-profile-editor-title {
@@ -25108,15 +25136,25 @@ h2 {
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-certificates-head {
   gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.pro-profile-editor-screen[data-editor-section="certificates"]
+  .pro-profile-editor-certificates-add {
+  width: 100%;
+  justify-content: center;
+}
+
+.pro-profile-editor-screen[data-editor-section="certificates"]
+  .pro-profile-editor-certificates-list {
+  gap: 12px;
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-certificate-card {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  grid-template-areas:
-    "media fields"
-    "actions actions";
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   border-radius: 20px;
   background: rgba(var(--paper-rgb), 0.96);
@@ -25126,34 +25164,31 @@ h2 {
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-certificate-media {
-  grid-area: media;
-  min-height: 120px;
+  min-height: 140px;
+  padding: 10px;
+  border-style: solid;
+  border-color: rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.9);
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
-  .pro-profile-editor-certificate-fields {
-  grid-area: fields;
+  .pro-profile-editor-certificate-media img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-certificate-actions {
-  grid-area: actions;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
   .pro-profile-editor-certificate-action {
   width: 100%;
-}
-
-@media (max-width: 360px) {
-  .pro-profile-editor-screen[data-editor-section="certificates"]
-    .pro-profile-editor-certificate-card {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "media"
-      "fields"
-      "actions";
-  }
 }
