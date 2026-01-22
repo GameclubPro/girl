@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type RefObject,
 } from 'react'
 import {
   IconChat,
@@ -279,7 +280,6 @@ export const ClientMasterProfileScreen = ({
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
   const [activeStat, setActiveStat] = useState<StatId | null>(null)
-  const [pendingStatScroll, setPendingStatScroll] = useState<StatId | null>(null)
   const [isFollowersOpen, setIsFollowersOpen] = useState(false)
   const [followers, setFollowers] = useState<MasterFollower[]>([])
   const [followersTotal, setFollowersTotal] = useState(0)
@@ -300,8 +300,11 @@ export const ClientMasterProfileScreen = ({
   >({})
   const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<MasterProfileTabId>('overview')
+  const activeTabRef = useRef<MasterProfileTabId>('overview')
   const scheduleInfoRef = useRef<HTMLDivElement | null>(null)
-  const portfolioPanelRef = useRef<HTMLElement | null>(null)
+  const overviewSectionRef = useRef<HTMLElement | null>(null)
+  const portfolioSectionRef = useRef<HTMLElement | null>(null)
+  const scheduleSectionRef = useRef<HTMLElement | null>(null)
   const reviewsSectionRef = useRef<HTMLElement | null>(null)
   const followersRequestIdRef = useRef(0)
   const favoriteStateRef = useRef<{ masterId: string; isFavorite: boolean }>({
@@ -468,6 +471,24 @@ export const ClientMasterProfileScreen = ({
     setIsFollowersOpen(false)
   }
 
+  const scrollToSection = useCallback((nextTab: MasterProfileTabId) => {
+    const sectionMap: Record<MasterProfileTabId, RefObject<HTMLElement>> = {
+      overview: overviewSectionRef,
+      portfolio: portfolioSectionRef,
+      schedule: scheduleSectionRef,
+      reviews: reviewsSectionRef,
+    }
+    const target = sectionMap[nextTab]?.current
+    if (!target) return
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    })
+  }, [])
+
   const handleStatTap = (statId: StatId) => {
     setActiveStat(statId)
     if (statId === 'followers') {
@@ -476,11 +497,11 @@ export const ClientMasterProfileScreen = ({
     }
     if (statId === 'works') {
       setActiveTab('portfolio')
-      setPendingStatScroll(statId)
+      scrollToSection('portfolio')
       return
     }
     setActiveTab('reviews')
-    setPendingStatScroll(statId)
+    scrollToSection('reviews')
   }
 
   const getStatAriaLabel = (stat: { id: StatId; label: string; value: string }) => {
@@ -509,7 +530,6 @@ export const ClientMasterProfileScreen = ({
     setCertificateLightboxIndex(null)
     setIsScheduleInfoOpen(false)
     setActiveTab('overview')
-    setPendingStatScroll(null)
     setActiveStat(null)
     setIsFollowersOpen(false)
     setFollowers([])
@@ -528,26 +548,8 @@ export const ClientMasterProfileScreen = ({
   }, [activeStat])
 
   useEffect(() => {
-    if (!pendingStatScroll) return
-    if (pendingStatScroll === 'works' && activeTab === 'portfolio') {
-      portfolioPanelRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-      setPendingStatScroll(null)
-      return
-    }
-    if (
-      (pendingStatScroll === 'rating' || pendingStatScroll === 'reviews') &&
-      activeTab === 'reviews'
-    ) {
-      reviewsSectionRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-      setPendingStatScroll(null)
-    }
-  }, [activeTab, pendingStatScroll])
+    activeTabRef.current = activeTab
+  }, [activeTab])
 
   useEffect(() => {
     const trimmed = followersQuery.trim()
@@ -598,17 +600,51 @@ export const ClientMasterProfileScreen = ({
     }
   }, [activeTab])
 
+  useEffect(() => {
+    if (!profile) return
+    const sections: Array<{
+      id: MasterProfileTabId
+      ref: RefObject<HTMLElement>
+    }> = [
+      { id: 'overview', ref: overviewSectionRef },
+      { id: 'portfolio', ref: portfolioSectionRef },
+      { id: 'schedule', ref: scheduleSectionRef },
+      { id: 'reviews', ref: reviewsSectionRef },
+    ]
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting)
+        if (visible.length === 0) return
+        const sorted = [...visible].sort(
+          (a, b) => b.intersectionRatio - a.intersectionRatio
+        )
+        const nextId = sorted[0]?.target.getAttribute('data-section')
+        if (
+          nextId &&
+          nextId !== activeTabRef.current &&
+          (nextId === 'overview' ||
+            nextId === 'portfolio' ||
+            nextId === 'schedule' ||
+            nextId === 'reviews')
+        ) {
+          activeTabRef.current = nextId
+          setActiveTab(nextId)
+        }
+      },
+      {
+        rootMargin: '-40% 0px -55% 0px',
+        threshold: [0.2, 0.4, 0.6],
+      }
+    )
+    sections.forEach(({ ref }) => {
+      if (ref.current) observer.observe(ref.current)
+    })
+    return () => observer.disconnect()
+  }, [profile])
+
   const handleTabChange = (nextTab: MasterProfileTabId) => {
     setActiveTab(nextTab)
-    const panel = document.getElementById('master-profile-panel')
-    if (!panel) return
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches
-    panel.scrollIntoView({
-      behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      block: 'start',
-    })
+    scrollToSection(nextTab)
   }
 
   const serviceItems = useMemo(
@@ -808,6 +844,30 @@ export const ClientMasterProfileScreen = ({
   const previewTags = previewTagSource.slice(0, 3)
   const previewTagRemainder = previewTagSource.length - previewTags.length
   const isActive = Boolean(profile?.isActive ?? true)
+  const statusLabel = isActive ? 'Запись открыта' : 'Пауза'
+  const heroTags = categoryLabels.slice(0, 2)
+  const heroTagRemainder = Math.max(0, categoryLabels.length - heroTags.length)
+  const heroHighlights = [
+    {
+      id: 'location',
+      label: locationLabel,
+      icon: <IconPin />,
+      isVisible: hasLocation || Boolean(distanceLabel),
+    },
+    {
+      id: 'format',
+      label: workFormatLabel,
+      icon: formatIcon,
+      isVisible: hasWorkFormat,
+    },
+    {
+      id: 'price',
+      label: priceLabel,
+      icon: <IconPrice />,
+      isVisible: hasPrice,
+    },
+  ]
+  const visibleHeroHighlights = heroHighlights.filter((item) => item.isVisible)
   const certificateItems = useMemo(
     () =>
       (Array.isArray(profile?.certificates) ? profile?.certificates : []).filter(
@@ -953,7 +1013,7 @@ export const ClientMasterProfileScreen = ({
           </div>
         ) : profile ? (
           <>
-            <section className="pro-profile-ig animate delay-1">
+            <section className="pro-profile-ig client-master-hero animate delay-1">
               <div
                 className={`pro-profile-ig-cover${coverUrl ? ' has-image' : ''}`}
                 style={
@@ -963,13 +1023,14 @@ export const ClientMasterProfileScreen = ({
                 }
               >
                 <div className="pro-profile-ig-cover-glow" aria-hidden="true" />
+                <div className="client-master-hero-sheen" aria-hidden="true" />
                 {!coverUrl && (
                   <span className="master-profile-cover-fallback" aria-hidden="true">
                     {initials}
                   </span>
                 )}
               </div>
-              <div className="pro-profile-ig-header">
+              <div className="pro-profile-ig-header client-master-hero-header">
                 <div className="pro-profile-ig-avatar">
                   {profile.avatarUrl ? (
                     <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
@@ -977,45 +1038,67 @@ export const ClientMasterProfileScreen = ({
                     <span aria-hidden="true">{initials}</span>
                   )}
                 </div>
-                <div className="pro-profile-ig-name-row">
-                  <h1 className="pro-profile-ig-name">{displayName}</h1>
-                  <button
-                    className={`pro-profile-ig-button master-profile-follow-button master-profile-follow-inline${
-                      isFavorite ? ' is-active' : ''
-                    }`}
-                    type="button"
-                    onClick={() => onToggleFavorite(favoritePayload)}
-                    aria-label={followAriaLabel}
-                  >
-                    <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                      {isFavorite ? <IconCheck /> : <IconStar />}
-                    </span>
-                    <span className="pro-profile-ig-button-label">
-                      {followActionLabel}
-                    </span>
-                  </button>
-                </div>
-                <div className="pro-profile-ig-stats">
-                  {profileStats.map((stat) => (
-                    <button
-                      className={`pro-profile-ig-stat pro-profile-ig-stat-button${
-                        activeStat === stat.id ? ' is-active' : ''
+                <div className="client-master-hero-main">
+                  <div className="client-master-hero-name-row">
+                    <h1 className="pro-profile-ig-name">{displayName}</h1>
+                    <span
+                      className={`client-master-hero-status${
+                        isActive ? ' is-active' : ' is-paused'
                       }`}
-                      type="button"
-                      key={stat.id}
-                      onClick={() => handleStatTap(stat.id)}
-                      aria-label={getStatAriaLabel(stat)}
-                      aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
                     >
-                      <span className="pro-profile-ig-stat-value">{stat.value}</span>
-                      <span className="pro-profile-ig-stat-label">
-                        {stat.label}
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <div className="client-master-hero-sub">
+                    <div className="client-master-hero-tags">
+                      {heroTags.map((label, index) => (
+                        <span
+                          className="client-master-hero-tag"
+                          key={`${label}-${index}`}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                      {heroTagRemainder > 0 && (
+                        <span className="client-master-hero-tag is-muted">
+                          +{heroTagRemainder}
+                        </span>
+                      )}
+                    </div>
+                    {reviewCount > 0 ? (
+                      <span className="client-master-hero-rating">
+                        ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
                       </span>
-                    </button>
-                  ))}
+                    ) : (
+                      <span className="client-master-hero-rating is-muted">
+                        Нет отзывов
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="pro-profile-ig-actions">
+              <div className="client-master-hero-highlights">
+                {visibleHeroHighlights.length > 0 ? (
+                  visibleHeroHighlights.map((item) => (
+                    <span className="client-master-hero-highlight" key={item.id}>
+                      <span
+                        className="client-master-hero-highlight-icon"
+                        aria-hidden="true"
+                      >
+                        {item.icon}
+                      </span>
+                      <span className="client-master-hero-highlight-text">
+                        {item.label}
+                      </span>
+                    </span>
+                  ))
+                ) : (
+                  <span className="client-master-hero-highlight is-muted">
+                    Данные дополняются
+                  </span>
+                )}
+              </div>
+              <div className="pro-profile-ig-actions client-master-hero-actions">
                 <button
                   className="pro-profile-ig-button pro-profile-ig-button--primary master-profile-booking-cta"
                   type="button"
@@ -1023,12 +1106,47 @@ export const ClientMasterProfileScreen = ({
                 >
                   Записаться
                 </button>
+                <button
+                  className={`pro-profile-ig-button pro-profile-ig-button--secondary master-profile-follow-button${
+                    isFavorite ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => onToggleFavorite(favoritePayload)}
+                  aria-label={followAriaLabel}
+                >
+                  <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                    {isFavorite ? <IconCheck /> : <IconStar />}
+                  </span>
+                  <span className="pro-profile-ig-button-label">
+                    {followActionLabel}
+                  </span>
+                </button>
+              </div>
+              <div className="pro-profile-ig-stats client-master-hero-stats">
+                {profileStats.map((stat) => (
+                  <button
+                    className={`pro-profile-ig-stat pro-profile-ig-stat-button${
+                      activeStat === stat.id ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    key={stat.id}
+                    onClick={() => handleStatTap(stat.id)}
+                    aria-label={getStatAriaLabel(stat)}
+                    aria-haspopup={stat.id === 'followers' ? 'dialog' : undefined}
+                    data-stat={stat.id}
+                  >
+                    <span className="pro-profile-ig-stat-value">{stat.value}</span>
+                    <span className="pro-profile-ig-stat-label">
+                      {stat.label}
+                    </span>
+                  </button>
+                ))}
               </div>
             </section>
 
             <div
               className="master-profile-tabs"
-              role="tablist"
+              role="navigation"
               aria-label="Разделы профиля мастера"
             >
               {masterTabs.map((tab) => (
@@ -1039,9 +1157,7 @@ export const ClientMasterProfileScreen = ({
                   type="button"
                   key={tab.id}
                   id={`master-profile-tab-${tab.id}`}
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  aria-controls="master-profile-panel"
+                  aria-pressed={activeTab === tab.id}
                   onClick={() => handleTabChange(tab.id)}
                 >
                   <span>{tab.label}</span>
@@ -1054,506 +1170,494 @@ export const ClientMasterProfileScreen = ({
               ))}
             </div>
 
-            <div
-              id="master-profile-panel"
-              className="master-profile-panel"
-              role="tabpanel"
-              aria-labelledby={`master-profile-tab-${activeTab}`}
-              key={activeTab}
-            >
-              {activeTab === 'overview' && (
-                <div className="pro-profile-ig-body master-profile-overview animate delay-2">
-                  <div className="pro-profile-status-card">
-                    <div className="pro-profile-status-head">
-                      <span className="pro-profile-status-title">Статус</span>
-                      <span
-                        className={`pro-profile-ig-status${
-                          isActive ? '' : ' is-paused'
-                        }`}
-                      >
-                        <span className="pro-profile-social-dot" aria-hidden="true" />
-                        {isActive ? 'Запись открыта' : 'Пауза'}
-                      </span>
-                    </div>
-                    <p
-                      className={`pro-profile-status-text${
-                        aboutValue ? '' : ' is-muted'
+            <div className="master-profile-panel">
+              <section
+                id="master-profile-section-overview"
+                className="pro-profile-ig-body master-profile-overview animate delay-2 master-profile-section"
+                ref={overviewSectionRef}
+                data-section="overview"
+                role="region"
+                aria-labelledby="master-profile-tab-overview"
+              >
+                <div className="pro-profile-status-card">
+                  <div className="pro-profile-status-head">
+                    <span className="pro-profile-status-title">Статус</span>
+                    <span
+                      className={`pro-profile-ig-status${
+                        isActive ? '' : ' is-paused'
                       }`}
                     >
-                      {aboutText}
-                    </p>
+                      <span className="pro-profile-social-dot" aria-hidden="true" />
+                      {statusLabel}
+                    </span>
                   </div>
-                  <div className="pro-profile-facts-grid">
-                    {profileFacts.map((fact) => (
-                      <div
-                        className={`pro-profile-fact-card${
-                          fact.isMuted ? ' is-muted' : ''
-                        }`}
-                        key={fact.label}
-                      >
-                        <span
-                          className={`pro-profile-fact-icon is-${fact.id}`}
-                          aria-hidden="true"
-                        >
-                          {fact.icon}
-                        </span>
-                        <div className="pro-profile-fact-info">
-                          <span className="pro-profile-fact-value">
-                            {fact.value}
-                          </span>
-                          <span className="pro-profile-fact-label">
-                            {fact.label}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div
-                    className={`pro-profile-certificates is-client${
-                      isCertificatesCollapsed
-                        ? ' is-collapsed'
-                        : isCertificatesExpanded
-                          ? ' is-expanded'
-                          : ''
+                  <p
+                    className={`pro-profile-status-text${
+                      aboutValue ? '' : ' is-muted'
                     }`}
                   >
-                    <div className="pro-profile-certificates-head">
-                      <div className="pro-profile-certificates-summary">
-                        <p className="pro-profile-certificates-kicker">Квалификация</p>
-                        <h3 className="pro-profile-certificates-title">
-                          Сертификаты
-                        </h3>
-                      </div>
-                      <div className="pro-profile-certificates-actions">
-                        {certificateItems.length > 0 && (
-                          <button
-                            className="pro-profile-certificates-action is-toggle"
-                            type="button"
-                            onClick={() =>
-                              setIsCertificatesExpanded((current) => !current)
-                            }
-                            aria-expanded={isCertificatesExpanded}
-                            aria-controls={certificatesListId}
-                          >
-                            {certificatesToggleLabel}
-                          </button>
-                        )}
+                    {aboutText}
+                  </p>
+                </div>
+                <div className="pro-profile-facts-grid">
+                  {profileFacts.map((fact) => (
+                    <div
+                      className={`pro-profile-fact-card${
+                        fact.isMuted ? ' is-muted' : ''
+                      }`}
+                      key={fact.label}
+                    >
+                      <span
+                        className={`pro-profile-fact-icon is-${fact.id}`}
+                        aria-hidden="true"
+                      >
+                        {fact.icon}
+                      </span>
+                      <div className="pro-profile-fact-info">
+                        <span className="pro-profile-fact-value">{fact.value}</span>
+                        <span className="pro-profile-fact-label">{fact.label}</span>
                       </div>
                     </div>
-                    {certificateItems.length > 0 && (
-                      <div
-                        className={`pro-profile-certificates-list${
-                          isCertificatesExpanded ? ' is-expanded' : ''
-                        }`}
-                        role="list"
-                        id={certificatesListId}
-                        aria-hidden={!isCertificatesExpanded}
-                      >
-                        {certificateItems.map((certificate, index) => {
-                          const meta = buildCertificateMeta(certificate)
-                          const title = certificate.title?.trim() || 'Сертификат'
-                          const certificateStyle = certificateRatios[certificate.id]
-                            ? ({
-                                '--certificate-ratio': certificateRatios[certificate.id],
-                              } as CSSProperties)
-                            : undefined
-                          return (
-                            <button
-                              className="pro-profile-certificate-card"
-                              type="button"
-                              key={certificate.id ?? `${certificate.url}-${index}`}
-                              onClick={() => openCertificateLightbox(index)}
-                              role="listitem"
-                              aria-label={title}
-                            >
-                              <div
-                                className="pro-profile-certificate-media"
-                                style={certificateStyle}
-                              >
-                                {certificate.url ? (
-                                  <img
-                                    src={certificate.url}
-                                    alt=""
-                                    loading="lazy"
-                                    onLoad={(event) =>
-                                      handleCertificateImageLoad(
-                                        certificate.id,
-                                        event.currentTarget
-                                      )
-                                    }
-                                  />
-                                ) : (
-                                  <span className="pro-profile-certificate-fallback">
-                                    CERT
-                                  </span>
-                                )}
-                              </div>
-                              <div className="pro-profile-certificate-info">
-                                <span className="pro-profile-certificate-title">
-                                  {title}
-                                </span>
-                                <span
-                                  className={`pro-profile-certificate-meta${
-                                    meta ? '' : ' is-muted'
-                                  }`}
-                                >
-                                  {meta || 'Данные не указаны'}
-                                </span>
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div className="pro-profile-ig-tags">
-                    {previewTags.length > 0 ? (
-                      <>
-                        {previewTags.map((label, index) => (
-                          <span className="pro-profile-tag" key={`${label}-${index}`}>
-                            {label}
-                          </span>
-                        ))}
-                        {previewTagRemainder > 0 && (
-                          <span className="pro-profile-tag is-muted">
-                            +{previewTagRemainder}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="pro-profile-tag is-muted">
-                        Теги появятся здесь
-                      </span>
-                    )}
-                    {reviewCount > 0 ? (
-                      <span className="pro-profile-tag is-review">
-                        ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
-                      </span>
-                    ) : (
-                      <span className="pro-profile-tag is-muted">Нет отзывов</span>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              )}
-
-              {activeTab === 'portfolio' && (
-                <section
-                  className="pro-profile-portfolio-panel animate delay-2"
-                  ref={portfolioPanelRef}
+                <div
+                  className={`pro-profile-certificates is-client${
+                    isCertificatesCollapsed
+                      ? ' is-collapsed'
+                      : isCertificatesExpanded
+                        ? ' is-expanded'
+                        : ''
+                  }`}
                 >
-                  <div className="pro-profile-portfolio-panel-head">
-                    <div className="pro-profile-portfolio-panel-controls">
-                      <span className="pro-profile-portfolio-panel-count">
-                        {portfolioCountLabel}
-                      </span>
-                      {hasPortfolioOverflow && (
+                  <div className="pro-profile-certificates-head">
+                    <div className="pro-profile-certificates-summary">
+                      <p className="pro-profile-certificates-kicker">Квалификация</p>
+                      <h3 className="pro-profile-certificates-title">
+                        Сертификаты
+                      </h3>
+                    </div>
+                    <div className="pro-profile-certificates-actions">
+                      {certificateItems.length > 0 && (
                         <button
-                          className="pro-profile-portfolio-panel-action"
+                          className="pro-profile-certificates-action is-toggle"
                           type="button"
-                          onClick={() => setIsPortfolioExpanded((current) => !current)}
-                          aria-expanded={isPortfolioExpanded}
+                          onClick={() =>
+                            setIsCertificatesExpanded((current) => !current)
+                          }
+                          aria-expanded={isCertificatesExpanded}
+                          aria-controls={certificatesListId}
                         >
-                          {isPortfolioExpanded ? 'Свернуть' : 'Все фото'}
+                          {certificatesToggleLabel}
                         </button>
                       )}
                     </div>
                   </div>
-                  <div
-                    className={`pro-profile-portfolio-grid${
-                      isPortfolioCollapsed ? ' is-collapsed' : ''
-                    }`}
-                    role="list"
-                    aria-label="Портфолио"
-                  >
-                    {visiblePortfolioItems.length > 0 ? (
-                      visiblePortfolioItems.map(({ item, index }) => {
-                        const focus = resolvePortfolioFocus(item)
-                        const showImage = isImageUrl(item.url)
-                        const isInShowcase = showcaseItems.some(
-                          (showcaseItem) => showcaseItem.url === item.url
-                        )
+                  {certificateItems.length > 0 && (
+                    <div
+                      className={`pro-profile-certificates-list${
+                        isCertificatesExpanded ? ' is-expanded' : ''
+                      }`}
+                      role="list"
+                      id={certificatesListId}
+                      aria-hidden={!isCertificatesExpanded}
+                    >
+                      {certificateItems.map((certificate, index) => {
+                        const meta = buildCertificateMeta(certificate)
+                        const title = certificate.title?.trim() || 'Сертификат'
+                        const certificateStyle = certificateRatios[certificate.id]
+                          ? ({
+                              '--certificate-ratio': certificateRatios[certificate.id],
+                            } as CSSProperties)
+                          : undefined
                         return (
                           <button
-                            className="pro-profile-portfolio-item"
-                            key={`${item.url}-${index}`}
+                            className="pro-profile-certificate-card"
                             type="button"
-                            onClick={() => setPortfolioLightboxIndex(index)}
+                            key={certificate.id ?? `${certificate.url}-${index}`}
+                            onClick={() => openCertificateLightbox(index)}
                             role="listitem"
-                            aria-label={`Открыть работу ${index + 1}`}
+                            aria-label={title}
                           >
-                            {showImage ? (
-                              <img
-                                src={item.url}
-                                alt=""
-                                loading="lazy"
-                                style={{ objectPosition: focus.position }}
-                              />
-                            ) : (
-                              <span className="pro-profile-portfolio-fallback">
-                                LINK
+                            <div
+                              className="pro-profile-certificate-media"
+                              style={certificateStyle}
+                            >
+                              {certificate.url ? (
+                                <img
+                                  src={certificate.url}
+                                  alt=""
+                                  loading="lazy"
+                                  onLoad={(event) =>
+                                    handleCertificateImageLoad(
+                                      certificate.id,
+                                      event.currentTarget
+                                    )
+                                  }
+                                />
+                              ) : (
+                                <span className="pro-profile-certificate-fallback">
+                                  CERT
+                                </span>
+                              )}
+                            </div>
+                            <div className="pro-profile-certificate-info">
+                              <span className="pro-profile-certificate-title">
+                                {title}
                               </span>
-                            )}
-                            {isInShowcase && (
                               <span
-                                className="pro-profile-portfolio-badge"
-                                aria-hidden="true"
-                                title="В витрине"
+                                className={`pro-profile-certificate-meta${
+                                  meta ? '' : ' is-muted'
+                                }`}
                               >
-                                ✦
+                                {meta || 'Данные не указаны'}
                               </span>
-                            )}
+                            </div>
                           </button>
                         )
-                      })
-                    ) : (
-                      <div className="pro-profile-portfolio-empty" role="listitem">
-                        У мастера пока нет работ.
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="pro-profile-ig-tags">
+                  {previewTags.length > 0 ? (
+                    <>
+                      {previewTags.map((label, index) => (
+                        <span className="pro-profile-tag" key={`${label}-${index}`}>
+                          {label}
+                        </span>
+                      ))}
+                      {previewTagRemainder > 0 && (
+                        <span className="pro-profile-tag is-muted">
+                          +{previewTagRemainder}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="pro-profile-tag is-muted">
+                      Теги появятся здесь
+                    </span>
+                  )}
+                  {reviewCount > 0 ? (
+                    <span className="pro-profile-tag is-review">
+                      ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                    </span>
+                  ) : (
+                    <span className="pro-profile-tag is-muted">Нет отзывов</span>
+                  )}
+                </div>
+              </section>
+
+              <section
+                id="master-profile-section-portfolio"
+                className="pro-profile-portfolio-panel animate delay-2 master-profile-section"
+                ref={portfolioSectionRef}
+                data-section="portfolio"
+                role="region"
+                aria-labelledby="master-profile-tab-portfolio"
+              >
+                <div className="pro-profile-portfolio-panel-head">
+                  <div className="pro-profile-portfolio-panel-controls">
+                    <span className="pro-profile-portfolio-panel-count">
+                      {portfolioCountLabel}
+                    </span>
+                    {hasPortfolioOverflow && (
+                      <button
+                        className="pro-profile-portfolio-panel-action"
+                        type="button"
+                        onClick={() => setIsPortfolioExpanded((current) => !current)}
+                        aria-expanded={isPortfolioExpanded}
+                      >
+                        {isPortfolioExpanded ? 'Свернуть' : 'Все фото'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div
+                  className={`pro-profile-portfolio-grid${
+                    isPortfolioCollapsed ? ' is-collapsed' : ''
+                  }`}
+                  role="list"
+                  aria-label="Портфолио"
+                >
+                  {visiblePortfolioItems.length > 0 ? (
+                    visiblePortfolioItems.map(({ item, index }) => {
+                      const focus = resolvePortfolioFocus(item)
+                      const showImage = isImageUrl(item.url)
+                      const isInShowcase = showcaseItems.some(
+                        (showcaseItem) => showcaseItem.url === item.url
+                      )
+                      return (
+                        <button
+                          className="pro-profile-portfolio-item"
+                          key={`${item.url}-${index}`}
+                          type="button"
+                          onClick={() => setPortfolioLightboxIndex(index)}
+                          role="listitem"
+                          aria-label={`Открыть работу ${index + 1}`}
+                        >
+                          {showImage ? (
+                            <img
+                              src={item.url}
+                              alt=""
+                              loading="lazy"
+                              style={{ objectPosition: focus.position }}
+                            />
+                          ) : (
+                            <span className="pro-profile-portfolio-fallback">LINK</span>
+                          )}
+                          {isInShowcase && (
+                            <span
+                              className="pro-profile-portfolio-badge"
+                              aria-hidden="true"
+                              title="В витрине"
+                            >
+                              ✦
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })
+                  ) : (
+                    <div className="pro-profile-portfolio-empty" role="listitem">
+                      У мастера пока нет работ.
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section
+                id="master-profile-section-schedule"
+                className="pro-profile-schedule-panel animate delay-2 master-profile-section"
+                ref={scheduleSectionRef}
+                data-section="schedule"
+                role="region"
+                aria-labelledby="master-profile-tab-schedule"
+              >
+                <div className="pro-profile-schedule-head">
+                  <div>
+                    <h3 className="pro-profile-schedule-title">График работы</h3>
+                    <p className="pro-profile-schedule-subtitle">
+                      {scheduleDays.length > 0 ? 'Дни приема' : 'График не указан'}
+                    </p>
+                  </div>
+                  <div className="pro-profile-schedule-info-wrap" ref={scheduleInfoRef}>
+                    <button
+                      className="pro-profile-schedule-info"
+                      type="button"
+                      aria-label="Показать график"
+                      aria-expanded={isScheduleInfoOpen}
+                      aria-controls="pro-profile-schedule-popover"
+                      onClick={() => setIsScheduleInfoOpen((current) => !current)}
+                    >
+                      i
+                    </button>
+                    {isScheduleInfoOpen && (
+                      <div
+                        className="pro-profile-schedule-popover"
+                        id="pro-profile-schedule-popover"
+                        role="tooltip"
+                      >
+                        <p className="pro-profile-schedule-popover-title">График</p>
+                        <div className="pro-profile-schedule-popover-row">
+                          <span className="pro-profile-schedule-popover-label">
+                            Рабочие дни
+                          </span>
+                          <span
+                            className={`pro-profile-schedule-popover-value${
+                              hasScheduleDays ? '' : ' is-muted'
+                            }`}
+                          >
+                            {workingDaysLabel}
+                          </span>
+                        </div>
+                        <div className="pro-profile-schedule-popover-row">
+                          <span className="pro-profile-schedule-popover-label">
+                            Выходные
+                          </span>
+                          <span
+                            className={`pro-profile-schedule-popover-value${
+                              hasScheduleDays ? '' : ' is-muted'
+                            }`}
+                          >
+                            {offDaysLabel}
+                          </span>
+                        </div>
+                        <div className="pro-profile-schedule-popover-row">
+                          <span className="pro-profile-schedule-popover-label">
+                            Время
+                          </span>
+                          <span
+                            className={`pro-profile-schedule-popover-value${
+                              hasScheduleRange ? '' : ' is-muted'
+                            }`}
+                          >
+                            {scheduleRange}
+                          </span>
+                        </div>
+                        <div className="pro-profile-schedule-popover-week" role="list">
+                          {scheduleWeek.map((day) => (
+                            <span
+                              className={`pro-profile-schedule-popover-day${
+                                day.isActive ? ' is-active' : ''
+                              }`}
+                              key={`popover-${day.id}`}
+                              role="listitem"
+                            >
+                              {day.label}
+                            </span>
+                          ))}
+                        </div>
+                        <div
+                          className={`pro-profile-schedule-timebar${
+                            hasScheduleTimebar ? '' : ' is-muted'
+                          }`}
+                          style={scheduleTimeStyle}
+                        />
+                        <div className="pro-profile-schedule-timebar-scale">
+                          <span>0:00</span>
+                          <span>24:00</span>
+                        </div>
                       </div>
                     )}
                   </div>
-                </section>
-              )}
-
-              {activeTab === 'schedule' && (
-                <section className="pro-profile-schedule-panel animate delay-2">
-                  <div className="pro-profile-schedule-head">
-                    <div>
-                      <h3 className="pro-profile-schedule-title">График работы</h3>
-                      <p className="pro-profile-schedule-subtitle">
-                        {scheduleDays.length > 0 ? 'Дни приема' : 'График не указан'}
-                      </p>
-                    </div>
-                    <div
-                      className="pro-profile-schedule-info-wrap"
-                      ref={scheduleInfoRef}
-                    >
-                      <button
-                        className="pro-profile-schedule-info"
-                        type="button"
-                        aria-label="Показать график"
-                        aria-expanded={isScheduleInfoOpen}
-                        aria-controls="pro-profile-schedule-popover"
-                        onClick={() => setIsScheduleInfoOpen((current) => !current)}
-                      >
-                        i
-                      </button>
-                      {isScheduleInfoOpen && (
-                        <div
-                          className="pro-profile-schedule-popover"
-                          id="pro-profile-schedule-popover"
-                          role="tooltip"
-                        >
-                          <p className="pro-profile-schedule-popover-title">
-                            График
-                          </p>
-                          <div className="pro-profile-schedule-popover-row">
-                            <span className="pro-profile-schedule-popover-label">
-                              Рабочие дни
-                            </span>
-                            <span
-                              className={`pro-profile-schedule-popover-value${
-                                hasScheduleDays ? '' : ' is-muted'
-                              }`}
-                            >
-                              {workingDaysLabel}
-                            </span>
-                          </div>
-                          <div className="pro-profile-schedule-popover-row">
-                            <span className="pro-profile-schedule-popover-label">
-                              Выходные
-                            </span>
-                            <span
-                              className={`pro-profile-schedule-popover-value${
-                                hasScheduleDays ? '' : ' is-muted'
-                              }`}
-                            >
-                              {offDaysLabel}
-                            </span>
-                          </div>
-                          <div className="pro-profile-schedule-popover-row">
-                            <span className="pro-profile-schedule-popover-label">
-                              Время
-                            </span>
-                            <span
-                              className={`pro-profile-schedule-popover-value${
-                                hasScheduleRange ? '' : ' is-muted'
-                              }`}
-                            >
-                              {scheduleRange}
-                            </span>
-                          </div>
-                          <div
-                            className="pro-profile-schedule-popover-week"
-                            role="list"
-                          >
-                            {scheduleWeek.map((day) => (
-                              <span
-                                className={`pro-profile-schedule-popover-day${
-                                  day.isActive ? ' is-active' : ''
-                                }`}
-                                key={`popover-${day.id}`}
-                                role="listitem"
-                              >
-                                {day.label}
-                              </span>
-                            ))}
-                          </div>
-                          <div
-                            className={`pro-profile-schedule-timebar${
-                              hasScheduleTimebar ? '' : ' is-muted'
-                            }`}
-                            style={scheduleTimeStyle}
-                          />
-                          <div className="pro-profile-schedule-timebar-scale">
-                            <span>0:00</span>
-                            <span>24:00</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="pro-profile-schedule-week" role="list">
-                    {scheduleWeek.map((day) => (
-                      <span
-                        className={`pro-profile-schedule-day${
-                          day.isActive ? ' is-active' : ''
-                        }`}
-                        key={day.id}
-                        role="listitem"
-                      >
-                        {day.label}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="pro-profile-schedule-range">
-                    <span className="pro-profile-schedule-range-label">Время</span>
+                </div>
+                <div className="pro-profile-schedule-week" role="list">
+                  {scheduleWeek.map((day) => (
                     <span
-                      className={`pro-profile-schedule-range-value${
-                        hasScheduleRange ? '' : ' is-muted'
+                      className={`pro-profile-schedule-day${
+                        day.isActive ? ' is-active' : ''
                       }`}
+                      key={day.id}
+                      role="listitem"
                     >
-                      {scheduleRange}
+                      {day.label}
                     </span>
-                  </div>
-                </section>
-              )}
+                  ))}
+                </div>
+                <div className="pro-profile-schedule-range">
+                  <span className="pro-profile-schedule-range-label">Время</span>
+                  <span
+                    className={`pro-profile-schedule-range-value${
+                      hasScheduleRange ? '' : ' is-muted'
+                    }`}
+                  >
+                    {scheduleRange}
+                  </span>
+                </div>
+              </section>
 
-              {activeTab === 'reviews' && (
-                <section
-                  className="pro-profile-reviews animate delay-3"
-                  ref={reviewsSectionRef}
-                >
-                  <div className="pro-profile-reviews-head">
-                    <div>
-                      <p className="pro-profile-reviews-kicker">Отзывы</p>
-                      <h2 className="pro-profile-reviews-title">Отзывы клиентов</h2>
-                    </div>
-                    <span className="pro-profile-reviews-count-pill">
-                      {reviewCountLabel}
-                    </span>
+              <section
+                id="master-profile-section-reviews"
+                className="pro-profile-reviews animate delay-3 master-profile-section"
+                ref={reviewsSectionRef}
+                data-section="reviews"
+                role="region"
+                aria-labelledby="master-profile-tab-reviews"
+              >
+                <div className="pro-profile-reviews-head">
+                  <div>
+                    <p className="pro-profile-reviews-kicker">Отзывы</p>
+                    <h2 className="pro-profile-reviews-title">Отзывы клиентов</h2>
                   </div>
+                  <span className="pro-profile-reviews-count-pill">
+                    {reviewCountLabel}
+                  </span>
+                </div>
 
-                  {isReviewsLoading ? (
-                    <div className="pro-profile-reviews-skeleton" aria-hidden="true">
-                      <div className="pro-profile-reviews-skeleton-line is-wide" />
-                      <div className="pro-profile-reviews-skeleton-line" />
-                      <div className="pro-profile-reviews-skeleton-line is-short" />
-                    </div>
-                  ) : reviewsError ? (
-                    <p className="pro-error">{reviewsError}</p>
-                  ) : reviewCount > 0 ? (
-                    <>
-                      <div className="pro-profile-reviews-summary">
-                        <div className="pro-profile-reviews-score">
-                          <span className="pro-profile-reviews-average">
-                            {reviewAverage.toFixed(1)}
-                          </span>
-                          <span className="pro-profile-reviews-stars">
-                            {buildStars(reviewAverage)}
-                          </span>
-                          <span className="pro-profile-reviews-count">
-                            {reviewCountLabel}
-                          </span>
-                        </div>
-                        <div className="pro-profile-reviews-bars">
-                          {reviewDistribution.map((entry) => {
-                            const percent =
-                              reviewCount > 0
-                                ? (entry.count / reviewCount) * 100
-                                : 0
-                            return (
-                              <div
-                                className="pro-profile-reviews-bar"
-                                key={`rating-${entry.rating}`}
-                              >
-                                <span className="pro-profile-reviews-bar-label">
-                                  {entry.rating}
-                                </span>
-                                <span className="pro-profile-reviews-bar-track">
-                                  <span
-                                    className="pro-profile-reviews-bar-fill"
-                                    style={{ width: `${percent}%` }}
-                                  />
-                                </span>
-                                <span className="pro-profile-reviews-bar-count">
-                                  {entry.count}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
+                {isReviewsLoading ? (
+                  <div className="pro-profile-reviews-skeleton" aria-hidden="true">
+                    <div className="pro-profile-reviews-skeleton-line is-wide" />
+                    <div className="pro-profile-reviews-skeleton-line" />
+                    <div className="pro-profile-reviews-skeleton-line is-short" />
+                  </div>
+                ) : reviewsError ? (
+                  <p className="pro-error">{reviewsError}</p>
+                ) : reviewCount > 0 ? (
+                  <>
+                    <div className="pro-profile-reviews-summary">
+                      <div className="pro-profile-reviews-score">
+                        <span className="pro-profile-reviews-average">
+                          {reviewAverage.toFixed(1)}
+                        </span>
+                        <span className="pro-profile-reviews-stars">
+                          {buildStars(reviewAverage)}
+                        </span>
+                        <span className="pro-profile-reviews-count">
+                          {reviewCountLabel}
+                        </span>
                       </div>
-                      <div className="pro-profile-reviews-list">
-                        {reviews.map((review) => {
-                          const reviewerName = buildReviewerName(review)
-                          const reviewerInitials = getInitials(reviewerName)
-                          const dateLabel = formatReviewDate(review.createdAt)
-                          const comment =
-                            review.comment?.trim() || 'Без комментария.'
-
+                      <div className="pro-profile-reviews-bars">
+                        {reviewDistribution.map((entry) => {
+                          const percent =
+                            reviewCount > 0 ? (entry.count / reviewCount) * 100 : 0
                           return (
-                            <article className="pro-profile-review-card" key={review.id}>
-                              <span
-                                className="pro-profile-review-avatar"
-                                aria-hidden="true"
-                              >
-                                {reviewerInitials}
+                            <div
+                              className="pro-profile-reviews-bar"
+                              key={`rating-${entry.rating}`}
+                            >
+                              <span className="pro-profile-reviews-bar-label">
+                                {entry.rating}
                               </span>
-                              <div className="pro-profile-review-body">
-                                <div className="pro-profile-review-head">
-                                  <span className="pro-profile-review-name">
-                                    {reviewerName}
-                                  </span>
-                                  <span className="pro-profile-review-rating">
-                                    {buildStars(review.rating)}
-                                  </span>
-                                </div>
-                                {(review.serviceName || dateLabel) && (
-                                  <div className="pro-profile-review-meta">
-                                    {review.serviceName && (
-                                      <span className="pro-profile-review-service">
-                                        {review.serviceName}
-                                      </span>
-                                    )}
-                                    {dateLabel && (
-                                      <span className="pro-profile-review-date">
-                                        {dateLabel}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                <p className="pro-profile-review-text">{comment}</p>
-                              </div>
-                            </article>
+                              <span className="pro-profile-reviews-bar-track">
+                                <span
+                                  className="pro-profile-reviews-bar-fill"
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </span>
+                              <span className="pro-profile-reviews-bar-count">
+                                {entry.count}
+                              </span>
+                            </div>
                           )
                         })}
                       </div>
-                    </>
-                  ) : (
-                    <p className="pro-profile-reviews-empty">Пока нет отзывов.</p>
-                  )}
-                </section>
-              )}
+                    </div>
+                    <div className="pro-profile-reviews-list">
+                      {reviews.map((review) => {
+                        const reviewerName = buildReviewerName(review)
+                        const reviewerInitials = getInitials(reviewerName)
+                        const dateLabel = formatReviewDate(review.createdAt)
+                        const comment = review.comment?.trim() || 'Без комментария.'
+
+                        return (
+                          <article className="pro-profile-review-card" key={review.id}>
+                            <span className="pro-profile-review-avatar" aria-hidden="true">
+                              {reviewerInitials}
+                            </span>
+                            <div className="pro-profile-review-body">
+                              <div className="pro-profile-review-head">
+                                <span className="pro-profile-review-name">
+                                  {reviewerName}
+                                </span>
+                                <span className="pro-profile-review-rating">
+                                  {buildStars(review.rating)}
+                                </span>
+                              </div>
+                              {(review.serviceName || dateLabel) && (
+                                <div className="pro-profile-review-meta">
+                                  {review.serviceName && (
+                                    <span className="pro-profile-review-service">
+                                      {review.serviceName}
+                                    </span>
+                                  )}
+                                  {dateLabel && (
+                                    <span className="pro-profile-review-date">
+                                      {dateLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              <p className="pro-profile-review-text">{comment}</p>
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <p className="pro-profile-reviews-empty">Пока нет отзывов.</p>
+                )}
+              </section>
             </div>
           </>
         ) : null}
