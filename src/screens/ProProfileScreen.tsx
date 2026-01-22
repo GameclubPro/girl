@@ -604,13 +604,6 @@ export const ProProfileScreen = ({
       : profileStatusSummary.profileStatus === 'ready'
         ? 'is-ready'
         : 'is-draft'
-  const missingFieldLabels: Record<string, string> = {
-    displayName: 'Имя и специализация',
-    categories: 'Категории услуг',
-    workFormat: 'Формат работы',
-    cityId: 'Город',
-    districtId: 'Район',
-  }
   const progressStyle = {
     '--progress-value': `${profileCompletion}%`,
   } as CSSProperties
