@@ -3307,6 +3307,9 @@ export const ProProfileScreen = ({
           {portfolioView === 'portfolio' ? (
             <div
               id="pro-profile-portfolio-content"
+              className={`pro-profile-portfolio-content${
+                isPortfolioSparse ? ' is-sparse' : ''
+              }`}
               role="tabpanel"
               aria-label="Портфолио"
             >
@@ -3350,7 +3353,7 @@ export const ProProfileScreen = ({
               <div
                 className={`pro-profile-portfolio-grid${
                   isPortfolioCollapsed ? ' is-collapsed' : ''
-                }${isPortfolioSparse ? ' is-sparse' : ''}`}
+                }`}
                 role="list"
                 aria-label="Портфолио"
               >

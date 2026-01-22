@@ -9921,6 +9921,10 @@
   margin-right: calc(50% - 50vw);
 }
 
+.pro-profile-portfolio-content.is-sparse {
+  padding-left: var(--pro-pad-x);
+}
+
 .pro-profile-portfolio-panel-left {
   display: inline-flex;
   align-items: center;
@@ -10136,12 +10140,6 @@
   padding-inline: calc(var(--portfolio-grid-gap) / 2);
 }
 
-.pro-profile-portfolio-grid.is-sparse {
-  grid-template-columns: none;
-  grid-auto-flow: column;
-  grid-auto-columns: clamp(110px, 30vw, 160px);
-  justify-content: center;
-}
 
 .pro-profile-portfolio-grid.is-collapsed {
   grid-template-columns: none;
