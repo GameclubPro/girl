@@ -604,7 +604,6 @@ export const ProProfileScreen = ({
       : profileStatusSummary.profileStatus === 'ready'
         ? 'is-ready'
         : 'is-draft'
-  const profileCompletionValue = Math.round(profileCompletion)
   const progressStyle = {
     '--progress-value': `${profileCompletion}%`,
   } as CSSProperties
@@ -640,12 +639,6 @@ export const ProProfileScreen = ({
     [certificates]
   )
   const certificateCount = certificateItems.length
-  const certificateCountLabel = formatCount(
-    certificateCount,
-    'сертификат',
-    'сертификата',
-    'сертификатов'
-  )
   const certificatesToggleLabel = isCertificatesExpanded ? 'Свернуть' : 'Показать'
   const isCertificatesCollapsed = certificateCount > 0 && !isCertificatesExpanded
   const handleCertificateImageLoad = (
@@ -933,6 +926,10 @@ export const ProProfileScreen = ({
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_ROW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded
   const visiblePortfolioItems = portfolioGridItems
+  const isPortfolioSparse =
+    !isPortfolioCollapsed && visiblePortfolioItems.length > 0
+      ? visiblePortfolioItems.length < 3
+      : false
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
@@ -1120,42 +1117,6 @@ export const ProProfileScreen = ({
         Boolean(item)
     )
     .slice(0, 2)
-  const profileQuickActions = [
-    !avatarDisplayUrl
-      ? {
-          id: 'avatar',
-          label: 'Добавить фото',
-          onClick: () => openEditor('media'),
-        }
-      : null,
-    !hasLocation || !hasWorkFormat
-      ? {
-          id: 'location',
-          label: 'Указать локацию',
-          onClick: () => openEditor('location'),
-        }
-      : null,
-    serviceItems.length === 0
-      ? {
-          id: 'services',
-          label: 'Добавить услуги',
-          onClick: () => openEditor('services'),
-        }
-      : null,
-    scheduleDays.length === 0 && !scheduleStartValue && !scheduleEndValue
-      ? {
-          id: 'availability',
-          label: 'Настроить график',
-          onClick: () => openEditor('availability'),
-        }
-      : null,
-  ]
-    .filter(
-      (item): item is { id: string; label: string; onClick: () => void } =>
-        Boolean(item)
-    )
-    .slice(0, 2)
-
   const openFollowersSheet = useCallback(() => {
     setFollowersTotal((current) => (current > 0 ? current : followersCount))
     setIsFollowersOpen(true)
@@ -3141,100 +3102,15 @@ export const ProProfileScreen = ({
                 Добавить работу
               </button>
               <button
-                className="pro-profile-hero-action"
-                type="button"
-                onClick={() => openEditor('basic')}
-              >
-                Редактировать
-              </button>
-              <button
                 className="pro-profile-hero-action is-ghost"
                 type="button"
                 onClick={openSettings}
               >
-                Настройки
+                Редактировать
               </button>
             </div>
           </div>
           <div className="pro-profile-ig-body">
-            <div className="pro-profile-growth">
-              <div className="pro-profile-growth-head">
-                <div className="pro-profile-growth-info">
-                  <p className="pro-profile-growth-kicker">Рост профиля</p>
-                  <h3 className="pro-profile-growth-title">
-                    {profileStatusLabel}
-                  </h3>
-                </div>
-                <button
-                  className="pro-profile-growth-action"
-                  type="button"
-                  onClick={openSettings}
-                >
-                  Настроить
-                </button>
-              </div>
-              <div className="pro-profile-growth-meter" style={progressStyle}>
-                <span className="pro-profile-growth-meter-value">
-                  {profileCompletionValue}%
-                </span>
-                <div className="pro-profile-growth-meter-track">
-                  <span className="pro-profile-growth-meter-fill" />
-                </div>
-              </div>
-              <div className="pro-profile-growth-grid">
-                <button
-                  className="pro-profile-growth-tile"
-                  type="button"
-                  onClick={() => openEditor('certificates')}
-                >
-                  <span className="pro-profile-growth-tile-label">
-                    Сертификаты
-                  </span>
-                  <span
-                    className={`pro-profile-growth-tile-value${
-                      certificateCount > 0 ? '' : ' is-muted'
-                    }`}
-                  >
-                    {certificateCount > 0
-                      ? certificateCountLabel
-                      : 'Добавить'}
-                  </span>
-                </button>
-                <button
-                  className="pro-profile-growth-tile"
-                  type="button"
-                  onClick={() => handleStatTap('reviews')}
-                >
-                  <span className="pro-profile-growth-tile-label">Отзывы</span>
-                  <span
-                    className={`pro-profile-growth-tile-value${
-                      reviewCount > 0 ? '' : ' is-muted'
-                    }`}
-                  >
-                    {reviewCount > 0
-                      ? `${reviewAverage.toFixed(1)} · ${reviewCountLabel}`
-                      : 'Нет отзывов'}
-                  </span>
-                </button>
-              </div>
-              {profileQuickActions.length > 0 && (
-                <div className="pro-profile-growth-steps">
-                  <p className="pro-profile-growth-steps-label">Быстрые шаги</p>
-                  <div className="pro-profile-growth-actions" role="list">
-                    {profileQuickActions.map((action) => (
-                      <button
-                        className="pro-profile-growth-chip"
-                        key={action.id}
-                        type="button"
-                        onClick={action.onClick}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
             <div className="pro-profile-facts">
               <div
                 className="pro-profile-facts-grid"
@@ -3474,7 +3350,7 @@ export const ProProfileScreen = ({
               <div
                 className={`pro-profile-portfolio-grid${
                   isPortfolioCollapsed ? ' is-collapsed' : ''
-                }`}
+                }${isPortfolioSparse ? ' is-sparse' : ''}`}
                 role="list"
                 aria-label="Портфолио"
               >
