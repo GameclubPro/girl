@@ -614,9 +614,6 @@ export const ProProfileScreen = ({
   const missingFieldList = profileStatusSummary.missingFields
     .map((item) => missingFieldLabels[item])
     .filter((item): item is string => Boolean(item))
-  const missingPrimary = missingFieldList.slice(0, 2).join(' • ')
-  const missingExtra =
-    missingFieldList.length > 2 ? ` + ещё ${missingFieldList.length - 2}` : ''
   const progressStyle = {
     '--progress-value': `${profileCompletion}%`,
   } as CSSProperties
