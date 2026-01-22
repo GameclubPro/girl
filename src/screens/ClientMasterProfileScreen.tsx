@@ -472,7 +472,7 @@ export const ClientMasterProfileScreen = ({
   }
 
   const scrollToSection = useCallback((nextTab: MasterProfileTabId) => {
-    const sectionMap: Record<MasterProfileTabId, RefObject<HTMLElement>> = {
+    const sectionMap: Record<MasterProfileTabId, RefObject<HTMLElement | null>> = {
       overview: overviewSectionRef,
       portfolio: portfolioSectionRef,
       schedule: scheduleSectionRef,
@@ -604,7 +604,7 @@ export const ClientMasterProfileScreen = ({
     if (!profile) return
     const sections: Array<{
       id: MasterProfileTabId
-      ref: RefObject<HTMLElement>
+      ref: RefObject<HTMLElement | null>
     }> = [
       { id: 'overview', ref: overviewSectionRef },
       { id: 'portfolio', ref: portfolioSectionRef },
