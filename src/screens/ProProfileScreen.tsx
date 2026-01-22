@@ -4419,9 +4419,6 @@ export const ProProfileScreen = ({
                       {profileStatusLabel}
                     </span>
                   </div>
-                  <p className="pro-profile-settings-summary-text">
-                    {missingSummary}
-                  </p>
                 </div>
                 <div
                   className="pro-profile-settings-progress-ring"
