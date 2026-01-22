@@ -11903,7 +11903,6 @@
 
 .pro-profile-settings-screen {
   --pro-editor-savebar: 0px;
-  position: relative;
   isolation: isolate;
   background:
     radial-gradient(140% 120% at 40% -10%, rgba(var(--accent-rgb), 0.22), transparent
