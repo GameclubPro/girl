@@ -927,9 +927,7 @@ export const ProProfileScreen = ({
   const isPortfolioCollapsed = !isPortfolioExpanded
   const visiblePortfolioItems = portfolioGridItems
   const isPortfolioSparse =
-    !isPortfolioCollapsed && visiblePortfolioItems.length > 0
-      ? visiblePortfolioItems.length < 3
-      : false
+    visiblePortfolioItems.length > 0 ? visiblePortfolioItems.length < 3 : false
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
