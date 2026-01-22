@@ -231,6 +231,22 @@ const scheduleDayOptions = [
   { id: 'sun', label: 'Вс' },
 ]
 
+const schedulePresetOptions = [
+  { id: 'weekdays', label: 'Будни', days: ['mon', 'tue', 'wed', 'thu', 'fri'] },
+  { id: 'weekends', label: 'Выходные', days: ['sat', 'sun'] },
+  {
+    id: 'everyday',
+    label: 'Каждый день',
+    days: scheduleDayOptions.map((day) => day.id),
+  },
+] as const
+
+const scheduleTimePresets = [
+  { id: 'early', label: '09–17', start: '09:00', end: '17:00' },
+  { id: 'day', label: '10–19', start: '10:00', end: '19:00' },
+  { id: 'late', label: '12–21', start: '12:00', end: '21:00' },
+] as const
+
 type InlineSection = Exclude<ProProfileSection, 'portfolio'>
 type CategoryId = (typeof categoryItems)[number]['id']
 const isCategoryId = (value: string): value is CategoryId =>
@@ -568,6 +584,46 @@ export const ProProfileScreen = ({
         : worksAtMaster
           ? 'У мастера'
           : 'Формат не указан'
+  const profileStatusSummary = useMemo(
+    () => getProfileStatusSummary(profilePayload),
+    [profilePayload]
+  )
+  const profileCompletion = Math.min(
+    100,
+    Math.max(0, profileStatusSummary.completeness)
+  )
+  const profileStatusLabel =
+    profileStatusSummary.profileStatus === 'complete'
+      ? 'Профиль готов'
+      : profileStatusSummary.profileStatus === 'ready'
+        ? 'Почти готов'
+        : 'Черновик'
+  const profileStatusTone =
+    profileStatusSummary.profileStatus === 'complete'
+      ? 'is-complete'
+      : profileStatusSummary.profileStatus === 'ready'
+        ? 'is-ready'
+        : 'is-draft'
+  const missingFieldLabels: Record<string, string> = {
+    displayName: 'Имя и специализация',
+    categories: 'Категории услуг',
+    workFormat: 'Формат работы',
+    cityId: 'Город',
+    districtId: 'Район',
+  }
+  const missingFieldList = profileStatusSummary.missingFields
+    .map((item) => missingFieldLabels[item])
+    .filter((item): item is string => Boolean(item))
+  const missingPrimary = missingFieldList.slice(0, 2).join(' • ')
+  const missingExtra =
+    missingFieldList.length > 2 ? ` + ещё ${missingFieldList.length - 2}` : ''
+  const missingSummary =
+    missingFieldList.length > 0
+      ? `Нужно заполнить: ${missingPrimary}${missingExtra}`
+      : 'Профиль заполнен — клиенты видят вас полностью.'
+  const progressStyle = {
+    '--progress-value': `${profileCompletion}%`,
+  } as CSSProperties
   const reviewCount = reviewSummary?.count ?? 0
   const reviewAverage = reviewSummary?.average ?? 0
   const reviewDistribution = reviewSummary?.distribution ?? []
@@ -718,6 +774,7 @@ export const ProProfileScreen = ({
     () => serviceItems.filter((item) => item.name.trim()).map((item) => item.name),
     [serviceItems]
   )
+  const scheduleDaysSet = useMemo(() => new Set(scheduleDays), [scheduleDays])
   const scheduleDayLabels = scheduleDayOptions
     .filter((day) => scheduleDays.includes(day.id))
     .map((day) => day.label)
@@ -784,6 +841,30 @@ export const ProProfileScreen = ({
     availability: availabilitySummary,
     services: servicesSummary,
     certificates: certificatesSummary,
+  }
+  const settingsItemStatus: Record<
+    SettingsItemId,
+    { label: string; tone: 'ready' | 'required' | 'optional' }
+  > = {
+    basic: displayName.trim()
+      ? { label: 'Готово', tone: 'ready' }
+      : { label: 'Нужно', tone: 'required' },
+    location:
+      hasLocation && hasWorkFormat
+        ? { label: 'Готово', tone: 'ready' }
+        : { label: 'Нужно', tone: 'required' },
+    availability:
+      scheduleDays.length > 0 || scheduleStartValue || scheduleEndValue
+        ? { label: 'Заполнено', tone: 'ready' }
+        : { label: 'Опционально', tone: 'optional' },
+    services:
+      serviceItems.length > 0
+        ? { label: 'Готово', tone: 'ready' }
+        : { label: 'Нужно', tone: 'required' },
+    certificates:
+      certificateCount > 0
+        ? { label: 'Добавлено', tone: 'ready' }
+        : { label: 'Опционально', tone: 'optional' },
   }
   const portfolioGridItems = useMemo(
     () =>
@@ -1014,6 +1095,41 @@ export const ProProfileScreen = ({
       setSaveSuccess('')
     }, 2000)
   }
+  const settingsQuickActions = [
+    !avatarDisplayUrl
+      ? {
+          id: 'avatar',
+          label: 'Добавить фото',
+          onClick: () => openEditor('media', { returnToSettings: true }),
+        }
+      : null,
+    !hasLocation || !hasWorkFormat
+      ? {
+          id: 'location',
+          label: 'Указать локацию',
+          onClick: () => openEditor('location', { returnToSettings: true }),
+        }
+      : null,
+    serviceItems.length === 0
+      ? {
+          id: 'services',
+          label: 'Добавить услуги',
+          onClick: () => openEditor('services', { returnToSettings: true }),
+        }
+      : null,
+    scheduleDays.length === 0 && !scheduleStartValue && !scheduleEndValue
+      ? {
+          id: 'availability',
+          label: 'Настроить график',
+          onClick: () => openEditor('availability', { returnToSettings: true }),
+        }
+      : null,
+  ]
+    .filter(
+      (item): item is { id: string; label: string; onClick: () => void } =>
+        Boolean(item)
+    )
+    .slice(0, 2)
 
   const openFollowersSheet = useCallback(() => {
     setFollowersTotal((current) => (current > 0 ? current : followersCount))
@@ -4289,13 +4405,73 @@ export const ProProfileScreen = ({
                 </div>
               </div>
             </section>
-            <section className="pro-profile-settings-group animate delay-1">
+            <section className="pro-profile-settings-summary animate delay-1">
+              <div className="pro-profile-settings-summary-head">
+                <div>
+                  <p className="pro-profile-settings-kicker">Готовность профиля</p>
+                  <div className="pro-profile-settings-progress-row">
+                    <span className="pro-profile-settings-progress-value">
+                      {profileCompletion}%
+                    </span>
+                    <span
+                      className={`pro-profile-settings-status ${profileStatusTone}`}
+                    >
+                      {profileStatusLabel}
+                    </span>
+                  </div>
+                  <p className="pro-profile-settings-summary-text">
+                    {missingSummary}
+                  </p>
+                </div>
+                <div
+                  className="pro-profile-settings-progress-ring"
+                  style={progressStyle}
+                  aria-hidden="true"
+                />
+              </div>
+              <div
+                className="pro-profile-settings-progress-bar"
+                style={progressStyle}
+                aria-hidden="true"
+              >
+                <span />
+              </div>
+              {settingsQuickActions.length > 0 && (
+                <div className="pro-profile-settings-actions" role="list">
+                  {settingsQuickActions.map((action) => (
+                    <button
+                      className="pro-profile-settings-action"
+                      type="button"
+                      key={action.id}
+                      role="listitem"
+                      onClick={action.onClick}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+            <section className="pro-profile-settings-group animate delay-2">
+              <div className="pro-profile-settings-group-head">
+                <p className="pro-profile-settings-group-title">Разделы</p>
+                <span
+                  className={`pro-profile-settings-status ${profileStatusTone}`}
+                >
+                  {profileStatusSummary.isResponseReady
+                    ? 'Готов к заявкам'
+                    : 'Черновик'}
+                </span>
+              </div>
               <div className="pro-profile-settings-list" role="list">
                 {profileSettingsItems.map((item) => {
                   const Icon = item.icon
+                  const status = settingsItemStatus[item.id]
                   return (
                     <button
-                      className="pro-profile-settings-item"
+                      className={`pro-profile-settings-item${
+                        status.tone === 'required' ? ' is-required' : ''
+                      }`}
                       type="button"
                       key={item.id}
                       role="listitem"
@@ -4317,11 +4493,18 @@ export const ProProfileScreen = ({
                           {settingsHints[item.id]}
                         </span>
                       </span>
-                      <span
-                        className="pro-profile-settings-arrow"
-                        aria-hidden="true"
-                      >
-                        &gt;
+                      <span className="pro-profile-settings-tail">
+                        <span
+                          className={`pro-profile-settings-status-pill is-${status.tone}`}
+                        >
+                          {status.label}
+                        </span>
+                        <span
+                          className="pro-profile-settings-arrow"
+                          aria-hidden="true"
+                        >
+                          ›
+                        </span>
                       </span>
                     </button>
                   )
@@ -4374,6 +4557,16 @@ export const ProProfileScreen = ({
             <section className="pro-profile-editor-card">
               {editingSection === 'media' && (
                 <div className="pro-profile-editor-media">
+                  <div className="pro-profile-editor-section-head">
+                    <p className="pro-profile-editor-section-kicker">Профиль</p>
+                    <h3 className="pro-profile-editor-section-title">
+                      Фото и обложка
+                    </h3>
+                    <p className="pro-profile-editor-section-subtitle">
+                      Аватар виден во всех списках, обложка — в верхней части
+                      профиля.
+                    </p>
+                  </div>
                   <div className="pro-profile-editor-media-group">
                     <div className="pro-profile-editor-media-label">Аватар</div>
                     <div className="pro-profile-editor-media-row">
@@ -4455,99 +4648,175 @@ export const ProProfileScreen = ({
                 </div>
               )}
               {editingSection === 'basic' && (
-                <>
-                  <div className="pro-field">
-                    <label className="pro-label" htmlFor="pro-name">
-                      Имя и специализация
-                    </label>
-                    <input
-                      id="pro-name"
-                      className="pro-input"
-                      type="text"
-                      value={displayName}
-                      onChange={(event) => setDisplayName(event.target.value)}
-                      placeholder="Например, Алина • Маникюр"
-                    />
+                <div className="pro-profile-editor-stack">
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Визитка</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Имя и специализация
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Именно это увидит клиент в выдаче и в карточке профиля.
+                      </p>
+                    </div>
+                    <div className="pro-field">
+                      <label className="pro-label" htmlFor="pro-name">
+                        Имя и специализация
+                      </label>
+                      <input
+                        id="pro-name"
+                        className="pro-input"
+                        type="text"
+                        value={displayName}
+                        onChange={(event) => setDisplayName(event.target.value)}
+                        placeholder="Например, Алина • Маникюр"
+                      />
+                      <span className="pro-profile-editor-help">
+                        Коротко, без лишних слов.
+                      </span>
+                    </div>
                   </div>
-                  <div className="pro-field">
-                    <label className="pro-label" htmlFor="pro-about">
-                      Статус
-                    </label>
-                    <textarea
-                      id="pro-about"
-                      className="pro-textarea"
-                      value={about}
-                      onChange={(event) => setAbout(event.target.value)}
-                      placeholder="Короткий статус, что важно клиенту"
-                      rows={4}
-                    />
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Статус</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Коротко о вас
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        1–2 предложения о подходе, стиле или преимуществах.
+                      </p>
+                    </div>
+                    <div className="pro-field">
+                      <label className="pro-label" htmlFor="pro-about">
+                        Статус
+                      </label>
+                      <textarea
+                        id="pro-about"
+                        className="pro-textarea"
+                        value={about}
+                        onChange={(event) => setAbout(event.target.value)}
+                        placeholder="Короткий статус, что важно клиенту"
+                        rows={4}
+                      />
+                      <span className="pro-profile-editor-help">
+                        Можно указать уникальность или ключевой опыт.
+                      </span>
+                    </div>
                   </div>
-                </>
+                  <div className="pro-profile-editor-preview">
+                    <p className="pro-profile-editor-preview-title">
+                      Предпросмотр
+                    </p>
+                    <div className="pro-profile-editor-preview-card">
+                      <div className="pro-profile-editor-preview-avatar">
+                        {avatarDisplayUrl ? (
+                          <img
+                            src={avatarDisplayUrl}
+                            alt={`Аватар ${displayNameValue}`}
+                          />
+                        ) : (
+                          <span aria-hidden="true">{profileInitials}</span>
+                        )}
+                      </div>
+                      <div className="pro-profile-editor-preview-body">
+                        <p className="pro-profile-editor-preview-name">
+                          {displayNameValue}
+                        </p>
+                        <p className="pro-profile-editor-preview-meta">
+                          {aboutPreview}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {editingSection === 'location' && (
-                <>
-                  <div className="pro-field pro-field--split">
-                    <div>
-                      <label className="pro-label" htmlFor="pro-city">
-                        Город
-                      </label>
-                      <select
-                        id="pro-city"
-                        className="pro-select"
-                        value={cityId ?? ''}
-                        onChange={(event) => {
-                          const nextValue = event.target.value
-                          if (!nextValue) {
-                            setCityId(null)
-                            return
-                          }
-                          const parsedValue = Number(nextValue)
-                          setCityId(Number.isInteger(parsedValue) ? parsedValue : null)
-                        }}
-                      >
-                        <option value="">Выберите город</option>
-                        {cities.map((city) => (
-                          <option key={city.id} value={city.id}>
-                            {city.name}
-                          </option>
-                        ))}
-                      </select>
+                <div className="pro-profile-editor-stack">
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Локация</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Город и район
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Помогает клиентам быстрее находить вас рядом.
+                      </p>
                     </div>
-                    <div>
-                      <label className="pro-label" htmlFor="pro-district">
-                        Район
-                      </label>
-                      <select
-                        id="pro-district"
-                        className="pro-select"
-                        value={districtId ?? ''}
-                        onChange={(event) => {
-                          const nextValue = event.target.value
-                          if (!nextValue) {
-                            setDistrictId(null)
-                            return
-                          }
-                          const parsedValue = Number(nextValue)
-                          setDistrictId(
-                            Number.isInteger(parsedValue) ? parsedValue : null
-                          )
-                        }}
-                        disabled={!cityId || districts.length === 0}
-                      >
-                        <option value="">
-                          {cityId ? 'Выберите район' : 'Сначала выберите город'}
-                        </option>
-                        {districts.map((district) => (
-                          <option key={district.id} value={district.id}>
-                            {district.name}
+                    <div className="pro-field pro-field--split">
+                      <div>
+                        <label className="pro-label" htmlFor="pro-city">
+                          Город
+                        </label>
+                        <select
+                          id="pro-city"
+                          className="pro-select"
+                          value={cityId ?? ''}
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            if (!nextValue) {
+                              setCityId(null)
+                              return
+                            }
+                            const parsedValue = Number(nextValue)
+                            setCityId(
+                              Number.isInteger(parsedValue) ? parsedValue : null
+                            )
+                          }}
+                        >
+                          <option value="">Выберите город</option>
+                          {cities.map((city) => (
+                            <option key={city.id} value={city.id}>
+                              {city.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="pro-label" htmlFor="pro-district">
+                          Район
+                        </label>
+                        <select
+                          id="pro-district"
+                          className="pro-select"
+                          value={districtId ?? ''}
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            if (!nextValue) {
+                              setDistrictId(null)
+                              return
+                            }
+                            const parsedValue = Number(nextValue)
+                            setDistrictId(
+                              Number.isInteger(parsedValue) ? parsedValue : null
+                            )
+                          }}
+                          disabled={!cityId || districts.length === 0}
+                        >
+                          <option value="">
+                            {cityId ? 'Выберите район' : 'Сначала выберите город'}
                           </option>
-                        ))}
-                      </select>
+                          {districts.map((district) => (
+                            <option key={district.id} value={district.id}>
+                              {district.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
-                  <div className="pro-field">
-                    <span className="pro-label">Геолокация (по желанию)</span>
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">
+                        Геолокация
+                      </p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Поделиться координатой
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Мы показываем примерное расстояние, а не точный адрес.
+                      </p>
+                    </div>
                     <div className="pro-geo-card">
                       <div className="pro-geo-row">
                         <div>
@@ -4600,64 +4869,180 @@ export const ProProfileScreen = ({
                         <p className="pro-geo-error">{locationError}</p>
                       )}
                     </div>
+                    <p className="pro-profile-editor-note">
+                      Точный адрес видите только вы.
+                    </p>
                   </div>
-                  <div className="pro-field">
-                    <label className="pro-label" htmlFor="experience">
-                      Опыт (лет)
-                    </label>
-                    <input
-                      id="experience"
-                      className="pro-input"
-                      type="number"
-                      value={experienceYears}
-                      onChange={(event) => setExperienceYears(event.target.value)}
-                      placeholder="3"
-                      min="0"
-                    />
-                  </div>
-                  <div className="pro-field">
-                    <span className="pro-label">Формат работы</span>
-                    <div className="pro-toggle-grid">
-                      <label className="pro-toggle">
-                        <input
-                          type="checkbox"
-                          checked={worksAtMaster}
-                          onChange={(event) =>
-                            setWorksAtMaster(event.target.checked)
-                          }
-                        />
-                        У мастера
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">
+                        Опыт и формат
+                      </p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Как вы работаете
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Эти параметры влияют на фильтры и выдачу.
+                      </p>
+                    </div>
+                    <div className="pro-field">
+                      <label className="pro-label" htmlFor="experience">
+                        Опыт (лет)
                       </label>
-                      <label className="pro-toggle">
-                        <input
-                          type="checkbox"
-                          checked={worksAtClient}
-                          onChange={(event) =>
-                            setWorksAtClient(event.target.checked)
-                          }
-                        />
-                        Выезд к клиенту
-                      </label>
+                      <input
+                        id="experience"
+                        className="pro-input"
+                        type="number"
+                        value={experienceYears}
+                        onChange={(event) => setExperienceYears(event.target.value)}
+                        placeholder="3"
+                        min="0"
+                      />
+                    </div>
+                    <div className="pro-field">
+                      <span className="pro-label">Формат работы</span>
+                      <div className="pro-profile-editor-toggle-grid">
+                        <label
+                          className={`pro-profile-editor-toggle-card${
+                            worksAtMaster ? ' is-active' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={worksAtMaster}
+                            onChange={(event) =>
+                              setWorksAtMaster(event.target.checked)
+                            }
+                          />
+                          <span className="pro-profile-editor-toggle-icon">
+                            <IconHomeMaster />
+                          </span>
+                          <span className="pro-profile-editor-toggle-body">
+                            <span className="pro-profile-editor-toggle-title">
+                              У мастера
+                            </span>
+                            <span className="pro-profile-editor-toggle-subtitle">
+                              Кабинет или студия
+                            </span>
+                          </span>
+                          <span
+                            className="pro-profile-editor-toggle-check"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+                        </label>
+                        <label
+                          className={`pro-profile-editor-toggle-card${
+                            worksAtClient ? ' is-active' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={worksAtClient}
+                            onChange={(event) =>
+                              setWorksAtClient(event.target.checked)
+                            }
+                          />
+                          <span className="pro-profile-editor-toggle-icon">
+                            <IconClientVisit />
+                          </span>
+                          <span className="pro-profile-editor-toggle-body">
+                            <span className="pro-profile-editor-toggle-title">
+                              Выезд к клиенту
+                            </span>
+                            <span className="pro-profile-editor-toggle-subtitle">
+                              Дома или в офисе
+                            </span>
+                          </span>
+                          <span
+                            className="pro-profile-editor-toggle-check"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
               {editingSection === 'availability' && (
-                <>
-                  <div className="pro-field">
-                    <span className="pro-label">Статус</span>
-                    <label className="pro-toggle">
+                <div className="pro-profile-editor-stack">
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Статус</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Принимаете заявки
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Можно быстро поставить паузу, если заняты.
+                      </p>
+                    </div>
+                    <label
+                      className={`pro-profile-editor-toggle-card is-wide${
+                        isActive ? ' is-active' : ''
+                      }`}
+                    >
                       <input
                         type="checkbox"
                         checked={isActive}
                         onChange={(event) => setIsActive(event.target.checked)}
                       />
-                      Принимаю заявки
+                      <span className="pro-profile-editor-toggle-body">
+                        <span className="pro-profile-editor-toggle-title">
+                          Принимаю заявки
+                        </span>
+                        <span className="pro-profile-editor-toggle-subtitle">
+                          Клиенты могут писать сейчас
+                        </span>
+                      </span>
+                      <span
+                        className="pro-profile-editor-toggle-check"
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
                     </label>
                   </div>
-                  <div className="pro-field">
-                    <span className="pro-label">Дни работы</span>
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">График</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Дни и время работы
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Можно выбрать пресет и уточнить вручную.
+                      </p>
+                    </div>
+                    <div className="pro-profile-editor-presets">
+                      {schedulePresetOptions.map((preset) => {
+                        const isPresetActive =
+                          preset.days.length === scheduleDays.length &&
+                          preset.days.every((day) => scheduleDaysSet.has(day))
+                        return (
+                          <button
+                            className={`pro-profile-editor-preset${
+                              isPresetActive ? ' is-active' : ''
+                            }`}
+                            key={preset.id}
+                            type="button"
+                            aria-pressed={isPresetActive}
+                            onClick={() => setScheduleDays([...preset.days])}
+                          >
+                            {preset.label}
+                          </button>
+                        )
+                      })}
+                      <button
+                        className="pro-profile-editor-preset is-ghost"
+                        type="button"
+                        onClick={() => setScheduleDays([])}
+                      >
+                        Сбросить
+                      </button>
+                    </div>
                     <div className="request-chips">
                       {scheduleDayOptions.map((day) => (
                         <button
@@ -4673,38 +5058,103 @@ export const ProProfileScreen = ({
                         </button>
                       ))}
                     </div>
-                  </div>
-                  <div className="pro-field pro-field--split">
-                    <div>
-                      <label className="pro-label" htmlFor="schedule-start">
-                        Начало
-                      </label>
-                      <input
-                        id="schedule-start"
-                        className="pro-input"
-                        type="time"
-                        value={scheduleStart}
-                        onChange={(event) => setScheduleStart(event.target.value)}
-                      />
+                    <div className="pro-profile-editor-presets is-time">
+                      {scheduleTimePresets.map((preset) => {
+                        const isPresetActive =
+                          scheduleStartValue === preset.start &&
+                          scheduleEndValue === preset.end
+                        return (
+                          <button
+                            className={`pro-profile-editor-preset${
+                              isPresetActive ? ' is-active' : ''
+                            }`}
+                            key={preset.id}
+                            type="button"
+                            aria-pressed={isPresetActive}
+                            onClick={() => {
+                              setScheduleStart(preset.start)
+                              setScheduleEnd(preset.end)
+                            }}
+                          >
+                            {preset.label}
+                          </button>
+                        )
+                      })}
+                      <button
+                        className="pro-profile-editor-preset is-ghost"
+                        type="button"
+                        onClick={() => {
+                          setScheduleStart('')
+                          setScheduleEnd('')
+                        }}
+                      >
+                        Без времени
+                      </button>
                     </div>
-                    <div>
-                      <label className="pro-label" htmlFor="schedule-end">
-                        Окончание
-                      </label>
-                      <input
-                        id="schedule-end"
-                        className="pro-input"
-                        type="time"
-                        value={scheduleEnd}
-                        onChange={(event) => setScheduleEnd(event.target.value)}
-                      />
+                    <div className="pro-field pro-field--split">
+                      <div>
+                        <label className="pro-label" htmlFor="schedule-start">
+                          Начало
+                        </label>
+                        <input
+                          id="schedule-start"
+                          className="pro-input"
+                          type="time"
+                          value={scheduleStart}
+                          onChange={(event) =>
+                            setScheduleStart(event.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="pro-label" htmlFor="schedule-end">
+                          Окончание
+                        </label>
+                        <input
+                          id="schedule-end"
+                          className="pro-input"
+                          type="time"
+                          value={scheduleEnd}
+                          onChange={(event) => setScheduleEnd(event.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
               {editingSection === 'services' && (
-                <>
+                <div className="pro-profile-editor-stack">
+                  <div className="pro-profile-editor-section pro-profile-editor-section--summary">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Услуги</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Каталог и прайс
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Добавьте услуги, чтобы клиенту сразу было понятно, сколько
+                        это стоит.
+                      </p>
+                    </div>
+                    <div className="pro-profile-editor-metrics">
+                      <div className="pro-profile-editor-metric">
+                        <span className="pro-profile-editor-metric-label">
+                          Услуг
+                        </span>
+                        <span className="pro-profile-editor-metric-value">
+                          {selectedServicesLabel}
+                        </span>
+                      </div>
+                      <div className="pro-profile-editor-metric">
+                        <span className="pro-profile-editor-metric-label">
+                          Цены
+                        </span>
+                        <span className="pro-profile-editor-metric-value">
+                          {servicePriceLabel || 'Не указано'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                   <div className="pro-service-block pro-service-block--category">
                     <div className="pro-service-panel-head">
                       <span className="pro-label">Категория</span>
@@ -4986,36 +5436,53 @@ export const ProProfileScreen = ({
                     </div>
                   </div>
 
-                </>
+                </div>
               )}
 
               {editingSection === 'certificates' && (
-                <div className="pro-profile-editor-certificates">
-                  <div className="pro-profile-editor-certificates-head">
-                    <div>
-                      <p className="pro-profile-editor-certificates-kicker">
-                        Сертификаты
+                <div className="pro-profile-editor-stack">
+                  <div className="pro-profile-editor-highlight">
+                    <div className="pro-profile-editor-highlight-icon">
+                      <IconCertificate />
+                    </div>
+                    <div className="pro-profile-editor-highlight-body">
+                      <p className="pro-profile-editor-highlight-title">
+                        Доверие и квалификация
                       </p>
-                      <h3 className="pro-profile-editor-certificates-title">
-                        Подтвердите квалификацию
-                      </h3>
-                      <p className="pro-profile-editor-certificates-subtitle">
-                        Добавьте дипломы и курсы, чтобы клиентам было проще
-                        выбрать вас. Любой формат — мы аккуратно подгоним превью.
+                      <p className="pro-profile-editor-highlight-subtitle">
+                        Сертификаты повышают уверенность клиентов в выборе.
                       </p>
                     </div>
-                    <button
-                      className="pro-profile-editor-certificates-add"
-                      type="button"
-                      onClick={handleCertificateAddClick}
-                      disabled={
-                        isCertificatesUploading ||
-                        certificates.length >= MAX_CERTIFICATES
-                      }
-                    >
-                      + Добавить
-                    </button>
+                    <span className="pro-profile-editor-highlight-pill">
+                      {certificatesSummary}
+                    </span>
                   </div>
+                  <div className="pro-profile-editor-certificates">
+                    <div className="pro-profile-editor-certificates-head">
+                      <div>
+                        <p className="pro-profile-editor-certificates-kicker">
+                          Сертификаты
+                        </p>
+                        <h3 className="pro-profile-editor-certificates-title">
+                          Подтвердите квалификацию
+                        </h3>
+                        <p className="pro-profile-editor-certificates-subtitle">
+                          Добавьте дипломы и курсы, чтобы клиентам было проще
+                          выбрать вас. Любой формат — мы аккуратно подгоним превью.
+                        </p>
+                      </div>
+                      <button
+                        className="pro-profile-editor-certificates-add"
+                        type="button"
+                        onClick={handleCertificateAddClick}
+                        disabled={
+                          isCertificatesUploading ||
+                          certificates.length >= MAX_CERTIFICATES
+                        }
+                      >
+                        + Добавить
+                      </button>
+                    </div>
 
                   <input
                     ref={certificateUploadInputRef}
@@ -5045,143 +5512,150 @@ export const ProProfileScreen = ({
                     </div>
                   )}
 
-                  <div className="pro-profile-editor-certificates-list">
-                    {certificates.length > 0 ? (
-                      certificates.map((certificate) => {
-                        const title = certificate.title?.trim() || ''
-                        const certificateStyle = certificateRatios[certificate.id]
-                          ? ({
-                              '--certificate-ratio': certificateRatios[certificate.id],
-                            } as CSSProperties)
-                          : undefined
-                        return (
-                          <div
-                            className="pro-profile-editor-certificate-card"
-                            key={certificate.id}
-                          >
-                            <button
-                              className="pro-profile-editor-certificate-media"
-                              type="button"
-                              onClick={() => handleCertificateReplaceClick(certificate.id)}
-                              aria-label="Загрузить изображение сертификата"
-                              style={certificateStyle}
+                    <div className="pro-profile-editor-certificates-list">
+                      {certificates.length > 0 ? (
+                        certificates.map((certificate) => {
+                          const title = certificate.title?.trim() || ''
+                          const certificateStyle = certificateRatios[certificate.id]
+                            ? ({
+                                '--certificate-ratio': certificateRatios[certificate.id],
+                              } as CSSProperties)
+                            : undefined
+                          return (
+                            <div
+                              className="pro-profile-editor-certificate-card"
+                              key={certificate.id}
                             >
-                              {certificate.url ? (
-                                <img
-                                  src={certificate.url}
-                                  alt=""
-                                  loading="lazy"
-                                  onLoad={(event) =>
-                                    handleCertificateImageLoad(
-                                      certificate.id,
-                                      event.currentTarget
-                                    )
-                                  }
-                                />
-                              ) : (
-                                <span className="pro-profile-editor-certificate-fallback">
-                                  Добавить фото
-                                </span>
-                              )}
-                            </button>
-                            <div className="pro-profile-editor-certificate-fields">
-                              <label className="pro-profile-editor-certificate-field">
-                                <span className="pro-label">Название</span>
-                                <input
-                                  className="pro-input"
-                                  type="text"
-                                  value={title}
-                                  onChange={(event) =>
-                                    updateCertificate(certificate.id, {
-                                      title: event.target.value,
-                                    })
-                                  }
-                                  placeholder="Сертификат повышения квалификации"
-                                />
-                              </label>
-                              <div className="pro-profile-editor-certificate-row">
+                              <button
+                                className="pro-profile-editor-certificate-media"
+                                type="button"
+                                onClick={() =>
+                                  handleCertificateReplaceClick(certificate.id)
+                                }
+                                aria-label="Загрузить изображение сертификата"
+                                style={certificateStyle}
+                              >
+                                {certificate.url ? (
+                                  <img
+                                    src={certificate.url}
+                                    alt=""
+                                    loading="lazy"
+                                    onLoad={(event) =>
+                                      handleCertificateImageLoad(
+                                        certificate.id,
+                                        event.currentTarget
+                                      )
+                                    }
+                                  />
+                                ) : (
+                                  <span className="pro-profile-editor-certificate-fallback">
+                                    Добавить фото
+                                  </span>
+                                )}
+                              </button>
+                              <div className="pro-profile-editor-certificate-fields">
                                 <label className="pro-profile-editor-certificate-field">
-                                  <span className="pro-label">Организация</span>
+                                  <span className="pro-label">Название</span>
                                   <input
                                     className="pro-input"
                                     type="text"
-                                    value={certificate.issuer ?? ''}
+                                    value={title}
                                     onChange={(event) =>
                                       updateCertificate(certificate.id, {
-                                        issuer: event.target.value,
+                                        title: event.target.value,
                                       })
                                     }
-                                    placeholder="Название школы"
+                                    placeholder="Сертификат повышения квалификации"
                                   />
                                 </label>
+                                <div className="pro-profile-editor-certificate-row">
+                                  <label className="pro-profile-editor-certificate-field">
+                                    <span className="pro-label">Организация</span>
+                                    <input
+                                      className="pro-input"
+                                      type="text"
+                                      value={certificate.issuer ?? ''}
+                                      onChange={(event) =>
+                                        updateCertificate(certificate.id, {
+                                          issuer: event.target.value,
+                                        })
+                                      }
+                                      placeholder="Название школы"
+                                    />
+                                  </label>
+                                  <label className="pro-profile-editor-certificate-field">
+                                    <span className="pro-label">Год</span>
+                                    <input
+                                      className="pro-input"
+                                      type="number"
+                                      min="1900"
+                                      max={new Date().getFullYear() + 1}
+                                      value={certificate.year ?? ''}
+                                      onChange={(event) => {
+                                        const raw = event.target.value.trim()
+                                        if (!raw) {
+                                          updateCertificate(certificate.id, {
+                                            year: null,
+                                          })
+                                          return
+                                        }
+                                        const parsed = Number(raw)
+                                        updateCertificate(certificate.id, {
+                                          year: Number.isFinite(parsed)
+                                            ? Math.round(parsed)
+                                            : null,
+                                        })
+                                      }}
+                                      placeholder="2024"
+                                    />
+                                  </label>
+                                </div>
                                 <label className="pro-profile-editor-certificate-field">
-                                  <span className="pro-label">Год</span>
+                                  <span className="pro-label">
+                                    Ссылка на проверку
+                                  </span>
                                   <input
                                     className="pro-input"
-                                    type="number"
-                                    min="1900"
-                                    max={new Date().getFullYear() + 1}
-                                    value={certificate.year ?? ''}
-                                    onChange={(event) => {
-                                      const raw = event.target.value.trim()
-                                      if (!raw) {
-                                        updateCertificate(certificate.id, {
-                                          year: null,
-                                        })
-                                        return
-                                      }
-                                      const parsed = Number(raw)
+                                    type="url"
+                                    inputMode="url"
+                                    value={certificate.verifyUrl ?? ''}
+                                    onChange={(event) =>
                                       updateCertificate(certificate.id, {
-                                        year: Number.isFinite(parsed)
-                                          ? Math.round(parsed)
-                                          : null,
+                                        verifyUrl: event.target.value,
                                       })
-                                    }}
-                                    placeholder="2024"
+                                    }
+                                    placeholder="https://..."
                                   />
                                 </label>
                               </div>
-                              <label className="pro-profile-editor-certificate-field">
-                                <span className="pro-label">Ссылка на проверку</span>
-                                <input
-                                  className="pro-input"
-                                  type="url"
-                                  inputMode="url"
-                                  value={certificate.verifyUrl ?? ''}
-                                  onChange={(event) =>
-                                    updateCertificate(certificate.id, {
-                                      verifyUrl: event.target.value,
-                                    })
+                              <div className="pro-profile-editor-certificate-actions">
+                                <button
+                                  className="pro-profile-editor-certificate-action"
+                                  type="button"
+                                  onClick={() =>
+                                    handleCertificateReplaceClick(certificate.id)
                                   }
-                                  placeholder="https://..."
-                                />
-                              </label>
+                                >
+                                  Заменить фото
+                                </button>
+                                <button
+                                  className="pro-profile-editor-certificate-action is-danger"
+                                  type="button"
+                                  onClick={() => removeCertificate(certificate.id)}
+                                >
+                                  Удалить
+                                </button>
+                              </div>
                             </div>
-                            <div className="pro-profile-editor-certificate-actions">
-                              <button
-                                className="pro-profile-editor-certificate-action"
-                                type="button"
-                                onClick={() => handleCertificateReplaceClick(certificate.id)}
-                              >
-                                Заменить фото
-                              </button>
-                              <button
-                                className="pro-profile-editor-certificate-action is-danger"
-                                type="button"
-                                onClick={() => removeCertificate(certificate.id)}
-                              >
-                                Удалить
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div className="pro-profile-editor-certificates-empty">
-                        Пока нет сертификатов. Добавьте первый, чтобы повысить
-                        доверие.
-                      </div>
-                    )}
+                          )
+                        })
+                      ) : (
+                        <div className="pro-profile-editor-certificates-empty">
+                          Пока нет сертификатов. Добавьте первый, чтобы повысить
+                          доверие.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
