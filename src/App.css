@@ -11913,20 +11913,23 @@
 
 .pro-profile-settings-shell {
   width: min(420px, 100%);
-  gap: 16px;
+  gap: 14px;
   padding-bottom: calc(120px + var(--safe-bottom));
 }
 
 .pro-profile-settings-hero {
   position: relative;
   border-radius: 26px;
-  padding: 16px 16px 18px;
+  padding: 14px 16px 16px;
   background:
     radial-gradient(140% 160% at 20% 0%, rgba(var(--accent-rgb), 0.18), transparent
         55%),
     rgba(var(--paper-rgb), 0.96);
-  box-shadow: 0 20px 34px rgba(var(--shadow-rgb), 0.14);
+  border: 1px solid rgba(var(--shadow-rgb), 0.08);
+  box-shadow: 0 16px 28px rgba(var(--shadow-rgb), 0.14);
   overflow: hidden;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .pro-profile-settings-hero::before {
@@ -11950,7 +11953,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .pro-profile-settings-title {
@@ -11965,7 +11968,7 @@
 .pro-profile-settings-identity {
   display: grid;
   justify-items: center;
-  gap: 10px;
+  gap: 8px;
   text-align: center;
 }
 
@@ -12050,14 +12053,14 @@
 
 .pro-profile-settings-name {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--pro-ink);
 }
 
 .pro-profile-settings-meta {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--pro-muted);
 }
@@ -12068,7 +12071,29 @@
   padding: 10px 12px;
   display: grid;
   gap: 8px;
-  box-shadow: 0 18px 30px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 16px 26px rgba(var(--shadow-rgb), 0.12);
+  border: 1px solid rgba(var(--shadow-rgb), 0.08);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.pro-profile-settings-summary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(var(--accent-rgb), 0.12), transparent
+        45%),
+    radial-gradient(140% 140% at 100% 0%, rgba(var(--raspberry-rgb), 0.1), transparent
+        45%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.pro-profile-settings-summary > * {
+  position: relative;
 }
 
 .pro-profile-settings-summary-head {
@@ -12115,8 +12140,8 @@
 
 .pro-profile-settings-status {
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 10px;
+  padding: 5px 9px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -12215,20 +12240,37 @@
 .pro-profile-settings-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  align-items: center;
 }
 
 .pro-profile-settings-action {
   border: none;
   border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 11px;
+  padding: 7px 12px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--accent-strong);
-  background: rgba(var(--accent-rgb), 0.12);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: linear-gradient(
+    160deg,
+    rgba(var(--accent-rgb), 0.18),
+    rgba(var(--paper-rgb), 0.96)
+  );
+  box-shadow:
+    0 10px 16px rgba(var(--accent-rgb), 0.14),
+    inset 0 0 0 1px rgba(var(--accent-rgb), 0.2);
   cursor: pointer;
   font-family: inherit;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.pro-profile-settings-action:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 6px 12px rgba(var(--accent-rgb), 0.12),
+    inset 0 0 0 1px rgba(var(--accent-rgb), 0.2);
 }
 
 .pro-profile-settings-action:focus-visible {
@@ -12238,9 +12280,12 @@
 
 .pro-profile-settings-group {
   border-radius: 26px;
-  background: rgba(var(--paper-rgb), 0.96);
-  box-shadow: 0 18px 30px rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.95);
+  box-shadow: 0 16px 26px rgba(var(--shadow-rgb), 0.12);
   overflow: hidden;
+  border: 1px solid rgba(var(--shadow-rgb), 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .pro-profile-settings-group-head {
@@ -12248,9 +12293,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-bottom: 1px solid rgba(var(--shadow-rgb), 0.08);
-  background: rgba(var(--paper-rgb), 0.94);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--paper-rgb), 0.98) 0%,
+    rgba(var(--paper-rgb), 0.92) 100%
+  );
 }
 
 .pro-profile-settings-group-title {
@@ -12273,7 +12322,7 @@
   width: 100%;
   border: none;
   background: transparent;
-  padding: 14px 16px;
+  padding: 13px 14px;
   min-height: 62px;
   font-size: 14px;
   font-weight: 700;
@@ -12282,7 +12331,7 @@
   text-align: left;
   appearance: none;
   font-family: inherit;
-  transition: background 0.18s ease, transform 0.18s ease;
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .pro-profile-settings-item.is-required .pro-profile-settings-icon {
@@ -12303,19 +12352,26 @@
 .pro-profile-settings-item:active {
   background: rgba(var(--accent-rgb), 0.08);
   transform: translateY(1px);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.12);
 }
 
 .pro-profile-settings-icon {
   width: 46px;
   height: 46px;
   border-radius: 16px;
-  background: rgba(var(--accent-rgb), 0.12);
+  background: linear-gradient(
+    150deg,
+    rgba(var(--accent-rgb), 0.18),
+    rgba(var(--raspberry-rgb), 0.12)
+  );
   color: var(--accent-strong);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.14);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--accent-rgb), 0.16),
+    0 8px 14px rgba(var(--shadow-rgb), 0.12);
 }
 
 .pro-profile-settings-icon svg,
@@ -12575,7 +12631,18 @@
 
 @media (max-width: 360px) {
   .pro-profile-settings-summary-head {
-    grid-template-columns: minmax(0, 1fr);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .pro-profile-settings-progress-ring {
+    width: 44px;
+    height: 44px;
+  }
+
+  .pro-profile-settings-progress-value {
+    font-size: 12.5px;
   }
 
   .pro-profile-editor-highlight {
