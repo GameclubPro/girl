@@ -611,9 +611,6 @@ export const ProProfileScreen = ({
     cityId: 'Город',
     districtId: 'Район',
   }
-  const missingFieldList = profileStatusSummary.missingFields
-    .map((item) => missingFieldLabels[item])
-    .filter((item): item is string => Boolean(item))
   const progressStyle = {
     '--progress-value': `${profileCompletion}%`,
   } as CSSProperties
