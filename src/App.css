@@ -67,14 +67,14 @@
   --start-raspberry-rgb: 224, 45, 98;
   background: linear-gradient(
     45deg,
-    rgba(var(--start-sapphire-rgb), 0.7) 0%,
-    rgba(var(--start-sapphire-rgb), 0.38) 32%,
-    #ffffff 50%,
-    #ffffff 54%,
-    rgba(var(--start-raspberry-rgb), 0.14) 70%,
-    rgba(var(--start-raspberry-rgb), 0.32) 82%,
-    rgba(var(--start-raspberry-rgb), 0.64) 92%,
-    rgba(var(--start-raspberry-rgb), 1) 100%
+    rgba(var(--start-sapphire-rgb), 0.32) 0%,
+    rgba(var(--start-sapphire-rgb), 0.14) 30%,
+    #ffffff 48%,
+    #ffffff 58%,
+    rgba(var(--start-raspberry-rgb), 0.08) 72%,
+    rgba(var(--start-raspberry-rgb), 0.18) 84%,
+    rgba(var(--start-raspberry-rgb), 0.38) 94%,
+    rgba(var(--start-raspberry-rgb), 0.7) 100%
   );
   padding: calc(18px + var(--safe-top) + var(--tg-top-offset)) 22px
     calc(30px + var(--safe-bottom));
