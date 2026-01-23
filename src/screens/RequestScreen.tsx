@@ -9,10 +9,7 @@ import {
 } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { categoryItems } from '../data/clientData'
-import {
-  requestBudgetOptions,
-  requestServiceCatalog,
-} from '../data/requestData'
+import { requestBudgetPresets, requestServiceCatalog } from '../data/requestData'
 import { useTelegramMainButton } from '../hooks/useTelegramMainButton'
 import {
   loadClientPreferences,
@@ -36,6 +33,16 @@ const dateOptions = [
   { value: 'choose', label: 'Выбрать' },
 ] as const
 
+const timeWindowOptions = [
+  { value: 'any', label: 'Не важно' },
+  { value: 'morning', label: 'Утро' },
+  { value: 'afternoon', label: 'День' },
+  { value: 'evening', label: 'Вечер' },
+  { value: 'exact', label: 'Точно' },
+] as const
+
+const durationOptions = [30, 60, 90, 120] as const
+
 const requestSteps = [
   { id: 'service', title: 'Услуга' },
   { id: 'location', title: 'Локация' },
@@ -43,10 +50,11 @@ const requestSteps = [
   { id: 'details', title: 'Детали' },
 ] as const
 
-type RequestBudgetOption = (typeof requestBudgetOptions)[number]
+type RequestBudgetPreset = (typeof requestBudgetPresets)[number]
 
-const isRequestBudgetOption = (value: string): value is RequestBudgetOption =>
-  requestBudgetOptions.some((option) => option === value)
+const resolveBudgetPreset = (label?: string) =>
+  requestBudgetPresets.find((preset) => preset.label === label) ??
+  requestBudgetPresets[0]
 
 type RequestScreenProps = {
   apiBase: string
@@ -120,20 +128,49 @@ export const RequestScreen = ({
     )
       ? preferencesRef.current.defaultDateOption
       : 'today'
-  const initialBudget =
-    preferencesRef.current.defaultBudget &&
-    isRequestBudgetOption(preferencesRef.current.defaultBudget)
-      ? preferencesRef.current.defaultBudget
-      : requestBudgetOptions[0] ?? 'не важно'
+  const initialBudgetPreset = resolveBudgetPreset(
+    preferencesRef.current.defaultBudget
+  )
+  const initialTimeWindow =
+    preferencesRef.current.defaultTimeWindow &&
+    timeWindowOptions.some(
+      (option) => option.value === preferencesRef.current.defaultTimeWindow
+    )
+      ? preferencesRef.current.defaultTimeWindow
+      : 'any'
+  const initialDurationOption =
+    typeof preferencesRef.current.defaultDurationMinutes === 'number'
+      ? preferencesRef.current.defaultDurationMinutes
+      : 60
   const [locationType, setLocationType] = useState<
     (typeof locationOptions)[number]['value']
   >(initialLocationType)
   const [dateOption, setDateOption] = useState<
     (typeof dateOptions)[number]['value']
   >(initialDateOption)
+  const [timeWindow, setTimeWindow] = useState<
+    (typeof timeWindowOptions)[number]['value']
+  >(initialTimeWindow)
   const [dateValue, setDateValue] = useState('')
   const [timeValue, setTimeValue] = useState('')
-  const [budget, setBudget] = useState<RequestBudgetOption>(initialBudget)
+  const [budgetPreset, setBudgetPreset] =
+    useState<RequestBudgetPreset>(initialBudgetPreset)
+  const [customBudgetMin, setCustomBudgetMin] = useState(
+    preferencesRef.current.defaultBudgetMin?.toString() ?? ''
+  )
+  const [customBudgetMax, setCustomBudgetMax] = useState(
+    preferencesRef.current.defaultBudgetMax?.toString() ?? ''
+  )
+  const [durationOption, setDurationOption] = useState<number | 'custom'>(
+    durationOptions.includes(initialDurationOption as (typeof durationOptions)[number])
+      ? (initialDurationOption as (typeof durationOptions)[number])
+      : 'custom'
+  )
+  const [customDuration, setCustomDuration] = useState(
+    durationOptions.includes(initialDurationOption as (typeof durationOptions)[number])
+      ? ''
+      : String(initialDurationOption)
+  )
   const [details, setDetails] = useState('')
   const [photos, setPhotos] = useState<RequestPhoto[]>([])
   const [uploadError, setUploadError] = useState('')
@@ -143,6 +180,7 @@ export const RequestScreen = ({
   const [submitSuccess, setSubmitSuccess] = useState('')
   const [step, setStep] = useState(0)
   const [hasTelegramMainButton, setHasTelegramMainButton] = useState(false)
+  const [hasTelegramWebApp, setHasTelegramWebApp] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const maxPhotos = 5
   const maxUploadBytes = 6 * 1024 * 1024
@@ -164,6 +202,7 @@ export const RequestScreen = ({
 
   useEffect(() => {
     setHasTelegramMainButton(Boolean(window.Telegram?.WebApp?.MainButton))
+    setHasTelegramWebApp(Boolean(window.Telegram?.WebApp))
   }, [])
 
   useEffect(() => {
@@ -202,9 +241,26 @@ export const RequestScreen = ({
       defaultCategoryId: categoryId,
       defaultLocationType: locationType,
       defaultDateOption: dateOption,
-      defaultBudget: budget,
+      defaultBudget: budgetPreset.label,
+      defaultBudgetMin: customBudgetMin ? Number(customBudgetMin) : null,
+      defaultBudgetMax: customBudgetMax ? Number(customBudgetMax) : null,
+      defaultTimeWindow: timeWindow,
+      defaultDurationMinutes:
+        durationOption === 'custom'
+          ? Number(customDuration) || undefined
+          : durationOption,
     }))
-  }, [budget, categoryId, dateOption, locationType])
+  }, [
+    budgetPreset.label,
+    categoryId,
+    customBudgetMax,
+    customBudgetMin,
+    customDuration,
+    dateOption,
+    durationOption,
+    locationType,
+    timeWindow,
+  ])
 
   useEffect(() => {
     if (!serviceName.trim()) return
@@ -318,18 +374,27 @@ export const RequestScreen = ({
   }
 
   const hasLocation = Boolean(cityId && districtId)
+  const resolvedDuration =
+    durationOption === 'custom'
+      ? Number(customDuration)
+      : durationOption
+  const hasDuration = Number.isFinite(resolvedDuration) && resolvedDuration > 0
+  const needsExactTime = timeWindow === 'exact'
   const hasDateTime =
-    dateOption !== 'choose' || Boolean(dateValue && timeValue)
+    dateOption !== 'choose'
+      ? !needsExactTime || Boolean(timeValue)
+      : Boolean(dateValue && (!needsExactTime || timeValue))
   const isUploading = uploadingCount > 0
   const canContinueService = Boolean(categoryId && serviceName.trim())
   const canContinueLocation = hasLocation
-  const canContinueTime = hasDateTime
+  const canContinueTime = hasDateTime && hasDuration
   const isFinalStep = safeStep >= stepCount - 1
   const canSubmit =
     Boolean(categoryId) &&
     Boolean(serviceName.trim()) &&
     hasLocation &&
     hasDateTime &&
+    hasDuration &&
     !isSubmitting &&
     !isUploading
   const canContinue = isFinalStep
@@ -350,10 +415,22 @@ export const RequestScreen = ({
     : 'Локация не выбрана'
   const dateSummary =
     dateOption === 'choose'
-      ? dateValue && timeValue
-        ? `${formatDateValue(dateValue)} ${timeValue}`
+      ? dateValue
+        ? `${formatDateValue(dateValue)}${
+            needsExactTime && timeValue ? ` ${timeValue}` : ''
+          }`
         : 'Выберите дату'
-      : dateLabel
+      : needsExactTime && timeValue
+        ? `${dateLabel} ${timeValue}`
+        : dateLabel
+  const timeWindowLabel =
+    timeWindowOptions.find((option) => option.value === timeWindow)?.label ??
+    'Не важно'
+  const durationSummary = hasDuration
+    ? resolvedDuration % 60 === 0
+      ? `${resolvedDuration / 60} ч`
+      : `${resolvedDuration} мин`
+    : 'Длительность не выбрана'
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return
@@ -375,13 +452,69 @@ export const RequestScreen = ({
       return
     }
 
-    let dateTime: string | null = null
-    if (dateOption === 'choose') {
-      if (!dateValue || !timeValue) {
-        setSubmitError('Выберите дату и время.')
+    const parsedCustomDuration =
+      durationOption === 'custom' ? Number(customDuration) : durationOption
+    if (!Number.isFinite(parsedCustomDuration) || parsedCustomDuration <= 0) {
+      setSubmitError('Укажите длительность услуги.')
+      return
+    }
+
+    const parseBudgetValue = (value: string) => {
+      const parsed = Number(value)
+      return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null
+    }
+
+    let budgetMin: number | null = budgetPreset.min
+    let budgetMax: number | null = budgetPreset.max
+    let budgetLabel = budgetPreset.label
+
+    if (budgetPreset.isCustom) {
+      budgetMin = parseBudgetValue(customBudgetMin)
+      budgetMax = parseBudgetValue(customBudgetMax)
+      if (budgetMin !== null && budgetMax !== null && budgetMin > budgetMax) {
+        setSubmitError('Бюджет: минимум не может быть больше максимума.')
         return
       }
-      const parsedDate = new Date(`${dateValue}T${timeValue}`)
+      budgetLabel =
+        budgetMin !== null && budgetMax !== null
+          ? `${budgetMin}–${budgetMax} ₽`
+          : budgetMax !== null
+            ? `до ${budgetMax} ₽`
+            : budgetMin !== null
+              ? `от ${budgetMin} ₽`
+              : 'не важно'
+    }
+
+    let dateTime: string | null = null
+    if (dateOption === 'choose') {
+      if (!dateValue) {
+        setSubmitError('Выберите дату.')
+        return
+      }
+      if (needsExactTime && !timeValue) {
+        setSubmitError('Выберите точное время.')
+        return
+      }
+      const time = needsExactTime ? timeValue : '00:00'
+      const parsedDate = new Date(`${dateValue}T${time}`)
+      if (Number.isNaN(parsedDate.getTime())) {
+        setSubmitError('Некорректная дата или время.')
+        return
+      }
+      dateTime = parsedDate.toISOString()
+    } else if (needsExactTime) {
+      if (!timeValue) {
+        setSubmitError('Выберите точное время.')
+        return
+      }
+      const base = new Date()
+      if (dateOption === 'tomorrow') {
+        base.setDate(base.getDate() + 1)
+      }
+      const date = `${String(base.getFullYear())}-${String(
+        base.getMonth() + 1
+      ).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+      const parsedDate = new Date(`${date}T${timeValue}`)
       if (Number.isNaN(parsedDate.getTime())) {
         setSubmitError('Некорректная дата или время.')
         return
@@ -406,7 +539,11 @@ export const RequestScreen = ({
           locationType,
           dateOption,
           dateTime,
-          budget,
+          budget: budgetLabel,
+          budgetMin,
+          budgetMax,
+          durationMinutes: Math.round(parsedCustomDuration),
+          timeWindow,
           details: details.trim() || null,
           photoUrls: photos.map((photo) => photo.url),
         }),
@@ -423,7 +560,11 @@ export const RequestScreen = ({
         defaultCategoryId: categoryId,
         defaultLocationType: locationType,
         defaultDateOption: dateOption,
-        defaultBudget: budget,
+        defaultBudget: budgetPreset.label,
+        defaultBudgetMin: budgetMin,
+        defaultBudgetMax: budgetMax,
+        defaultTimeWindow: timeWindow,
+        defaultDurationMinutes: Math.round(parsedCustomDuration),
         lastRequestServiceByCategory: {
           ...(current.lastRequestServiceByCategory ?? {}),
           [categoryId]: serviceName.trim(),
@@ -438,9 +579,12 @@ export const RequestScreen = ({
   }, [
     address,
     apiBase,
-    budget,
+    budgetPreset,
     categoryId,
     cityId,
+    customBudgetMax,
+    customBudgetMin,
+    customDuration,
     dateOption,
     dateValue,
     details,
@@ -448,10 +592,13 @@ export const RequestScreen = ({
     isSubmitting,
     isUploading,
     locationType,
+    needsExactTime,
     photos,
     serviceName,
     timeValue,
+    timeWindow,
     userId,
+    durationOption,
   ])
 
   const handleStepBack = useCallback(() => {
@@ -502,14 +649,16 @@ export const RequestScreen = ({
     >
       <div className="request-shell">
         <header className="request-header animate delay-1">
-          <button
-            className="request-back"
-            type="button"
-            onClick={handleBackPress}
-            aria-label="Назад"
-          >
-            ←
-          </button>
+          {!hasTelegramWebApp && (
+            <button
+              className="request-back"
+              type="button"
+              onClick={handleBackPress}
+              aria-label="Назад"
+            >
+              ←
+            </button>
+          )}
           <div className="request-header-body">
             <h1 className="request-title">Новая заявка</h1>
             <p className="request-subtitle">
@@ -543,6 +692,12 @@ export const RequestScreen = ({
             <div className="request-summary-item">
               <span className="request-summary-label">Когда</span>
               <span className="request-summary-value">{dateSummary}</span>
+            </div>
+            <div className="request-summary-item">
+              <span className="request-summary-label">Окно и длительность</span>
+              <span className="request-summary-value">
+                {timeWindowLabel} · {durationSummary}
+              </span>
             </div>
           </div>
         )}
@@ -694,21 +849,93 @@ export const RequestScreen = ({
               ))}
             </div>
             <div className="request-field">
-              <span className="request-label">Дата и время *</span>
-              {dateOption === 'choose' ? (
+              <span className="request-label">Время</span>
+              <div className="request-chips">
+                {timeWindowOptions.map((option) => (
+                  <button
+                    className={`request-chip${
+                      option.value === timeWindow ? ' is-active' : ''
+                    }`}
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setTimeWindow(option.value)
+                      hapticSelection()
+                    }}
+                    aria-pressed={option.value === timeWindow}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="request-field">
+              <span className="request-label">Длительность</span>
+              <div className="request-chips">
+                {durationOptions.map((option) => (
+                  <button
+                    className={`request-chip${
+                      durationOption === option ? ' is-active' : ''
+                    }`}
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      setDurationOption(option)
+                      setCustomDuration('')
+                      hapticSelection()
+                    }}
+                    aria-pressed={durationOption === option}
+                  >
+                    {option} мин
+                  </button>
+                ))}
+                <button
+                  className={`request-chip${
+                    durationOption === 'custom' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => {
+                    setDurationOption('custom')
+                    hapticSelection()
+                  }}
+                  aria-pressed={durationOption === 'custom'}
+                >
+                  Другое
+                </button>
+              </div>
+              {durationOption === 'custom' && (
+                <input
+                  className="request-input"
+                  type="number"
+                  inputMode="numeric"
+                  min="10"
+                  step="5"
+                  placeholder="Минут"
+                  value={customDuration}
+                  onChange={(event) => setCustomDuration(event.target.value)}
+                />
+              )}
+            </div>
+            <div className="request-field">
+              <span className="request-label">Дата</span>
+              {dateOption === 'choose' || needsExactTime ? (
                 <div className="request-date-grid">
-                  <input
-                    className="request-input"
-                    type="date"
-                    value={dateValue}
-                    onChange={(event) => setDateValue(event.target.value)}
-                  />
-                  <input
-                    className="request-input"
-                    type="time"
-                    value={timeValue}
-                    onChange={(event) => setTimeValue(event.target.value)}
-                  />
+                  {dateOption === 'choose' && (
+                    <input
+                      className="request-input"
+                      type="date"
+                      value={dateValue}
+                      onChange={(event) => setDateValue(event.target.value)}
+                    />
+                  )}
+                  {needsExactTime && (
+                    <input
+                      className="request-input"
+                      type="time"
+                      value={timeValue}
+                      onChange={(event) => setTimeValue(event.target.value)}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="request-select request-select--icon request-select--static">
@@ -730,23 +957,45 @@ export const RequestScreen = ({
             <div className="request-field">
               <span className="request-label">Бюджет</span>
               <div className="request-chips">
-                {requestBudgetOptions.map((option) => (
+                {requestBudgetPresets.map((option) => (
                   <button
                     className={`request-chip${
-                      option === budget ? ' is-active' : ''
+                      option.label === budgetPreset.label ? ' is-active' : ''
                     }`}
-                    key={option}
+                    key={option.label}
                     type="button"
                     onClick={() => {
-                      setBudget(option)
+                      setBudgetPreset(option)
                       hapticSelection()
                     }}
-                    aria-pressed={option === budget}
+                    aria-pressed={option.label === budgetPreset.label}
                   >
-                    {option}
+                    {option.label}
                   </button>
                 ))}
               </div>
+              {budgetPreset.isCustom && (
+                <div className="request-date-grid">
+                  <input
+                    className="request-input"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="От, ₽"
+                    value={customBudgetMin}
+                    onChange={(event) => setCustomBudgetMin(event.target.value)}
+                  />
+                  <input
+                    className="request-input"
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="До, ₽"
+                    value={customBudgetMax}
+                    onChange={(event) => setCustomBudgetMax(event.target.value)}
+                  />
+                </div>
+              )}
             </div>
             <div className="request-field">
               <span className="request-label">Комментарий</span>

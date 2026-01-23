@@ -3,6 +3,10 @@ export type ClientPreferences = {
   defaultLocationType?: 'master' | 'client' | 'any'
   defaultDateOption?: 'today' | 'tomorrow' | 'choose'
   defaultBudget?: string
+  defaultBudgetMin?: number | null
+  defaultBudgetMax?: number | null
+  defaultDurationMinutes?: number | null
+  defaultTimeWindow?: 'any' | 'morning' | 'afternoon' | 'evening' | 'exact'
   lastRequestServiceByCategory?: Record<string, string>
   lastBookingServiceByCategory?: Record<string, string>
   lastBookingServiceByMaster?: Record<string, string>
@@ -46,6 +50,24 @@ const normalizePreferences = (value: unknown): ClientPreferences => {
   }
   if (typeof value.defaultBudget === 'string') {
     prefs.defaultBudget = value.defaultBudget
+  }
+  if (typeof value.defaultBudgetMin === 'number') {
+    prefs.defaultBudgetMin = value.defaultBudgetMin
+  }
+  if (typeof value.defaultBudgetMax === 'number') {
+    prefs.defaultBudgetMax = value.defaultBudgetMax
+  }
+  if (typeof value.defaultDurationMinutes === 'number') {
+    prefs.defaultDurationMinutes = value.defaultDurationMinutes
+  }
+  if (
+    value.defaultTimeWindow === 'any' ||
+    value.defaultTimeWindow === 'morning' ||
+    value.defaultTimeWindow === 'afternoon' ||
+    value.defaultTimeWindow === 'evening' ||
+    value.defaultTimeWindow === 'exact'
+  ) {
+    prefs.defaultTimeWindow = value.defaultTimeWindow
   }
   if (isRecord(value.lastRequestServiceByCategory)) {
     prefs.lastRequestServiceByCategory = toStringRecord(

@@ -23,6 +23,14 @@ const dateLabelMap = {
   choose: 'По времени',
 } as const
 
+const timeWindowLabelMap = {
+  any: 'Любое время',
+  morning: 'Утро',
+  afternoon: 'День',
+  evening: 'Вечер',
+  exact: 'Точно',
+} as const
+
 const responseStatusLabelMap = {
   sent: 'отправлен',
   accepted: 'принят',
@@ -99,6 +107,31 @@ const formatPriceRange = (from?: number | null, to?: number | null) => {
     return `Прайс до ${formatPrice(to)}`
   }
   return ''
+}
+
+const formatBudgetRange = (
+  min?: number | null,
+  max?: number | null,
+  fallback?: string | null
+) => {
+  if (typeof min === 'number' && typeof max === 'number') {
+    return `${formatPrice(min)} — ${formatPrice(max)}`
+  }
+  if (typeof max === 'number') {
+    return `до ${formatPrice(max)}`
+  }
+  if (typeof min === 'number') {
+    return `от ${formatPrice(min)}`
+  }
+  return fallback ?? ''
+}
+
+const formatDurationLabel = (minutes?: number | null) => {
+  if (!minutes || minutes <= 0) return ''
+  if (minutes % 60 === 0) {
+    return `${minutes / 60} ч`
+  }
+  return `${minutes} мин`
 }
 
 const formatTimeLeft = (value?: string | null) => {
@@ -206,6 +239,7 @@ type ClientRequestsScreenProps = {
   onCreateRequest: () => void
   onViewHome: () => void
   onViewChats: () => void
+  onViewClientProfile: () => void
   onViewProfile: (masterId: string) => void
   onRescheduleBooking: (booking: Booking) => void
   onOpenChat: (chatId: number) => void
@@ -225,6 +259,7 @@ export const ClientRequestsScreen = ({
   onCreateRequest,
   onViewHome,
   onViewChats,
+  onViewClientProfile,
   onViewProfile,
   onRescheduleBooking,
   onOpenChat,
@@ -247,6 +282,9 @@ export const ClientRequestsScreen = ({
   const [responseActionId, setResponseActionId] = useState<number | null>(null)
   const [responseActionError, setResponseActionError] = useState<
     Record<number, string>
+  >({})
+  const [responseSortByRequestId, setResponseSortByRequestId] = useState<
+    Record<number, 'recent' | 'price' | 'rating'>
   >({})
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isBookingsLoading, setIsBookingsLoading] = useState(false)
@@ -655,7 +693,13 @@ export const ClientRequestsScreen = ({
         }
       )
       const data = (await response.json().catch(() => null)) as
-        | { status?: string; requestStatus?: string; chatId?: number | null }
+        | {
+            status?: string
+            requestStatus?: string
+            chatId?: number | null
+            bookingId?: number | null
+            bookingError?: string | null
+          }
         | null
 
       if (!response.ok) {
@@ -694,6 +738,16 @@ export const ClientRequestsScreen = ({
             request.id === requestId ? { ...request, status: 'closed' } : request
           )
         )
+        if (data?.bookingError) {
+          const message =
+            data.bookingError === 'time_unavailable'
+              ? 'Выбранное время уже занято. Обсудите новое время в чате.'
+              : 'Запись требует уточнения времени в чате.'
+          setResponseActionError((current) => ({
+            ...current,
+            [responseId]: message,
+          }))
+        }
       }
     } catch (error) {
       setResponseActionError((current) => ({
@@ -835,6 +889,17 @@ export const ClientRequestsScreen = ({
                     item.dateOption === 'choose'
                       ? formatDateTime(item.dateTime) || 'По договоренности'
                       : dateLabelMap[item.dateOption]
+                  const budgetLabel = formatBudgetRange(
+                    item.budgetMin,
+                    item.budgetMax,
+                    item.budget
+                  )
+                  const durationLabel = formatDurationLabel(item.durationMinutes)
+                  const timeWindowLabel = item.timeWindow
+                    ? timeWindowLabelMap[
+                        item.timeWindow as keyof typeof timeWindowLabelMap
+                      ]
+                    : ''
                   const statusLabel = item.status === 'open' ? 'Открыта' : 'Закрыта'
                   const categoryLabel =
                     categoryItems.find((category) => category.id === item.categoryId)
@@ -856,6 +921,23 @@ export const ClientRequestsScreen = ({
                     item.status === 'open' && responseCount === 0
                   const responses = responsesByRequestId[item.id] ?? []
                   const isResponsesOpen = expandedRequestId === item.id
+                  const sortMode =
+                    responseSortByRequestId[item.id] ?? 'recent'
+                  const sortedResponses = [...responses].sort((a, b) => {
+                    if (sortMode === 'price') {
+                      const aPrice = typeof a.price === 'number' ? a.price : Infinity
+                      const bPrice = typeof b.price === 'number' ? b.price : Infinity
+                      if (aPrice !== bPrice) return aPrice - bPrice
+                    }
+                    if (sortMode === 'rating') {
+                      const aRating = Number(a.reviewsAverage ?? 0)
+                      const bRating = Number(b.reviewsAverage ?? 0)
+                      if (aRating !== bRating) return bRating - aRating
+                    }
+                    const aTime = new Date(a.createdAt).getTime()
+                    const bTime = new Date(b.createdAt).getTime()
+                    return bTime - aTime
+                  })
 
                   return (
                     <div className="request-item" key={item.id}>
@@ -871,14 +953,18 @@ export const ClientRequestsScreen = ({
                       </div>
                       <div className="request-item-meta">
                         {categoryLabel}
-                        {item.budget ? ` • ${item.budget}` : ''}
+                        {budgetLabel ? ` • ${budgetLabel}` : ''}
+                        {durationLabel ? ` • ${durationLabel}` : ''}
                       </div>
                       <div className="request-item-meta">
                         {locationLabel}
                         {item.cityName ? ` • ${item.cityName}` : ''}
                         {item.districtName ? ` • ${item.districtName}` : ''}
                       </div>
-                      <div className="request-item-meta">{dateLabel}</div>
+                      <div className="request-item-meta">
+                        {dateLabel}
+                        {timeWindowLabel ? ` • ${timeWindowLabel}` : ''}
+                      </div>
                       {dispatchedCount > 0 && (
                         <div className="request-item-meta request-item-meta--hint">
                           Отправлено: {dispatchedCount}
@@ -963,7 +1049,33 @@ export const ClientRequestsScreen = ({
                                 Откликов пока нет.
                               </p>
                             )}
-                          {responses.map((responseItem) => {
+                          {responses.length > 1 && (
+                            <div className="request-chips">
+                              {([
+                                ['recent', 'Сначала новые'],
+                                ['price', 'Лучшая цена'],
+                                ['rating', 'Лучший рейтинг'],
+                              ] as const).map(([value, label]) => (
+                                <button
+                                  key={`${item.id}-${value}`}
+                                  className={`request-chip${
+                                    sortMode === value ? ' is-active' : ''
+                                  }`}
+                                  type="button"
+                                  onClick={() =>
+                                    setResponseSortByRequestId((current) => ({
+                                      ...current,
+                                      [item.id]: value,
+                                    }))
+                                  }
+                                  aria-pressed={sortMode === value}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {sortedResponses.map((responseItem) => {
                             const responseStatusLabel =
                               responseStatusLabelMap[responseItem.status] ??
                               responseItem.status
@@ -1059,7 +1171,7 @@ export const ClientRequestsScreen = ({
                                 )}
                                 {responseItem.proposedTime && (
                                   <div className="response-meta">
-                                    Время: {responseItem.proposedTime}
+                                    Время: {formatDateTime(responseItem.proposedTime)}
                                   </div>
                                 )}
                                 {previewUrls.length > 0 && (
@@ -1477,6 +1589,17 @@ export const ClientRequestsScreen = ({
                           )}
                         </div>
                       )}
+                      {booking.chatId && (
+                        <div className="booking-actions">
+                          <button
+                            className="booking-action is-primary"
+                            type="button"
+                            onClick={() => onOpenChat(booking.chatId!)}
+                          >
+                            Перейти в чат
+                          </button>
+                        </div>
+                      )}
                       {bookingActionError[booking.id] && (
                         <p className="booking-action-error">
                           {bookingActionError[booking.id]}
@@ -1510,7 +1633,7 @@ export const ClientRequestsScreen = ({
           </span>
           Мои заявки
         </button>
-        <button className="nav-item" type="button">
+        <button className="nav-item" type="button" onClick={onViewClientProfile}>
           <span className="nav-icon" aria-hidden="true">
             <IconUser />
           </span>

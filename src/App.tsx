@@ -1427,6 +1427,7 @@ function App() {
         }}
         onViewHome={() => navigate('client', { reset: true })}
         onViewChats={openChatList}
+        onViewClientProfile={() => navigate('client-profile')}
         onViewProfile={(masterId) => {
           setSelectedMasterId(masterId)
           navigate('client-master-profile')

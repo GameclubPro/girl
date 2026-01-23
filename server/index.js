@@ -3,7 +3,7 @@ import cors from 'cors'
 import express from 'express'
 import { WebSocketServer } from 'ws'
 import { Pool } from 'pg'
-import { randomUUID } from 'crypto'
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -74,9 +74,94 @@ const chatMessageTypes = new Set([
   'offer_location',
 ])
 
-app.use(cors({ origin: corsOrigin }))
+app.use(
+  cors({
+    origin: corsOrigin,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Telegram-Init-Data'],
+  })
+)
 app.use(express.json({ limit: '12mb' }))
 app.use('/uploads', express.static(uploadsRoot))
+
+app.use((req, res, next) => {
+  const initData = extractInitData(req)
+  if (!initData) {
+    return next()
+  }
+  const auth = verifyTelegramInitData(initData)
+  if (!auth) {
+    res.status(401).json({ error: 'auth_invalid' })
+    return
+  }
+  req.auth = auth
+  applyAuthToRequest(req, auth.userId)
+  next()
+})
+
+const rateBuckets = new Map()
+const buildRateKey = (req, scope) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown'
+  const userId = req.auth?.userId || req.userId || ''
+  return `${scope}:${ip}:${userId}`
+}
+
+const createRateLimiter = ({ windowMs, max, scope }) => (req, res, next) => {
+  const key = buildRateKey(req, scope)
+  const now = Date.now()
+  const bucket = rateBuckets.get(key) ?? { count: 0, resetAt: now + windowMs }
+  if (now > bucket.resetAt) {
+    bucket.count = 0
+    bucket.resetAt = now + windowMs
+  }
+  bucket.count += 1
+  rateBuckets.set(key, bucket)
+  if (bucket.count > max) {
+    res.status(429).json({ error: 'rate_limited' })
+    return
+  }
+  next()
+}
+
+const rateLimiters = {
+  upload: createRateLimiter({ windowMs: 10 * 60 * 1000, max: 24, scope: 'upload' }),
+  write: createRateLimiter({ windowMs: 60 * 1000, max: 90, scope: 'write' }),
+  read: createRateLimiter({ windowMs: 60 * 1000, max: 240, scope: 'read' }),
+}
+
+const rateLimitGuard = (req, res, next) => {
+  const path = req.path ?? ''
+  if (path.includes('/media') || path.includes('/attachments')) {
+    return rateLimiters.upload(req, res, next)
+  }
+  if (['POST', 'PATCH', 'DELETE'].includes(req.method)) {
+    return rateLimiters.write(req, res, next)
+  }
+  return rateLimiters.read(req, res, next)
+}
+
+app.use('/api', rateLimitGuard)
+
+const requireAuthMiddleware = (req, res, next) => {
+  const userId = requireAuth(req, res)
+  if (!userId) return
+  applyAuthToRequest(req, userId)
+  next()
+}
+
+app.use('/api/user', requireAuthMiddleware)
+app.use('/api/address', requireAuthMiddleware)
+app.use('/api/location', requireAuthMiddleware)
+app.use('/api/requests', requireAuthMiddleware)
+app.use('/api/bookings', requireAuthMiddleware)
+app.use('/api/chats', requireAuthMiddleware)
+app.use('/api/support', requireAuthMiddleware)
+app.use('/api/pro', requireAuthMiddleware)
+app.use('/api/masters', (req, res, next) => {
+  if (req.method === 'GET') return next()
+  return requireAuthMiddleware(req, res, next)
+})
+app.use('/api/clients', requireAuthMiddleware)
+app.use('/api/stories', requireAuthMiddleware)
 
 const createPool = () => {
   if (process.env.DATABASE_URL) {
@@ -128,6 +213,114 @@ const parseOptionalInt = (value) => {
   if (!normalized) return null
   const parsed = Number(normalized)
   return Number.isInteger(parsed) ? parsed : null
+}
+
+const ALLOW_INSECURE_USER_ID =
+  normalizeText(process.env.ALLOW_INSECURE_USER_ID).toLowerCase() === 'true'
+const INIT_DATA_MAX_AGE_SEC = parseOptionalInt(process.env.INIT_DATA_MAX_AGE_SEC) ?? 86400
+const AUTH_HEADER_PREFIX = 'tma '
+
+const decodeAuthValue = (value) => {
+  if (!value) return ''
+  try {
+    return decodeURIComponent(value)
+  } catch (error) {
+    return value
+  }
+}
+
+const extractInitData = (req) => {
+  const header = normalizeText(req.get('authorization') ?? '')
+  if (header.toLowerCase().startsWith(AUTH_HEADER_PREFIX)) {
+    return decodeAuthValue(header.slice(AUTH_HEADER_PREFIX.length).trim())
+  }
+  const alt = normalizeText(req.get('x-telegram-init-data') ?? '')
+  if (alt) return decodeAuthValue(alt)
+  const queryValue =
+    typeof req.query?.auth === 'string'
+      ? req.query.auth
+      : typeof req.query?.initData === 'string'
+        ? req.query.initData
+        : ''
+  return decodeAuthValue(queryValue)
+}
+
+const safeTimingEqual = (a, b) => {
+  if (!a || !b) return false
+  const bufferA = Buffer.from(a)
+  const bufferB = Buffer.from(b)
+  if (bufferA.length !== bufferB.length) return false
+  return timingSafeEqual(bufferA, bufferB)
+}
+
+const buildTelegramDataCheckString = (params) => {
+  const entries = [...params.entries()].filter(
+    ([key]) => key !== 'hash' && key !== 'signature'
+  )
+  entries.sort(([a], [b]) => (a > b ? 1 : a < b ? -1 : 0))
+  return entries.map(([key, value]) => `${key}=${value}`).join('\n')
+}
+
+const verifyTelegramInitData = (initData) => {
+  const normalized = normalizeText(initData)
+  if (!normalized || !telegramBotToken) return null
+  const params = new URLSearchParams(normalized)
+  const hash = params.get('hash')
+  if (!hash) return null
+  const authDate = parseOptionalInt(params.get('auth_date'))
+  if (!authDate) return null
+  const ageSeconds = Math.floor(Date.now() / 1000) - authDate
+  if (Number.isFinite(ageSeconds) && ageSeconds > INIT_DATA_MAX_AGE_SEC) {
+    return null
+  }
+  const dataCheckString = buildTelegramDataCheckString(params)
+  if (!dataCheckString) return null
+  const secretKey = createHmac('sha256', 'WebAppData')
+    .update(telegramBotToken)
+    .digest()
+  const computed = createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex')
+  if (!safeTimingEqual(computed, hash)) return null
+  const userRaw = params.get('user')
+  if (!userRaw) return null
+  try {
+    const user = JSON.parse(userRaw)
+    const userId = user?.id ? String(user.id) : ''
+    if (!userId) return null
+    return { userId, user }
+  } catch (error) {
+    return null
+  }
+}
+
+const applyAuthToRequest = (req, userId) => {
+  if (!userId) return
+  req.userId = userId
+  if (req.body && typeof req.body === 'object') {
+    if (!('userId' in req.body)) req.body.userId = userId
+    if ('userId' in req.body) req.body.userId = userId
+    if ('viewerId' in req.body) req.body.viewerId = userId
+    if ('followerId' in req.body) req.body.followerId = userId
+  }
+  if (req.query && typeof req.query === 'object') {
+    if (!('userId' in req.query)) req.query.userId = userId
+    if ('userId' in req.query) req.query.userId = userId
+  }
+}
+
+const requireAuth = (req, res) => {
+  if (req.auth?.userId) return req.auth.userId
+  if (ALLOW_INSECURE_USER_ID) {
+    const fallback =
+      normalizeText(req.body?.userId) ||
+      normalizeText(req.query?.userId) ||
+      normalizeText(req.body?.viewerId) ||
+      normalizeText(req.body?.followerId)
+    if (fallback) return fallback
+  }
+  res.status(401).json({ error: 'auth_required' })
+  return null
 }
 
 const resolveBookingDurationMinutes = (value) => {
@@ -326,6 +519,39 @@ const buildDayBounds = (date) => {
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
   return { start, end }
+}
+
+const hasBookingConflict = async (
+  db,
+  masterId,
+  scheduledAt,
+  durationMinutes
+) => {
+  const scheduledDate = new Date(scheduledAt)
+  if (Number.isNaN(scheduledDate.getTime())) return true
+  const safeDuration = resolveBookingDurationMinutes(durationMinutes)
+  const { start: dayStart, end: dayEnd } = buildDayBounds(scheduledDate)
+  const existing = await db.query(
+    `
+      SELECT
+        scheduled_at AS "scheduledAt",
+        service_duration AS "serviceDuration"
+      FROM service_bookings
+      WHERE master_id = $1
+        AND status NOT IN ('declined', 'cancelled')
+        AND scheduled_at >= $2
+        AND scheduled_at < $3
+    `,
+    [masterId, dayStart.toISOString(), dayEnd.toISOString()]
+  )
+  const startMs = scheduledDate.getTime()
+  const endMs = startMs + safeDuration * 60 * 1000
+  return existing.rows.some((row) => {
+    const existingStart = new Date(row.scheduledAt).getTime()
+    const existingDuration = Number(row.serviceDuration) || BOOKING_DURATION_FALLBACK_MINUTES
+    const existingEnd = existingStart + existingDuration * 60 * 1000
+    return startMs < existingEnd && endMs > existingStart
+  })
 }
 
 const toRadians = (value) => (value * Math.PI) / 180
@@ -2416,12 +2642,36 @@ const ensureSchema = async () => {
       date_option TEXT NOT NULL,
       date_time TIMESTAMPTZ,
       budget TEXT,
+      budget_min INTEGER,
+      budget_max INTEGER,
+      duration_minutes INTEGER,
+      time_window TEXT,
       details TEXT,
       photo_urls TEXT[] NOT NULL DEFAULT '{}',
       status TEXT NOT NULL DEFAULT 'open',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_requests
+    ADD COLUMN IF NOT EXISTS budget_min INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_requests
+    ADD COLUMN IF NOT EXISTS budget_max INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_requests
+    ADD COLUMN IF NOT EXISTS duration_minutes INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_requests
+    ADD COLUMN IF NOT EXISTS time_window TEXT;
   `)
 
   await pool.query(`
@@ -3533,6 +3783,12 @@ app.get('/api/masters/:userId/bookings', async (req, res) => {
     res.status(400).json({ error: 'userId_required' })
     return
   }
+  const actorId = requireAuth(req, res)
+  if (!actorId) return
+  if (actorId !== normalizedUserId) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
 
   const fromParam = normalizeText(req.query.from)
   const toParam = normalizeText(req.query.to)
@@ -3647,6 +3903,12 @@ app.get('/api/masters/:userId/followers', async (req, res) => {
   const normalizedUserId = normalizeText(req.params.userId)
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  const actorId = requireAuth(req, res)
+  if (!actorId) return
+  if (actorId !== normalizedUserId) {
+    res.status(403).json({ error: 'forbidden' })
     return
   }
 
@@ -3783,6 +4045,12 @@ app.post('/api/masters/:userId/stories', async (req, res) => {
     res.status(400).json({ error: 'userId_required' })
     return
   }
+  const actorId = requireAuth(req, res)
+  if (!actorId) return
+  if (actorId !== normalizedUserId) {
+    res.status(403).json({ error: 'forbidden' })
+    return
+  }
 
   const mediaUrl = normalizeText(
     req.body?.mediaUrl ?? req.body?.url ?? req.body?.mediaPath
@@ -3863,6 +4131,12 @@ app.delete('/api/masters/:userId/stories/:storyId', async (req, res) => {
   const storyId = parseOptionalInt(req.params.storyId)
   if (!normalizedUserId || !storyId) {
     res.status(400).json({ error: 'storyId_required' })
+    return
+  }
+  const actorId = requireAuth(req, res)
+  if (!actorId) return
+  if (actorId !== normalizedUserId) {
+    res.status(403).json({ error: 'forbidden' })
     return
   }
 
@@ -4729,6 +5003,10 @@ app.get('/api/pro/requests', async (req, res) => {
           r.date_option AS "dateOption",
           r.date_time AS "dateTime",
           r.budget,
+          r.budget_min AS "budgetMin",
+          r.budget_max AS "budgetMax",
+          r.duration_minutes AS "durationMinutes",
+          r.time_window AS "timeWindow",
           r.details,
           r.photo_urls AS "photoUrls",
           r.status,
@@ -4817,6 +5095,13 @@ app.get('/api/pro/requests', async (req, res) => {
         confidenceKey: 'clientTrustConfidence',
         updatedAtKey: 'clientTrustUpdatedAt',
       })
+      const photoUrls = Array.isArray(row.photoUrls) ? row.photoUrls : []
+      const canViewPrivate =
+        row.responseStatus === 'accepted' || Boolean(row.chatId)
+      const detailsText = row.details ? String(row.details) : ''
+      const detailsPreview = !canViewPrivate && detailsText
+        ? `${detailsText.slice(0, 140)}${detailsText.length > 140 ? '…' : ''}`
+        : null
       const distanceKm =
         masterLocation &&
         row.clientShareToMasters &&
@@ -4838,6 +5123,12 @@ app.get('/api/pro/requests', async (req, res) => {
         clientName,
         distanceKm,
         clientTrust,
+        address: canViewPrivate ? row.address : null,
+        details: canViewPrivate ? row.details : null,
+        detailsPreview,
+        photoUrls: canViewPrivate ? photoUrls : [],
+        photoCount: photoUrls.length,
+        privacyLocked: !canViewPrivate,
         clientLat: undefined,
         clientLng: undefined,
         clientShareToMasters: undefined,
@@ -6362,6 +6653,10 @@ app.get('/api/requests', async (req, res) => {
           r.date_option AS "dateOption",
           r.date_time AS "dateTime",
           r.budget,
+          r.budget_min AS "budgetMin",
+          r.budget_max AS "budgetMax",
+          r.duration_minutes AS "durationMinutes",
+          r.time_window AS "timeWindow",
           r.details,
           r.photo_urls AS "photoUrls",
           r.status,
@@ -6457,6 +6752,12 @@ app.get('/api/requests/:id', async (req, res) => {
     return
   }
 
+  const normalizedUserId = normalizeText(req.query.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
   try {
     const result = await pool.query(
       `
@@ -6475,6 +6776,10 @@ app.get('/api/requests/:id', async (req, res) => {
           r.date_option AS "dateOption",
           r.date_time AS "dateTime",
           r.budget,
+          r.budget_min AS "budgetMin",
+          r.budget_max AS "budgetMax",
+          r.duration_minutes AS "durationMinutes",
+          r.time_window AS "timeWindow",
           r.details,
           r.photo_urls AS "photoUrls",
           r.status,
@@ -6489,6 +6794,11 @@ app.get('/api/requests/:id', async (req, res) => {
 
     if (result.rows.length === 0) {
       res.status(404).json({ error: 'not_found' })
+      return
+    }
+
+    if (result.rows[0].userId !== normalizedUserId) {
+      res.status(403).json({ error: 'forbidden' })
       return
     }
 
@@ -6640,13 +6950,23 @@ app.post('/api/requests/:id/responses', async (req, res) => {
   const normalizedComment = normalizeText(comment)
   const normalizedProposedTime = normalizeText(proposedTime)
   const parsedPrice = parseOptionalInt(price)
+  let parsedProposedTime = null
+
+  if (normalizedProposedTime) {
+    const parsed = new Date(normalizedProposedTime)
+    if (Number.isNaN(parsed.getTime())) {
+      res.status(400).json({ error: 'proposedTime_invalid' })
+      return
+    }
+    parsedProposedTime = parsed.toISOString()
+  }
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
     return
   }
 
-  if (!normalizedComment && parsedPrice === null && !normalizedProposedTime) {
+  if (!normalizedComment && parsedPrice === null && !parsedProposedTime) {
     res.status(400).json({ error: 'response_required' })
     return
   }
@@ -6800,7 +7120,7 @@ app.post('/api/requests/:id/responses', async (req, res) => {
         normalizedUserId,
         parsedPrice,
         normalizedComment || null,
-        normalizedProposedTime || null,
+        parsedProposedTime,
       ]
     )
 
@@ -6852,6 +7172,16 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
         SELECT
           user_id AS "userId",
           service_name AS "serviceName",
+          category_id AS "categoryId",
+          city_id AS "cityId",
+          district_id AS "districtId",
+          address,
+          location_type AS "locationType",
+          date_option AS "dateOption",
+          date_time AS "dateTime",
+          duration_minutes AS "durationMinutes",
+          details,
+          photo_urls AS "photoUrls",
           status
         FROM service_requests
         WHERE id = $1
@@ -6880,6 +7210,8 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
         SELECT
           id,
           master_id AS "masterId",
+          price,
+          proposed_time AS "proposedTime",
           status
         FROM request_responses
         WHERE id = $1
@@ -6901,49 +7233,130 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
         return
       }
 
-      if (response.status !== 'accepted') {
-        await pool.query(
-          `
-            UPDATE request_responses
-            SET status = 'accepted',
-                updated_at = NOW()
-            WHERE id = $1
-          `,
-          [responseId]
-        )
+      let bookingId = null
+      let bookingStatus = null
+      let bookingError = null
 
-        await pool.query(
-          `
-            UPDATE request_responses
-            SET status = 'rejected',
-                updated_at = NOW()
-            WHERE request_id = $1
-              AND id <> $2
-              AND status = 'sent'
-          `,
-          [requestId, responseId]
-        )
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        if (response.status !== 'accepted') {
+          await client.query(
+            `
+              UPDATE request_responses
+              SET status = 'accepted',
+                  updated_at = NOW()
+              WHERE id = $1
+            `,
+            [responseId]
+          )
 
-        await pool.query(
-          `
-            UPDATE service_requests
-            SET status = 'closed',
-                updated_at = NOW()
-            WHERE id = $1
-          `,
-          [requestId]
-        )
+          await client.query(
+            `
+              UPDATE request_responses
+              SET status = 'rejected',
+                  updated_at = NOW()
+              WHERE request_id = $1
+                AND id <> $2
+                AND status = 'sent'
+            `,
+            [requestId, responseId]
+          )
 
-        await pool.query(
-          `
-            UPDATE request_dispatches
-            SET status = 'expired',
-                updated_at = NOW()
-            WHERE request_id = $1
-              AND status = 'sent'
-          `,
-          [requestId]
-        )
+          await client.query(
+            `
+              UPDATE service_requests
+              SET status = 'closed',
+                  updated_at = NOW()
+              WHERE id = $1
+            `,
+            [requestId]
+          )
+
+          await client.query(
+            `
+              UPDATE request_dispatches
+              SET status = 'expired',
+                  updated_at = NOW()
+              WHERE request_id = $1
+                AND status = 'sent'
+            `,
+            [requestId]
+          )
+
+          if (response.proposedTime) {
+            const scheduledAt = new Date(response.proposedTime)
+            if (Number.isNaN(scheduledAt.getTime())) {
+              bookingError = 'time_invalid'
+            } else if (scheduledAt.getTime() < Date.now()) {
+              bookingError = 'time_unavailable'
+            } else {
+              const durationMinutes =
+                parseOptionalInt(request.durationMinutes) ??
+                BOOKING_DURATION_FALLBACK_MINUTES
+              const hasConflict = await hasBookingConflict(
+                client,
+                response.masterId,
+                scheduledAt,
+                durationMinutes
+              )
+              if (hasConflict) {
+                bookingError = 'time_unavailable'
+              } else {
+                const resolvedLocationType =
+                  request.locationType === 'any' ? 'master' : request.locationType
+                const status = response.price !== null ? 'pending' : 'price_pending'
+                const insertResult = await client.query(
+                  `
+                    INSERT INTO service_bookings (
+                      client_id,
+                      master_id,
+                      city_id,
+                      district_id,
+                      address,
+                      category_id,
+                      service_name,
+                      service_price,
+                      service_duration,
+                      location_type,
+                      scheduled_at,
+                      photo_urls,
+                      status,
+                      proposed_price,
+                      client_comment
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, $14)
+                    RETURNING id
+                  `,
+                  [
+                    request.userId,
+                    response.masterId,
+                    request.cityId,
+                    request.districtId,
+                    resolvedLocationType === 'client' ? request.address ?? null : null,
+                    request.categoryId,
+                    request.serviceName,
+                    response.price ?? null,
+                    durationMinutes,
+                    resolvedLocationType,
+                    scheduledAt.toISOString(),
+                    Array.isArray(request.photoUrls) ? request.photoUrls : [],
+                    status,
+                    request.details ?? null,
+                  ]
+                )
+                bookingId = insertResult.rows[0]?.id ?? null
+                bookingStatus = status
+              }
+            }
+          }
+        }
+        await client.query('COMMIT')
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
       }
 
       let chatId = null
@@ -6987,6 +7400,9 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
         status: 'accepted',
         requestStatus: 'closed',
         chatId,
+        bookingId,
+        bookingStatus,
+        bookingError,
       })
       return
     }
@@ -8020,6 +8436,10 @@ app.post('/api/requests', async (req, res) => {
     dateOption,
     dateTime,
     budget,
+    budgetMin,
+    budgetMax,
+    durationMinutes,
+    timeWindow,
     details,
     photoUrls,
   } = req.body ?? {}
@@ -8034,6 +8454,10 @@ app.post('/api/requests', async (req, res) => {
   const normalizedDetails = normalizeText(details)
   const tagList = normalizeStringArray(tags)
   const photoList = normalizeStringArray(photoUrls)
+  const parsedBudgetMin = parseOptionalInt(budgetMin)
+  const parsedBudgetMax = parseOptionalInt(budgetMax)
+  const parsedDurationMinutes = parseOptionalInt(durationMinutes)
+  const normalizedTimeWindow = normalizeText(timeWindow)
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -8055,6 +8479,30 @@ app.post('/api/requests', async (req, res) => {
     return
   }
 
+  if (
+    normalizedTimeWindow &&
+    !['any', 'morning', 'afternoon', 'evening', 'exact'].includes(
+      normalizedTimeWindow
+    )
+  ) {
+    res.status(400).json({ error: 'timeWindow_invalid' })
+    return
+  }
+
+  if (
+    parsedBudgetMin !== null &&
+    parsedBudgetMax !== null &&
+    parsedBudgetMin > parsedBudgetMax
+  ) {
+    res.status(400).json({ error: 'budget_range_invalid' })
+    return
+  }
+
+  if (parsedDurationMinutes !== null && parsedDurationMinutes <= 0) {
+    res.status(400).json({ error: 'duration_invalid' })
+    return
+  }
+
   const parsedCityId = Number(cityId)
   const parsedDistrictId = Number(districtId)
   if (!Number.isInteger(parsedCityId) || !Number.isInteger(parsedDistrictId)) {
@@ -8062,18 +8510,25 @@ app.post('/api/requests', async (req, res) => {
     return
   }
 
+  const normalizedDateTime = normalizeText(dateTime)
   let parsedDateTime = null
-  if (normalizedDateOption === 'choose') {
-    if (!normalizeText(dateTime)) {
-      res.status(400).json({ error: 'dateTime_required' })
-      return
-    }
-    const parsedValue = new Date(dateTime)
+  if (normalizedDateTime) {
+    const parsedValue = new Date(normalizedDateTime)
     if (Number.isNaN(parsedValue.getTime())) {
       res.status(400).json({ error: 'dateTime_invalid' })
       return
     }
     parsedDateTime = parsedValue.toISOString()
+  }
+
+  if (normalizedDateOption === 'choose' && !parsedDateTime) {
+    res.status(400).json({ error: 'dateTime_required' })
+    return
+  }
+
+  if (normalizedTimeWindow === 'exact' && !parsedDateTime) {
+    res.status(400).json({ error: 'dateTime_required' })
+    return
   }
 
   try {
@@ -8110,10 +8565,14 @@ app.post('/api/requests', async (req, res) => {
           date_option,
           date_time,
           budget,
+          budget_min,
+          budget_max,
+          duration_minutes,
+          time_window,
           details,
           photo_urls
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         RETURNING id, created_at AS "createdAt"
       `,
       [
@@ -8128,6 +8587,10 @@ app.post('/api/requests', async (req, res) => {
         normalizedDateOption,
         parsedDateTime,
         normalizedBudget || null,
+        parsedBudgetMin,
+        parsedBudgetMax,
+        parsedDurationMinutes,
+        normalizedTimeWindow || null,
         normalizedDetails || null,
         photoList,
       ]
@@ -8354,9 +8817,14 @@ const start = async () => {
     try {
       const baseUrl = `http://${req.headers.host ?? 'localhost'}`
       const url = new URL(req.url ?? '', baseUrl)
-      const userId = normalizeText(url.searchParams.get('userId'))
+      const authParam = normalizeText(url.searchParams.get('auth'))
+      const auth = authParam ? verifyTelegramInitData(decodeAuthValue(authParam)) : null
+      let userId = auth?.userId ?? ''
+      if (!userId && ALLOW_INSECURE_USER_ID) {
+        userId = normalizeText(url.searchParams.get('userId'))
+      }
       if (!userId) {
-        ws.close(1008, 'userId_required')
+        ws.close(1008, 'auth_required')
         return
       }
       ws.userId = userId

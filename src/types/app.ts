@@ -147,8 +147,15 @@ export type ServiceRequest = {
   dateOption: 'today' | 'tomorrow' | 'choose'
   dateTime?: string | null
   budget?: string | null
+  budgetMin?: number | null
+  budgetMax?: number | null
+  durationMinutes?: number | null
+  timeWindow?: 'any' | 'morning' | 'afternoon' | 'evening' | 'exact' | null
   details?: string | null
   photoUrls: string[]
+  detailsPreview?: string | null
+  photoCount?: number | null
+  privacyLocked?: boolean
   status: 'open' | 'closed'
   createdAt: string
   responsesCount?: number

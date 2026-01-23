@@ -37,6 +37,14 @@ const dateLabelMap = {
   choose: 'По времени',
 } as const
 
+const timeWindowLabelMap = {
+  any: 'Любое время',
+  morning: 'Утро',
+  afternoon: 'День',
+  evening: 'Вечер',
+  exact: 'Точно',
+} as const
+
 const responseStatusLabelMap = {
   sent: 'отправлен',
   accepted: 'принят',
@@ -183,6 +191,31 @@ const formatDistance = (value?: number | null) => {
   return `${value.toFixed(1).replace('.', ',')} км`
 }
 
+const formatBudgetRange = (
+  min?: number | null,
+  max?: number | null,
+  fallback?: string | null
+) => {
+  if (typeof min === 'number' && typeof max === 'number') {
+    return `${formatPrice(min)} — ${formatPrice(max)}`
+  }
+  if (typeof max === 'number') {
+    return `до ${formatPrice(max)}`
+  }
+  if (typeof min === 'number') {
+    return `от ${formatPrice(min)}`
+  }
+  return fallback ?? ''
+}
+
+const formatDurationLabel = (minutes?: number | null) => {
+  if (!minutes || minutes <= 0) return ''
+  if (minutes % 60 === 0) {
+    return `${minutes / 60} ч`
+  }
+  return `${minutes} мин`
+}
+
 const formatTimeLeft = (value?: string | null) => {
   if (!value) return ''
   const parsed = new Date(value)
@@ -217,6 +250,16 @@ const formatMinutes = (value: number) => {
   const hours = Math.floor(value / 60)
   const minutes = value % 60
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const formatLocalDateTimeInput = (value?: string | null) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const pad = (num: number) => String(num).padStart(2, '0')
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(
+    parsed.getDate()
+  )}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`
 }
 
 const formatOutcomeLabel = (
@@ -674,7 +717,9 @@ export const ProRequestsScreen = ({
                     ? String(item.responsePrice)
                     : '',
                 comment: item.responseComment ?? '',
-                proposedTime: item.responseProposedTime ?? '',
+                proposedTime: formatLocalDateTimeInput(
+                  item.responseProposedTime ?? ''
+                ),
               }
             }
           })
@@ -2060,7 +2105,22 @@ export const ProRequestsScreen = ({
     const priceValue = draft.price.trim()
     const hasPrice = priceValue.length > 0
     const hasComment = draft.comment.trim().length > 0
-    const hasProposedTime = draft.proposedTime.trim().length > 0
+    const proposedTimeRaw = draft.proposedTime.trim()
+    const hasProposedTime = proposedTimeRaw.length > 0
+
+    let proposedTimeIso: string | null = null
+    if (hasProposedTime) {
+      const parsed = new Date(proposedTimeRaw)
+      if (Number.isNaN(parsed.getTime())) {
+        setSubmitError((current) => ({
+          ...current,
+          [requestId]: 'Укажите корректную дату и время.',
+        }))
+        setSubmittingId(null)
+        return
+      }
+      proposedTimeIso = parsed.toISOString()
+    }
 
     if (!hasPrice && !hasComment && !hasProposedTime) {
       setSubmitError((current) => ({
@@ -2081,7 +2141,7 @@ export const ProRequestsScreen = ({
             userId,
             price: hasPrice ? Number(priceValue) : null,
             comment: draft.comment.trim() || null,
-            proposedTime: draft.proposedTime.trim() || null,
+            proposedTime: proposedTimeIso,
           }),
         }
       )
@@ -2279,14 +2339,30 @@ export const ProRequestsScreen = ({
                       item.dateOption === 'choose'
                         ? formatDateTime(item.dateTime) || 'По договоренности'
                         : dateLabelMap[item.dateOption]
+                    const budgetLabel = formatBudgetRange(
+                      item.budgetMin,
+                      item.budgetMax,
+                      item.budget
+                    )
+                    const durationLabel = formatDurationLabel(item.durationMinutes)
+                    const timeWindowLabel = item.timeWindow
+                      ? timeWindowLabelMap[
+                          item.timeWindow as keyof typeof timeWindowLabelMap
+                        ]
+                      : ''
                     const statusLabel =
                       item.status === 'open' ? 'Открыта' : 'Закрыта'
                     const clientName = item.clientName?.trim() || 'Клиент'
                     const clientInitials = getInitials(clientName)
                     const tagItems = Array.isArray(item.tags) ? item.tags : []
+                    const isPrivateLocked = Boolean(item.privacyLocked)
                     const photoItems = Array.isArray(item.photoUrls)
                       ? item.photoUrls
                       : []
+                    const detailsText = isPrivateLocked
+                      ? item.detailsPreview ||
+                        'Детали, фото и адрес откроются после подтверждения.'
+                      : item.details
                     const responseStatusLabel = item.responseStatus
                       ? responseStatusLabelMap[
                           item.responseStatus as keyof typeof responseStatusLabelMap
@@ -2341,7 +2417,8 @@ export const ProRequestsScreen = ({
                         </div>
                         <div className="request-item-meta">
                           {categoryLabel}
-                          {item.budget ? ` • ${item.budget}` : ''}
+                          {budgetLabel ? ` • ${budgetLabel}` : ''}
+                          {durationLabel ? ` • ${durationLabel}` : ''}
                         </div>
                         <div className="request-item-meta">
                           {locationLabel}
@@ -2349,7 +2426,10 @@ export const ProRequestsScreen = ({
                           {item.districtName ? ` • ${item.districtName}` : ''}
                           {distanceLabel ? ` • ${distanceLabel}` : ''}
                         </div>
-                        <div className="request-item-meta">{dateLabel}</div>
+                        <div className="request-item-meta">
+                          {dateLabel}
+                          {timeWindowLabel ? ` • ${timeWindowLabel}` : ''}
+                        </div>
                         {item.status === 'open' &&
                           !item.responseStatus &&
                           (dispatchTimeLeft || dispatchBatchLabel) && (
@@ -2393,10 +2473,17 @@ export const ProRequestsScreen = ({
                               Перейти в чат
                             </button>
                           )}
-                          {item.details && (
-                            <div className="request-item-details">{item.details}</div>
+                          {detailsText && (
+                            <div className="request-item-details">
+                              {detailsText}
+                            </div>
                           )}
-                          {photoItems.length > 0 && (
+                          {isPrivateLocked && (
+                            <div className="request-item-meta request-item-meta--hint">
+                              Данные скрыты до подтверждения клиента.
+                            </div>
+                          )}
+                          {!isPrivateLocked && photoItems.length > 0 && (
                             <div className="booking-photo-strip" role="list">
                               {photoItems.map((url, index) => (
                                 <span
@@ -2428,8 +2515,8 @@ export const ProRequestsScreen = ({
                             />
                             <input
                               className="pro-response-input"
-                              type="text"
-                              placeholder="Предложенное время (опционально)"
+                              type="datetime-local"
+                              placeholder="Дата и время (опционально)"
                               value={draft.proposedTime}
                               onChange={(event) =>
                                 handleDraftChange(
