@@ -88,9 +88,11 @@ app.use((req, res, next) => {
   if (!initData) {
     return next()
   }
-  const auth = verifyTelegramInitData(initData)
+  const { auth, reason } = verifyTelegramInitData(initData)
   if (!auth) {
-    res.status(401).json({ error: 'auth_invalid' })
+    res.status(401).json(
+      AUTH_DEBUG ? { error: 'auth_invalid', reason } : { error: 'auth_invalid' }
+    )
     return
   }
   req.auth = auth
@@ -217,6 +219,7 @@ const parseOptionalInt = (value) => {
 
 const ALLOW_INSECURE_USER_ID =
   normalizeText(process.env.ALLOW_INSECURE_USER_ID).toLowerCase() === 'true'
+const AUTH_DEBUG = normalizeText(process.env.AUTH_DEBUG).toLowerCase() === 'true'
 const INIT_DATA_MAX_AGE_SEC = parseOptionalInt(process.env.INIT_DATA_MAX_AGE_SEC) ?? 86400
 const AUTH_HEADER_PREFIX = 'tma '
 
@@ -263,34 +266,43 @@ const buildTelegramDataCheckString = (params) => {
 
 const verifyTelegramInitData = (initData) => {
   const normalized = normalizeText(initData)
-  if (!normalized || !telegramBotToken) return null
+  if (!normalized) {
+    return { auth: null, reason: 'init_data_missing' }
+  }
+  if (!telegramBotToken) {
+    return { auth: null, reason: 'bot_token_missing' }
+  }
   const params = new URLSearchParams(normalized)
   const hash = params.get('hash')
-  if (!hash) return null
+  if (!hash) return { auth: null, reason: 'hash_missing' }
   const authDate = parseOptionalInt(params.get('auth_date'))
-  if (!authDate) return null
+  if (!authDate) return { auth: null, reason: 'auth_date_missing' }
   const ageSeconds = Math.floor(Date.now() / 1000) - authDate
   if (Number.isFinite(ageSeconds) && ageSeconds > INIT_DATA_MAX_AGE_SEC) {
-    return null
+    return { auth: null, reason: 'auth_date_expired' }
   }
   const dataCheckString = buildTelegramDataCheckString(params)
-  if (!dataCheckString) return null
+  if (!dataCheckString) {
+    return { auth: null, reason: 'data_check_missing' }
+  }
   const secretKey = createHmac('sha256', 'WebAppData')
     .update(telegramBotToken)
     .digest()
   const computed = createHmac('sha256', secretKey)
     .update(dataCheckString)
     .digest('hex')
-  if (!safeTimingEqual(computed, hash)) return null
+  if (!safeTimingEqual(computed, hash)) {
+    return { auth: null, reason: 'hash_mismatch' }
+  }
   const userRaw = params.get('user')
-  if (!userRaw) return null
+  if (!userRaw) return { auth: null, reason: 'user_missing' }
   try {
     const user = JSON.parse(userRaw)
     const userId = user?.id ? String(user.id) : ''
-    if (!userId) return null
-    return { userId, user }
+    if (!userId) return { auth: null, reason: 'user_invalid' }
+    return { auth: { userId, user }, reason: null }
   } catch (error) {
-    return null
+    return { auth: null, reason: 'user_parse_failed' }
   }
 }
 
@@ -821,6 +833,9 @@ const safeJson = (value) => {
 }
 
 const telegramBotToken = normalizeText(process.env.BOT_TOKEN)
+if (!telegramBotToken) {
+  console.warn('BOT_TOKEN is missing. Telegram auth verification will fail.')
+}
 const telegramWebAppUrl = normalizeText(process.env.WEB_APP_URL)
 const telegramApiBase = 'https://api.telegram.org'
 
@@ -8818,7 +8833,9 @@ const start = async () => {
       const baseUrl = `http://${req.headers.host ?? 'localhost'}`
       const url = new URL(req.url ?? '', baseUrl)
       const authParam = normalizeText(url.searchParams.get('auth'))
-      const auth = authParam ? verifyTelegramInitData(decodeAuthValue(authParam)) : null
+      const { auth } = authParam
+        ? verifyTelegramInitData(decodeAuthValue(authParam))
+        : { auth: null }
       let userId = auth?.userId ?? ''
       if (!userId && ALLOW_INSECURE_USER_ID) {
         userId = normalizeText(url.searchParams.get('userId'))
