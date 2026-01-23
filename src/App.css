@@ -15621,7 +15621,7 @@ h1 {
 .subtitle {
   margin: 0;
   color: var(--muted);
-  max-width: 280px;
+  max-width: 300px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -15630,18 +15630,26 @@ h1 {
 }
 
 .subtitle-line {
-  font-size: clamp(14px, 4.1vw, 16px);
+  font-size: clamp(14px, 4.2vw, 16px);
   font-weight: 600;
   color: var(--muted);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.25px;
 }
 
 .subtitle-line--accent {
   font-family: var(--font-title);
-  font-size: clamp(18px, 5vw, 22px);
+  font-size: clamp(20px, 5.4vw, 24px);
   font-weight: 700;
+  letter-spacing: 0.2px;
   color: var(--ink);
-  letter-spacing: 0.3px;
+  background: linear-gradient(
+    90deg,
+    var(--accent-strong),
+    rgb(var(--start-raspberry-rgb))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 h2 {
