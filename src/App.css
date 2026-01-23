@@ -15642,13 +15642,6 @@ h1 {
   word-spacing: 11px;
 }
 
-.subtitle-line--accent {
-  font-family: var(--font-title);
-  font-size: clamp(20px, 5.4vw, 24px);
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  color: #000;
-}
 
 h2 {
   margin: 18px 0 8px;

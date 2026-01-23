@@ -26,7 +26,7 @@ export const StartScreen = ({
           <span className="subtitle-line subtitle-line--wide">
             Создаем новую эру
           </span>
-          <span className="subtitle-line subtitle-line--accent">
+          <span className="subtitle-line subtitle-line--wide">
             красоты вместе
           </span>
         </p>
