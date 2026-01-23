@@ -24,6 +24,19 @@ const shouldAttachAuth = (input: RequestInfo | URL, apiBase?: string) => {
   return false
 }
 
+const withAuthQuery = (input: string, initData: string) => {
+  try {
+    const url = new URL(input, window.location.origin)
+    if (!url.searchParams.has('auth')) {
+      url.searchParams.set('auth', initData)
+    }
+    return url.toString()
+  } catch (error) {
+    const joiner = input.includes('?') ? '&' : '?'
+    return `${input}${joiner}auth=${encodeURIComponent(initData)}`
+  }
+}
+
 export const installAuthFetch = (apiBase?: string) => {
   if (typeof window === 'undefined') return
   if ((window as unknown as { __authFetchInstalled?: boolean }).__authFetchInstalled) {
@@ -35,10 +48,24 @@ export const installAuthFetch = (apiBase?: string) => {
     if (!shouldAttachAuth(input, normalizedBase)) {
       return originalFetch(input, init)
     }
+    const initData = getTelegramInitData()
+    const method = (init?.method ??
+      (input instanceof Request ? input.method : 'GET')
+    ).toUpperCase()
+    let nextInput: RequestInfo | URL = input
+    if (initData && (method === 'GET' || method === 'HEAD')) {
+      if (typeof input === 'string') {
+        nextInput = withAuthQuery(input, initData)
+      } else if (input instanceof URL) {
+        nextInput = withAuthQuery(input.toString(), initData)
+      } else if ('url' in input) {
+        nextInput = new Request(withAuthQuery(input.url, initData), input)
+      }
+    }
     const headers = new Headers(init?.headers ?? {})
     const authHeaders = buildAuthHeaders()
     Object.entries(authHeaders).forEach(([key, value]) => headers.set(key, value))
-    return originalFetch(input, { ...init, headers })
+    return originalFetch(nextInput, { ...init, headers })
   }
   ;(window as unknown as { __authFetchInstalled?: boolean }).__authFetchInstalled = true
 }
