@@ -235,12 +235,6 @@ export const ProCabinetScreen = ({
   const repeatShare = totalClients
     ? Math.max(0, Math.min(100, Math.round((repeatClients / totalClients) * 100)))
     : 0
-  const nextBookingDate = bookingStats.nextBookingTime
-    ? new Date(bookingStats.nextBookingTime)
-    : null
-  const nextBookingLabel = nextBookingDate
-    ? `${formatShortDate(nextBookingDate)} · ${formatShortTime(nextBookingDate)}`
-    : 'Пока нет записей'
   const campaignAudience = bookingStats.uniqueClients
   const campaignRepeatRate = campaignAudience
     ? bookingStats.repeatClients / campaignAudience
