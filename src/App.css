@@ -15623,36 +15623,27 @@ h1 {
 .subtitle {
   margin: 0;
   color: var(--muted);
-  max-width: 260px;
-  display: grid;
-  justify-items: center;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  gap: 6px;
+  gap: 4px;
 }
 
-.subtitle-intro {
-  font-size: 13px;
+.subtitle-line {
+  font-size: clamp(14px, 4.1vw, 16px);
   font-weight: 600;
   color: var(--muted);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.2px;
 }
 
-.subtitle-main {
+.subtitle-line--accent {
   font-family: var(--font-title);
-  font-size: clamp(20px, 5.4vw, 24px);
+  font-size: clamp(18px, 5vw, 22px);
   font-weight: 700;
   color: var(--ink);
   letter-spacing: 0.3px;
-}
-
-.subtitle-accent-line {
-  position: relative;
-  display: inline-block;
-  color: var(--ink);
-  font-size: clamp(16px, 4.4vw, 20px);
-  font-weight: 600;
-  padding: 0 2px;
-  line-height: 1.1;
 }
 
 h2 {

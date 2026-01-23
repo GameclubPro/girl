@@ -23,9 +23,10 @@ export const StartScreen = ({
           decoding="async"
         />
         <p className="subtitle">
-          <span className="subtitle-intro">Услуги</span>
-          <span className="subtitle-main">для девушек</span>
-          <span className="subtitle-accent-line">от девушек</span>
+          <span className="subtitle-line">Услуги для девушек</span>
+          <span className="subtitle-line subtitle-line--accent">
+            от девушек
+          </span>
         </p>
       </div>
 
