@@ -15620,7 +15620,7 @@ h1 {
 
 .subtitle {
   margin: 0;
-  color: var(--muted);
+  color: #000;
   max-width: 300px;
   display: flex;
   flex-direction: column;
@@ -15632,7 +15632,7 @@ h1 {
 .subtitle-line {
   font-size: clamp(14px, 4.2vw, 16px);
   font-weight: 600;
-  color: var(--muted);
+  color: #000;
   letter-spacing: 0.25px;
 }
 
@@ -15641,15 +15641,7 @@ h1 {
   font-size: clamp(20px, 5.4vw, 24px);
   font-weight: 700;
   letter-spacing: 0.2px;
-  color: var(--ink);
-  background: linear-gradient(
-    90deg,
-    var(--accent-strong),
-    rgb(var(--start-raspberry-rgb))
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #000;
 }
 
 h2 {
@@ -15658,6 +15650,10 @@ h2 {
   font-size: clamp(20px, 5vw, 26px);
   font-weight: 700;
   color: var(--ink);
+}
+
+.screen--start h2.animate.delay-2 {
+  margin-top: 32px;
 }
 
 .illustration-wrap {
