@@ -15588,19 +15588,30 @@
 }
 
 .title-block {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 10px;
+  justify-items: start;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  text-align: left;
 }
 
-.title-block::after {
+.title-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title-copy::after {
   content: '';
   width: 76px;
   height: 3px;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .brand-hero {
@@ -15624,8 +15635,8 @@ h1 {
   max-width: 300px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
   gap: 4px;
 }
 

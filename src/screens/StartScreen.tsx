@@ -22,12 +22,14 @@ export const StartScreen = ({
           loading="eager"
           decoding="async"
         />
-        <p className="subtitle">
-          <span className="subtitle-line">Создаем новую эру</span>
-          <span className="subtitle-line subtitle-line--accent">
-            красоты вместе
-          </span>
-        </p>
+        <div className="title-copy">
+          <p className="subtitle">
+            <span className="subtitle-line">Создаем новую эру</span>
+            <span className="subtitle-line subtitle-line--accent">
+              красоты вместе
+            </span>
+          </p>
+        </div>
       </div>
 
       <h2 className="animate delay-2">Какая роль вам подходит?</h2>
