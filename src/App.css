@@ -64,12 +64,10 @@
   position: relative;
   overflow: hidden;
   background: linear-gradient(
-    90deg,
-    rgba(var(--accent-rgb), 0.16) 0%,
-    rgba(var(--accent-rgb), 0.05) 36%,
-    #ffffff 48%,
-    #ffffff 52%,
-    rgba(var(--raspberry-rgb), 0.05) 64%,
+    180deg,
+    #ffffff 0%,
+    #ffffff 50%,
+    rgba(var(--raspberry-rgb), 0.06) 72%,
     rgba(var(--raspberry-rgb), 0.16) 100%
   );
   padding: calc(18px + var(--safe-top) + var(--tg-top-offset)) 22px
