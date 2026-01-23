@@ -278,11 +278,6 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">Статистика</span>
                 <span className="pro-cabinet-nav-title">Аналитика</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  {requestStats.total > 0
-                    ? `Всего заявок: ${requestStats.total}`
-                    : 'Пока нет заявок'}
-                </span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
@@ -324,9 +319,6 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">График</span>
                 <span className="pro-cabinet-nav-title">Календарь</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  Ближайшая: {nextBookingLabel}
-                </span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
@@ -368,11 +360,6 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">База</span>
                 <span className="pro-cabinet-nav-title">Клиенты</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  {bookingStats.uniqueClients > 0
-                    ? `Всего: ${bookingStats.uniqueClients}`
-                    : 'Пока нет клиентов'}
-                </span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview is-clients-preview">
@@ -442,11 +429,6 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">Продажи</span>
                 <span className="pro-cabinet-nav-title">Рассылка</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  {campaignAudience > 0
-                    ? `Аудитория: ${campaignAudience}`
-                    : 'Пока нет аудитории'}
-                </span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
@@ -485,9 +467,6 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">Контент</span>
                 <span className="pro-cabinet-nav-title">Истории</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  24 часа на показ
-                </span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
@@ -518,9 +497,6 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">Портфолио</span>
                 <span className="pro-cabinet-nav-title">Витрина</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  Добавьте новые работы
-                </span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
@@ -572,9 +548,6 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">Сервис</span>
                 <span className="pro-cabinet-nav-title">Поддержка</span>
-                <span className="pro-cabinet-nav-subtitle">
-                  Ответим в чате
-                </span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
