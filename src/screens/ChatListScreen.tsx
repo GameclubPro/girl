@@ -44,48 +44,6 @@ const formatChatTimestamp = (value?: string | null) => {
   }).format(date)
 }
 
-const formatContextTimestamp = (value?: string | null) => {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const dayDiff = Math.round((target.getTime() - today.getTime()) / 86400000)
-  const timeLabel = new Intl.DateTimeFormat('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-  if (dayDiff === 0) return `Сегодня, ${timeLabel}`
-  if (dayDiff === 1) return `Завтра, ${timeLabel}`
-  if (dayDiff === -1) return `Вчера, ${timeLabel}`
-  const dateLabel = new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  }).format(date)
-  return `${dateLabel}, ${timeLabel}`
-}
-
-const bookingStatusLabels: Record<string, string> = {
-  pending: 'Ожидает подтверждения',
-  price_pending: 'Ожидает цену',
-  price_proposed: 'Предложена цена',
-  confirmed: 'Подтверждено',
-  declined: 'Отказ',
-  cancelled: 'Отменено',
-}
-
-const requestStatusLabels: Record<string, string> = {
-  open: 'Ожидает отклика',
-  closed: 'Согласовано',
-}
-
-const bookingOutcomeLabels: Record<string, string> = {
-  on_time: 'Вовремя',
-  late: 'Опоздал',
-  no_show: 'Не пришёл',
-  late_cancel: 'Поздняя отмена',
-}
 
 const getInitials = (value: string) => {
   const normalized = value.trim()
@@ -148,41 +106,6 @@ const getLatestContext = (chat: ChatSummary) => {
   return null
 }
 
-const getContextStatusLabel = (
-  context: ReturnType<typeof getLatestContext>
-) => {
-  if (!context) return ''
-  if (context.contextType === 'booking') {
-    if (context.outcome) {
-      return bookingOutcomeLabels[context.outcome] ?? context.outcome
-    }
-    if (context.status) {
-      return bookingStatusLabels[context.status] ?? context.status
-    }
-    return 'Запись'
-  }
-  if (context.status) {
-    return requestStatusLabels[context.status] ?? context.status
-  }
-  return 'Заявка'
-}
-
-const getContextTimeLabel = (context: ReturnType<typeof getLatestContext>) => {
-  if (!context) return ''
-  if (context.contextType === 'booking') {
-    return formatContextTimestamp(context.scheduledAt ?? context.createdAt ?? null)
-  }
-  if (context.dateOption === 'today') return 'Сегодня'
-  if (context.dateOption === 'tomorrow') return 'Завтра'
-  if (context.dateOption === 'choose' && context.dateTime) {
-    return formatContextTimestamp(context.dateTime)
-  }
-  if (context.dateTime) {
-    return formatContextTimestamp(context.dateTime)
-  }
-  return context.createdAt ? formatContextTimestamp(context.createdAt) : 'По договоренности'
-}
-
 const getContextTypeLabel = (context: ReturnType<typeof getLatestContext>) => {
   if (!context) return 'Диалог'
   return context.contextType === 'booking' ? 'Запись' : 'Заявка'
@@ -228,8 +151,8 @@ export const ChatListScreen = ({
   const [items, setItems] = useState<ChatSummary[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const [streamStatus, setStreamStatus] = useState<ChatStreamStatus>('idle')
   const reloadTimerRef = useRef<number | null>(null)
   const isReadyRef = useRef(false)
@@ -270,12 +193,8 @@ export const ChatListScreen = ({
           return haystack.includes(query)
         })
       : regularItems
-
-    if (filter === 'unread') {
-      return byQuery.filter((item) => (item.unreadCount ?? 0) > 0)
-    }
     return byQuery
-  }, [filter, regularItems, searchQuery])
+  }, [regularItems, searchQuery])
 
   const chatSections = useMemo(() => {
     const active: ChatSummary[] = []
@@ -294,16 +213,14 @@ export const ChatListScreen = ({
     return { active, waiting, archived }
   }, [filteredItems])
 
-  const supportPreview = supportChat
-    ? getMessagePreview(supportChat.lastMessage) || 'Откройте чат поддержки'
-    : 'Ответим по записи, оплате и сервису'
-  const supportTime = formatChatTimestamp(supportChat?.lastMessage?.createdAt ?? null)
-  const supportUnread = supportChat?.unreadCount ?? 0
   const hasRegularChats = regularItems.length > 0
   const filteredCount =
     chatSections.active.length +
     chatSections.waiting.length +
     chatSections.archived.length
+  const showSupportPinned = Boolean(
+    !isSupportAgent && !searchQuery.trim() && (supportChat || onOpenSupport)
+  )
 
   const loadChats = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -527,8 +444,6 @@ export const ChatListScreen = ({
     const contextLabel = isSupportChat
       ? 'Поддержка'
       : getContextTypeLabel(latestContext)
-    const contextStatus = isSupportChat ? '' : getContextStatusLabel(latestContext)
-    const contextTime = isSupportChat ? '' : getContextTimeLabel(latestContext)
     const contextType = isSupportChat
       ? 'support'
       : latestContext?.contextType ?? chat.contextType
@@ -541,10 +456,6 @@ export const ChatListScreen = ({
     const unreadCount = chat.unreadCount ?? 0
     const showTrust =
       role === 'pro' && counterpart.role === 'client' && !isSupportChat
-    const statusPrefix =
-      latestContext?.contextType === 'booking' && latestContext.outcome
-        ? 'Итог: '
-        : ''
 
     return (
       <button
@@ -557,7 +468,9 @@ export const ChatListScreen = ({
         onClick={() => onOpenChat(chat.id)}
       >
         <span className="chat-avatar" aria-hidden="true">
-          {counterpart.avatarUrl ? (
+          {isSupportChat ? (
+            <IconSupport />
+          ) : counterpart.avatarUrl ? (
             <img src={counterpart.avatarUrl} alt="" loading="lazy" />
           ) : (
             <span>{getInitials(counterpart.name)}</span>
@@ -566,7 +479,9 @@ export const ChatListScreen = ({
         <span className="chat-card-main">
           <span className="chat-card-top">
             <span className="chat-card-name-row">
-              <span className="chat-card-name">{counterpart.name}</span>
+              <span className="chat-card-name">
+                {isSupportChat ? 'Поддержка KIVEN' : counterpart.name}
+              </span>
               {showTrust && (
                 <TrustBadge
                   trust={counterpart.trust ?? null}
@@ -577,23 +492,20 @@ export const ChatListScreen = ({
             </span>
             <span className="chat-card-time">{lastTime}</span>
           </span>
-          <span className="chat-card-context-row">
-            <span className={`chat-card-context is-${contextType}`}>
-              {contextLabel}
+          {isSupportChat ? (
+            <span className="chat-card-support-subtitle">
+              Команда поддержки · 24/7
             </span>
-            <span className="chat-card-context-title">{serviceName}</span>
-          </span>
-          <span className="chat-card-context-meta">
-            {contextStatus && (
-              <span className="chat-card-context-status">
-                {statusPrefix}
-                {contextStatus}
+          ) : (
+            <>
+              <span className="chat-card-context-row">
+                <span className={`chat-card-context is-${contextType}`}>
+                  {contextLabel}
+                </span>
+                <span className="chat-card-context-title">{serviceName}</span>
               </span>
-            )}
-            {contextTime && (
-              <span className="chat-card-context-time">{contextTime}</span>
-            )}
-          </span>
+            </>
+          )}
           <span className="chat-card-preview">{lastLabel}</span>
         </span>
         <span className="chat-card-meta">
@@ -627,65 +539,35 @@ export const ChatListScreen = ({
   return (
     <div className="screen screen--chat-list">
       <div className="chat-shell">
-        {!isSupportAgent && onOpenSupport && (
-          <button
-            className={`chat-support-card${supportUnread > 0 ? ' is-unread' : ''}`}
-            type="button"
-            onClick={onOpenSupport}
-          >
-            <span className="chat-support-avatar" aria-hidden="true">
-              <IconSupport />
-            </span>
-            <span className="chat-support-main">
-              <span className="chat-support-top">
-                <span className="chat-support-title">Поддержка KIVEN</span>
-                {supportTime && (
-                  <span className="chat-support-time">{supportTime}</span>
-                )}
-              </span>
-              <span className="chat-support-subtitle">
-                Ответим в чате клиентам и мастерам
-              </span>
-              <span className="chat-support-preview">{supportPreview}</span>
-            </span>
-            <span className="chat-support-meta">
-              <span className="chat-support-pill">24/7</span>
-              {supportUnread > 0 && (
-                <span className="chat-unread">{supportUnread}</span>
-              )}
-            </span>
-          </button>
+        {showSupportPinned && supportChat && (
+          <div className="chat-pinned">
+            {renderChatCard(supportChat)}
+          </div>
         )}
-
-        <div className="chat-filters" role="tablist" aria-label="Фильтры">
-          <button
-            className={`chat-filter${filter === 'all' ? ' is-active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={filter === 'all'}
-            onClick={() => setFilter('all')}
-          >
-            Все
-          </button>
-          <button
-            className={`chat-filter${filter === 'unread' ? ' is-active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={filter === 'unread'}
-            onClick={() => setFilter('unread')}
-          >
-            Непрочитанные
-          </button>
-          <button
-            className={`chat-refresh${isLoading ? ' is-loading' : ''}`}
-            type="button"
-            onClick={() => void loadChats()}
-            disabled={isLoading}
-          >
-            <span className="chat-refresh-label">Обновить</span>
-            <span className="chat-refresh-spinner" aria-hidden="true" />
-          </button>
-        </div>
+        {showSupportPinned && !supportChat && onOpenSupport && (
+          <div className="chat-pinned">
+            <button
+              className="chat-card is-support chat-card--support-empty"
+              type="button"
+              onClick={onOpenSupport}
+            >
+              <span className="chat-avatar" aria-hidden="true">
+                <IconSupport />
+              </span>
+              <span className="chat-card-main">
+                <span className="chat-card-top">
+                  <span className="chat-card-name-row">
+                    <span className="chat-card-name">Поддержка KIVEN</span>
+                  </span>
+                </span>
+                <span className="chat-card-support-subtitle">
+                  Команда поддержки · 24/7
+                </span>
+                <span className="chat-card-preview">Поможем с записью и сервисом</span>
+              </span>
+            </button>
+          </div>
+        )}
 
         <div className="chat-search">
           <input
@@ -737,9 +619,9 @@ export const ChatListScreen = ({
             <div className="chat-empty-icon">
               <IconChat />
             </div>
-            <h2>Чаты появятся после подтверждения</h2>
+            <h2>Диалоги появятся после подтверждения</h2>
             <p>
-              Поддержка доступна всегда, а остальные чаты появятся после
+              Поддержка доступна всегда, а чаты с клиентами появятся после
               подтверждения заявки или записи.
             </p>
             {onViewRequests && (
@@ -769,7 +651,34 @@ export const ChatListScreen = ({
           <div className="chat-sections">
             {renderSection('Активные', chatSections.active, 'active')}
             {renderSection('Ожидают', chatSections.waiting, 'waiting')}
-            {renderSection('Архив', chatSections.archived, 'archived')}
+            {chatSections.archived.length > 0 && (
+              <section className="chat-section is-archived">
+                <button
+                  className="chat-archive-toggle"
+                  type="button"
+                  onClick={() => setShowArchived((prev) => !prev)}
+                  aria-expanded={showArchived}
+                >
+                  <span className="chat-section-title">Архив</span>
+                  <span className="chat-section-count">
+                    {chatSections.archived.length}
+                  </span>
+                  <span
+                    className={`chat-archive-chevron${
+                      showArchived ? ' is-open' : ''
+                    }`}
+                    aria-hidden="true"
+                  >
+                    ⌄
+                  </span>
+                </button>
+                {showArchived && (
+                  <div className="chat-list" role="list">
+                    {chatSections.archived.map(renderChatCard)}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
         )}
       </div>
