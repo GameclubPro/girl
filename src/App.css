@@ -63,14 +63,15 @@
 .screen--start {
   position: relative;
   overflow: hidden;
+  --start-raspberry-rgb: 224, 45, 98;
   background: linear-gradient(
     45deg,
     rgba(var(--accent-rgb), 0.5) 0%,
     rgba(var(--accent-rgb), 0.22) 34%,
     #ffffff 50%,
     #ffffff 54%,
-    rgba(var(--raspberry-rgb), 0.5) 70%,
-    rgba(var(--raspberry-rgb), 0.9) 100%
+    rgba(var(--start-raspberry-rgb), 0.55) 70%,
+    rgba(var(--start-raspberry-rgb), 0.95) 100%
   );
   padding: calc(18px + var(--safe-top) + var(--tg-top-offset)) 22px
     calc(30px + var(--safe-bottom));
