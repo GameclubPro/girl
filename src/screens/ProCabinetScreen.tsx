@@ -32,11 +32,6 @@ const formatShortDate = (value: Date) =>
     value
   )
 
-const formatShortTime = (value: Date) =>
-  new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(
-    value
-  )
-
 const formatWeekday = (value: Date) =>
   new Intl.DateTimeFormat('ru-RU', { weekday: 'short' })
     .format(value)
