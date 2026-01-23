@@ -1,4 +1,4 @@
-import logoImage from '../assets/kiven-logo.webp'
+import brandHeroImage from '../assets/kiven-brand-hero.webp'
 import girlOneImage from '../assets/kiven-girl-1.webp'
 import girlTwoImage from '../assets/kiven-girl-2.webp'
 import clientRoleImage from '../assets/start-role-client-new.webp'
@@ -15,8 +15,13 @@ export const StartScreen = ({
   <div className="screen screen--start">
     <main className="content">
       <div className="title-block animate delay-1">
-        <img className="brand-logo" src={logoImage} alt="KIVEN GIRL" />
-        <h1>KIVEN GIRL</h1>
+        <img
+          className="brand-hero"
+          src={brandHeroImage}
+          alt="KIVEN GIRL"
+          loading="eager"
+          decoding="async"
+        />
         <p className="subtitle">
           <span className="subtitle-intro">Услуги</span>
           <span className="subtitle-main">для девушек</span>

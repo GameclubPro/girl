@@ -15588,7 +15588,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .title-block::after {
@@ -15600,10 +15600,11 @@
   margin-top: 6px;
 }
 
-.brand-logo {
-  width: 66px;
+.brand-hero {
+  width: clamp(180px, 60vw, 260px);
   height: auto;
   object-fit: contain;
+  filter: drop-shadow(0 10px 22px rgba(var(--shadow-rgb), 0.18));
 }
 
 h1 {
