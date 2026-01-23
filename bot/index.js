@@ -18,8 +18,23 @@ const webAppUrl = process.env.WEB_APP_URL;
 
 const bot = new Telegraf(token);
 
-const appKeyboard = (url) =>
-  Markup.keyboard([[Markup.button.webApp('Open Mini App', url)]])
+const withRoleParam = (url, role) => {
+  if (!url) return url;
+  if (!role) return url;
+  try {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has('role')) {
+      parsed.searchParams.set('role', role);
+    }
+    return parsed.toString();
+  } catch (error) {
+    const joiner = url.includes('?') ? '&' : '?';
+    return `${url}${joiner}role=${encodeURIComponent(role)}`;
+  }
+};
+
+const appKeyboard = (url, role) =>
+  Markup.keyboard([[Markup.button.webApp('Open Mini App', withRoleParam(url, role))]])
     .resize()
     .oneTime();
 
@@ -28,7 +43,7 @@ bot.start(async (ctx) => {
     await ctx.reply('WEB_APP_URL is not set. Add it to .env and restart.');
     return;
   }
-  await ctx.reply('Tap to open the mini app:', appKeyboard(webAppUrl));
+  await ctx.reply('Tap to open the mini app:', appKeyboard(webAppUrl, 'pro'));
 });
 
 bot.command('app', async (ctx) => {
@@ -36,7 +51,7 @@ bot.command('app', async (ctx) => {
     await ctx.reply('WEB_APP_URL is not set. Add it to .env and restart.');
     return;
   }
-  await ctx.reply('Tap to open the mini app:', appKeyboard(webAppUrl));
+  await ctx.reply('Tap to open the mini app:', appKeyboard(webAppUrl, 'pro'));
 });
 
 bot.on('message', async (ctx) => {

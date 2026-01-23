@@ -141,6 +141,19 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
+const parseRoleParam = (value?: string | null): Role | null => {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return null
+  if (normalized === 'pro' || normalized === 'master') return 'pro'
+  if (normalized === 'client') return 'client'
+  const match = normalized.match(/^(role)[_:-](pro|client|master)$/i)
+  if (!match) return null
+  const role = match[2]?.toLowerCase()
+  if (role === 'pro' || role === 'master') return 'pro'
+  if (role === 'client') return 'client'
+  return null
+}
 const resolveFallbackUserId = () => (import.meta.env.DEV ? 'local-dev' : '')
 type View =
   | 'start'
@@ -372,6 +385,7 @@ function App() {
       searchParams.get('masterId') ?? searchParams.get('master') ?? null
     const queryChat =
       searchParams.get('chatId') ?? searchParams.get('chat') ?? null
+    const queryRole = searchParams.get('role') ?? searchParams.get('r') ?? null
     const rawParam = webAppStart ?? queryStart
     const decodedParam = rawParam
       ? (() => {
@@ -384,6 +398,8 @@ function App() {
       : null
     const parsedChatId = parseChatStartParam(decodedParam)
     const parsedMasterId = parseBookingStartParam(decodedParam)
+    const parsedRole =
+      parseRoleParam(decodedParam) ?? parseRoleParam(queryRole) ?? null
     const rawChatId = parsedChatId ?? queryChat?.trim() ?? null
     const parsedChatNumber = rawChatId ? Number(rawChatId) : null
     const masterId = parsedMasterId ?? queryMaster?.trim() ?? null
@@ -396,16 +412,24 @@ function App() {
       return
     }
 
-    if (!masterId) return
+    if (masterId) {
+      deepLinkHandledRef.current = true
+      setRole('client')
+      setSelectedMasterId(masterId)
+      setBookingMasterId(masterId)
+      setBookingPhotoUrls([])
+      setBookingPreferredCategoryId(null)
+      setBookingReturnView('client-master-profile')
+      setRescheduleBookingId(null)
+      navigate('booking', { reset: true })
+      return
+    }
+
+    if (!parsedRole) return
     deepLinkHandledRef.current = true
-    setRole('client')
-    setSelectedMasterId(masterId)
-    setBookingMasterId(masterId)
-    setBookingPhotoUrls([])
-    setBookingPreferredCategoryId(null)
-    setBookingReturnView('client-master-profile')
-    setRescheduleBookingId(null)
-    navigate('booking', { reset: true })
+    setRole(parsedRole)
+    navigate(parsedRole === 'pro' ? 'pro-profile' : 'address', { reset: true })
+    return
   }, [navigate])
 
   const handleDistrictChange = (value: number | null) => {
