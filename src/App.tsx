@@ -141,6 +141,7 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
+const resolveFallbackUserId = () => (import.meta.env.DEV ? 'local-dev' : '')
 type View =
   | 'start'
   | 'address'
@@ -270,8 +271,10 @@ function App() {
     'pro-cabinet' | 'pro-profile'
   >('pro-cabinet')
   const [address, setAddress] = useState('')
-  const [telegramUser] = useState(() => getTelegramUser())
-  const [userId] = useState(() => telegramUser?.id?.toString() ?? 'local-dev')
+  const [telegramUser, setTelegramUser] = useState(() => getTelegramUser())
+  const [userId, setUserId] = useState(
+    () => telegramUser?.id?.toString() ?? resolveFallbackUserId()
+  )
   const [cities, setCities] = useState<City[]>([])
   const [districts, setDistricts] = useState<District[]>([])
   const [cityId, setCityId] = useState<number | null>(null)
@@ -325,6 +328,28 @@ function App() {
   const [favorites, setFavorites] = useState<FavoriteMaster[]>(() =>
     loadFavorites()
   )
+
+  useEffect(() => {
+    let cancelled = false
+    let attempts = 0
+    const pollTelegramUser = () => {
+      if (cancelled) return
+      const nextUser = getTelegramUser()
+      if (nextUser?.id) {
+        setTelegramUser(nextUser)
+        setUserId(nextUser.id.toString())
+        return
+      }
+      if (attempts < 20) {
+        attempts += 1
+        setTimeout(pollTelegramUser, 200)
+      }
+    }
+    pollTelegramUser()
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [supportChatId, setSupportChatId] = useState<number | null>(null)
   const supportChatPromiseRef = useRef<Promise<number | null> | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
