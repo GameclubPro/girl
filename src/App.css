@@ -15601,7 +15601,7 @@
 }
 
 .brand-hero {
-  width: clamp(180px, 60vw, 260px);
+  width: clamp(120px, 40vw, 176px);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 10px 22px rgba(var(--shadow-rgb), 0.18));
