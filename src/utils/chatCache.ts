@@ -2,6 +2,7 @@ import type { ChatDetail, ChatMessage, ChatSummary } from '../types/app'
 
 const CHAT_CACHE_TTL_MS = 5 * 60 * 1000
 const CHAT_MESSAGES_MAX = 200
+const STORAGE_PREFIX = 'kiven:chat-cache'
 
 type CacheEntry<T> = {
   value: T
@@ -15,12 +16,67 @@ const chatMessagesCache = new Map<string, CacheEntry<ChatMessage[]>>()
 const buildKey = (apiBase: string, userId: string, chatId?: number) =>
   `${apiBase}::${userId}${chatId ? `::${chatId}` : ''}`
 
+const normalizePart = (value: string) =>
+  encodeURIComponent(value.trim().toLowerCase())
+
+const buildStorageKey = (
+  scope: 'list' | 'detail' | 'messages',
+  apiBase: string,
+  userId: string,
+  chatId?: number
+) =>
+  `${STORAGE_PREFIX}:${scope}:${normalizePart(apiBase)}:${normalizePart(userId)}${
+    typeof chatId === 'number' ? `:${chatId}` : ''
+  }`
+
+const readStorage = <T>(key: string): CacheEntry<T> | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as CacheEntry<T>
+    if (!parsed || typeof parsed.updatedAt !== 'number') return null
+    return parsed
+  } catch (error) {
+    console.warn('Chat cache read failed:', error)
+    return null
+  }
+}
+
+const writeStorage = <T>(key: string, entry: CacheEntry<T>) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, JSON.stringify(entry))
+  } catch (error) {
+    console.warn('Chat cache write failed:', error)
+  }
+}
+
+const clearStorage = (key: string) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(key)
+  } catch (error) {
+    console.warn('Chat cache clear failed:', error)
+  }
+}
+
 const isFresh = (entry?: CacheEntry<unknown> | null) =>
   entry && Date.now() - entry.updatedAt < CHAT_CACHE_TTL_MS
 
 export const getCachedChatList = (apiBase: string, userId: string) => {
   const entry = chatListCache.get(buildKey(apiBase, userId))
-  return isFresh(entry) ? entry!.value : null
+  if (isFresh(entry)) return entry!.value
+  const storageKey = buildStorageKey('list', apiBase, userId)
+  const stored = readStorage<ChatSummary[]>(storageKey)
+  if (isFresh(stored)) {
+    chatListCache.set(buildKey(apiBase, userId), stored!)
+    return stored!.value
+  }
+  if (stored) {
+    clearStorage(storageKey)
+  }
+  return null
 }
 
 export const setCachedChatList = (
@@ -28,10 +84,9 @@ export const setCachedChatList = (
   userId: string,
   value: ChatSummary[]
 ) => {
-  chatListCache.set(buildKey(apiBase, userId), {
-    value,
-    updatedAt: Date.now(),
-  })
+  const entry = { value, updatedAt: Date.now() }
+  chatListCache.set(buildKey(apiBase, userId), entry)
+  writeStorage(buildStorageKey('list', apiBase, userId), entry)
 }
 
 export const getCachedChatDetail = (
@@ -40,7 +95,17 @@ export const getCachedChatDetail = (
   chatId: number
 ) => {
   const entry = chatDetailCache.get(buildKey(apiBase, userId, chatId))
-  return isFresh(entry) ? entry!.value : null
+  if (isFresh(entry)) return entry!.value
+  const storageKey = buildStorageKey('detail', apiBase, userId, chatId)
+  const stored = readStorage<ChatDetail>(storageKey)
+  if (isFresh(stored)) {
+    chatDetailCache.set(buildKey(apiBase, userId, chatId), stored!)
+    return stored!.value
+  }
+  if (stored) {
+    clearStorage(storageKey)
+  }
+  return null
 }
 
 export const setCachedChatDetail = (
@@ -49,10 +114,9 @@ export const setCachedChatDetail = (
   chatId: number,
   value: ChatDetail
 ) => {
-  chatDetailCache.set(buildKey(apiBase, userId, chatId), {
-    value,
-    updatedAt: Date.now(),
-  })
+  const entry = { value, updatedAt: Date.now() }
+  chatDetailCache.set(buildKey(apiBase, userId, chatId), entry)
+  writeStorage(buildStorageKey('detail', apiBase, userId, chatId), entry)
 }
 
 export const getCachedChatMessages = (
@@ -61,7 +125,17 @@ export const getCachedChatMessages = (
   chatId: number
 ) => {
   const entry = chatMessagesCache.get(buildKey(apiBase, userId, chatId))
-  return isFresh(entry) ? entry!.value : null
+  if (isFresh(entry)) return entry!.value
+  const storageKey = buildStorageKey('messages', apiBase, userId, chatId)
+  const stored = readStorage<ChatMessage[]>(storageKey)
+  if (isFresh(stored)) {
+    chatMessagesCache.set(buildKey(apiBase, userId, chatId), stored!)
+    return stored!.value
+  }
+  if (stored) {
+    clearStorage(storageKey)
+  }
+  return null
 }
 
 export const setCachedChatMessages = (
@@ -72,8 +146,7 @@ export const setCachedChatMessages = (
 ) => {
   const trimmed =
     value.length > CHAT_MESSAGES_MAX ? value.slice(-CHAT_MESSAGES_MAX) : value
-  chatMessagesCache.set(buildKey(apiBase, userId, chatId), {
-    value: trimmed,
-    updatedAt: Date.now(),
-  })
+  const entry = { value: trimmed, updatedAt: Date.now() }
+  chatMessagesCache.set(buildKey(apiBase, userId, chatId), entry)
+  writeStorage(buildStorageKey('messages', apiBase, userId, chatId), entry)
 }

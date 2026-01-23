@@ -22457,6 +22457,12 @@ h2 {
   gap: 16px;
 }
 
+.chat-list-connection {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
 .chat-connection {
   display: inline-flex;
   align-items: center;
@@ -22708,6 +22714,11 @@ h2 {
 .chat-section.is-waiting .chat-section-count {
   background: rgba(var(--warning-rgb), 0.18);
   color: var(--warning);
+}
+
+.chat-section.is-attention .chat-section-count {
+  background: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent-strong);
 }
 
 .chat-section.is-archived .chat-section-count {

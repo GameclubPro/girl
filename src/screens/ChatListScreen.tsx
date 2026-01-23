@@ -166,6 +166,17 @@ export const ChatListScreen = ({
     () => items.find((item) => item.contextType === 'support') ?? null,
     [items]
   )
+  const showConnection = streamStatus !== 'connected'
+  const connectionLabel =
+    streamStatus === 'connecting' || streamStatus === 'reconnecting'
+      ? 'Соединяем...'
+      : 'Нет связи'
+  const connectionTone =
+    streamStatus === 'connecting' || streamStatus === 'reconnecting'
+      ? 'is-syncing'
+      : streamStatus === 'connected'
+        ? 'is-online'
+        : 'is-offline'
 
   const regularItems = useMemo(
     () =>
@@ -189,7 +200,9 @@ export const ChatListScreen = ({
                 .filter(Boolean)
                 .join(' ')
             : ''
-          const haystack = `${item.counterpart.name} ${serviceName} ${contextNames}`.toLowerCase()
+          const lastMessage = item.lastMessage?.body ?? ''
+          const haystack =
+            `${item.counterpart.name} ${serviceName} ${contextNames} ${lastMessage}`.toLowerCase()
           return haystack.includes(query)
         })
       : regularItems
@@ -197,10 +210,40 @@ export const ChatListScreen = ({
   }, [regularItems, searchQuery])
 
   const chatSections = useMemo(() => {
+    const attention: ChatSummary[] = []
     const active: ChatSummary[] = []
     const waiting: ChatSummary[] = []
     const archived: ChatSummary[] = []
+    const needsAttention = (chat: ChatSummary) => {
+      if (chat.contextType === 'support') return false
+      if ((chat.unreadCount ?? 0) > 0) return true
+      const context = getLatestContext(chat)
+      if (!context) return false
+      if (role === 'pro') {
+        if (context.contextType === 'request' && context.status === 'open') {
+          return true
+        }
+        if (context.contextType === 'booking') {
+          const status = context.status ?? ''
+          return ['pending', 'price_pending', 'price_proposed'].includes(status)
+        }
+      } else {
+        const lastType = chat.lastMessage?.type ?? ''
+        if (
+          lastType === 'offer_price' ||
+          lastType === 'offer_time' ||
+          lastType === 'offer_location'
+        ) {
+          return true
+        }
+      }
+      return false
+    }
     filteredItems.forEach((chat) => {
+      if (needsAttention(chat)) {
+        attention.push(chat)
+        return
+      }
       const bucket = getChatBucket(chat)
       if (bucket === 'archived') {
         archived.push(chat)
@@ -210,11 +253,12 @@ export const ChatListScreen = ({
         active.push(chat)
       }
     })
-    return { active, waiting, archived }
-  }, [filteredItems])
+    return { attention, active, waiting, archived }
+  }, [filteredItems, role])
 
   const hasRegularChats = regularItems.length > 0
   const filteredCount =
+    chatSections.attention.length +
     chatSections.active.length +
     chatSections.waiting.length +
     chatSections.archived.length
@@ -520,7 +564,7 @@ export const ChatListScreen = ({
   const renderSection = (
     title: string,
     items: ChatSummary[],
-    tone: 'active' | 'waiting' | 'archived'
+    tone: 'attention' | 'active' | 'waiting' | 'archived'
   ) => {
     if (items.length === 0) return null
     return (
@@ -566,6 +610,18 @@ export const ChatListScreen = ({
                 <span className="chat-card-preview">Поможем с записью и сервисом</span>
               </span>
             </button>
+          </div>
+        )}
+
+        {showConnection && (
+          <div className="chat-list-connection">
+            <span
+              className={`chat-connection is-compact ${connectionTone}`}
+              role="status"
+              aria-live="polite"
+            >
+              {connectionLabel}
+            </span>
           </div>
         )}
 
@@ -649,6 +705,7 @@ export const ChatListScreen = ({
 
         {!isLoading && !loadError && filteredCount > 0 && (
           <div className="chat-sections">
+            {renderSection('Нужно ответить', chatSections.attention, 'attention')}
             {renderSection('Активные', chatSections.active, 'active')}
             {renderSection('Ожидают', chatSections.waiting, 'waiting')}
             {chatSections.archived.length > 0 && (

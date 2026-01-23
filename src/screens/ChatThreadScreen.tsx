@@ -18,6 +18,14 @@ import {
   setCachedChatDetail,
   setCachedChatMessages,
 } from '../utils/chatCache'
+import {
+  enqueueOutbox,
+  getOutbox,
+  pruneOutbox,
+  removeOutboxItem,
+  updateOutboxItem,
+  type OutboxItem,
+} from '../utils/chatOutbox'
 
 type ChatThreadScreenProps = {
   apiBase: string
@@ -163,6 +171,11 @@ const extractClientMessageId = (
   return typeof candidate === 'string' ? candidate : null
 }
 
+const shouldPersistOutbox = (payload: {
+  type: ChatMessage['type']
+  attachmentPath?: string | null
+}) => payload.type !== 'image' && !payload.attachmentPath
+
 const sortMessages = (items: LocalChatMessage[]) => {
   return [...items].sort((a, b) => {
     const timeA = new Date(a.createdAt).getTime()
@@ -194,6 +207,24 @@ const supportTopics = [
     id: 'other',
     label: 'Другое',
     template: 'Опишите ситуацию: ',
+  },
+]
+
+const clientQuickTemplates = [
+  {
+    id: 'confirm',
+    label: 'Подтверждаю',
+    template: 'Подтверждаю, мне подходит.',
+  },
+  {
+    id: 'reschedule',
+    label: 'Другое время',
+    template: 'Можно другое время? Мне удобнее ',
+  },
+  {
+    id: 'question',
+    label: 'Уточнить',
+    template: 'Есть вопрос по записи: ',
   },
 ]
 
@@ -254,6 +285,7 @@ export const ChatThreadScreen = ({
   const typingTimeoutRef = useRef<number | null>(null)
   const selfTypingTimeoutRef = useRef<number | null>(null)
   const isSelfTypingRef = useRef(false)
+  const outboxFlushRef = useRef(false)
   const lastReadSentRef = useRef<number | null>(null)
   const detailAbortRef = useRef<AbortController | null>(null)
   const messagesAbortRef = useRef<{
@@ -531,6 +563,121 @@ export const ChatThreadScreen = ({
     )
   }, [])
 
+  const sendMessageRequest = useCallback(
+    async (
+      payload: {
+        type: ChatMessage['type']
+        body?: string | null
+        meta?: Record<string, unknown> | null
+        attachmentPath?: string | null
+      },
+      clientMessageId: string
+    ) => {
+      const requestMeta =
+        payload.meta && typeof payload.meta === 'object'
+          ? { ...payload.meta, clientMessageId }
+          : { clientMessageId }
+      const response = await fetch(`${apiBase}/api/chats/${chatId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: payload.type,
+          body: payload.body ?? null,
+          meta: requestMeta,
+          attachmentPath: payload.attachmentPath ?? null,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error('Send failed')
+      }
+      return (await response.json()) as ChatMessage
+    },
+    [apiBase, chatId, userId]
+  )
+
+  const hydrateOutboxMessages = useCallback(() => {
+    const outbox = getOutbox(apiBase, userId).filter(
+      (item) => item.chatId === chatId
+    )
+    if (outbox.length === 0) return
+    setMessages((current) => {
+      const existingClientIds = new Set(
+        current
+          .map((item) => extractClientMessageId(item.meta))
+          .filter((value): value is string => Boolean(value))
+      )
+      const existingIds = new Set(current.map((item) => item.id))
+      const extras: LocalChatMessage[] = outbox
+        .filter((item) => !existingClientIds.has(item.clientMessageId))
+        .filter((item) => !existingIds.has(item.tempId))
+        .map((item) => ({
+          id: item.tempId,
+          chatId: item.chatId,
+          senderId: userId,
+          type: item.payload.type,
+          body: item.payload.body ?? null,
+          meta: item.payload.meta ?? null,
+          attachmentUrl: item.payload.attachmentUrl ?? null,
+          createdAt: item.createdAt,
+          status: item.retryCount > 0 ? 'failed' : 'sending',
+          clientMessageId: item.clientMessageId,
+          localAttachmentUrl: item.payload.localAttachmentUrl ?? null,
+        }))
+      if (extras.length === 0) return current
+      extras.forEach((item) => {
+        pendingByClientIdRef.current.set(item.clientMessageId!, item.id)
+      })
+      return sortMessages([...current, ...extras])
+    })
+  }, [apiBase, chatId, userId])
+
+  const flushOutbox = useCallback(async () => {
+    if (outboxFlushRef.current) return
+    const outbox = getOutbox(apiBase, userId).filter(
+      (item) => item.chatId === chatId
+    )
+    if (outbox.length === 0) return
+    outboxFlushRef.current = true
+    const deliveredClientIds = new Set(
+      messagesRef.current
+        .map((item) => extractClientMessageId(item.meta))
+        .filter((value): value is string => Boolean(value))
+    )
+    try {
+      for (const item of outbox) {
+        if (deliveredClientIds.has(item.clientMessageId)) {
+          removeOutboxItem(apiBase, userId, item.clientMessageId)
+          continue
+        }
+        updateMessageStatus(item.tempId, 'sending')
+        updateOutboxItem(apiBase, userId, item.clientMessageId, {
+          retryCount: item.retryCount + 1,
+          lastAttemptAt: Date.now(),
+        })
+        try {
+          const message = await sendMessageRequest(
+            {
+              type: item.payload.type,
+              body: item.payload.body ?? null,
+              meta: item.payload.meta ?? null,
+              attachmentPath: item.payload.attachmentPath ?? null,
+            },
+            item.clientMessageId
+          )
+          if (message?.id) {
+            mergeMessages([message])
+          }
+          removeOutboxItem(apiBase, userId, item.clientMessageId)
+        } catch {
+          updateMessageStatus(item.tempId, 'failed')
+        }
+      }
+    } finally {
+      outboxFlushRef.current = false
+    }
+  }, [apiBase, chatId, mergeMessages, sendMessageRequest, updateMessageStatus, userId])
+
   const enqueueOptimisticMessage = useCallback(
     (payload: {
       type: ChatMessage['type']
@@ -543,6 +690,7 @@ export const ChatThreadScreen = ({
     }) => {
       const clientMessageId = payload.clientMessageId ?? createClientMessageId()
       const tempId = payload.tempId ?? -Date.now()
+      const createdAt = new Date().toISOString()
       const meta = payload.meta ? { ...payload.meta, clientMessageId } : { clientMessageId }
 
       const optimistic: LocalChatMessage = {
@@ -553,7 +701,7 @@ export const ChatThreadScreen = ({
         body: payload.body ?? null,
         meta,
         attachmentUrl: payload.attachmentUrl ?? null,
-        createdAt: new Date().toISOString(),
+        createdAt,
         status: 'sending',
         clientMessageId,
         localAttachmentUrl: payload.localAttachmentUrl ?? null,
@@ -569,7 +717,7 @@ export const ChatThreadScreen = ({
         }
         return sortMessages([...current, optimistic])
       })
-      return { clientMessageId, tempId }
+      return { clientMessageId, tempId, createdAt }
     },
     [chatId, userId]
   )
@@ -783,9 +931,10 @@ export const ChatThreadScreen = ({
       hasInitialScrollRef.current = false
     }
 
+    hydrateOutboxMessages()
     void loadDetail({ silent: Boolean(cachedDetail) })
     void loadMessages(undefined, { silent: Boolean(cachedMessages?.length) })
-  }, [apiBase, chatId, loadDetail, loadMessages, userId])
+  }, [apiBase, chatId, hydrateOutboxMessages, loadDetail, loadMessages, userId])
 
   useEffect(() => {
     setIsHistoryOpen(false)
@@ -879,6 +1028,16 @@ export const ChatThreadScreen = ({
   }, [apiBase, chatId, messages, userId])
 
   useEffect(() => {
+    const deliveredIds = new Set(
+      messages
+        .map((item) => extractClientMessageId(item.meta))
+        .filter((value): value is string => Boolean(value))
+    )
+    if (deliveredIds.size === 0) return
+    pruneOutbox(apiBase, userId, (item) => deliveredIds.has(item.clientMessageId))
+  }, [apiBase, messages, userId])
+
+  useEffect(() => {
     return () => {
       if (detailAbortRef.current) {
         detailAbortRef.current.abort()
@@ -923,6 +1082,20 @@ export const ChatThreadScreen = ({
     }, 15000)
     return () => window.clearInterval(timer)
   }, [loadDetail, loadMessages, streamStatus])
+
+  useEffect(() => {
+    if (streamStatus === 'connected') {
+      void flushOutbox()
+    }
+  }, [flushOutbox, streamStatus])
+
+  useEffect(() => {
+    const handleOnline = () => {
+      void flushOutbox()
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [flushOutbox])
 
   useEffect(() => {
     const unsubscribeStatus = stream.subscribeStatus(setStreamStatus)
@@ -1038,7 +1211,7 @@ export const ChatThreadScreen = ({
       payload.meta && typeof payload.meta === 'object'
         ? { ...payload.meta }
         : payload.meta
-    const { clientMessageId, tempId } = enqueueOptimisticMessage({
+    const { clientMessageId, tempId, createdAt } = enqueueOptimisticMessage({
       type: payload.type,
       body: payload.body ?? null,
       meta,
@@ -1049,33 +1222,46 @@ export const ChatThreadScreen = ({
     })
 
     try {
-      const requestMeta =
-        meta && typeof meta === 'object'
-          ? { ...meta, clientMessageId }
-          : { clientMessageId }
-      const response = await fetch(`${apiBase}/api/chats/${chatId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
+      const message = await sendMessageRequest(
+        {
           type: payload.type,
           body: payload.body ?? null,
-          meta: requestMeta,
+          meta,
           attachmentPath: payload.attachmentPath ?? null,
-        }),
-      })
-      if (!response.ok) {
-        throw new Error('Send failed')
-      }
-      const message = (await response.json()) as ChatMessage
+        },
+        clientMessageId
+      )
       if (message?.id) {
         mergeMessages([message])
         setTimeout(() => scrollToBottom(), 0)
       }
+      removeOutboxItem(apiBase, userId, clientMessageId)
     } catch (error) {
       console.error('Chat send failed:', error)
       updateMessageStatus(tempId, 'failed')
       setSendError('Не удалось отправить сообщение.')
+      const isNetworkError =
+        error instanceof TypeError ||
+        (typeof navigator !== 'undefined' && navigator.onLine === false)
+      if (shouldPersistOutbox(payload) && isNetworkError) {
+        const outboxItem: OutboxItem = {
+          clientMessageId,
+          tempId,
+          chatId,
+          createdAt,
+          retryCount: 0,
+          lastAttemptAt: null,
+          payload: {
+            type: payload.type,
+            body: payload.body ?? null,
+            meta,
+            attachmentPath: payload.attachmentPath ?? null,
+            attachmentUrl: payload.attachmentUrl ?? null,
+            localAttachmentUrl: null,
+          },
+        }
+        enqueueOutbox(apiBase, userId, outboxItem)
+      }
     } finally {
       pendingByClientIdRef.current.delete(clientMessageId)
     }
@@ -2127,29 +2313,49 @@ export const ChatThreadScreen = ({
             </section>
 
             <section className="chat-context-quick">
-              <span className="chat-context-quick-title">Быстрые предложения</span>
+              <span className="chat-context-quick-title">
+                {isProViewer ? 'Быстрые предложения' : 'Быстрые ответы'}
+              </span>
               <div className="chat-context-quick-actions">
-                <button
-                  className="chat-context-quick-action"
-                  type="button"
-                  onClick={() => openQuickMode('price')}
-                >
-                  Цена
-                </button>
-                <button
-                  className="chat-context-quick-action"
-                  type="button"
-                  onClick={() => openQuickMode('time')}
-                >
-                  Время
-                </button>
-                <button
-                  className="chat-context-quick-action"
-                  type="button"
-                  onClick={() => openQuickMode('location')}
-                >
-                  Место
-                </button>
+                {isProViewer ? (
+                  <>
+                    <button
+                      className="chat-context-quick-action"
+                      type="button"
+                      onClick={() => openQuickMode('price')}
+                    >
+                      Цена
+                    </button>
+                    <button
+                      className="chat-context-quick-action"
+                      type="button"
+                      onClick={() => openQuickMode('time')}
+                    >
+                      Время
+                    </button>
+                    <button
+                      className="chat-context-quick-action"
+                      type="button"
+                      onClick={() => openQuickMode('location')}
+                    >
+                      Место
+                    </button>
+                  </>
+                ) : (
+                  clientQuickTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      className="chat-context-quick-action"
+                      type="button"
+                      onClick={() => {
+                        applyComposerTemplate(template.template)
+                        closeContextSheet()
+                      }}
+                    >
+                      {template.label}
+                    </button>
+                  ))
+                )}
               </div>
             </section>
 
