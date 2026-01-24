@@ -88,6 +88,8 @@ const SUPPORT_AGENT_IDS = Array.from(
 const SUPPORT_CONTEXT_ID = 1
 const SUPPORT_WELCOME_MESSAGE =
   'Здравствуйте! Это поддержка KIVEN. Опишите ситуацию, добавьте номер заявки/записи (если есть) и приложите фото или скриншот.'
+const BLOCKED_CLIENT_NOTICE =
+  'Служба поддержки: клиента заблокировали по подозрению на спам или недобросовестную активность. Приносим извинения за неудобства и работаем над улучшением сервиса.'
 const chatMessageTypes = new Set([
   'text',
   'image',
@@ -995,6 +997,138 @@ const refreshClientTrustScore = async (userId) => {
     level: getTrustLevelLabel(summary.confidence),
     eventCount: summary.eventCount,
   }
+}
+
+const loadUserBlockStatus = async (userId) => {
+  const result = await pool.query(
+    `
+      SELECT is_blocked AS "isBlocked", blocked_reason AS "blockedReason"
+      FROM users
+      WHERE user_id = $1
+    `,
+    [userId]
+  )
+  return result.rows[0] ?? { isBlocked: false, blockedReason: null }
+}
+
+const ensureUserNotBlocked = async (userId, res) => {
+  const block = await loadUserBlockStatus(userId)
+  if (block?.isBlocked) {
+    res.status(403).json({ error: 'user_blocked' })
+    return false
+  }
+  return true
+}
+
+const notifyMasterAboutBlockedClient = async ({ clientId, masterId }) => {
+  try {
+    const chatResult = await pool.query(
+      `
+        SELECT id
+        FROM chats
+        WHERE client_id = $1
+          AND master_id = $2
+        ORDER BY updated_at DESC NULLS LAST
+        LIMIT 1
+      `,
+      [clientId, masterId]
+    )
+    const chatId = chatResult.rows[0]?.id ?? null
+    if (chatId) {
+      const meta = { event: 'client_blocked', clientId }
+      const messageResult = await insertSystemMessage({
+        chatId,
+        body: BLOCKED_CLIENT_NOTICE,
+        meta,
+        actorId: null,
+        audience: 'master',
+      })
+      const messagePayload = {
+        id: messageResult.id,
+        chatId,
+        senderId: null,
+        type: 'system',
+        body: BLOCKED_CLIENT_NOTICE,
+        meta,
+        attachmentUrl: null,
+        createdAt: messageResult.createdAt,
+      }
+      void notifyChatMembers(
+        chatId,
+        { type: 'message:new', chatId, message: messagePayload },
+        { audience: 'master' }
+      )
+      void sendChatNotification({
+        chatId,
+        audience: 'master',
+        title: 'Клиент заблокирован',
+        text: BLOCKED_CLIENT_NOTICE,
+      })
+      return
+    }
+    await sendTelegramMessage({
+      recipientId: masterId,
+      text: BLOCKED_CLIENT_NOTICE,
+    })
+  } catch (error) {
+    console.error('Failed to notify master about blocked client:', error)
+  }
+}
+
+const blockUserForever = async ({ userId, reason }) => {
+  await pool.query(
+    `
+      UPDATE users
+      SET is_blocked = TRUE,
+          blocked_reason = $2,
+          blocked_at = NOW(),
+          updated_at = NOW()
+      WHERE user_id = $1
+    `,
+    [userId, reason]
+  )
+}
+
+const evaluateClientSpamBlock = async (clientId) => {
+  if (!clientId) return
+  const blockStatus = await loadUserBlockStatus(clientId)
+  if (blockStatus?.isBlocked) return
+
+  const trustRow = await loadClientTrustScore(clientId)
+  const trustScore =
+    typeof trustRow?.score === 'number' ? trustRow.score : TRUST_BASE_SCORE
+  if (trustScore > 50) return
+
+  const result = await pool.query(
+    `
+      SELECT
+        COUNT(*)::int AS count,
+        ARRAY_AGG(DISTINCT master_id) AS "masterIds"
+      FROM service_bookings
+      WHERE client_id = $1
+        AND status = 'confirmed'
+        AND created_at >= DATE_TRUNC('day', NOW())
+        AND (COALESCE(deposit_amount, 0) <= 0 OR deposit_status = 'not_required')
+    `,
+    [clientId]
+  )
+  const count = result.rows[0]?.count ?? 0
+  if (count <= 4) return
+
+  await blockUserForever({
+    userId: clientId,
+    reason: 'spam_confirmed_no_deposit_bookings',
+  })
+
+  const masterIds = Array.isArray(result.rows[0]?.masterIds)
+    ? result.rows[0].masterIds.filter(Boolean)
+    : []
+  const uniqueMasterIds = Array.from(new Set(masterIds))
+  await Promise.all(
+    uniqueMasterIds.map((masterId) =>
+      notifyMasterAboutBlockedClient({ clientId, masterId })
+    )
+  )
 }
 
 const buildTrustPayload = (row, options = {}) => {
@@ -2719,6 +2853,21 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT FALSE;
+  `)
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS blocked_reason TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMPTZ;
   `)
 
   await pool.query(`
@@ -6348,6 +6497,7 @@ app.post('/api/bookings', async (req, res) => {
   }
 
   try {
+    if (!(await ensureUserNotBlocked(normalizedUserId, res))) return
     const profile = await loadMasterProfile(normalizedMasterId)
     if (!profile) {
       res.status(404).json({ error: 'master_not_found' })
@@ -6684,6 +6834,14 @@ app.patch('/api/bookings/:id', async (req, res) => {
       return
     }
 
+    if (isClient) {
+      const blockStatus = await loadUserBlockStatus(normalizedUserId)
+      if (blockStatus?.isBlocked) {
+        res.status(403).json({ error: 'user_blocked' })
+        return
+      }
+    }
+
     if (normalizedAction === 'master-accept') {
       if (!isMaster) {
         res.status(403).json({ error: 'forbidden' })
@@ -6703,6 +6861,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         `,
         [bookingId]
       )
+      void evaluateClientSpamBlock(booking.clientId)
 
       let chatPayload = null
       try {
@@ -6877,6 +7036,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         `,
         [bookingId, booking.proposedPrice, nextDepositAmount, nextDepositStatus, nextDepositHoldExpiresAt]
       )
+      void evaluateClientSpamBlock(booking.clientId)
 
       let chatPayload = null
       try {
@@ -7493,6 +7653,11 @@ app.post('/api/bookings/:id/review', async (req, res) => {
   }
 
   try {
+    const blockStatus = await loadUserBlockStatus(normalizedUserId)
+    if (blockStatus?.isBlocked) {
+      res.status(403).json({ error: 'user_blocked' })
+      return
+    }
     const bookingResult = await pool.query(
       `
         SELECT
@@ -8301,6 +8466,13 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
         return
       }
 
+      const blockStatus = await loadUserBlockStatus(normalizedUserId)
+      if (blockStatus?.isBlocked) {
+        await client.query('ROLLBACK')
+        res.status(403).json({ error: 'user_blocked' })
+        return
+      }
+
       if (request.status !== 'open') {
         await client.query('ROLLBACK')
         res.status(409).json({ error: 'request_closed' })
@@ -8564,6 +8736,7 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             id: bookingInsert.rows[0]?.id ?? null,
             createdAt: bookingInsert.rows[0]?.createdAt ?? null,
           }
+          void evaluateClientSpamBlock(request.userId)
         }
 
         if (response.status !== 'accepted') {
@@ -9828,6 +10001,7 @@ app.post('/api/requests', async (req, res) => {
 
   try {
     await ensureUser(normalizedUserId)
+    if (!(await ensureUserNotBlocked(normalizedUserId, res))) return
 
     const cityCheck = await pool.query(`SELECT id FROM cities WHERE id = $1`, [
       parsedCityId,

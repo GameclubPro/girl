@@ -938,6 +938,10 @@ export const BookingScreen = ({
         | null
 
       if (!response.ok) {
+        if (data?.error === 'user_blocked') {
+          setSubmitError('Аккаунт заблокирован. Обратитесь в поддержку.')
+          return
+        }
         if (data?.error === 'time_unavailable') {
           setSubmitError('Это время уже занято. Выберите другое.')
           return

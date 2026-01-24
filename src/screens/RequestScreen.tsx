@@ -496,6 +496,10 @@ export const RequestScreen = ({
         | null
 
       if (!response.ok) {
+        if (data?.error === 'user_blocked') {
+          setSubmitError('Аккаунт заблокирован. Обратитесь в поддержку.')
+          return
+        }
         if (data?.error === 'open_request_limit') {
           setSubmitError(
             'У вас слишком много активных заявок. Закройте старые, чтобы создать новую.'
