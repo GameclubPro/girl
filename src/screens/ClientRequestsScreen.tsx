@@ -291,6 +291,7 @@ export const ClientRequestsScreen = ({
   >({})
   const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
   const bookingListRef = useRef<HTMLDivElement | null>(null)
+  const [bookingFilter, setBookingFilter] = useState<'all' | 'action'>('all')
   const [reviewOpenId, setReviewOpenId] = useState<number | null>(null)
   const [reviewSubmittingId, setReviewSubmittingId] = useState<number | null>(null)
   const [reviewErrors, setReviewErrors] = useState<Record<number, string>>({})
@@ -449,6 +450,10 @@ export const ClientRequestsScreen = ({
   }, [bookingItems])
   const depositAttentionCount = depositAttentionBookings.length
   const nextDepositBooking = depositAttentionBookings[0] ?? null
+  const nextDepositHoldTimeLeft = useMemo(() => {
+    if (!nextDepositBooking?.depositHoldExpiresAt) return ''
+    return formatTimeLeft(nextDepositBooking.depositHoldExpiresAt)
+  }, [nextDepositBooking])
   const bookingCalendarItems = useMemo(() => {
     return bookingItems
       .map((booking): BookingCalendarItem | null => {
@@ -491,6 +496,39 @@ export const ClientRequestsScreen = ({
     () => bookingsByDate.get(selectedDateKey) ?? [],
     [bookingsByDate, selectedDateKey]
   )
+  const selectedBookingsAction = useMemo(() => {
+    return selectedBookings.filter((booking) => {
+      const depositPercent =
+        typeof booking.depositPercent === 'number'
+          ? Math.max(0, Math.round(booking.depositPercent))
+          : 0
+      const basePrice =
+        typeof booking.servicePrice === 'number'
+          ? booking.servicePrice
+          : typeof booking.proposedPrice === 'number'
+            ? booking.proposedPrice
+            : null
+      const depositAmount =
+        typeof booking.depositAmount === 'number'
+          ? booking.depositAmount
+          : basePrice && depositPercent > 0
+            ? Math.round((basePrice * depositPercent) / 100)
+            : 0
+      const depositStatus =
+        booking.depositStatus ??
+        (depositAmount > 0 ? 'pending' : 'not_required')
+      const needsDeposit =
+        depositAmount > 0 &&
+        (depositStatus === 'pending' || depositStatus === 'rejected')
+      const needsPriceDecision = booking.status === 'price_proposed'
+      const needsConfirmation =
+        booking.status === 'pending' || booking.status === 'price_pending'
+      return needsDeposit || needsPriceDecision || needsConfirmation
+    })
+  }, [selectedBookings])
+  const visibleBookings =
+    bookingFilter === 'action' ? selectedBookingsAction : selectedBookings
+  const visibleBookingsCount = visibleBookings.length
   const calendarDays = useMemo(
     () =>
       Array.from({ length: CALENDAR_RANGE_DAYS }, (_, index) =>
@@ -1037,7 +1075,9 @@ export const ClientRequestsScreen = ({
                       {depositAttentionCount === 1
                         ? 'У вас есть запись, где нужно оплатить депозит.'
                         : `У вас ${depositAttentionCount} записи, где нужно оплатить депозит.`}{' '}
-                      Слот удерживается {DEPOSIT_HOLD_MINUTES} минут.
+                      {nextDepositHoldTimeLeft
+                        ? `Осталось ${nextDepositHoldTimeLeft}.`
+                        : `Слот удерживается ${DEPOSIT_HOLD_MINUTES} минут.`}
                     </p>
                     {nextDepositBooking && (
                       <p className="requests-alert-meta">
@@ -1536,15 +1576,48 @@ export const ClientRequestsScreen = ({
               )}
 
               {!isBookingsLoading && bookingItems.length > 0 && !bookingsError && (
-                <div className="booking-calendar-label">
-                  <span>Записи на</span>
-                  <span className="booking-calendar-label-date">
-                    {selectedDateLabel}
-                  </span>
-                  <span className="booking-calendar-label-count">
-                    {selectedBookings.length}
-                  </span>
-                </div>
+                <>
+                  <div className="booking-calendar-label">
+                    <span>Записи на</span>
+                    <span className="booking-calendar-label-date">
+                      {selectedDateLabel}
+                    </span>
+                    <span className="booking-calendar-label-count">
+                      {visibleBookingsCount}
+                    </span>
+                    {bookingFilter === 'action' &&
+                      visibleBookingsCount !== selectedBookings.length && (
+                        <span className="booking-calendar-label-hint">
+                          из {selectedBookings.length}
+                        </span>
+                      )}
+                  </div>
+                  <div className="booking-filter" role="group" aria-label="Фильтр">
+                    <button
+                      className={`booking-filter-chip${
+                        bookingFilter === 'all' ? ' is-active' : ''
+                      }`}
+                      type="button"
+                      onClick={() => setBookingFilter('all')}
+                    >
+                      Все
+                    </button>
+                    <button
+                      className={`booking-filter-chip${
+                        bookingFilter === 'action' ? ' is-active' : ''
+                      }`}
+                      type="button"
+                      onClick={() => setBookingFilter('action')}
+                    >
+                      Нужны действия
+                      {selectedBookingsAction.length > 0 && (
+                        <span className="booking-filter-count">
+                          {selectedBookingsAction.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </>
               )}
 
               {!isBookingsLoading &&
@@ -1556,9 +1629,15 @@ export const ClientRequestsScreen = ({
                   </p>
                 )}
 
-              {selectedBookings.length > 0 && (
+              {selectedBookings.length > 0 && visibleBookingsCount === 0 && (
+                <p className="requests-empty">
+                  Нет записей, требующих действий. Переключитесь на «Все».
+                </p>
+              )}
+
+              {visibleBookingsCount > 0 && (
                 <div className="requests-list booking-list" ref={bookingListRef}>
-                  {selectedBookings.map((booking) => {
+                  {visibleBookings.map((booking) => {
                   const statusLabel =
                     bookingStatusLabelMap[booking.status] ?? booking.status
                   const statusTone =
@@ -1664,7 +1743,13 @@ export const ClientRequestsScreen = ({
                   const depositQrUrl = booking.depositQrUrl ?? ''
                   const canSubmitDeposit =
                     depositStatus === 'pending' || depositStatus === 'rejected'
-                  const showDepositHoldNote = canSubmitDeposit
+                  const showDepositPay = depositAmount > 0 && canSubmitDeposit
+                  const depositHoldTimeLeft = booking.depositHoldExpiresAt
+                    ? formatTimeLeft(booking.depositHoldExpiresAt)
+                    : ''
+                  const depositHoldLabel = depositHoldTimeLeft
+                    ? `Слот удерживается: ${depositHoldTimeLeft}`
+                    : `Слот удерживается ${DEPOSIT_HOLD_MINUTES} минут`
                   const lateCancelFeePercent =
                     typeof booking.lateCancelFeePercent === 'number'
                       ? Math.max(0, Math.round(booking.lateCancelFeePercent))
@@ -1880,7 +1965,7 @@ export const ClientRequestsScreen = ({
                           {depositStatusLabel}
                         </div>
                       )}
-                      {depositAmount > 0 && (
+                      {showDepositPay && (
                         <div className="booking-deposit-pay">
                           <div className="booking-deposit-row">
                             <span className="booking-deposit-title">
@@ -1927,12 +2012,7 @@ export const ClientRequestsScreen = ({
                               Реквизиты мастер пришлёт в чате.
                             </p>
                           )}
-                          {showDepositHoldNote && (
-                            <p className="booking-deposit-note">
-                              Слот удерживается {DEPOSIT_HOLD_MINUTES} минут, затем
-                              автоматически освободится.
-                            </p>
-                          )}
+                          <p className="booking-deposit-note">{depositHoldLabel}</p>
                           {depositQrUrl && (
                             <div className="booking-deposit-qr">
                               <img src={depositQrUrl} alt="QR для оплаты" />

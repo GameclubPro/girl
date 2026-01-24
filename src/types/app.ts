@@ -226,6 +226,7 @@ export type Booking = {
   depositPercent?: number | null
   depositAmount?: number | null
   depositStatus?: DepositStatus | null
+  depositHoldExpiresAt?: string | null
   depositPaidAt?: string | null
   depositProofUrl?: string | null
   depositDetails?: string | null
