@@ -1,3 +1,11 @@
+const decodeValue = (value: string) => {
+  try {
+    return decodeURIComponent(value)
+  } catch (error) {
+    return value
+  }
+}
+
 const extractInitDataFromUrl = () => {
   if (typeof window === 'undefined') return ''
   let url: URL
@@ -16,7 +24,7 @@ const extractInitDataFromUrl = () => {
       value = hashParams.get('tgWebAppData') ?? ''
     }
   }
-  return value || ''
+  return value ? decodeValue(value) : ''
 }
 
 const getTelegramInitData = () => {
