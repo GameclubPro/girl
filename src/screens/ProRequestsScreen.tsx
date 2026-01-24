@@ -19,6 +19,7 @@ import type {
 } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
 import { getChatStream } from '../utils/chatStream'
+import { hapticSelection } from '../utils/haptics'
 import {
   normalizeScheduleDays,
   parseScheduleRange,
@@ -194,6 +195,54 @@ const formatTimeLeft = (value?: string | null) => {
   const minutes = minutesTotal % 60
   if (hours <= 0) return `${minutesTotal} мин`
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
+}
+
+const formatTimeWindowList = (windows?: ServiceRequest['timeWindows']) => {
+  if (!Array.isArray(windows) || windows.length === 0) return ''
+  return windows
+    .map((window) => {
+      if (!window) return ''
+      if (window.label) return window.label
+      if (window.start && window.end) {
+        return window.start === window.end
+          ? window.start
+          : `${window.start}–${window.end}`
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join(', ')
+}
+
+const formatTimeWindowChip = (window?: ServiceRequest['timeWindows'][number]) => {
+  if (!window) return ''
+  if (window.label) return window.label
+  if (window.start && window.end) {
+    return window.start === window.end
+      ? window.start
+      : `${window.start}–${window.end}`
+  }
+  return ''
+}
+
+const formatTimeWindowChoice = (
+  dateOption: ServiceRequest['dateOption'] | undefined,
+  window?: ServiceRequest['timeWindows'][number]
+) => {
+  const windowLabel = formatTimeWindowChip(window)
+  let dateLabel = ''
+  if (dateOption === 'today') {
+    dateLabel = 'Сегодня'
+  } else if (dateOption === 'tomorrow') {
+    dateLabel = 'Завтра'
+  } else if (window?.date) {
+    const parsed = new Date(window.date)
+    if (!Number.isNaN(parsed.getTime())) {
+      dateLabel = formatDayMonth(parsed)
+    }
+  }
+  const fallback = dateLabel || 'По времени'
+  return windowLabel ? `${fallback} · ${windowLabel}` : fallback
 }
 
 const formatCountLabel = (
@@ -2275,10 +2324,14 @@ export const ProRequestsScreen = ({
                     const locationLabel =
                       locationLabelMap[item.locationType] ?? 'Не важно'
                     const distanceLabel = formatDistance(item.distanceKm)
-                    const dateLabel =
+                    const baseDateLabel =
                       item.dateOption === 'choose'
                         ? formatDateTime(item.dateTime) || 'По договоренности'
                         : dateLabelMap[item.dateOption]
+                    const timeWindowLabel = formatTimeWindowList(item.timeWindows)
+                    const dateLabel = timeWindowLabel
+                      ? `${baseDateLabel} · ${timeWindowLabel}`
+                      : baseDateLabel
                     const statusLabel =
                       item.status === 'open' ? 'Открыта' : 'Закрыта'
                     const clientName = item.clientName?.trim() || 'Клиент'
@@ -2286,6 +2339,9 @@ export const ProRequestsScreen = ({
                     const tagItems = Array.isArray(item.tags) ? item.tags : []
                     const photoItems = Array.isArray(item.photoUrls)
                       ? item.photoUrls
+                      : []
+                    const timeWindowChoices = Array.isArray(item.timeWindows)
+                      ? item.timeWindows
                       : []
                     const responseStatusLabel = item.responseStatus
                       ? responseStatusLabelMap[
@@ -2407,6 +2463,33 @@ export const ProRequestsScreen = ({
                                   <img src={url} alt="" loading="lazy" />
                                 </span>
                               ))}
+                            </div>
+                          )}
+
+                          {timeWindowChoices.length > 0 && (
+                            <div className="request-chips pro-response-chips">
+                              {timeWindowChoices.map((window, index) => {
+                                const chipLabel = formatTimeWindowChip(window)
+                                if (!chipLabel) return null
+                                const choiceLabel = formatTimeWindowChoice(
+                                  item.dateOption,
+                                  window
+                                )
+                                return (
+                                  <button
+                                    className="request-chip"
+                                    key={`${item.id}-window-${index}`}
+                                    type="button"
+                                    onClick={() => {
+                                      handleDraftChange(item.id, 'proposedTime', choiceLabel)
+                                      hapticSelection()
+                                    }}
+                                    disabled={!canRespond}
+                                  >
+                                    {chipLabel}
+                                  </button>
+                                )
+                              })}
                             </div>
                           )}
 

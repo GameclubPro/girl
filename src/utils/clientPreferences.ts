@@ -2,6 +2,7 @@ export type ClientPreferences = {
   defaultCategoryId?: string
   defaultLocationType?: 'master' | 'client' | 'any'
   defaultDateOption?: 'today' | 'tomorrow' | 'choose'
+  defaultTimeWindowIds?: string[]
   defaultBudget?: string
   lastRequestServiceByCategory?: Record<string, string>
   lastBookingServiceByCategory?: Record<string, string>
@@ -23,6 +24,11 @@ const toStringRecord = (value: Record<string, unknown>) =>
     return acc
   }, {})
 
+const toStringArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+    : []
+
 const normalizePreferences = (value: unknown): ClientPreferences => {
   if (!isRecord(value)) return {}
   const prefs: ClientPreferences = {}
@@ -43,6 +49,12 @@ const normalizePreferences = (value: unknown): ClientPreferences => {
     value.defaultDateOption === 'choose'
   ) {
     prefs.defaultDateOption = value.defaultDateOption
+  }
+  if (Array.isArray(value.defaultTimeWindowIds)) {
+    const parsed = toStringArray(value.defaultTimeWindowIds)
+    if (parsed.length > 0) {
+      prefs.defaultTimeWindowIds = parsed
+    }
   }
   if (typeof value.defaultBudget === 'string') {
     prefs.defaultBudget = value.defaultBudget

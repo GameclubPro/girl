@@ -64,6 +64,23 @@ const formatDateTime = (value?: string | null) => {
   }).format(parsed)
 }
 
+const formatTimeWindowList = (windows?: ServiceRequest['timeWindows']) => {
+  if (!Array.isArray(windows) || windows.length === 0) return ''
+  return windows
+    .map((window) => {
+      if (!window) return ''
+      if (window.label) return window.label
+      if (window.start && window.end) {
+        return window.start === window.end
+          ? window.start
+          : `${window.start}–${window.end}`
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join(', ')
+}
+
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
@@ -831,10 +848,14 @@ export const ClientRequestsScreen = ({
                 {items.map((item) => {
                   const locationLabel =
                     locationLabelMap[item.locationType] ?? 'Не важно'
-                  const dateLabel =
+                  const baseDateLabel =
                     item.dateOption === 'choose'
                       ? formatDateTime(item.dateTime) || 'По договоренности'
                       : dateLabelMap[item.dateOption]
+                  const timeWindowLabel = formatTimeWindowList(item.timeWindows)
+                  const dateLabel = timeWindowLabel
+                    ? `${baseDateLabel} · ${timeWindowLabel}`
+                    : baseDateLabel
                   const statusLabel = item.status === 'open' ? 'Открыта' : 'Закрыта'
                   const categoryLabel =
                     categoryItems.find((category) => category.id === item.categoryId)

@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { TrustBadge } from '../components/TrustBadge'
-import type { ChatDetail, ChatMessage } from '../types/app'
+import type { ChatDetail, ChatMessage, RequestTimeWindow } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
 import {
@@ -123,6 +123,23 @@ const formatDateTime = (value?: string | null) => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(parsed)
+}
+
+const formatTimeWindowList = (windows?: RequestTimeWindow[] | null) => {
+  if (!Array.isArray(windows) || windows.length === 0) return ''
+  return windows
+    .map((window) => {
+      if (!window) return ''
+      if (window.label) return window.label
+      if (window.start && window.end) {
+        return window.start === window.end
+          ? window.start
+          : `${window.start}–${window.end}`
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join(', ')
 }
 
 const formatMessageTime = (value?: string | null) => {
@@ -321,7 +338,7 @@ export const ChatThreadScreen = ({
       ? `Стоимость: ${formatPrice(booking.servicePrice)}`
       : null
   const bookingDurationLabel = formatDurationLabel(booking?.serviceDuration)
-  const requestTimeLabel =
+  const baseRequestDateLabel =
     request?.dateOption === 'choose'
       ? formatDateTime(request.dateTime) || 'По договоренности'
       : request?.dateOption === 'tomorrow'
@@ -331,6 +348,10 @@ export const ChatThreadScreen = ({
           : request?.dateTime
             ? formatDateTime(request.dateTime)
             : 'По договоренности'
+  const requestWindowLabel = formatTimeWindowList(request?.timeWindows)
+  const requestTimeLabel = requestWindowLabel
+    ? `${baseRequestDateLabel} · ${requestWindowLabel}`
+    : baseRequestDateLabel
   const requestBudgetLabel = request?.budget ? `Бюджет: ${request.budget}` : null
   const activeTitle = booking?.serviceName ?? request?.serviceName ?? 'Диалог'
   const activeStatusLabel = isBookingChat

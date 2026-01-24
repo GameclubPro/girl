@@ -36,6 +36,13 @@ const dateOptions = [
   { value: 'choose', label: 'Выбрать' },
 ] as const
 
+const timeWindowOptions = [
+  { id: 'morning', label: 'Утро', start: '09:00', end: '12:00' },
+  { id: 'day', label: 'День', start: '12:00', end: '17:00' },
+  { id: 'evening', label: 'Вечер', start: '17:00', end: '21:00' },
+  { id: 'late', label: 'Поздно', start: '21:00', end: '23:00' },
+] as const
+
 const requestSteps = [
   { id: 'service', title: 'Услуга' },
   { id: 'location', title: 'Локация' },
@@ -44,6 +51,7 @@ const requestSteps = [
 ] as const
 
 type RequestBudgetOption = (typeof requestBudgetOptions)[number]
+type TimeWindowId = (typeof timeWindowOptions)[number]['id']
 
 const isRequestBudgetOption = (value: string): value is RequestBudgetOption =>
   requestBudgetOptions.some((option) => option === value)
@@ -79,6 +87,25 @@ const formatDateValue = (value: string) => {
   return value
 }
 
+const toDateKey = (value: Date) => {
+  const year = value.getFullYear()
+  const month = `${value.getMonth() + 1}`.padStart(2, '0')
+  const day = `${value.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const addDays = (value: Date, amount: number) => {
+  const next = new Date(value)
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+const formatTimeWindowLabel = (idList: TimeWindowId[]) =>
+  idList
+    .map((id) => timeWindowOptions.find((option) => option.id === id)?.label)
+    .filter(Boolean)
+    .join(', ')
+
 export const RequestScreen = ({
   apiBase,
   userId,
@@ -88,7 +115,6 @@ export const RequestScreen = ({
   cityName,
   districtName,
   address,
-  onBack,
   onBackHandlerChange,
 }: RequestScreenProps) => {
   const preferencesRef = useRef(loadClientPreferences())
@@ -120,6 +146,13 @@ export const RequestScreen = ({
     )
       ? preferencesRef.current.defaultDateOption
       : 'today'
+  const initialTimeWindowIds = Array.isArray(
+    preferencesRef.current.defaultTimeWindowIds
+  )
+    ? preferencesRef.current.defaultTimeWindowIds.filter((id): id is TimeWindowId =>
+        timeWindowOptions.some((option) => option.id === id)
+      )
+    : []
   const initialBudget =
     preferencesRef.current.defaultBudget &&
     isRequestBudgetOption(preferencesRef.current.defaultBudget)
@@ -131,6 +164,9 @@ export const RequestScreen = ({
   const [dateOption, setDateOption] = useState<
     (typeof dateOptions)[number]['value']
   >(initialDateOption)
+  const [timeWindowIds, setTimeWindowIds] = useState<TimeWindowId[]>(
+    initialTimeWindowIds.length > 0 ? initialTimeWindowIds : ['day']
+  )
   const [dateValue, setDateValue] = useState('')
   const [timeValue, setTimeValue] = useState('')
   const [budget, setBudget] = useState<RequestBudgetOption>(initialBudget)
@@ -191,6 +227,13 @@ export const RequestScreen = ({
     window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' })
   }, [safeStep])
 
+  useEffect(() => {
+    if (dateOption === 'choose') return
+    if (timeWindowIds.length === 0) {
+      setTimeWindowIds(['day'])
+    }
+  }, [dateOption, timeWindowIds])
+
   const dateLabel = useMemo(() => {
     const match = dateOptions.find((option) => option.value === dateOption)
     return match?.label ?? ''
@@ -202,9 +245,10 @@ export const RequestScreen = ({
       defaultCategoryId: categoryId,
       defaultLocationType: locationType,
       defaultDateOption: dateOption,
+      defaultTimeWindowIds: timeWindowIds,
       defaultBudget: budget,
     }))
-  }, [budget, categoryId, dateOption, locationType])
+  }, [budget, categoryId, dateOption, locationType, timeWindowIds])
 
   useEffect(() => {
     if (!serviceName.trim()) return
@@ -319,7 +363,9 @@ export const RequestScreen = ({
 
   const hasLocation = Boolean(cityId && districtId)
   const hasDateTime =
-    dateOption !== 'choose' || Boolean(dateValue && timeValue)
+    dateOption === 'choose'
+      ? Boolean(dateValue && timeValue)
+      : timeWindowIds.length > 0
   const isUploading = uploadingCount > 0
   const canContinueService = Boolean(categoryId && serviceName.trim())
   const canContinueLocation = hasLocation
@@ -348,12 +394,13 @@ export const RequestScreen = ({
   const locationSummary = hasLocation
     ? [cityName, districtName].filter(Boolean).join(', ')
     : 'Локация не выбрана'
+  const timeWindowSummary = formatTimeWindowLabel(timeWindowIds)
   const dateSummary =
     dateOption === 'choose'
       ? dateValue && timeValue
         ? `${formatDateValue(dateValue)} ${timeValue}`
         : 'Выберите дату'
-      : dateLabel
+      : [dateLabel, timeWindowSummary].filter(Boolean).join(' · ')
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return
@@ -376,6 +423,13 @@ export const RequestScreen = ({
     }
 
     let dateTime: string | null = null
+    let timeWindowsPayload: {
+      date: string
+      start: string
+      end: string
+      label?: string | null
+      exact?: boolean | null
+    }[] = []
     if (dateOption === 'choose') {
       if (!dateValue || !timeValue) {
         setSubmitError('Выберите дату и время.')
@@ -387,6 +441,30 @@ export const RequestScreen = ({
         return
       }
       dateTime = parsedDate.toISOString()
+      timeWindowsPayload = [
+        {
+          date: dateValue,
+          start: timeValue,
+          end: timeValue,
+          label: 'Точное время',
+          exact: true,
+        },
+      ]
+    } else {
+      const base = new Date()
+      base.setHours(0, 0, 0, 0)
+      const baseDate = dateOption === 'tomorrow' ? addDays(base, 1) : base
+      const dateKey = toDateKey(baseDate)
+      timeWindowsPayload = timeWindowIds
+        .map((id) => timeWindowOptions.find((option) => option.id === id))
+        .filter(Boolean)
+        .map((option) => ({
+          date: dateKey,
+          start: option!.start,
+          end: option!.end,
+          label: option!.label,
+          exact: false,
+        }))
     }
 
     setIsSubmitting(true)
@@ -406,6 +484,7 @@ export const RequestScreen = ({
           locationType,
           dateOption,
           dateTime,
+          timeWindows: timeWindowsPayload,
           budget,
           details: details.trim() || null,
           photoUrls: photos.map((photo) => photo.url),
@@ -423,6 +502,7 @@ export const RequestScreen = ({
         defaultCategoryId: categoryId,
         defaultLocationType: locationType,
         defaultDateOption: dateOption,
+        defaultTimeWindowIds: timeWindowIds,
         defaultBudget: budget,
         lastRequestServiceByCategory: {
           ...(current.lastRequestServiceByCategory ?? {}),
@@ -450,6 +530,7 @@ export const RequestScreen = ({
     locationType,
     photos,
     serviceName,
+    timeWindowIds,
     timeValue,
     userId,
   ])
@@ -462,11 +543,6 @@ export const RequestScreen = ({
     }
     return false
   }, [safeStep])
-
-  const handleBackPress = useCallback(() => {
-    if (handleStepBack()) return
-    onBack()
-  }, [handleStepBack, onBack])
 
   const handleStepNext = useCallback(() => {
     if (!canContinue) {
@@ -502,14 +578,6 @@ export const RequestScreen = ({
     >
       <div className="request-shell">
         <header className="request-header animate delay-1">
-          <button
-            className="request-back"
-            type="button"
-            onClick={handleBackPress}
-            aria-label="Назад"
-          >
-            ←
-          </button>
           <div className="request-header-body">
             <h1 className="request-title">Новая заявка</h1>
             <p className="request-subtitle">
@@ -693,8 +761,23 @@ export const RequestScreen = ({
                 </button>
               ))}
             </div>
+            {dateOption !== 'choose' && (
+              <div className="request-field">
+                <span className="request-label">Дата *</span>
+                <div className="request-select request-select--icon request-select--static">
+                  <span className="request-select-main">
+                    <span className="request-select-icon" aria-hidden="true">
+                      <IconClock />
+                    </span>
+                    {dateLabel}
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="request-field">
-              <span className="request-label">Дата и время *</span>
+              <span className="request-label">
+                {dateOption === 'choose' ? 'Дата и время *' : 'Время *'}
+              </span>
               {dateOption === 'choose' ? (
                 <div className="request-date-grid">
                   <input
@@ -711,14 +794,37 @@ export const RequestScreen = ({
                   />
                 </div>
               ) : (
-                <div className="request-select request-select--icon request-select--static">
-                  <span className="request-select-main">
-                    <span className="request-select-icon" aria-hidden="true">
-                      <IconClock />
-                    </span>
-                    {dateLabel}
-                  </span>
-                </div>
+                <>
+                  <div className="request-chips">
+                    {timeWindowOptions.map((option) => {
+                      const isActive = timeWindowIds.includes(option.id)
+                      return (
+                        <button
+                          className={`request-chip${isActive ? ' is-active' : ''}`}
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            setTimeWindowIds((current) => {
+                              if (current.includes(option.id)) {
+                                return current.filter((id) => id !== option.id)
+                              }
+                              return [...current, option.id]
+                            })
+                            hapticSelection()
+                          }}
+                          aria-pressed={isActive}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {timeWindowIds.length === 0 && (
+                    <p className="request-helper">
+                      Выберите удобное окно времени.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </section>

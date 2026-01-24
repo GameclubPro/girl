@@ -130,6 +130,14 @@ export type MasterReviewSummary = {
   distribution: { rating: number; count: number }[]
 }
 
+export type RequestTimeWindow = {
+  date: string
+  start: string
+  end: string
+  label?: string | null
+  exact?: boolean | null
+}
+
 export type ServiceRequest = {
   id: number
   userId: string
@@ -146,6 +154,7 @@ export type ServiceRequest = {
   locationType: 'client' | 'master' | 'any'
   dateOption: 'today' | 'tomorrow' | 'choose'
   dateTime?: string | null
+  timeWindows?: RequestTimeWindow[] | null
   budget?: string | null
   details?: string | null
   photoUrls: string[]
@@ -254,6 +263,7 @@ export type ChatContextSummary = {
   createdAt?: string | null
   dateOption?: ServiceRequest['dateOption']
   dateTime?: string | null
+  timeWindows?: RequestTimeWindow[] | null
   locationType?: ServiceRequest['locationType']
   scheduledAt?: string | null
   serviceDuration?: number | null
@@ -293,6 +303,7 @@ export type ChatSummary = {
     locationType?: ServiceRequest['locationType']
     dateOption?: ServiceRequest['dateOption']
     dateTime?: string | null
+    timeWindows?: RequestTimeWindow[] | null
     status?: string | null
     createdAt?: string | null
   } | null
@@ -340,6 +351,7 @@ export type ChatDetail = {
     locationType?: ServiceRequest['locationType']
     dateOption?: ServiceRequest['dateOption']
     dateTime?: string | null
+    timeWindows?: RequestTimeWindow[] | null
     budget?: string | null
     details?: string | null
     photoUrls?: string[]

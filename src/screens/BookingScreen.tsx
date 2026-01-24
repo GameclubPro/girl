@@ -163,7 +163,6 @@ export const BookingScreen = ({
   initialServiceName,
   initialLocationType,
   initialDetails,
-  onBack,
   onBackHandlerChange,
   onBookingCreated,
 }: BookingScreenProps) => {
@@ -906,11 +905,6 @@ export const BookingScreen = ({
     return false
   }, [safeStep])
 
-  const handleBackPress = useCallback(() => {
-    if (handleStepBack()) return
-    onBack()
-  }, [handleStepBack, onBack])
-
   const handleStepNext = useCallback(() => {
     if (!canContinue) {
       hapticImpact('light')
@@ -945,14 +939,6 @@ export const BookingScreen = ({
     >
       <div className="request-shell booking-shell">
         <header className="request-header booking-header animate delay-1">
-          <button
-            className="request-back"
-            type="button"
-            onClick={handleBackPress}
-            aria-label="Назад"
-          >
-            ←
-          </button>
           <div className="request-header-body">
             <h1 className="request-title">Запись</h1>
             <p className="request-subtitle">

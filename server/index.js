@@ -23,6 +23,7 @@ const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'imag
 const REQUEST_INITIAL_BATCH_SIZE = 15
 const REQUEST_EXPANDED_BATCH_SIZE = 20
 const REQUEST_RESPONSE_WINDOW_MINUTES = 30
+const REQUEST_TIME_WINDOW_LIMIT = 6
 const REQUEST_DISPATCH_SCAN_INTERVAL_MS = 60_000
 const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
 const OUTCOME_PROMPT_SCAN_INTERVAL_MS = 90_000
@@ -317,6 +318,47 @@ const parseTimeToMinutes = (value) => {
   return hours * 60 + minutes
 }
 
+const isDateKey = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+
+const normalizeTimeWindow = (value) => {
+  if (!value || typeof value !== 'object') return null
+  const date = normalizeText(value.date)
+  const start = normalizeText(value.start)
+  const end = normalizeText(value.end)
+  if (!date || !start || !end) return null
+  if (!isDateKey(date)) return null
+  const startMinutes = parseTimeToMinutes(start)
+  const endMinutes = parseTimeToMinutes(end)
+  if (startMinutes === null || endMinutes === null) return null
+  if (endMinutes < startMinutes) return null
+  const label = normalizeText(value.label)
+  const exact = value.exact === true
+  return {
+    date,
+    start,
+    end,
+    label: label || null,
+    exact,
+  }
+}
+
+const normalizeTimeWindows = (value) => {
+  let source = value
+  if (typeof value === 'string') {
+    try {
+      source = JSON.parse(value)
+    } catch (error) {
+      return []
+    }
+  }
+  if (!Array.isArray(source)) return []
+  const normalized = source
+    .map((item) => normalizeTimeWindow(item))
+    .filter(Boolean)
+  if (normalized.length === 0) return []
+  return normalized.slice(0, REQUEST_TIME_WINDOW_LIMIT)
+}
+
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const getDayKeyFromDate = (date) =>
@@ -372,11 +414,34 @@ const isScheduleCompatible = (profile, request) => {
 
   const requestDateOption = normalizeText(request?.dateOption)
   const requestDateTime = normalizeText(request?.dateTime)
+  const requestTimeWindows = normalizeTimeWindows(request?.timeWindows)
+  const hasScheduleDays = scheduleDays.length > 0
+
+  if (requestTimeWindows.length > 0) {
+    if (!hasScheduleDays || !hasTimeWindow) return true
+    return requestTimeWindows.some((window) => {
+      const date = new Date(window.date)
+      if (Number.isNaN(date.getTime())) return false
+      const dayKey = getDayKeyFromDate(date)
+      if (!scheduleDays.includes(dayKey)) return false
+      const startMinutes = parseTimeToMinutes(window.start)
+      const endMinutes = parseTimeToMinutes(window.end)
+      if (startMinutes === null || endMinutes === null) return false
+      if (window.exact || startMinutes === endMinutes) {
+        return (
+          startMinutes >= scheduleStartMinutes && startMinutes <= scheduleEndMinutes
+        )
+      }
+      return (
+        startMinutes < scheduleEndMinutes && endMinutes > scheduleStartMinutes
+      )
+    })
+  }
 
   if (requestDateOption === 'choose' && requestDateTime) {
     const scheduledDate = new Date(requestDateTime)
     if (Number.isNaN(scheduledDate.getTime())) return false
-    if (scheduleDays.length === 0 || !hasTimeWindow) return false
+    if (!hasScheduleDays || !hasTimeWindow) return false
     const dayKey = getDayKeyFromDate(scheduledDate)
     if (!scheduleDays.includes(dayKey)) return false
     const scheduledMinutes =
@@ -391,7 +456,7 @@ const isScheduleCompatible = (profile, request) => {
   }
 
   if (requestDateOption === 'today' || requestDateOption === 'tomorrow') {
-    if (scheduleDays.length === 0) return true
+    if (!hasScheduleDays) return true
     const baseDate = new Date()
     baseDate.setHours(0, 0, 0, 0)
     const day = requestDateOption === 'tomorrow' ? addDays(baseDate, 1) : baseDate
@@ -1702,6 +1767,7 @@ const loadRequestForDispatch = async (requestId) => {
         location_type AS "locationType",
         date_option AS "dateOption",
         date_time AS "dateTime",
+        time_windows AS "timeWindows",
         status
       FROM service_requests
       WHERE id = $1
@@ -1923,6 +1989,7 @@ const runRequestDispatchCycle = async () => {
           r.location_type AS "locationType",
           r.date_option AS "dateOption",
           r.date_time AS "dateTime",
+          r.time_windows AS "timeWindows",
           r.status,
           COALESCE(MAX(rd.batch), 0)::int AS "lastBatch",
           COUNT(rd.id)::int AS "dispatchCount"
@@ -2415,6 +2482,7 @@ const ensureSchema = async () => {
       location_type TEXT NOT NULL,
       date_option TEXT NOT NULL,
       date_time TIMESTAMPTZ,
+      time_windows JSONB NOT NULL DEFAULT '[]'::jsonb,
       budget TEXT,
       details TEXT,
       photo_urls TEXT[] NOT NULL DEFAULT '{}',
@@ -2422,6 +2490,11 @@ const ensureSchema = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_requests
+    ADD COLUMN IF NOT EXISTS time_windows JSONB NOT NULL DEFAULT '[]'::jsonb;
   `)
 
   await pool.query(`
@@ -2905,7 +2978,11 @@ app.get('/api/address', async (req, res) => {
       return
     }
 
-    res.json(result.rows[0])
+    const row = result.rows[0]
+    res.json({
+      ...row,
+      timeWindows: normalizeTimeWindows(row.timeWindows),
+    })
   } catch (error) {
     console.error('GET /api/address failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -4728,6 +4805,7 @@ app.get('/api/pro/requests', async (req, res) => {
           r.location_type AS "locationType",
           r.date_option AS "dateOption",
           r.date_time AS "dateTime",
+          r.time_windows AS "timeWindows",
           r.budget,
           r.details,
           r.photo_urls AS "photoUrls",
@@ -4838,6 +4916,7 @@ app.get('/api/pro/requests', async (req, res) => {
         clientName,
         distanceKm,
         clientTrust,
+        timeWindows: normalizeTimeWindows(row.timeWindows),
         clientLat: undefined,
         clientLng: undefined,
         clientShareToMasters: undefined,
@@ -6361,6 +6440,7 @@ app.get('/api/requests', async (req, res) => {
           r.location_type AS "locationType",
           r.date_option AS "dateOption",
           r.date_time AS "dateTime",
+          r.time_windows AS "timeWindows",
           r.budget,
           r.details,
           r.photo_urls AS "photoUrls",
@@ -6440,6 +6520,7 @@ app.get('/api/requests', async (req, res) => {
       return {
         ...row,
         responsePreview,
+        timeWindows: normalizeTimeWindows(row.timeWindows),
       }
     })
 
@@ -6474,6 +6555,7 @@ app.get('/api/requests/:id', async (req, res) => {
           r.location_type AS "locationType",
           r.date_option AS "dateOption",
           r.date_time AS "dateTime",
+          r.time_windows AS "timeWindows",
           r.budget,
           r.details,
           r.photo_urls AS "photoUrls",
@@ -7101,6 +7183,7 @@ app.get('/api/chats', async (req, res) => {
           sr.status AS "requestStatus",
           sr.date_option AS "requestDateOption",
           sr.date_time AS "requestDateTime",
+          sr.time_windows AS "requestTimeWindows",
           sr.created_at AS "requestCreatedAt",
           sb.service_name AS "bookingServiceName",
           sb.category_id AS "bookingCategoryId",
@@ -7200,6 +7283,7 @@ app.get('/api/chats', async (req, res) => {
               status: row.requestStatus,
               dateOption: row.requestDateOption,
               dateTime: row.requestDateTime,
+              timeWindows: normalizeTimeWindows(row.requestTimeWindows),
               createdAt: row.requestCreatedAt,
             }
           : null
@@ -7305,6 +7389,7 @@ app.get('/api/chats', async (req, res) => {
                 locationType: row.requestLocationType ?? null,
                 dateOption: row.requestDateOption ?? null,
                 dateTime: row.requestDateTime ?? null,
+                timeWindows: normalizeTimeWindows(row.requestTimeWindows),
                 createdAt: row.contextCreatedAt ?? row.requestCreatedAt ?? null,
               }
         const bucket = contextsByChatId.get(row.chatId) ?? []
@@ -7323,6 +7408,7 @@ app.get('/api/chats', async (req, res) => {
               locationType: item.request.locationType ?? null,
               dateOption: item.request.dateOption ?? null,
               dateTime: item.request.dateTime ?? null,
+              timeWindows: normalizeTimeWindows(item.request.timeWindows),
               createdAt: item.request.createdAt ?? null,
             })
           } else if (item.booking) {
@@ -7354,6 +7440,7 @@ app.get('/api/chats', async (req, res) => {
               locationType: item.request.locationType ?? null,
               dateOption: item.request.dateOption ?? null,
               dateTime: item.request.dateTime ?? null,
+              timeWindows: normalizeTimeWindows(item.request.timeWindows),
               createdAt: item.request.createdAt ?? null,
             },
           ]
@@ -7421,6 +7508,7 @@ app.get('/api/chats/:id', async (req, res) => {
           sr.location_type AS "locationType",
           sr.date_option AS "dateOption",
           sr.date_time AS "dateTime",
+          sr.time_windows AS "timeWindows",
           sr.budget,
           sr.details,
           sr.photo_urls AS "photoUrls",
@@ -7515,6 +7603,7 @@ app.get('/api/chats/:id', async (req, res) => {
           sr.location_type AS "requestLocationType",
           sr.date_option AS "requestDateOption",
           sr.date_time AS "requestDateTime",
+          sr.time_windows AS "requestTimeWindows",
           sr.created_at AS "requestCreatedAt",
           sb.service_name AS "bookingServiceName",
           sb.status AS "bookingStatus",
@@ -7555,6 +7644,7 @@ app.get('/api/chats/:id', async (req, res) => {
             locationType: contextRow.requestLocationType ?? null,
             dateOption: contextRow.requestDateOption ?? null,
             dateTime: contextRow.requestDateTime ?? null,
+            timeWindows: normalizeTimeWindows(contextRow.requestTimeWindows),
             createdAt:
               contextRow.contextCreatedAt ?? contextRow.requestCreatedAt ?? null,
           }
@@ -7570,6 +7660,7 @@ app.get('/api/chats/:id', async (req, res) => {
           locationType: row.locationType ?? null,
           dateOption: row.dateOption ?? null,
           dateTime: row.dateTime ?? null,
+          timeWindows: normalizeTimeWindows(row.timeWindows),
           createdAt: row.requestCreatedAt ?? null,
         })
       } else if (row.bookingId) {
@@ -7622,6 +7713,7 @@ app.get('/api/chats/:id', async (req, res) => {
               locationType: row.locationType,
               dateOption: row.dateOption,
               dateTime: row.dateTime,
+              timeWindows: normalizeTimeWindows(row.timeWindows),
               budget: row.budget,
               details: row.details,
               photoUrls: Array.isArray(row.photoUrls) ? row.photoUrls : [],
@@ -8019,6 +8111,7 @@ app.post('/api/requests', async (req, res) => {
     locationType,
     dateOption,
     dateTime,
+    timeWindows,
     budget,
     details,
     photoUrls,
@@ -8034,6 +8127,7 @@ app.post('/api/requests', async (req, res) => {
   const normalizedDetails = normalizeText(details)
   const tagList = normalizeStringArray(tags)
   const photoList = normalizeStringArray(photoUrls)
+  const timeWindowList = normalizeTimeWindows(timeWindows)
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -8109,11 +8203,12 @@ app.post('/api/requests', async (req, res) => {
           location_type,
           date_option,
           date_time,
+          time_windows,
           budget,
           details,
           photo_urls
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING id, created_at AS "createdAt"
       `,
       [
@@ -8127,6 +8222,7 @@ app.post('/api/requests', async (req, res) => {
         normalizedLocationType,
         normalizedDateOption,
         parsedDateTime,
+        JSON.stringify(timeWindowList),
         normalizedBudget || null,
         normalizedDetails || null,
         photoList,
@@ -8148,6 +8244,7 @@ app.post('/api/requests', async (req, res) => {
             locationType: normalizedLocationType,
             dateOption: normalizedDateOption,
             dateTime: parsedDateTime,
+            timeWindows: timeWindowList,
             status: 'open',
           },
           REQUEST_INITIAL_BATCH_SIZE,

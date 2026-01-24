@@ -15120,6 +15120,11 @@
   margin-top: 4px;
 }
 
+.pro-response-chips {
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+
 .pro-response-input,
 .pro-response-textarea {
   width: 100%;
