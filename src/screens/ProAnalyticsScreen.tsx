@@ -15,6 +15,14 @@ const rangeOptions: Array<{ id: AnalyticsRangeKey; label: string }> = [
 const categoryLabelMap = new Map<string, string>(
   categoryItems.map((item) => [item.id, item.label])
 )
+const locationLabelMap: Record<string, string> = {
+  client: 'Выезд',
+  master: 'У мастера',
+  any: 'Не важно',
+}
+
+const CONVERSION_MIN_SAMPLE = 6
+const CONVERSION_LOCATION_MIN_SAMPLE = 4
 
 const formatNumber = (value: number) =>
   Math.round(value).toLocaleString('ru-RU')
@@ -330,6 +338,50 @@ export const ProAnalyticsScreen = ({
     compareProfileViewsSeries.length > 0
       ? compareProfileViewsSeries.slice(0, profileViewsSeries.length)
       : []
+  const leadScoreVariant = data?.leadScoreVariant ?? 'A'
+  const leadVariantLabel =
+    leadScoreVariant === 'B'
+      ? 'B · с историей конверсий'
+      : 'A · базовый скоринг'
+  const leadConversionStats = data?.leadConversionStats ?? null
+  const conversionOverallRate =
+    typeof leadConversionStats?.overall?.rate === 'number'
+      ? leadConversionStats?.overall?.rate
+      : null
+  const conversionOverallMeta =
+    leadConversionStats?.overall
+      ? `${formatNumber(leadConversionStats.overall.accepted)} из ${formatNumber(
+          leadConversionStats.overall.responses
+        )}`
+      : ''
+  const conversionCategoryItems = useMemo(() => {
+    if (!leadConversionStats) return []
+    return Object.entries(leadConversionStats.categories ?? {})
+      .map(([id, stats]) => ({
+        id,
+        label: categoryLabelMap.get(id) ?? id,
+        responses: stats.responses,
+        accepted: stats.accepted,
+        rate: stats.rate,
+      }))
+      .filter((item) => item.responses >= CONVERSION_MIN_SAMPLE)
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 3)
+  }, [leadConversionStats])
+  const conversionLocationItems = useMemo(() => {
+    if (!leadConversionStats) return []
+    return Object.entries(leadConversionStats.locations ?? {})
+      .map(([id, stats]) => ({
+        id,
+        label: locationLabelMap[id] ?? id,
+        responses: stats.responses,
+        accepted: stats.accepted,
+        rate: stats.rate,
+      }))
+      .filter((item) => item.responses >= CONVERSION_LOCATION_MIN_SAMPLE)
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 3)
+  }, [leadConversionStats])
   const renderRangeControls = () => (
     <div className="analytics-range analytics-range--card" role="group">
       {rangeOptions.map((option) => (
@@ -820,6 +872,97 @@ export const ProAnalyticsScreen = ({
                     </div>
                   )}
                 </div>
+              )}
+            </section>
+
+            <section className="analytics-card animate delay-5">
+              <div className="analytics-card-head">
+                <div>
+                  <p className="analytics-card-kicker">A/B‑скоринг</p>
+                  <h2 className="analytics-card-title">
+                    Вариант {leadScoreVariant}
+                  </h2>
+                  <p className="analytics-card-subtitle">{leadVariantLabel}</p>
+                </div>
+                <span className="analytics-pill">Эксперимент</span>
+              </div>
+              {leadConversionStats ? (
+                <>
+                  <div className="analytics-ab-grid">
+                    <div className="analytics-ab-card">
+                      <span className="analytics-ab-label">Конверсия откликов</span>
+                      <span className="analytics-ab-value">
+                        {formatPercent(conversionOverallRate)}
+                      </span>
+                      {conversionOverallMeta && (
+                        <span className="analytics-ab-meta">
+                          {conversionOverallMeta}
+                        </span>
+                      )}
+                    </div>
+                    <div className="analytics-ab-card is-muted">
+                      <span className="analytics-ab-label">Логика варианта</span>
+                      <span className="analytics-ab-value">
+                        {leadScoreVariant === 'B'
+                          ? 'С учётом истории конверсий'
+                          : 'Базовый скоринг'}
+                      </span>
+                      <span className="analytics-ab-meta">
+                        Закреплён за аккаунтом
+                      </span>
+                    </div>
+                  </div>
+
+                  {(conversionCategoryItems.length > 0 ||
+                    conversionLocationItems.length > 0) && (
+                    <div className="analytics-ab-list">
+                      {conversionCategoryItems.length > 0 && (
+                        <div className="analytics-ab-block">
+                          <p className="analytics-ab-block-title">
+                            Лучшие категории
+                          </p>
+                          {conversionCategoryItems.map((item) => (
+                            <div className="analytics-ab-item" key={`cat-${item.id}`}>
+                              <span className="analytics-ab-item-title">
+                                {item.label}
+                              </span>
+                              <span className="analytics-ab-item-rate">
+                                {formatPercent(item.rate)}
+                              </span>
+                              <span className="analytics-ab-item-meta">
+                                {formatNumber(item.accepted)} из{' '}
+                                {formatNumber(item.responses)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {conversionLocationItems.length > 0 && (
+                        <div className="analytics-ab-block">
+                          <p className="analytics-ab-block-title">
+                            Лучшие форматы
+                          </p>
+                          {conversionLocationItems.map((item) => (
+                            <div className="analytics-ab-item" key={`loc-${item.id}`}>
+                              <span className="analytics-ab-item-title">
+                                {item.label}
+                              </span>
+                              <span className="analytics-ab-item-rate">
+                                {formatPercent(item.rate)}
+                              </span>
+                              <span className="analytics-ab-item-meta">
+                                {formatNumber(item.accepted)} из{' '}
+                                {formatNumber(item.responses)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="analytics-empty">Пока нет данных для A/B‑скоринга.</p>
               )}
             </section>
 

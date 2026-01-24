@@ -210,6 +210,9 @@ export type Booking = {
   districtName?: string | null
   address?: string | null
   scheduledAt: string
+  cancelWindowHours?: number | null
+  depositPercent?: number | null
+  lateCancelFeePercent?: number | null
   status: BookingStatus
   outcome?: string | null
   attendanceAt?: string | null

@@ -79,6 +79,22 @@ export type AnalyticsWaterfallStep = {
   isTotal?: boolean
 }
 
+export type LeadConversionStats = {
+  overall: {
+    responses: number
+    accepted: number
+    rate: number | null
+  }
+  categories: Record<
+    string,
+    { responses: number; accepted: number; rate: number }
+  >
+  locations: Record<
+    string,
+    { responses: number; accepted: number; rate: number }
+  >
+}
+
 export type AnalyticsCompare = {
   range: AnalyticsRange
   summary: AnalyticsSummary
@@ -94,6 +110,8 @@ export type ProAnalyticsResponse = {
   funnel: AnalyticsFunnel
   clients: AnalyticsClient[]
   waterfall: AnalyticsWaterfallStep[]
+  leadScoreVariant?: string | null
+  leadConversionStats?: LeadConversionStats | null
   compare?: AnalyticsCompare
 }
 

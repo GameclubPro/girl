@@ -2782,6 +2782,9 @@ const ensureSchema = async () => {
       scheduled_at TIMESTAMPTZ NOT NULL,
       photo_urls TEXT[] NOT NULL DEFAULT '{}',
       status TEXT NOT NULL DEFAULT 'pending',
+      cancel_window_hours INTEGER NOT NULL DEFAULT 12,
+      deposit_percent INTEGER NOT NULL DEFAULT 0,
+      late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0,
       proposed_price INTEGER,
       client_comment TEXT,
       cancelled_by TEXT,
@@ -2803,6 +2806,21 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS cancel_window_hours INTEGER NOT NULL DEFAULT 12;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS deposit_percent INTEGER NOT NULL DEFAULT 0;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0;
   `)
 
   await pool.query(`
@@ -5200,12 +5218,10 @@ app.get('/api/pro/requests', async (req, res) => {
 
     const leadScoreVariant = resolveLeadScoreVariant(normalizedUserId)
     let conversionStats = null
-    if (leadScoreVariant === 'B') {
-      try {
-        conversionStats = await loadLeadConversionStats(normalizedUserId)
-      } catch (error) {
-        conversionStats = null
-      }
+    try {
+      conversionStats = await loadLeadConversionStats(normalizedUserId)
+    } catch (error) {
+      conversionStats = null
     }
 
     const payload = dedupedRows.map((row) => {
@@ -5274,7 +5290,13 @@ app.get('/api/pro/requests', async (req, res) => {
         )
       })
 
-    res.json({ ...summary, isActive: profile.isActive, requests: scored })
+    res.json({
+      ...summary,
+      isActive: profile.isActive,
+      leadScoreVariant,
+      leadConversionStats: conversionStats,
+      requests: scored,
+    })
   } catch (error) {
     console.error('GET /api/pro/requests failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -5311,6 +5333,9 @@ app.get('/api/bookings', async (req, res) => {
           b.scheduled_at AS "scheduledAt",
           b.photo_urls AS "photoUrls",
           b.status,
+          b.cancel_window_hours AS "cancelWindowHours",
+          b.deposit_percent AS "depositPercent",
+          b.late_cancel_fee_percent AS "lateCancelFeePercent",
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
           b.outcome,
@@ -5396,6 +5421,9 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.scheduled_at AS "scheduledAt",
           b.photo_urls AS "photoUrls",
           b.status,
+          b.cancel_window_hours AS "cancelWindowHours",
+          b.deposit_percent AS "depositPercent",
+          b.late_cancel_fee_percent AS "lateCancelFeePercent",
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
           b.outcome,
@@ -5860,6 +5888,16 @@ app.get('/api/pro/analytics', async (req, res) => {
       tzOffsetMinutes
     )
 
+    const leadScoreVariant = resolveLeadScoreVariant(normalizedUserId)
+    let leadConversionStats = null
+    try {
+      leadConversionStats = await loadLeadConversionStats(normalizedUserId)
+    } catch (error) {
+      leadConversionStats = null
+    }
+    payload.leadScoreVariant = leadScoreVariant
+    payload.leadConversionStats = leadConversionStats
+
     if (shouldCompare) {
       const compareEnd = new Date(start.getTime() - DAY_MS)
       const compareStart = new Date(
@@ -5964,6 +6002,22 @@ app.post('/api/bookings', async (req, res) => {
       res.status(403).json({ error: 'service_mismatch' })
       return
     }
+
+    const normalizedCancelWindowHours = clampValue(
+      parseOptionalInt(profile.cancelWindowHours) ?? BOOKING_FREE_CANCEL_HOURS,
+      0,
+      72
+    )
+    const normalizedDepositPercent = clampValue(
+      parseOptionalInt(profile.depositPercent) ?? 0,
+      0,
+      100
+    )
+    const normalizedLateCancelFeePercent = clampValue(
+      parseOptionalInt(profile.lateCancelFeePercent) ?? 0,
+      0,
+      100
+    )
 
     if (normalizedLocationType === 'client' && !profile.worksAtClient) {
       res.status(403).json({ error: 'location_type_mismatch' })
@@ -6070,10 +6124,13 @@ app.post('/api/bookings', async (req, res) => {
           scheduled_at,
           photo_urls,
           status,
+          cancel_window_hours,
+          deposit_percent,
+          late_cancel_fee_percent,
           proposed_price,
           client_comment
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL, $17)
         RETURNING id, created_at AS "createdAt"
       `,
       [
@@ -6090,6 +6147,9 @@ app.post('/api/bookings', async (req, res) => {
         scheduledDate.toISOString(),
         photoList,
         status,
+        normalizedCancelWindowHours,
+        normalizedDepositPercent,
+        normalizedLateCancelFeePercent,
         normalizedComment || null,
       ]
     )
@@ -6143,6 +6203,9 @@ app.patch('/api/bookings/:id', async (req, res) => {
           proposed_price AS "proposedPrice",
           scheduled_at AS "scheduledAt",
           cancelled_at AS "cancelledAt",
+          cancel_window_hours AS "cancelWindowHours",
+          deposit_percent AS "depositPercent",
+          late_cancel_fee_percent AS "lateCancelFeePercent",
           outcome
         FROM service_bookings
         WHERE id = $1
@@ -6374,13 +6437,25 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
+      const cancelWindowHours = clampValue(
+        parseOptionalInt(booking.cancelWindowHours) ?? BOOKING_FREE_CANCEL_HOURS,
+        0,
+        72
+      )
+      const depositPercent = clampValue(parseOptionalInt(booking.depositPercent) ?? 0, 0, 100)
+      const lateCancelFeePercent = clampValue(
+        parseOptionalInt(booking.lateCancelFeePercent) ?? 0,
+        0,
+        100
+      )
+
       const cancelledDate = new Date()
       const cancelledAt = cancelledDate.toISOString()
       const scheduledAt = new Date(booking.scheduledAt ?? '')
       const isLateCancel =
         !Number.isNaN(scheduledAt.getTime()) &&
         scheduledAt.getTime() - cancelledDate.getTime() <
-          BOOKING_FREE_CANCEL_HOURS * 60 * 60 * 1000
+          cancelWindowHours * 60 * 60 * 1000
       const outcomeValue = isLateCancel ? 'late_cancel' : null
 
       await pool.query(
@@ -6403,10 +6478,21 @@ app.patch('/api/bookings/:id', async (req, res) => {
           ref: `booking:${bookingId}`,
           bookingId,
           scheduledAt: booking.scheduledAt,
+          cancelWindowHours,
+          depositPercent,
+          lateCancelFeePercent,
+          isLateCancel,
         },
       })
 
-      res.json({ ok: true, status: 'cancelled' })
+      res.json({
+        ok: true,
+        status: 'cancelled',
+        isLateCancel,
+        cancelWindowHours,
+        depositPercent,
+        lateCancelFeePercent,
+      })
       return
     }
 
@@ -7529,6 +7615,21 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             res.status(404).json({ error: 'master_not_found' })
             return
           }
+          const normalizedCancelWindowHours = clampValue(
+            parseOptionalInt(profile.cancelWindowHours) ?? BOOKING_FREE_CANCEL_HOURS,
+            0,
+            72
+          )
+          const normalizedDepositPercent = clampValue(
+            parseOptionalInt(profile.depositPercent) ?? 0,
+            0,
+            100
+          )
+          const normalizedLateCancelFeePercent = clampValue(
+            parseOptionalInt(profile.lateCancelFeePercent) ?? 0,
+            0,
+            100
+          )
 
           const serviceItems = parseServiceItems(profile.services ?? [])
           const normalizedRequestedService = normalizeServiceName(request.serviceName)
@@ -7671,10 +7772,13 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
                 scheduled_at,
                 photo_urls,
                 status,
+                cancel_window_hours,
+                deposit_percent,
+                late_cancel_fee_percent,
                 proposed_price,
                 client_comment
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed', NULL, $13)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed', $13, $14, $15, NULL, $16)
               RETURNING id, created_at AS "createdAt"
             `,
             [
@@ -7690,6 +7794,9 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
               resolvedLocationType,
               scheduledDate.toISOString(),
               requestPhotoList,
+              normalizedCancelWindowHours,
+              normalizedDepositPercent,
+              normalizedLateCancelFeePercent,
               requestComment,
             ]
           )

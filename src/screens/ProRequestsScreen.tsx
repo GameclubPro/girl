@@ -18,6 +18,7 @@ import type {
   RequestTimeWindow,
   ServiceRequest,
 } from '../types/app'
+import type { LeadConversionStats } from '../types/analytics'
 import { buildBookingStartParam } from '../utils/deeplink'
 import { getChatStream } from '../utils/chatStream'
 import { hapticSelection } from '../utils/haptics'
@@ -441,6 +442,8 @@ type SlotSuggestion = {
   startMinutes: number
   value: string
   label: string
+  score?: number
+  confidenceLabel?: string
 }
 
 type SlotFilter = 'all' | 'free' | 'booked' | 'closed'
@@ -467,6 +470,9 @@ const SLOT_TIME_START = 8 * 60
 const SLOT_TIME_END = 21 * 60
 const SLOT_TIME_STEP = 30
 const REQUEST_SLOT_SUGGESTIONS_LIMIT = 6
+const REQUEST_SLOT_CONFIDENCE_LIMIT = 2
+const LEAD_CONVERSION_MIN_SAMPLE = 6
+const LEAD_CONVERSION_LOCATION_MIN_SAMPLE = 4
 
 const buildSlotStorageKey = (userId: string) => `pro-slots:${userId}`
 const buildSlotSeedKey = (userId: string) => `pro-slots-seeded:${userId}`
@@ -621,6 +627,8 @@ export const ProRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
+  const [leadConversionStats, setLeadConversionStats] =
+    useState<LeadConversionStats | null>(null)
   const [bookingDrafts, setBookingDrafts] = useState<Record<number, string>>({})
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
@@ -772,6 +780,8 @@ export const ProRequestsScreen = ({
               profileStatus?: ProfileStatus
               missingFields?: string[]
               isActive?: boolean
+              leadScoreVariant?: string | null
+              leadConversionStats?: LeadConversionStats | null
               requests?: ProRequest[]
             }
         if (cancelled) return
@@ -779,10 +789,14 @@ export const ProRequestsScreen = ({
         const requestItems = Array.isArray(data) ? data : data.requests ?? []
         const nextMissing = Array.isArray(data) ? [] : data.missingFields ?? []
         const nextActive = Array.isArray(data) ? true : data.isActive ?? true
+        const nextLeadConversionStats = Array.isArray(data)
+          ? null
+          : data.leadConversionStats ?? null
 
         setRequests(requestItems)
         setMissingFields(nextMissing)
         setIsActive(nextActive)
+        setLeadConversionStats(nextLeadConversionStats)
         setDrafts((current) => {
           const nextDrafts = { ...current }
           requestItems.forEach((item) => {
@@ -1320,27 +1334,74 @@ export const ProRequestsScreen = ({
       const used = new Set<string>()
       const now = new Date()
       const nowMinutes = now.getHours() * 60 + now.getMinutes()
+      const conversionStats = leadConversionStats
+      const categoryStats =
+        conversionStats?.categories?.[request.categoryId ?? ''] ?? null
+      const locationStats =
+        conversionStats?.locations?.[request.locationType ?? ''] ?? null
+      const overallRate =
+        typeof conversionStats?.overall?.rate === 'number'
+          ? conversionStats?.overall?.rate
+          : null
+      const categoryRate =
+        categoryStats &&
+        categoryStats.responses >= LEAD_CONVERSION_MIN_SAMPLE &&
+        typeof categoryStats.rate === 'number'
+          ? categoryStats.rate
+          : null
+      const locationRate =
+        locationStats &&
+        locationStats.responses >= LEAD_CONVERSION_LOCATION_MIN_SAMPLE &&
+        typeof locationStats.rate === 'number'
+          ? locationStats.rate
+          : null
+      const blendedRate =
+        categoryRate !== null && locationRate !== null
+          ? categoryRate * 0.7 + locationRate * 0.3
+          : categoryRate ?? locationRate ?? overallRate
 
-      const addSuggestion = (dateKey: string, minutes: number) => {
+      const addSuggestion = (
+        dateKey: string,
+        minutes: number,
+        source: 'manual' | 'schedule'
+      ) => {
         if (suggestions.length >= REQUEST_SLOT_SUGGESTIONS_LIMIT) return
         const value = buildLocalDateTimeValue(dateKey, minutes)
         if (!value) return
         const key = `${dateKey}-${minutes}`
         if (used.has(key)) return
         used.add(key)
+        const baseScore = source === 'manual' ? 2 : 1
+        const conversionBoost = blendedRate !== null ? blendedRate * 2 : 0
+        const score = baseScore + conversionBoost
+        let confidenceLabel = ''
+        if (blendedRate !== null) {
+          if (blendedRate >= 0.5) {
+            confidenceLabel = 'Очень вероятно'
+          } else if (blendedRate >= 0.35) {
+            confidenceLabel = 'Вероятно'
+          } else if (blendedRate <= 0.15) {
+            confidenceLabel = 'Низкий шанс'
+          }
+        }
         suggestions.push({
           id: key,
           dateKey,
           startMinutes: minutes,
           value,
           label: formatSlotSuggestionLabel(dateKey, minutes, todayKey, tomorrowKey),
+          score,
+          confidenceLabel,
         })
       }
 
-      const isTimeAvailable = (dateKey: string, minutes: number) => {
+      const resolveTimeAvailability = (
+        dateKey: string,
+        minutes: number
+      ): 'manual' | 'schedule' | null => {
         const date = parseDateKey(dateKey)
-        if (!date) return false
-        if (dateKey === todayKey && minutes < nowMinutes) return false
+        if (!date) return null
+        if (dateKey === todayKey && minutes < nowMinutes) return null
         const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
         if (
           bookedRanges.some((range) =>
@@ -1352,11 +1413,11 @@ export const ProRequestsScreen = ({
             )
           )
         ) {
-          return false
+          return null
         }
         if (hasManualSlots) {
           const daySlots = slotsByDate.get(dateKey) ?? []
-          return daySlots.some(
+          const hasFreeSlot = daySlots.some(
             (slot) =>
               slot.status === 'free' &&
               rangesOverlap(
@@ -1366,14 +1427,15 @@ export const ProRequestsScreen = ({
                 slot.durationMinutes
               )
           )
+          return hasFreeSlot ? 'manual' : null
         }
-        if (profileScheduleStart === null || profileScheduleEnd === null) return false
-        if (profileScheduleDaySet.size === 0) return false
+        if (profileScheduleStart === null || profileScheduleEnd === null) return null
+        if (profileScheduleDaySet.size === 0) return null
         const dayKey = getDayKey(date)
-        if (!profileScheduleDaySet.has(dayKey)) return false
-        if (minutes < profileScheduleStart) return false
-        if (minutes + SLOT_DURATION_MIN > profileScheduleEnd) return false
-        return true
+        if (!profileScheduleDaySet.has(dayKey)) return null
+        if (minutes < profileScheduleStart) return null
+        if (minutes + SLOT_DURATION_MIN > profileScheduleEnd) return null
+        return 'schedule'
       }
 
       const normalizedWindows = windows
@@ -1425,15 +1487,28 @@ export const ProRequestsScreen = ({
               })()
         for (const time of times) {
           if (suggestions.length >= REQUEST_SLOT_SUGGESTIONS_LIMIT) break
-          if (!isTimeAvailable(window.dateKey, time)) continue
-          addSuggestion(window.dateKey, time)
+          const source = resolveTimeAvailability(window.dateKey, time)
+          if (!source) continue
+          addSuggestion(window.dateKey, time, source)
         }
       }
 
-      return suggestions
+      if (suggestions.length === 0) return []
+      if (blendedRate === null) return suggestions
+      const ranked = [...suggestions]
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .slice(0, REQUEST_SLOT_CONFIDENCE_LIMIT)
+        .map((item) => item.id)
+      if (ranked.length === 0) return suggestions
+      return suggestions.map((slot) =>
+        ranked.includes(slot.id)
+          ? { ...slot, confidenceLabel: 'Самый вероятный' }
+          : slot
+      )
     },
     [
       bookingRangesByDate,
+      leadConversionStats,
       profileScheduleDaySet,
       profileScheduleEnd,
       profileScheduleStart,
@@ -2041,10 +2116,15 @@ export const ProRequestsScreen = ({
       ? updatedAtMs + PRICE_OFFER_HOURS * 60 * 60 * 1000
       : null
     const priceOfferTimeLeft = formatTimeLeftFromMs(priceOfferExpiresAt)
-    const freeCancelUntilMs = booking.scheduledAt
-      ? new Date(booking.scheduledAt).getTime() -
-        FREE_CANCEL_HOURS * 60 * 60 * 1000
-      : null
+    const cancelWindowHours =
+      typeof booking.cancelWindowHours === 'number'
+        ? booking.cancelWindowHours
+        : FREE_CANCEL_HOURS
+    const cancelWindowMs = Math.max(0, cancelWindowHours) * 60 * 60 * 1000
+    const freeCancelUntilMs =
+      booking.scheduledAt && cancelWindowMs > 0
+        ? new Date(booking.scheduledAt).getTime() - cancelWindowMs
+        : null
     const freeCancelLabel =
       freeCancelUntilMs && freeCancelUntilMs > Date.now()
         ? formatDateTime(new Date(freeCancelUntilMs).toISOString())
@@ -2070,6 +2150,14 @@ export const ProRequestsScreen = ({
     const clientInitials = getInitials(clientName)
     const outcomeLabel = formatOutcomeLabel(booking.outcome, booking.lateMinutes)
     const canMarkOutcome = isOutcomePending(booking)
+    const depositPercent =
+      typeof booking.depositPercent === 'number'
+        ? Math.max(0, Math.round(booking.depositPercent))
+        : 0
+    const lateCancelFeePercent =
+      typeof booking.lateCancelFeePercent === 'number'
+        ? Math.max(0, Math.round(booking.lateCancelFeePercent))
+        : 0
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
@@ -2124,6 +2212,16 @@ export const ProRequestsScreen = ({
         {booking.status === 'confirmed' && freeCancelLabel && (
           <div className="booking-item-meta booking-item-meta--highlight">
             Бесплатная отмена до: {freeCancelLabel}
+          </div>
+        )}
+        {depositPercent > 0 && (
+          <div className="booking-item-meta">
+            Депозит: {depositPercent}%
+          </div>
+        )}
+        {lateCancelFeePercent > 0 && (
+          <div className="booking-item-meta booking-item-meta--warning">
+            Поздняя отмена: {lateCancelFeePercent}%
           </div>
         )}
         {outcomeLabel && (
@@ -2877,7 +2975,7 @@ export const ProRequestsScreen = ({
                                       draft.proposedSlotAt === slot.value
                                         ? ' is-active'
                                         : ''
-                                    }`}
+                                    }${slot.confidenceLabel ? ' is-boosted' : ''}`}
                                     key={`${item.id}-slot-${slot.id}`}
                                     type="button"
                                     onClick={() => {
@@ -2895,7 +2993,12 @@ export const ProRequestsScreen = ({
                                     }}
                                     disabled={!canRespond}
                                   >
-                                    {slot.label}
+                                    <span className="request-chip-label">{slot.label}</span>
+                                    {slot.confidenceLabel && (
+                                      <span className="request-chip-badge">
+                                        {slot.confidenceLabel}
+                                      </span>
+                                    )}
                                   </button>
                                 ))}
                               </div>

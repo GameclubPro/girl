@@ -50,7 +50,6 @@ const bookingStatusToneMap = {
 
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const
 const CALENDAR_RANGE_DAYS = 14
-const twelveHoursMs = 12 * 60 * 60 * 1000
 const PRICE_OFFER_HOURS = 12
 const FREE_CANCEL_HOURS = 12
 
@@ -1295,6 +1294,11 @@ export const ClientRequestsScreen = ({
                   const priceOfferTimeLeft = formatTimeLeftFromMs(
                     priceOfferExpiresAt
                   )
+                  const cancelWindowHours =
+                    typeof booking.cancelWindowHours === 'number'
+                      ? booking.cancelWindowHours
+                      : FREE_CANCEL_HOURS
+                  const cancelWindowMs = Math.max(0, cancelWindowHours) * 60 * 60 * 1000
                   const priceLabel =
                     typeof booking.servicePrice === 'number'
                       ? `Стоимость: ${formatPrice(booking.servicePrice)}`
@@ -1309,9 +1313,9 @@ export const ClientRequestsScreen = ({
                   const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
                   const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
                   const freeCancelUntilMs =
-                    typeof timeUntilMs === 'number'
+                    typeof timeUntilMs === 'number' && cancelWindowMs > 0
                       ? new Date(booking.scheduledAt).getTime() -
-                        FREE_CANCEL_HOURS * 60 * 60 * 1000
+                        cancelWindowMs
                       : null
                   const freeCancelLabel =
                     freeCancelUntilMs && freeCancelUntilMs > Date.now()
@@ -1320,16 +1324,24 @@ export const ClientRequestsScreen = ({
                   const canReschedule =
                     booking.status === 'confirmed' &&
                     typeof timeUntilMs === 'number' &&
-                    timeUntilMs >= twelveHoursMs
+                    timeUntilMs >= cancelWindowMs
                   const canCancelConfirmed =
                     booking.status === 'confirmed' &&
                     typeof timeUntilMs === 'number' &&
                     timeUntilMs > 0 &&
-                    timeUntilMs < twelveHoursMs
+                    (cancelWindowMs === 0 || timeUntilMs < cancelWindowMs)
                   const canLeaveReview =
                     booking.status === 'confirmed' && isPast && !booking.reviewId
                   const hasReview =
                     booking.status === 'confirmed' && isPast && Boolean(booking.reviewId)
+                  const depositPercent =
+                    typeof booking.depositPercent === 'number'
+                      ? Math.max(0, Math.round(booking.depositPercent))
+                      : 0
+                  const lateCancelFeePercent =
+                    typeof booking.lateCancelFeePercent === 'number'
+                      ? Math.max(0, Math.round(booking.lateCancelFeePercent))
+                      : 0
                   const canDelete =
                     booking.status === 'cancelled' || booking.status === 'declined'
                   const isConfirmed = booking.status === 'confirmed'
@@ -1501,6 +1513,16 @@ export const ClientRequestsScreen = ({
                             Отмена с удержанием
                           </div>
                         )}
+                      {depositPercent > 0 && (
+                        <div className="booking-item-meta">
+                          Депозит: {depositPercent}%
+                        </div>
+                      )}
+                      {lateCancelFeePercent > 0 && (
+                        <div className="booking-item-meta booking-item-meta--warning">
+                          Поздняя отмена: {lateCancelFeePercent}%
+                        </div>
+                      )}
                       {booking.comment && (
                         <div className="booking-item-comment">{booking.comment}</div>
                       )}
