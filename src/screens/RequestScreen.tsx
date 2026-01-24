@@ -509,6 +509,16 @@ export const RequestScreen = ({
           [categoryId]: serviceName.trim(),
         },
       }))
+      const webApp = window.Telegram?.WebApp
+      if (webApp?.close) {
+        setTimeout(() => {
+          try {
+            webApp?.close?.()
+          } catch (closeError) {
+            console.warn('Failed to close WebApp:', closeError)
+          }
+        }, 900)
+      }
     } catch (error) {
       setSubmitError('Не удалось опубликовать заявку. Попробуйте еще раз.')
       hapticNotification('error')
