@@ -51,6 +51,8 @@ declare global {
           }
           start_param?: string
         }
+        platform?: string
+        version?: string
         safeAreaInset?: { top: number; bottom: number; left: number; right: number }
         contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number }
         onEvent?: (eventType: string, callback: () => void) => void
