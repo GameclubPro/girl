@@ -256,6 +256,7 @@ const profileSettingsItems = [
   { id: 'basic', label: 'О себе', icon: IconProfileAbout },
   { id: 'location', label: 'Локация', icon: IconPin },
   { id: 'availability', label: 'График', icon: IconSchedule },
+  { id: 'policies', label: 'Политики и депозит', icon: IconPrice },
   { id: 'services', label: 'Услуги', icon: IconServices },
   { id: 'certificates', label: 'Сертификаты', icon: IconCertificate },
 ] as const
@@ -266,6 +267,7 @@ const editorTitleMap: Record<InlineSection, string> = {
   basic: 'О себе',
   location: 'Локация',
   availability: 'График',
+  policies: 'Политики и депозит',
   services: 'Услуги',
   certificates: 'Сертификаты',
   media: 'Фото профиля',
@@ -284,6 +286,9 @@ type ProfilePayload = {
   scheduleDays: string[]
   scheduleStart: string | null
   scheduleEnd: string | null
+  cancelWindowHours: number | null
+  depositPercent: number | null
+  lateCancelFeePercent: number | null
   worksAtClient: boolean
   worksAtMaster: boolean
   categories: string[]
@@ -372,6 +377,9 @@ export const ProProfileScreen = ({
   const [scheduleDays, setScheduleDays] = useState<string[]>([])
   const [scheduleStart, setScheduleStart] = useState('')
   const [scheduleEnd, setScheduleEnd] = useState('')
+  const [cancelWindowHours, setCancelWindowHours] = useState('')
+  const [depositPercent, setDepositPercent] = useState('')
+  const [lateCancelFeePercent, setLateCancelFeePercent] = useState('')
   const [proLocation, setProLocation] = useState<UserLocation | null>(null)
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
@@ -517,6 +525,9 @@ export const ProProfileScreen = ({
       scheduleDays: [...scheduleDays],
       scheduleStart: scheduleStart.trim() || null,
       scheduleEnd: scheduleEnd.trim() || null,
+      cancelWindowHours: parseNumber(cancelWindowHours),
+      depositPercent: parseNumber(depositPercent),
+      lateCancelFeePercent: parseNumber(lateCancelFeePercent),
       worksAtClient,
       worksAtMaster,
       categories: [...categories],
@@ -529,10 +540,13 @@ export const ProProfileScreen = ({
     about,
     categories,
     cityId,
+    cancelWindowHours,
     displayName,
     districtId,
+    depositPercent,
     experienceYears,
     isActive,
+    lateCancelFeePercent,
     portfolioStrings,
     priceFromValue,
     priceToValue,
@@ -783,6 +797,31 @@ export const ProProfileScreen = ({
     scheduleDaysLabel || scheduleTimeLabel
       ? [scheduleDaysLabel, scheduleTimeLabel].filter(Boolean).join(' · ')
       : 'График не задан'
+  const cancelWindowValue = parseNumber(cancelWindowHours)
+  const depositPercentValue = parseNumber(depositPercent)
+  const lateCancelFeeValue = parseNumber(lateCancelFeePercent)
+  const cancelWindowLabel =
+    cancelWindowValue !== null
+      ? `Бесплатная отмена за ${cancelWindowValue} ч`
+      : 'Окно отмены не задано'
+  const depositLabel =
+    depositPercentValue !== null && depositPercentValue > 0
+      ? `Депозит ${depositPercentValue}%`
+      : 'Без депозита'
+  const lateCancelLabel =
+    lateCancelFeeValue !== null && lateCancelFeeValue > 0
+      ? `Поздняя отмена ${lateCancelFeeValue}%`
+      : 'Без штрафа за отмену'
+  const hasCustomPolicies =
+    (cancelWindowValue !== null && cancelWindowValue !== 12) ||
+    (depositPercentValue !== null && depositPercentValue > 0) ||
+    (lateCancelFeeValue !== null && lateCancelFeeValue > 0)
+  const policiesSummary =
+    cancelWindowLabel || depositLabel || lateCancelLabel
+      ? [cancelWindowLabel, depositLabel, lateCancelLabel]
+          .filter(Boolean)
+          .join(' · ')
+      : 'Политики не настроены'
   const servicesCount = serviceNames.length
   const servicesPriceLabel =
     priceFromValue !== null && priceToValue !== null
@@ -822,6 +861,7 @@ export const ProProfileScreen = ({
     basic: basicSummary,
     location: locationLabel,
     availability: availabilitySummary,
+    policies: policiesSummary,
     services: servicesSummary,
     certificates: certificatesSummary,
   }
@@ -840,6 +880,9 @@ export const ProProfileScreen = ({
       scheduleDays.length > 0 || scheduleStartValue || scheduleEndValue
         ? { label: 'Заполнено', tone: 'ready' }
         : { label: 'Опционально', tone: 'optional' },
+    policies: hasCustomPolicies
+      ? { label: 'Настроено', tone: 'ready' }
+      : { label: 'Опционально', tone: 'optional' },
     services:
       serviceItems.length > 0
         ? { label: 'Готово', tone: 'ready' }
@@ -1681,6 +1724,18 @@ export const ProProfileScreen = ({
         )
         const nextScheduleStart = data.scheduleStart ?? ''
         const nextScheduleEnd = data.scheduleEnd ?? ''
+        const nextCancelWindowHours =
+          typeof data.cancelWindowHours === 'number'
+            ? Math.max(0, Math.round(data.cancelWindowHours))
+            : 12
+        const nextDepositPercent =
+          typeof data.depositPercent === 'number'
+            ? Math.max(0, Math.round(data.depositPercent))
+            : 0
+        const nextLateCancelFeePercent =
+          typeof data.lateCancelFeePercent === 'number'
+            ? Math.max(0, Math.round(data.lateCancelFeePercent))
+            : 0
         const nextWorksAtClient = data.worksAtClient
         const nextWorksAtMaster = data.worksAtMaster
         const nextCategories = data.categories ?? []
@@ -1706,6 +1761,9 @@ export const ProProfileScreen = ({
         setScheduleDays(nextScheduleDays)
         setScheduleStart(nextScheduleStart)
         setScheduleEnd(nextScheduleEnd)
+        setCancelWindowHours(String(nextCancelWindowHours))
+        setDepositPercent(String(nextDepositPercent))
+        setLateCancelFeePercent(String(nextLateCancelFeePercent))
         setWorksAtClient(nextWorksAtClient)
         setWorksAtMaster(nextWorksAtMaster)
         setCategories(nextCategories)
@@ -1743,6 +1801,9 @@ export const ProProfileScreen = ({
           scheduleDays: [...nextScheduleDays],
           scheduleStart: nextScheduleStart.trim() || null,
           scheduleEnd: nextScheduleEnd.trim() || null,
+          cancelWindowHours: nextCancelWindowHours,
+          depositPercent: nextDepositPercent,
+          lateCancelFeePercent: nextLateCancelFeePercent,
           worksAtClient: nextWorksAtClient,
           worksAtMaster: nextWorksAtMaster,
           categories: [...nextCategories],
@@ -5114,6 +5175,119 @@ export const ProProfileScreen = ({
                           onChange={(event) => setScheduleEnd(event.target.value)}
                         />
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {editingSection === 'policies' && (
+                <div className="pro-profile-editor-stack">
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Политика</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Отмена и удержание слота
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Задайте сроки бесплатной отмены и правила удержания.
+                      </p>
+                    </div>
+                    <div className="pro-field pro-field--split">
+                      <div>
+                        <label className="pro-label" htmlFor="policy-cancel-window">
+                          Бесплатная отмена, ч
+                        </label>
+                        <input
+                          id="policy-cancel-window"
+                          className="pro-input"
+                          type="number"
+                          min="0"
+                          max="72"
+                          inputMode="numeric"
+                          value={cancelWindowHours}
+                          onChange={(event) =>
+                            setCancelWindowHours(event.target.value)
+                          }
+                          placeholder="12"
+                        />
+                      </div>
+                      <div>
+                        <label className="pro-label" htmlFor="policy-late-fee">
+                          Поздняя отмена, %
+                        </label>
+                        <input
+                          id="policy-late-fee"
+                          className="pro-input"
+                          type="number"
+                          min="0"
+                          max="100"
+                          inputMode="numeric"
+                          value={lateCancelFeePercent}
+                          onChange={(event) =>
+                            setLateCancelFeePercent(event.target.value)
+                          }
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <span className="pro-profile-editor-help">
+                      Если клиент отменяет позже окна, удерживается штраф.
+                    </span>
+                  </div>
+
+                  <div className="pro-profile-editor-section">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Депозит</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Предоплата для фиксации
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        Депозит помогает закрепить слот и снижает отмены.
+                      </p>
+                    </div>
+                    <div className="pro-field">
+                      <label className="pro-label" htmlFor="policy-deposit">
+                        Размер депозита, %
+                      </label>
+                      <input
+                        id="policy-deposit"
+                        className="pro-input"
+                        type="number"
+                        min="0"
+                        max="100"
+                        inputMode="numeric"
+                        value={depositPercent}
+                        onChange={(event) =>
+                          setDepositPercent(event.target.value)
+                        }
+                        placeholder="0"
+                      />
+                      <span className="pro-profile-editor-help">
+                        0% — без депозита, 20–30% — комфортный уровень.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pro-profile-editor-preview">
+                    <p className="pro-profile-editor-preview-title">
+                      Как увидит клиент
+                    </p>
+                    <div className="pro-profile-editor-preview-card pro-policy-preview-card">
+                      <p className="pro-policy-preview-item">
+                        {cancelWindowValue !== null
+                          ? `Бесплатная отмена за ${cancelWindowValue} ч`
+                          : 'Бесплатная отмена не задана'}
+                      </p>
+                      <p className="pro-policy-preview-item">
+                        {depositPercentValue !== null && depositPercentValue > 0
+                          ? `Депозит ${depositPercentValue}%`
+                          : 'Депозит не нужен'}
+                      </p>
+                      <p className="pro-policy-preview-item">
+                        {lateCancelFeeValue !== null && lateCancelFeeValue > 0
+                          ? `Поздняя отмена: ${lateCancelFeeValue}%`
+                          : 'Штраф за отмену не удерживается'}
+                      </p>
                     </div>
                   </div>
                 </div>

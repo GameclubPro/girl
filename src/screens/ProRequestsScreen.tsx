@@ -264,6 +264,15 @@ const formatSlotLabel = (value: string) => {
   }).format(parsed)
 }
 
+const normalizeSlotInputValue = (value?: string | null) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const dateKey = toDateKey(parsed)
+  const minutes = parsed.getHours() * 60 + parsed.getMinutes()
+  return buildLocalDateTimeValue(dateKey, minutes)
+}
+
 const formatCountLabel = (
   value: number,
   one: string,
@@ -285,6 +294,36 @@ const formatMinutes = (value: number) => {
   const hours = Math.floor(value / 60)
   const minutes = value % 60
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const buildLocalDateTimeValue = (dateKey: string, minutes: number) => {
+  const match = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return ''
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return `${match[1]}-${match[2]}-${match[3]}T${String(hours).padStart(
+    2,
+    '0'
+  )}:${String(mins).padStart(2, '0')}`
+}
+
+const formatSlotSuggestionLabel = (
+  dateKey: string,
+  minutes: number,
+  todayKey: string,
+  tomorrowKey: string
+) => {
+  const date = parseDateKey(dateKey)
+  const dayLabel =
+    dateKey === todayKey
+      ? 'Сегодня'
+      : dateKey === tomorrowKey
+        ? 'Завтра'
+        : date
+          ? formatDayMonth(date)
+          : ''
+  const timeLabel = formatMinutes(minutes)
+  return dayLabel ? `${dayLabel}, ${timeLabel}` : timeLabel
 }
 
 const formatOutcomeLabel = (
@@ -396,6 +435,14 @@ type SlotView = {
   booking?: Booking
 }
 
+type SlotSuggestion = {
+  id: string
+  dateKey: string
+  startMinutes: number
+  value: string
+  label: string
+}
+
 type SlotFilter = 'all' | 'free' | 'booked' | 'closed'
 
 type ParsedSlotGroup = {
@@ -419,6 +466,7 @@ const SLOT_DURATION_MIN = 30
 const SLOT_TIME_START = 8 * 60
 const SLOT_TIME_END = 21 * 60
 const SLOT_TIME_STEP = 30
+const REQUEST_SLOT_SUGGESTIONS_LIMIT = 6
 
 const buildSlotStorageKey = (userId: string) => `pro-slots:${userId}`
 const buildSlotSeedKey = (userId: string) => `pro-slots-seeded:${userId}`
@@ -746,7 +794,7 @@ export const ProRequestsScreen = ({
                     : '',
                 comment: item.responseComment ?? '',
                 proposedTime: item.responseProposedTime ?? '',
-                proposedSlotAt: item.responseProposedSlotAt ?? '',
+                proposedSlotAt: normalizeSlotInputValue(item.responseProposedSlotAt),
               }
             }
           })
@@ -1205,6 +1253,11 @@ export const ProRequestsScreen = ({
     today.setHours(0, 0, 0, 0)
     return toDateKey(today)
   }, [])
+  const tomorrowKey = useMemo(() => {
+    const tomorrow = addDays(new Date(), 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    return toDateKey(tomorrow)
+  }, [])
   const timeGrid = useMemo(() => {
     const items: number[] = []
     for (let time = SLOT_TIME_START; time < SLOT_TIME_END; time += SLOT_TIME_STEP) {
@@ -1212,6 +1265,10 @@ export const ProRequestsScreen = ({
     }
     return items
   }, [])
+  const profileScheduleDaySet = useMemo(
+    () => new Set(profileScheduleDays),
+    [profileScheduleDays]
+  )
   const timeSlotStates = useMemo(() => {
     const bookedRanges = bookingRangesByDate.get(selectedDateKey) ?? []
     const dateSlots = selectedSlots
@@ -1232,6 +1289,160 @@ export const ProRequestsScreen = ({
       }
     })
   }, [bookingRangesByDate, selectedDateKey, selectedSlots, timeGrid])
+
+  const buildRequestSlotSuggestions = useCallback(
+    (request: ProRequest): SlotSuggestion[] => {
+      const rawWindows = Array.isArray(request.timeWindows)
+        ? request.timeWindows
+        : []
+      const fallbackWindow =
+        rawWindows.length === 0 && request.dateTime
+          ? (() => {
+              const parsed = new Date(request.dateTime)
+              if (Number.isNaN(parsed.getTime())) return null
+              const dateKey = toDateKey(parsed)
+              const timeValue = formatMinutes(
+                parsed.getHours() * 60 + parsed.getMinutes()
+              )
+              return {
+                date: dateKey,
+                start: timeValue,
+                end: timeValue,
+                exact: true,
+              }
+            })()
+          : null
+      const windows = fallbackWindow ? [fallbackWindow] : rawWindows
+      if (windows.length === 0) return []
+
+      const hasManualSlots = slots.length > 0
+      const suggestions: SlotSuggestion[] = []
+      const used = new Set<string>()
+      const now = new Date()
+      const nowMinutes = now.getHours() * 60 + now.getMinutes()
+
+      const addSuggestion = (dateKey: string, minutes: number) => {
+        if (suggestions.length >= REQUEST_SLOT_SUGGESTIONS_LIMIT) return
+        const value = buildLocalDateTimeValue(dateKey, minutes)
+        if (!value) return
+        const key = `${dateKey}-${minutes}`
+        if (used.has(key)) return
+        used.add(key)
+        suggestions.push({
+          id: key,
+          dateKey,
+          startMinutes: minutes,
+          value,
+          label: formatSlotSuggestionLabel(dateKey, minutes, todayKey, tomorrowKey),
+        })
+      }
+
+      const isTimeAvailable = (dateKey: string, minutes: number) => {
+        const date = parseDateKey(dateKey)
+        if (!date) return false
+        if (dateKey === todayKey && minutes < nowMinutes) return false
+        const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
+        if (
+          bookedRanges.some((range) =>
+            rangesOverlap(
+              minutes,
+              SLOT_DURATION_MIN,
+              range.startMinutes,
+              range.durationMinutes
+            )
+          )
+        ) {
+          return false
+        }
+        if (hasManualSlots) {
+          const daySlots = slotsByDate.get(dateKey) ?? []
+          return daySlots.some(
+            (slot) =>
+              slot.status === 'free' &&
+              rangesOverlap(
+                minutes,
+                SLOT_DURATION_MIN,
+                slot.startMinutes,
+                slot.durationMinutes
+              )
+          )
+        }
+        if (profileScheduleStart === null || profileScheduleEnd === null) return false
+        if (profileScheduleDaySet.size === 0) return false
+        const dayKey = getDayKey(date)
+        if (!profileScheduleDaySet.has(dayKey)) return false
+        if (minutes < profileScheduleStart) return false
+        if (minutes + SLOT_DURATION_MIN > profileScheduleEnd) return false
+        return true
+      }
+
+      const normalizedWindows = windows
+        .map((window) => {
+          if (!window) return null
+          const dateKey = typeof window.date === 'string' ? window.date : ''
+          const startMinutes = parseScheduleTimeToMinutes(window.start)
+          const endMinutes = parseScheduleTimeToMinutes(window.end)
+          if (!dateKey || startMinutes === null || endMinutes === null) return null
+          return {
+            dateKey,
+            startMinutes,
+            endMinutes,
+            exact: Boolean(window.exact) || startMinutes === endMinutes,
+          }
+        })
+        .filter(
+          (window): window is {
+            dateKey: string
+            startMinutes: number
+            endMinutes: number
+            exact: boolean
+          } => Boolean(window)
+        )
+        .sort((a, b) => {
+          if (a.dateKey !== b.dateKey) {
+            return a.dateKey < b.dateKey ? -1 : 1
+          }
+          return a.startMinutes - b.startMinutes
+        })
+
+      for (const window of normalizedWindows) {
+        if (suggestions.length >= REQUEST_SLOT_SUGGESTIONS_LIMIT) break
+        const rangeStart = Math.min(window.startMinutes, window.endMinutes)
+        const rangeEnd = Math.max(window.startMinutes, window.endMinutes)
+        const times =
+          window.exact || rangeStart === rangeEnd
+            ? [rangeStart]
+            : (() => {
+                const result: number[] = []
+                for (
+                  let time = rangeStart;
+                  time <= rangeEnd;
+                  time += SLOT_TIME_STEP
+                ) {
+                  result.push(time)
+                }
+                return result
+              })()
+        for (const time of times) {
+          if (suggestions.length >= REQUEST_SLOT_SUGGESTIONS_LIMIT) break
+          if (!isTimeAvailable(window.dateKey, time)) continue
+          addSuggestion(window.dateKey, time)
+        }
+      }
+
+      return suggestions
+    },
+    [
+      bookingRangesByDate,
+      profileScheduleDaySet,
+      profileScheduleEnd,
+      profileScheduleStart,
+      slots.length,
+      slotsByDate,
+      todayKey,
+      tomorrowKey,
+    ]
+  )
 
   useEffect(() => {
     if (calendarInitialized) return
@@ -2463,6 +2674,7 @@ export const ProRequestsScreen = ({
                     const timeWindowChoices = Array.isArray(item.timeWindows)
                       ? item.timeWindows
                       : []
+                    const slotSuggestions = buildRequestSlotSuggestions(item)
                     const responseStatusLabel = item.responseStatus
                       ? responseStatusLabelMap[
                           item.responseStatus as keyof typeof responseStatusLabelMap
@@ -2484,7 +2696,9 @@ export const ProRequestsScreen = ({
                       price: '',
                       comment: '',
                       proposedTime: '',
-                      proposedSlotAt: '',
+                      proposedSlotAt: normalizeSlotInputValue(
+                        item.responseProposedSlotAt
+                      ),
                     }
                     const isSubmitting = submittingId === item.id
                     const canRespond =
@@ -2493,6 +2707,7 @@ export const ProRequestsScreen = ({
                       item.status === 'open' &&
                       !isFinalResponse &&
                       (item.responseStatus === 'sent' || Boolean(dispatchTimeLeft))
+                    const showSlotEmpty = slotSuggestions.length === 0 && canRespond
 
                     return (
                       <div className="pro-request-item" key={item.id}>
@@ -2637,6 +2852,94 @@ export const ProRequestsScreen = ({
                             </div>
                           )}
 
+                          {slotSuggestions.length > 0 && (
+                            <div className="pro-response-slots">
+                              <div className="pro-response-slots-head">
+                                <span className="pro-response-slots-title">
+                                  Свободные окна под заявку
+                                </span>
+                                <button
+                                  className="pro-response-slots-action"
+                                  type="button"
+                                  onClick={() => {
+                                    scrollToSlots()
+                                    handleOpenAddSlots()
+                                  }}
+                                  disabled={!canRespond}
+                                >
+                                  Управлять
+                                </button>
+                              </div>
+                              <div className="request-chips pro-response-chips pro-response-chips--slots">
+                                {slotSuggestions.map((slot) => (
+                                  <button
+                                    className={`request-chip${
+                                      draft.proposedSlotAt === slot.value
+                                        ? ' is-active'
+                                        : ''
+                                    }`}
+                                    key={`${item.id}-slot-${slot.id}`}
+                                    type="button"
+                                    onClick={() => {
+                                      handleDraftChange(
+                                        item.id,
+                                        'proposedSlotAt',
+                                        slot.value
+                                      )
+                                      handleDraftChange(
+                                        item.id,
+                                        'proposedTime',
+                                        slot.label
+                                      )
+                                      hapticSelection()
+                                    }}
+                                    disabled={!canRespond}
+                                  >
+                                    {slot.label}
+                                  </button>
+                                ))}
+                              </div>
+                              {draft.proposedSlotAt && (
+                                <button
+                                  className="pro-response-slots-clear"
+                                  type="button"
+                                  onClick={() => {
+                                    handleDraftChange(item.id, 'proposedSlotAt', '')
+                                    handleDraftChange(item.id, 'proposedTime', '')
+                                  }}
+                                  disabled={!canRespond}
+                                >
+                                  Сбросить слот
+                                </button>
+                              )}
+                              <p className="pro-response-slots-note">
+                                Слот удержится за клиентом на 20 минут после
+                                отклика.
+                              </p>
+                            </div>
+                          )}
+
+                          {showSlotEmpty && (
+                            <div className="pro-response-slots-empty">
+                              <p className="pro-response-slots-empty-title">
+                                Нет свободных окон под заявку
+                              </p>
+                              <p className="pro-response-slots-empty-text">
+                                Откройте окна или предложите время вручную.
+                              </p>
+                              <button
+                                className="pro-response-slots-empty-action"
+                                type="button"
+                                onClick={() => {
+                                  scrollToSlots()
+                                  handleOpenAddSlots()
+                                }}
+                              >
+                                Открыть окна
+                              </button>
+                            </div>
+                          )}
+
                           <div className="pro-response-form">
                             <input
                               className="pro-response-input"
@@ -2651,20 +2954,6 @@ export const ProRequestsScreen = ({
                                 )
                               }
                               min="0"
-                              disabled={!canRespond}
-                            />
-                            <input
-                              className="pro-response-input"
-                              type="datetime-local"
-                              value={draft.proposedSlotAt}
-                              onChange={(event) => {
-                                const nextValue = event.target.value
-                                handleDraftChange(item.id, 'proposedSlotAt', nextValue)
-                                const nextLabel = nextValue ? formatSlotLabel(nextValue) : ''
-                                if (nextLabel) {
-                                  handleDraftChange(item.id, 'proposedTime', nextLabel)
-                                }
-                              }}
                               disabled={!canRespond}
                             />
                             <input

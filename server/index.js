@@ -25,6 +25,9 @@ const REQUEST_EXPANDED_BATCH_SIZE = 20
 const REQUEST_RESPONSE_WINDOW_MINUTES = 30
 const REQUEST_TIME_WINDOW_LIMIT = 6
 const RESPONSE_SLOT_HOLD_MINUTES = 20
+const LEAD_CONVERSION_WINDOW_DAYS = 120
+const LEAD_CONVERSION_MIN_SAMPLE = 6
+const LEAD_CONVERSION_LOCATION_MIN_SAMPLE = 4
 const REQUEST_DISPATCH_SCAN_INTERVAL_MS = 60_000
 const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
 const OUTCOME_PROMPT_SCAN_INTERVAL_MS = 90_000
@@ -1737,6 +1740,9 @@ const loadMasterProfile = async (userId) => {
         schedule_days AS "scheduleDays",
         schedule_start AS "scheduleStart",
         schedule_end AS "scheduleEnd",
+        cancel_window_hours AS "cancelWindowHours",
+        deposit_percent AS "depositPercent",
+        late_cancel_fee_percent AS "lateCancelFeePercent",
         works_at_client AS "worksAtClient",
         works_at_master AS "worksAtMaster"
       FROM master_profiles
@@ -1927,21 +1933,135 @@ const formatTimeLeftLabel = (expiresAt) => {
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
 }
 
-const buildLeadScore = (payload) => {
+const leadScoreLocationLabels = {
+  client: 'Выезд',
+  master: 'У мастера',
+  any: 'Не важно',
+}
+
+const resolveLeadScoreVariant = (userId) => {
+  const normalized = normalizeText(userId)
+  if (!normalized) return 'A'
+  let hash = 0
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash = (hash * 31 + normalized.charCodeAt(index)) | 0
+  }
+  return Math.abs(hash) % 2 === 0 ? 'A' : 'B'
+}
+
+const formatRatePercent = (value) => `${Math.round(value * 100)}%`
+
+const loadLeadConversionStats = async (masterId) => {
+  if (!masterId) {
+    return {
+      overall: { responses: 0, accepted: 0, rate: null },
+      categories: {},
+      locations: {},
+    }
+  }
+  const since = new Date(Date.now() - LEAD_CONVERSION_WINDOW_DAYS * DAY_MS)
+  const [overallResult, categoryResult, locationResult] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          COUNT(*)::int AS responses,
+          COUNT(*) FILTER (WHERE status = 'accepted')::int AS accepted
+        FROM request_responses
+        WHERE master_id = $1
+          AND created_at >= $2
+      `,
+      [masterId, since]
+    ),
+    pool.query(
+      `
+        SELECT
+          r.category_id AS "categoryId",
+          COUNT(*)::int AS responses,
+          COUNT(*) FILTER (WHERE rr.status = 'accepted')::int AS accepted
+        FROM request_responses rr
+        JOIN service_requests r ON r.id = rr.request_id
+        WHERE rr.master_id = $1
+          AND rr.created_at >= $2
+        GROUP BY r.category_id
+      `,
+      [masterId, since]
+    ),
+    pool.query(
+      `
+        SELECT
+          r.location_type AS "locationType",
+          COUNT(*)::int AS responses,
+          COUNT(*) FILTER (WHERE rr.status = 'accepted')::int AS accepted
+        FROM request_responses rr
+        JOIN service_requests r ON r.id = rr.request_id
+        WHERE rr.master_id = $1
+          AND rr.created_at >= $2
+        GROUP BY r.location_type
+      `,
+      [masterId, since]
+    ),
+  ])
+
+  const overallRow = overallResult.rows[0] ?? {}
+  const overallResponses = Number(overallRow.responses) || 0
+  const overallAccepted = Number(overallRow.accepted) || 0
+  const overallRate =
+    overallResponses > 0 ? overallAccepted / overallResponses : null
+
+  const categories = {}
+  categoryResult.rows.forEach((row) => {
+    const categoryId = normalizeText(row.categoryId)
+    if (!categoryId) return
+    const responses = Number(row.responses) || 0
+    const accepted = Number(row.accepted) || 0
+    if (responses <= 0) return
+    categories[categoryId] = {
+      responses,
+      accepted,
+      rate: accepted / responses,
+    }
+  })
+
+  const locations = {}
+  locationResult.rows.forEach((row) => {
+    const locationType = normalizeText(row.locationType)
+    if (!locationType) return
+    const responses = Number(row.responses) || 0
+    const accepted = Number(row.accepted) || 0
+    if (responses <= 0) return
+    locations[locationType] = {
+      responses,
+      accepted,
+      rate: accepted / responses,
+    }
+  })
+
+  return {
+    overall: { responses: overallResponses, accepted: overallAccepted, rate: overallRate },
+    categories,
+    locations,
+  }
+}
+
+const buildLeadScore = (payload, options = {}) => {
   let score = 50
   const reasons = []
+  const pushReason = (value) => {
+    if (!value) return
+    reasons.push(value)
+  }
 
   if (typeof payload.distanceKm === 'number') {
     const distance = payload.distanceKm
     if (distance <= 1) {
       score += 14
-      reasons.push(`Очень близко (${distance} км)`)
+      pushReason(`Очень близко (${distance} км)`)
     } else if (distance <= 3) {
       score += 10
-      reasons.push(`Рядом (${distance} км)`)
+      pushReason(`Рядом (${distance} км)`)
     } else if (distance <= 6) {
       score += 6
-      reasons.push(`Недалеко (${distance} км)`)
+      pushReason(`Недалеко (${distance} км)`)
     } else if (distance >= 10) {
       score -= 4
     }
@@ -1951,40 +2071,82 @@ const buildLeadScore = (payload) => {
     const confidence = Number(payload.clientTrust.confidence) || 0
     if (confidence >= 0.7) {
       score += 8
-      reasons.push('Надежный клиент')
+      pushReason('Надежный клиент')
     } else if (confidence <= 0.35) {
       score -= 3
-      reasons.push('Новый клиент')
+      pushReason('Новый клиент')
     }
   }
 
   if (payload.dateOption === 'today') {
     score += 6
-    reasons.push('Сегодня')
+    pushReason('Сегодня')
   } else if (payload.dateOption === 'tomorrow') {
     score += 3
-    reasons.push('Завтра')
+    pushReason('Завтра')
   }
 
   if (payload.budget) {
     score += 2
-    reasons.push('Бюджет указан')
+    pushReason('Бюджет указан')
   }
 
   if (Array.isArray(payload.photoUrls) && payload.photoUrls.length > 0) {
     score += 2
-    reasons.push('Есть фото')
+    pushReason('Есть фото')
   }
 
   if (payload.details) {
     score += 1
-    reasons.push('Есть комментарий')
+    pushReason('Есть комментарий')
   }
 
   const urgency = formatTimeLeftLabel(payload.dispatchExpiresAt)
   if (urgency) {
     score += 4
-    reasons.push(`Срочно: ${urgency}`)
+    pushReason(`Срочно: ${urgency}`)
+  }
+
+  if (options.variant === 'B' && options.conversionStats) {
+    const conversionStats = options.conversionStats
+    const categoryStats =
+      payload.categoryId && conversionStats.categories
+        ? conversionStats.categories[payload.categoryId]
+        : null
+    if (categoryStats && categoryStats.responses >= LEAD_CONVERSION_MIN_SAMPLE) {
+      const rate = categoryStats.rate
+      const rateLabel = formatRatePercent(rate)
+      if (rate >= 0.5) {
+        score += 8
+        pushReason(`Конверсия по услуге ${rateLabel}`)
+      } else if (rate >= 0.32) {
+        score += 4
+        pushReason(`Хорошая конверсия по услуге (${rateLabel})`)
+      } else if (rate <= 0.15) {
+        score -= 4
+        pushReason(`Низкая конверсия по услуге (${rateLabel})`)
+      }
+    }
+
+    const locationKey = normalizeText(payload.locationType)
+    const locationStats =
+      locationKey && conversionStats.locations
+        ? conversionStats.locations[locationKey]
+        : null
+    if (
+      locationStats &&
+      locationStats.responses >= LEAD_CONVERSION_LOCATION_MIN_SAMPLE
+    ) {
+      const rate = locationStats.rate
+      const locationLabel = leadScoreLocationLabels[locationKey] ?? 'Формат'
+      if (rate >= 0.5) {
+        score += 3
+        pushReason(`Формат «${locationLabel}» подтверждается часто`)
+      } else if (rate <= 0.2) {
+        score -= 2
+        pushReason(`Формат «${locationLabel}» редко подтверждается`)
+      }
+    }
   }
 
   const normalizedScore = Math.min(100, Math.max(0, Math.round(score)))
@@ -2417,6 +2579,9 @@ const ensureSchema = async () => {
       schedule_days TEXT[] NOT NULL DEFAULT '{}',
       schedule_start TEXT,
       schedule_end TEXT,
+      cancel_window_hours INTEGER NOT NULL DEFAULT 12,
+      deposit_percent INTEGER NOT NULL DEFAULT 0,
+      late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -2556,6 +2721,21 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS certificates JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS cancel_window_hours INTEGER NOT NULL DEFAULT 12;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS deposit_percent INTEGER NOT NULL DEFAULT 0;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0;
   `)
 
   await pool.query(`
@@ -3552,6 +3732,9 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.schedule_days AS "scheduleDays",
           mp.schedule_start AS "scheduleStart",
           mp.schedule_end AS "scheduleEnd",
+          mp.cancel_window_hours AS "cancelWindowHours",
+          mp.deposit_percent AS "depositPercent",
+          mp.late_cancel_fee_percent AS "lateCancelFeePercent",
           mp.works_at_client AS "worksAtClient",
           mp.works_at_master AS "worksAtMaster",
           mp.categories,
@@ -4602,6 +4785,9 @@ app.post('/api/masters', async (req, res) => {
     scheduleDays,
     scheduleStart,
     scheduleEnd,
+    cancelWindowHours,
+    depositPercent,
+    lateCancelFeePercent,
     worksAtClient,
     worksAtMaster,
     categories,
@@ -4626,6 +4812,20 @@ app.post('/api/masters', async (req, res) => {
   const scheduleDayList = normalizeStringArray(scheduleDays)
   const normalizedScheduleStart = normalizeText(scheduleStart) || null
   const normalizedScheduleEnd = normalizeText(scheduleEnd) || null
+  const parsedCancelWindowHours = parseOptionalInt(cancelWindowHours)
+  const parsedDepositPercent = parseOptionalInt(depositPercent)
+  const parsedLateCancelFeePercent = parseOptionalInt(lateCancelFeePercent)
+  const normalizedCancelWindowHours = clampValue(
+    parsedCancelWindowHours ?? BOOKING_FREE_CANCEL_HOURS,
+    0,
+    72
+  )
+  const normalizedDepositPercent = clampValue(parsedDepositPercent ?? 0, 0, 100)
+  const normalizedLateCancelFeePercent = clampValue(
+    parsedLateCancelFeePercent ?? 0,
+    0,
+    100
+  )
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -4698,6 +4898,9 @@ app.post('/api/masters', async (req, res) => {
           schedule_days,
           schedule_start,
           schedule_end,
+          cancel_window_hours,
+          deposit_percent,
+          late_cancel_fee_percent,
           works_at_client,
           works_at_master,
           categories,
@@ -4722,8 +4925,11 @@ app.post('/api/masters', async (req, res) => {
           $14,
           $15,
           $16,
-          COALESCE($17, '{}'::text[]),
-          $18::jsonb
+          $17,
+          $18,
+          $19,
+          COALESCE($20, '{}'::text[]),
+          $21::jsonb
         )
         ON CONFLICT (user_id) DO UPDATE
         SET display_name = EXCLUDED.display_name,
@@ -4737,14 +4943,17 @@ app.post('/api/masters', async (req, res) => {
             schedule_days = EXCLUDED.schedule_days,
             schedule_start = EXCLUDED.schedule_start,
             schedule_end = EXCLUDED.schedule_end,
+            cancel_window_hours = EXCLUDED.cancel_window_hours,
+            deposit_percent = EXCLUDED.deposit_percent,
+            late_cancel_fee_percent = EXCLUDED.late_cancel_fee_percent,
             works_at_client = EXCLUDED.works_at_client,
             works_at_master = EXCLUDED.works_at_master,
             categories = EXCLUDED.categories,
             services = EXCLUDED.services,
             portfolio_urls =
               CASE
-                WHEN $17 IS NULL THEN master_profiles.portfolio_urls
-                ELSE $17
+                WHEN $20 IS NULL THEN master_profiles.portfolio_urls
+                ELSE $20
               END,
             certificates = EXCLUDED.certificates,
             updated_at = NOW()
@@ -4762,6 +4971,9 @@ app.post('/api/masters', async (req, res) => {
         scheduleDayList,
         normalizedScheduleStart,
         normalizedScheduleEnd,
+        normalizedCancelWindowHours,
+        normalizedDepositPercent,
+        normalizedLateCancelFeePercent,
         workAtClient,
         workAtMaster,
         categoryList,
@@ -4986,6 +5198,16 @@ app.get('/api/pro/requests', async (req, res) => {
       dedupedRows.push(row)
     })
 
+    const leadScoreVariant = resolveLeadScoreVariant(normalizedUserId)
+    let conversionStats = null
+    if (leadScoreVariant === 'B') {
+      try {
+        conversionStats = await loadLeadConversionStats(normalizedUserId)
+      } catch (error) {
+        conversionStats = null
+      }
+    }
+
     const payload = dedupedRows.map((row) => {
       const clientName = formatUserDisplayName(
         row.clientFirstName,
@@ -5033,11 +5255,15 @@ app.get('/api/pro/requests', async (req, res) => {
     })
     const scored = payload
       .map((item) => {
-        const { score, reasons } = buildLeadScore(item)
+        const { score, reasons } = buildLeadScore(item, {
+          variant: leadScoreVariant,
+          conversionStats,
+        })
         return {
           ...item,
           leadScore: score,
           leadReasons: reasons,
+          leadScoreVariant,
         }
       })
       .sort((a, b) => {

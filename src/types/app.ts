@@ -46,6 +46,7 @@ export type ProProfileSection =
   | 'services'
   | 'location'
   | 'availability'
+  | 'policies'
   | 'certificates'
   | 'portfolio'
 
@@ -83,6 +84,9 @@ export type MasterProfile = {
   scheduleDays?: string[]
   scheduleStart?: string | null
   scheduleEnd?: string | null
+  cancelWindowHours?: number | null
+  depositPercent?: number | null
+  lateCancelFeePercent?: number | null
   updatedAt?: string | null
   reviewsCount?: number | null
   reviewsAverage?: number | null
@@ -169,6 +173,7 @@ export type ServiceRequest = {
   dispatchSentAt?: string | null
   leadScore?: number | null
   leadReasons?: string[] | null
+  leadScoreVariant?: string | null
   responsePreview?: {
     masterId: string
     displayName?: string | null
