@@ -7,7 +7,7 @@ import { createHmac, randomUUID, timingSafeEqual } from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
 
-dotenv.config({ override: true })
+dotenv.config()
 
 const app = express()
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 4000)
