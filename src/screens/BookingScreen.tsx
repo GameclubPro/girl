@@ -642,7 +642,7 @@ export const BookingScreen = ({
         : 'Без штрафа за позднюю отмену'
   const policyHint =
     cancelWindowHours === null && depositPercent === null && lateCancelFeePercent === null
-      ? 'Политики появятся после подтверждения мастером.'
+      ? 'Политики появятся после ответа мастера — при необходимости уточните в чате.'
       : 'Подтверждая запись, вы соглашаетесь с политиками мастера.'
   const policyItems = [
     { label: 'Отмена', value: cancelPolicyValue },

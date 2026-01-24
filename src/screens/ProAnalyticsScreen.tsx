@@ -20,14 +20,28 @@ const locationLabelMap: Record<string, string> = {
   master: 'У мастера',
   any: 'Не важно',
 }
+const weekdayLabelMap: Record<string, string> = {
+  mon: 'Пн',
+  tue: 'Вт',
+  wed: 'Ср',
+  thu: 'Чт',
+  fri: 'Пт',
+  sat: 'Сб',
+  sun: 'Вс',
+}
 
 const CONVERSION_MIN_SAMPLE = 6
 const CONVERSION_LOCATION_MIN_SAMPLE = 4
+const CONVERSION_HOUR_MIN_SAMPLE = 4
+const CONVERSION_WEEKDAY_MIN_SAMPLE = 4
 
 const formatNumber = (value: number) =>
   Math.round(value).toLocaleString('ru-RU')
 
 const formatMoney = (value: number) => `${formatNumber(value)} ₽`
+
+const formatHourLabel = (value: number) =>
+  `${String(Math.max(0, Math.min(23, value))).padStart(2, '0')}:00`
 
 const formatShortDate = (value: string) => {
   if (!value) return ''
@@ -382,6 +396,47 @@ export const ProAnalyticsScreen = ({
       .sort((a, b) => b.rate - a.rate)
       .slice(0, 3)
   }, [leadConversionStats])
+  const conversionHourItems = useMemo(() => {
+    if (!leadConversionStats) return []
+    return Object.entries(leadConversionStats.hours ?? {})
+      .map(([hour, stats]) => {
+        const hourValue = Number(hour)
+        return {
+          id: hour,
+          hour: hourValue,
+          label: formatHourLabel(hourValue),
+          responses: stats.responses,
+          accepted: stats.accepted,
+          rate: stats.rate,
+        }
+      })
+      .filter(
+        (item) =>
+          Number.isFinite(item.hour) &&
+          item.responses >= CONVERSION_HOUR_MIN_SAMPLE
+      )
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 4)
+  }, [leadConversionStats])
+  const conversionWeekdayItems = useMemo(() => {
+    if (!leadConversionStats) return []
+    return Object.entries(leadConversionStats.weekdays ?? {})
+      .map(([id, stats]) => ({
+        id,
+        label: weekdayLabelMap[id] ?? id,
+        responses: stats.responses,
+        accepted: stats.accepted,
+        rate: stats.rate,
+      }))
+      .filter((item) => item.responses >= CONVERSION_WEEKDAY_MIN_SAMPLE)
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 3)
+  }, [leadConversionStats])
+  const hasConversionBreakdown =
+    conversionCategoryItems.length > 0 ||
+    conversionLocationItems.length > 0 ||
+    conversionHourItems.length > 0 ||
+    conversionWeekdayItems.length > 0
   const renderRangeControls = () => (
     <div className="analytics-range analytics-range--card" role="group">
       {rangeOptions.map((option) => (
@@ -913,8 +968,7 @@ export const ProAnalyticsScreen = ({
                     </div>
                   </div>
 
-                  {(conversionCategoryItems.length > 0 ||
-                    conversionLocationItems.length > 0) && (
+                  {hasConversionBreakdown && (
                     <div className="analytics-ab-list">
                       {conversionCategoryItems.length > 0 && (
                         <div className="analytics-ab-block">
@@ -944,6 +998,50 @@ export const ProAnalyticsScreen = ({
                           </p>
                           {conversionLocationItems.map((item) => (
                             <div className="analytics-ab-item" key={`loc-${item.id}`}>
+                              <span className="analytics-ab-item-title">
+                                {item.label}
+                              </span>
+                              <span className="analytics-ab-item-rate">
+                                {formatPercent(item.rate)}
+                              </span>
+                              <span className="analytics-ab-item-meta">
+                                {formatNumber(item.accepted)} из{' '}
+                                {formatNumber(item.responses)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {conversionWeekdayItems.length > 0 && (
+                        <div className="analytics-ab-block">
+                          <p className="analytics-ab-block-title">Лучшие дни</p>
+                          {conversionWeekdayItems.map((item) => (
+                            <div
+                              className="analytics-ab-item"
+                              key={`day-${item.id}`}
+                            >
+                              <span className="analytics-ab-item-title">
+                                {item.label}
+                              </span>
+                              <span className="analytics-ab-item-rate">
+                                {formatPercent(item.rate)}
+                              </span>
+                              <span className="analytics-ab-item-meta">
+                                {formatNumber(item.accepted)} из{' '}
+                                {formatNumber(item.responses)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {conversionHourItems.length > 0 && (
+                        <div className="analytics-ab-block">
+                          <p className="analytics-ab-block-title">Лучшие часы</p>
+                          {conversionHourItems.map((item) => (
+                            <div
+                              className="analytics-ab-item"
+                              key={`hour-${item.id}`}
+                            >
                               <span className="analytics-ab-item-title">
                                 {item.label}
                               </span>

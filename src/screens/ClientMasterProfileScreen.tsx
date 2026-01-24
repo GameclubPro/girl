@@ -731,10 +731,12 @@ export const ClientMasterProfileScreen = ({
       ? 'Уточняется в переписке'
       : cancelWindowHours === 0
         ? 'Без бесплатного окна отмены'
-        : `Бесплатная отмена за ${formatHoursLabel(cancelWindowHours)}`
+        : `Бесплатная отмена за ${formatHoursLabel(cancelWindowHours)} до визита`
   const cancelPolicyNote =
     cancelWindowHours && cancelWindowHours > 0
-      ? 'После этого окна возможен штраф.'
+      ? lateCancelFeePercent && lateCancelFeePercent > 0
+        ? 'После этого окна действует штраф.'
+        : 'После этого окна условия уточняются.'
       : 'Лучше предупредить заранее.'
   const depositPolicyValue =
     depositPercent === null
