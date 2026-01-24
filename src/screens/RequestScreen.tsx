@@ -491,7 +491,29 @@ export const RequestScreen = ({
         }),
       })
 
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null
+
       if (!response.ok) {
+        if (data?.error === 'open_request_limit') {
+          setSubmitError(
+            'У вас слишком много активных заявок. Закройте старые, чтобы создать новую.'
+          )
+          return
+        }
+        if (data?.error === 'daily_request_limit') {
+          setSubmitError(
+            'Достигнут дневной лимит заявок. Попробуйте снова позже.'
+          )
+          return
+        }
+        if (data?.error === 'duplicate_request') {
+          setSubmitError(
+            'Похожая заявка уже создана. Подождите немного или измените детали.'
+          )
+          return
+        }
         throw new Error('Create request failed')
       }
 

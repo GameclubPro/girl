@@ -974,6 +974,24 @@ export const BookingScreen = ({
           setSubmitError('Мастер не найден.')
           return
         }
+        if (data?.error === 'open_booking_limit') {
+          setSubmitError(
+            'У вас слишком много активных записей. Завершите текущие, чтобы создать новую.'
+          )
+          return
+        }
+        if (data?.error === 'daily_booking_limit') {
+          setSubmitError(
+            'Достигнут дневной лимит записей. Попробуйте снова позже.'
+          )
+          return
+        }
+        if (data?.error === 'duplicate_booking') {
+          setSubmitError(
+            'Похоже, запись на это время уже создана. Проверьте список записей.'
+          )
+          return
+        }
         throw new Error('Create booking failed')
       }
 

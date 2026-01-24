@@ -49,6 +49,18 @@ const TRUST_LEVEL_THRESHOLDS = {
   new: 0.35,
   medium: 0.7,
 }
+const CLIENT_REQUEST_LIMITS = {
+  low: { maxOpen: 2, maxPerDay: 3 },
+  medium: { maxOpen: 4, maxPerDay: 6 },
+  high: { maxOpen: 6, maxPerDay: 10 },
+}
+const CLIENT_BOOKING_LIMITS = {
+  low: { maxOpen: 2, maxPerDay: 2 },
+  medium: { maxOpen: 4, maxPerDay: 4 },
+  high: { maxOpen: 7, maxPerDay: 8 },
+}
+const REQUEST_DUPLICATE_WINDOW_MINUTES = 30
+const BOOKING_DUPLICATE_WINDOW_MINUTES = 60
 const TRUST_EVENT_WEIGHTS = {
   visit_on_time: 5,
   visit_late: -5,
@@ -254,6 +266,23 @@ const getTrustLevelLabel = (confidence) => {
   if (safeConfidence < TRUST_LEVEL_THRESHOLDS.new) return 'Новый'
   if (safeConfidence <= TRUST_LEVEL_THRESHOLDS.medium) return 'Средняя уверенность'
   return 'Высокая уверенность'
+}
+
+const resolveClientLimitTier = (confidence) => {
+  const safeConfidence = Number.isFinite(confidence) ? confidence : 0
+  if (safeConfidence < TRUST_LEVEL_THRESHOLDS.new) return 'low'
+  if (safeConfidence <= TRUST_LEVEL_THRESHOLDS.medium) return 'medium'
+  return 'high'
+}
+
+const resolveClientLimits = async (userId) => {
+  const trustRow = await loadClientTrustScore(userId)
+  const tier = resolveClientLimitTier(trustRow?.confidence)
+  return {
+    tier,
+    request: CLIENT_REQUEST_LIMITS[tier],
+    booking: CLIENT_BOOKING_LIMITS[tier],
+  }
 }
 
 const summarizeTrustEvents = (events) => {
@@ -6364,6 +6393,74 @@ app.post('/api/bookings', async (req, res) => {
     const depositHoldExpiresAt =
       depositStatus === 'pending' ? buildDepositHoldExpiresAt() : null
 
+    const limits = await resolveClientLimits(normalizedUserId)
+    const dayWindowStart = new Date(Date.now() - DAY_MS).toISOString()
+    const duplicateWindowStart = new Date(
+      scheduledDate.getTime() - BOOKING_DUPLICATE_WINDOW_MINUTES * 60 * 1000
+    ).toISOString()
+    const duplicateWindowEnd = new Date(
+      scheduledDate.getTime() + BOOKING_DUPLICATE_WINDOW_MINUTES * 60 * 1000
+    ).toISOString()
+
+    const [openBookingsResult, dailyBookingsResult, duplicateBookingResult] =
+      await Promise.all([
+        pool.query(
+          `
+            SELECT COUNT(*)::int AS count
+            FROM service_bookings
+            WHERE client_id = $1
+              AND status IN ('pending', 'price_pending', 'price_proposed', 'confirmed')
+              AND (
+                status <> 'confirmed'
+                OR scheduled_at >= NOW() - INTERVAL '2 hours'
+              )
+          `,
+          [normalizedUserId]
+        ),
+        pool.query(
+          `
+            SELECT COUNT(*)::int AS count
+            FROM service_bookings
+            WHERE client_id = $1
+              AND created_at >= $2
+          `,
+          [normalizedUserId, dayWindowStart]
+        ),
+        pool.query(
+          `
+            SELECT id
+            FROM service_bookings
+            WHERE client_id = $1
+              AND master_id = $2
+              AND status NOT IN ('cancelled', 'declined')
+              AND scheduled_at >= $3
+              AND scheduled_at <= $4
+            LIMIT 1
+          `,
+          [
+            normalizedUserId,
+            normalizedMasterId,
+            duplicateWindowStart,
+            duplicateWindowEnd,
+          ]
+        ),
+      ])
+
+    const openBookingsCount = openBookingsResult.rows[0]?.count ?? 0
+    if (openBookingsCount >= limits.booking.maxOpen) {
+      res.status(429).json({ error: 'open_booking_limit' })
+      return
+    }
+    const dailyBookingsCount = dailyBookingsResult.rows[0]?.count ?? 0
+    if (dailyBookingsCount >= limits.booking.maxPerDay) {
+      res.status(429).json({ error: 'daily_booking_limit' })
+      return
+    }
+    if (duplicateBookingResult.rows.length > 0) {
+      res.status(409).json({ error: 'duplicate_booking' })
+      return
+    }
+
     if (normalizedLocationType === 'client' && !profile.worksAtClient) {
       res.status(403).json({ error: 'location_type_mismatch' })
       return
@@ -9746,6 +9843,69 @@ app.post('/api/requests', async (req, res) => {
     )
     if (districtCheck.rows.length === 0) {
       res.status(400).json({ error: 'district_not_found' })
+      return
+    }
+
+    const limits = await resolveClientLimits(normalizedUserId)
+    const dayWindowStart = new Date(Date.now() - DAY_MS).toISOString()
+    const duplicateWindowStart = new Date(
+      Date.now() - REQUEST_DUPLICATE_WINDOW_MINUTES * 60 * 1000
+    ).toISOString()
+
+    const [openRequestsResult, dailyRequestsResult, duplicateResult] =
+      await Promise.all([
+        pool.query(
+          `
+            SELECT COUNT(*)::int AS count
+            FROM service_requests
+            WHERE user_id = $1
+              AND status = 'open'
+          `,
+          [normalizedUserId]
+        ),
+        pool.query(
+          `
+            SELECT COUNT(*)::int AS count
+            FROM service_requests
+            WHERE user_id = $1
+              AND created_at >= $2
+          `,
+          [normalizedUserId, dayWindowStart]
+        ),
+        pool.query(
+          `
+            SELECT id
+            FROM service_requests
+            WHERE user_id = $1
+              AND status = 'open'
+              AND category_id = $2
+              AND service_name = $3
+              AND location_type = $4
+              AND created_at >= $5
+            LIMIT 1
+          `,
+          [
+            normalizedUserId,
+            normalizedCategoryId,
+            normalizedServiceName,
+            normalizedLocationType,
+            duplicateWindowStart,
+          ]
+        ),
+      ])
+
+    const openRequestsCount = openRequestsResult.rows[0]?.count ?? 0
+    if (openRequestsCount >= limits.request.maxOpen) {
+      res.status(429).json({ error: 'open_request_limit' })
+      return
+    }
+    const dailyRequestsCount = dailyRequestsResult.rows[0]?.count ?? 0
+    if (dailyRequestsCount >= limits.request.maxPerDay) {
+      res.status(429).json({ error: 'daily_request_limit' })
+      return
+    }
+    if (duplicateResult.rows.length > 0) {
+      res.status(409).json({ error: 'duplicate_request' })
       return
     }
 
