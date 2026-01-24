@@ -46,18 +46,9 @@ export const requestServiceCatalog: Record<string, RequestServiceOption[]> = {
   ],
 }
 
-export type RequestBudgetPreset = {
-  label: string
-  min: number | null
-  max: number | null
-  isCustom?: boolean
-}
-
-export const requestBudgetPresets: RequestBudgetPreset[] = [
-  { label: 'до 1500 ₽', min: null, max: 1500 },
-  { label: 'до 2500 ₽', min: null, max: 2500 },
-  { label: 'до 4000 ₽', min: null, max: 4000 },
-  { label: '3000–6000 ₽', min: 3000, max: 6000 },
-  { label: 'не важно', min: null, max: null },
-  { label: 'Свой диапазон', min: null, max: null, isCustom: true },
-]
+export const requestBudgetOptions = [
+  'до 1500 ₽',
+  'до 2000 ₽',
+  'до 3000 ₽',
+  'не важно',
+] as const

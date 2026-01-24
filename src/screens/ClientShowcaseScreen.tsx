@@ -134,7 +134,6 @@ const pickGalleryShape = (seed: number) =>
   galleryShapePattern[seed % galleryShapePattern.length]
 
 type SortMode =
-  | 'match'
   | 'recent'
   | 'active'
   | 'distance'
@@ -144,7 +143,6 @@ type SortMode =
   | 'rating'
 
 const sortOptions: { id: SortMode; label: string }[] = [
-  { id: 'match', label: 'Подходит вам' },
   { id: 'recent', label: 'Актуальные' },
   { id: 'active', label: 'Запись открыта' },
   { id: 'distance', label: 'Ближайшие' },
@@ -188,12 +186,7 @@ type MasterCard = {
   portfolioCount: number
   updateLabel: string
   initials: string
-  matchScore: number
-  matchReasons: string[]
 }
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value))
 
 const toSeed = (value: string) =>
   value.split('').reduce((total, char) => total + char.charCodeAt(0), 0)
@@ -868,24 +861,6 @@ export const ClientShowcaseScreen = ({
           ? categories.map((id) => getCategoryLabel(id))
           : ['Мастер-универсал']
 
-      const matchReasons: string[] = []
-      const distanceScore =
-        distanceKm !== null ? clamp(1 - distanceKm / 10, 0, 1) : 0.2
-      const ratingScore =
-        reviewsAverage !== null ? clamp(reviewsAverage / 5, 0, 1) : 0.3
-      const activityScore = isActive ? 0.1 : 0
-      const portfolioScore = portfolioCount >= 9 ? 0.1 : 0
-      if (distanceKm !== null && distanceKm <= 3) matchReasons.push('Рядом')
-      if (reviewsAverage !== null && reviewsAverage >= 4.7)
-        matchReasons.push('Высокий рейтинг')
-      if (isActive) matchReasons.push('Открыта запись')
-      if (portfolioCount >= 9) matchReasons.push('Сильное портфолио')
-      const matchScore =
-        distanceScore * 0.45 +
-        ratingScore * 0.35 +
-        activityScore +
-        portfolioScore
-
       return {
         id: profile.userId || `profile-${index}`,
         name: profile.displayName || 'Мастер',
@@ -915,8 +890,6 @@ export const ClientShowcaseScreen = ({
         portfolioCount,
         updateLabel,
         initials: getInitials(profile.displayName || 'Мастер'),
-        matchScore,
-        matchReasons,
       }
     })
   }, [profiles])
@@ -954,11 +927,6 @@ export const ClientShowcaseScreen = ({
     const sorted = [...list]
     sorted.sort((a, b) => {
       switch (sortMode) {
-        case 'match':
-          if (b.matchScore !== a.matchScore) {
-            return b.matchScore - a.matchScore
-          }
-          return b.updatedAtTs - a.updatedAtTs
         case 'active':
           if (a.isActive !== b.isActive) {
             return a.isActive ? -1 : 1
@@ -1256,9 +1224,6 @@ export const ClientShowcaseScreen = ({
                   master.scheduleDays.map((day) => normalizeScheduleDay(day))
                 )
                 const chipItems = [
-                  sortMode === 'match'
-                    ? master.matchReasons[0] ?? 'Подходит вам'
-                    : null,
                   distanceLabel,
                   responseLabel,
                   master.worksAtClient ? 'Выезд' : null,

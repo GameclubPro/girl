@@ -1,5 +1,3 @@
-import { buildAuthQuery } from './api'
-
 export const buildChatStreamUrl = (apiBase: string, userId: string) => {
   const normalizedBase = apiBase.trim().replace(/\/$/, '')
   const normalizedUserId = userId.trim()
@@ -7,7 +5,7 @@ export const buildChatStreamUrl = (apiBase: string, userId: string) => {
   const wsBase = normalizedBase.replace(/^http/i, (match) =>
     match.toLowerCase() === 'https' ? 'wss' : 'ws'
   )
-  const authQuery = buildAuthQuery()
-  const query = authQuery || `userId=${encodeURIComponent(normalizedUserId)}`
-  return `${wsBase}/api/chats/stream?${query}`
+  return `${wsBase}/api/chats/stream?userId=${encodeURIComponent(
+    normalizedUserId
+  )}`
 }
