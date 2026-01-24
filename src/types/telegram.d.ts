@@ -39,7 +39,6 @@ declare global {
           onClick: (callback: () => void) => void
           offClick: (callback: () => void) => void
         }
-        initData?: string
         initDataUnsafe?: {
           user?: {
             id: number
