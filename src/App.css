@@ -994,6 +994,53 @@
   color: var(--request-muted);
 }
 
+.booking-policy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.booking-policy-list {
+  display: grid;
+  gap: 10px;
+}
+
+.booking-policy-item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
+  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.booking-policy-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--request-muted);
+}
+
+.booking-policy-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--request-ink);
+}
+
+.booking-policy-hint {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
 .booking-days {
   display: grid;
   grid-auto-flow: column;
@@ -20035,6 +20082,94 @@ h2 {
 
 .screen--client-master-profile .pro-profile-reviews {
   padding: 14px;
+}
+
+.screen--client-master-profile .master-profile-policies {
+  border-radius: 22px;
+  background: var(--cm-glass);
+  border: 1px solid var(--cm-border);
+  box-shadow: var(--cm-shadow);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.master-policy-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.master-policy-kicker {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.master-policy-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  font-family: var(--font-title);
+}
+
+.master-policy-subtitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.master-policy-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.master-policy-card {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(var(--paper-rgb), 0.86);
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.master-policy-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.master-policy-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.master-policy-note {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.master-policy-foot {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pro-muted);
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .screen--client-master-profile .pro-profile-reviews-summary,

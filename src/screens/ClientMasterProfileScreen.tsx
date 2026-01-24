@@ -106,6 +106,8 @@ const formatCount = (value: number, one: string, few: string, many: string) => {
   return `${value} ${many}`
 }
 
+const formatHoursLabel = (value: number) => formatCount(value, 'час', 'часа', 'часов')
+
 const formatReviewCount = (value: number) =>
   formatCount(value, 'отзыв', 'отзыва', 'отзывов')
 
@@ -243,7 +245,12 @@ const resolvePortfolioFocus = (item?: PortfolioItem | null) => {
 
 const PORTFOLIO_PREVIEW_LIMIT = 4
 
-type MasterProfileTabId = 'overview' | 'portfolio' | 'schedule' | 'reviews'
+type MasterProfileTabId =
+  | 'overview'
+  | 'portfolio'
+  | 'schedule'
+  | 'policies'
+  | 'reviews'
 type StatId = 'works' | 'rating' | 'reviews' | 'followers'
 
 type MasterFollower = {
@@ -305,6 +312,7 @@ export const ClientMasterProfileScreen = ({
   const overviewSectionRef = useRef<HTMLElement | null>(null)
   const portfolioSectionRef = useRef<HTMLElement | null>(null)
   const scheduleSectionRef = useRef<HTMLElement | null>(null)
+  const policiesSectionRef = useRef<HTMLElement | null>(null)
   const reviewsSectionRef = useRef<HTMLElement | null>(null)
   const followersRequestIdRef = useRef(0)
   const favoriteStateRef = useRef<{ masterId: string; isFavorite: boolean }>({
@@ -476,6 +484,7 @@ export const ClientMasterProfileScreen = ({
       overview: overviewSectionRef,
       portfolio: portfolioSectionRef,
       schedule: scheduleSectionRef,
+      policies: policiesSectionRef,
       reviews: reviewsSectionRef,
     }
     const target = sectionMap[nextTab]?.current
@@ -609,6 +618,7 @@ export const ClientMasterProfileScreen = ({
       { id: 'overview', ref: overviewSectionRef },
       { id: 'portfolio', ref: portfolioSectionRef },
       { id: 'schedule', ref: scheduleSectionRef },
+      { id: 'policies', ref: policiesSectionRef },
       { id: 'reviews', ref: reviewsSectionRef },
     ]
     const observer = new IntersectionObserver(
@@ -625,6 +635,7 @@ export const ClientMasterProfileScreen = ({
           (nextId === 'overview' ||
             nextId === 'portfolio' ||
             nextId === 'schedule' ||
+            nextId === 'policies' ||
             nextId === 'reviews')
         ) {
           activeTabRef.current = nextId
@@ -703,6 +714,72 @@ export const ClientMasterProfileScreen = ({
 
   const portfolioCount = portfolioItems.filter((item) => item.url.trim()).length
   const reviewAverageLabel = reviewCount > 0 ? reviewAverage.toFixed(1) : '—'
+  const cancelWindowHours =
+    typeof profile?.cancelWindowHours === 'number'
+      ? Math.max(0, Math.round(profile.cancelWindowHours))
+      : null
+  const depositPercent =
+    typeof profile?.depositPercent === 'number'
+      ? Math.max(0, Math.round(profile.depositPercent))
+      : null
+  const lateCancelFeePercent =
+    typeof profile?.lateCancelFeePercent === 'number'
+      ? Math.max(0, Math.round(profile.lateCancelFeePercent))
+      : null
+  const cancelPolicyValue =
+    cancelWindowHours === null
+      ? 'Уточняется в переписке'
+      : cancelWindowHours === 0
+        ? 'Без бесплатного окна отмены'
+        : `Бесплатная отмена за ${formatHoursLabel(cancelWindowHours)}`
+  const cancelPolicyNote =
+    cancelWindowHours && cancelWindowHours > 0
+      ? 'После этого окна возможен штраф.'
+      : 'Лучше предупредить заранее.'
+  const depositPolicyValue =
+    depositPercent === null
+      ? 'Обсуждается с мастером'
+      : depositPercent > 0
+        ? `${depositPercent}% для фиксации слота`
+        : 'Без депозита'
+  const depositPolicyNote =
+    depositPercent && depositPercent > 0
+      ? 'Депозит засчитывается в стоимость услуги.'
+      : 'Оплата после подтверждения.'
+  const lateCancelPolicyValue =
+    lateCancelFeePercent === null
+      ? 'Уточняется'
+      : lateCancelFeePercent > 0
+        ? `Удержание ${lateCancelFeePercent}%`
+        : 'Без штрафа'
+  const lateCancelPolicyNote =
+    lateCancelFeePercent && lateCancelFeePercent > 0
+      ? 'Применяется при отмене после окна.'
+      : 'Гибкие условия для клиентов.'
+  const policySummary =
+    cancelWindowHours === null && depositPercent === null && lateCancelFeePercent === null
+      ? 'Политики пока не заполнены — уточните детали в чате.'
+      : 'Прозрачные условия помогают держать слот и время.'
+  const policyItems = [
+    {
+      id: 'cancel',
+      label: 'Отмена',
+      value: cancelPolicyValue,
+      note: cancelPolicyNote,
+    },
+    {
+      id: 'deposit',
+      label: 'Депозит',
+      value: depositPolicyValue,
+      note: depositPolicyNote,
+    },
+    {
+      id: 'late',
+      label: 'Поздняя отмена',
+      value: lateCancelPolicyValue,
+      note: lateCancelPolicyNote,
+    },
+  ]
   const profileStats = [
     { id: 'works', label: 'Работы', value: String(portfolioCount) },
     { id: 'rating', label: 'Рейтинг', value: reviewAverageLabel },
@@ -918,6 +995,7 @@ export const ClientMasterProfileScreen = ({
     { id: 'overview', label: 'Обзор' },
     { id: 'portfolio', label: 'Портфолио', badge: portfolioGridItems.length },
     { id: 'schedule', label: 'График' },
+    { id: 'policies', label: 'Политики' },
     { id: 'reviews', label: 'Отзывы', badge: reviewCount },
   ]
 
@@ -1464,6 +1542,33 @@ export const ClientMasterProfileScreen = ({
                     {scheduleRange}
                   </span>
                 </div>
+              </section>
+
+              <section
+                id="master-profile-section-policies"
+                className="master-profile-policies animate delay-2 master-profile-section"
+                ref={policiesSectionRef}
+                data-section="policies"
+                role="region"
+                aria-labelledby="master-profile-tab-policies"
+              >
+                <div className="master-policy-head">
+                  <p className="master-policy-kicker">Политики</p>
+                  <h2 className="master-policy-title">Правила записи</h2>
+                  <p className="master-policy-subtitle">{policySummary}</p>
+                </div>
+                <div className="master-policy-grid">
+                  {policyItems.map((item) => (
+                    <div className="master-policy-card" key={item.id}>
+                      <span className="master-policy-label">{item.label}</span>
+                      <span className="master-policy-value">{item.value}</span>
+                      <span className="master-policy-note">{item.note}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="master-policy-foot">
+                  Финальные условия подтверждаются при записи.
+                </p>
               </section>
 
               <section

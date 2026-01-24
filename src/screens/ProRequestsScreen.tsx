@@ -443,6 +443,7 @@ type SlotSuggestion = {
   value: string
   label: string
   score?: number
+  conversionRate?: number | null
   confidenceLabel?: string
 }
 
@@ -473,6 +474,8 @@ const REQUEST_SLOT_SUGGESTIONS_LIMIT = 6
 const REQUEST_SLOT_CONFIDENCE_LIMIT = 2
 const LEAD_CONVERSION_MIN_SAMPLE = 6
 const LEAD_CONVERSION_LOCATION_MIN_SAMPLE = 4
+const LEAD_CONVERSION_HOUR_MIN_SAMPLE = 4
+const LEAD_CONVERSION_WEEKDAY_MIN_SAMPLE = 4
 
 const buildSlotStorageKey = (userId: string) => `pro-slots:${userId}`
 const buildSlotSeedKey = (userId: string) => `pro-slots-seeded:${userId}`
@@ -1335,6 +1338,14 @@ export const ProRequestsScreen = ({
       const now = new Date()
       const nowMinutes = now.getHours() * 60 + now.getMinutes()
       const conversionStats = leadConversionStats
+      const resolveRate = (
+        stats?: { responses: number; rate: number } | null,
+        minSample?: number
+      ) => {
+        if (!stats || typeof stats.rate !== 'number') return null
+        if (typeof minSample === 'number' && stats.responses < minSample) return null
+        return stats.rate
+      }
       const categoryStats =
         conversionStats?.categories?.[request.categoryId ?? ''] ?? null
       const locationStats =
@@ -1343,22 +1354,24 @@ export const ProRequestsScreen = ({
         typeof conversionStats?.overall?.rate === 'number'
           ? conversionStats?.overall?.rate
           : null
-      const categoryRate =
-        categoryStats &&
-        categoryStats.responses >= LEAD_CONVERSION_MIN_SAMPLE &&
-        typeof categoryStats.rate === 'number'
-          ? categoryStats.rate
-          : null
-      const locationRate =
-        locationStats &&
-        locationStats.responses >= LEAD_CONVERSION_LOCATION_MIN_SAMPLE &&
-        typeof locationStats.rate === 'number'
-          ? locationStats.rate
-          : null
-      const blendedRate =
-        categoryRate !== null && locationRate !== null
-          ? categoryRate * 0.7 + locationRate * 0.3
-          : categoryRate ?? locationRate ?? overallRate
+      const categoryRate = resolveRate(categoryStats, LEAD_CONVERSION_MIN_SAMPLE)
+      const locationRate = resolveRate(
+        locationStats,
+        LEAD_CONVERSION_LOCATION_MIN_SAMPLE
+      )
+      const blendRates = (
+        items: Array<{ rate: number | null; weight: number }>
+      ): number | null => {
+        let totalWeight = 0
+        let sum = 0
+        items.forEach((item) => {
+          if (typeof item.rate !== 'number') return
+          totalWeight += item.weight
+          sum += item.rate * item.weight
+        })
+        if (totalWeight <= 0) return null
+        return sum / totalWeight
+      }
 
       const addSuggestion = (
         dateKey: string,
@@ -1371,6 +1384,23 @@ export const ProRequestsScreen = ({
         const key = `${dateKey}-${minutes}`
         if (used.has(key)) return
         used.add(key)
+        const date = parseDateKey(dateKey)
+        const dayKey = date ? getDayKey(date) : null
+        const hourKey = String(Math.floor(minutes / 60))
+        const hourStats = conversionStats?.hours?.[hourKey] ?? null
+        const weekdayStats = dayKey ? conversionStats?.weekdays?.[dayKey] : null
+        const hourRate = resolveRate(hourStats, LEAD_CONVERSION_HOUR_MIN_SAMPLE)
+        const weekdayRate = resolveRate(
+          weekdayStats,
+          LEAD_CONVERSION_WEEKDAY_MIN_SAMPLE
+        )
+        const blendedRate = blendRates([
+          { rate: categoryRate, weight: 0.34 },
+          { rate: locationRate, weight: 0.12 },
+          { rate: weekdayRate, weight: 0.18 },
+          { rate: hourRate, weight: 0.22 },
+          { rate: overallRate, weight: 0.14 },
+        ])
         const baseScore = source === 'manual' ? 2 : 1
         const conversionBoost = blendedRate !== null ? blendedRate * 2 : 0
         const score = baseScore + conversionBoost
@@ -1391,6 +1421,7 @@ export const ProRequestsScreen = ({
           value,
           label: formatSlotSuggestionLabel(dateKey, minutes, todayKey, tomorrowKey),
           score,
+          conversionRate: blendedRate,
           confidenceLabel,
         })
       }
@@ -1494,8 +1525,8 @@ export const ProRequestsScreen = ({
       }
 
       if (suggestions.length === 0) return []
-      if (blendedRate === null) return suggestions
-      const ranked = [...suggestions]
+      const ranked = suggestions
+        .filter((slot) => typeof slot.conversionRate === 'number')
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         .slice(0, REQUEST_SLOT_CONFIDENCE_LIMIT)
         .map((item) => item.id)

@@ -1957,12 +1957,15 @@ const loadLeadConversionStats = async (masterId) => {
       overall: { responses: 0, accepted: 0, rate: null },
       categories: {},
       locations: {},
+      hours: {},
+      weekdays: {},
     }
   }
   const since = new Date(Date.now() - LEAD_CONVERSION_WINDOW_DAYS * DAY_MS)
-  const [overallResult, categoryResult, locationResult] = await Promise.all([
-    pool.query(
-      `
+  const [overallResult, categoryResult, locationResult, hourResult, weekdayResult] =
+    await Promise.all([
+      pool.query(
+        `
         SELECT
           COUNT(*)::int AS responses,
           COUNT(*) FILTER (WHERE status = 'accepted')::int AS accepted
@@ -2000,7 +2003,35 @@ const loadLeadConversionStats = async (masterId) => {
       `,
       [masterId, since]
     ),
-  ])
+      pool.query(
+        `
+        SELECT
+          EXTRACT(HOUR FROM rr.proposed_slot_at)::int AS hour,
+          COUNT(*)::int AS responses,
+          COUNT(*) FILTER (WHERE rr.status = 'accepted')::int AS accepted
+        FROM request_responses rr
+        WHERE rr.master_id = $1
+          AND rr.created_at >= $2
+          AND rr.proposed_slot_at IS NOT NULL
+        GROUP BY hour
+      `,
+        [masterId, since]
+      ),
+      pool.query(
+        `
+        SELECT
+          EXTRACT(DOW FROM rr.proposed_slot_at)::int AS dow,
+          COUNT(*)::int AS responses,
+          COUNT(*) FILTER (WHERE rr.status = 'accepted')::int AS accepted
+        FROM request_responses rr
+        WHERE rr.master_id = $1
+          AND rr.created_at >= $2
+          AND rr.proposed_slot_at IS NOT NULL
+        GROUP BY dow
+      `,
+        [masterId, since]
+      ),
+    ])
 
   const overallRow = overallResult.rows[0] ?? {}
   const overallResponses = Number(overallRow.responses) || 0
@@ -2036,10 +2067,42 @@ const loadLeadConversionStats = async (masterId) => {
     }
   })
 
+  const hours = {}
+  hourResult.rows.forEach((row) => {
+    const hour = Number(row.hour)
+    if (!Number.isFinite(hour)) return
+    const responses = Number(row.responses) || 0
+    const accepted = Number(row.accepted) || 0
+    if (responses <= 0) return
+    hours[String(hour)] = {
+      responses,
+      accepted,
+      rate: accepted / responses,
+    }
+  })
+
+  const weekdays = {}
+  const weekdayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+  weekdayResult.rows.forEach((row) => {
+    const dow = Number(row.dow)
+    const key = weekdayKeys[dow]
+    if (!key) return
+    const responses = Number(row.responses) || 0
+    const accepted = Number(row.accepted) || 0
+    if (responses <= 0) return
+    weekdays[key] = {
+      responses,
+      accepted,
+      rate: accepted / responses,
+    }
+  })
+
   return {
     overall: { responses: overallResponses, accepted: overallAccepted, rate: overallRate },
     categories,
     locations,
+    hours,
+    weekdays,
   }
 }
 

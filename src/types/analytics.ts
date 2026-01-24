@@ -93,6 +93,8 @@ export type LeadConversionStats = {
     string,
     { responses: number; accepted: number; rate: number }
   >
+  hours: Record<string, { responses: number; accepted: number; rate: number }>
+  weekdays: Record<string, { responses: number; accepted: number; rate: number }>
 }
 
 export type AnalyticsCompare = {

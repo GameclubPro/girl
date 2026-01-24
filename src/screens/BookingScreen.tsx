@@ -113,6 +113,17 @@ const resolveServiceCategory = (serviceName: string): CategoryId | null => {
 
 const formatPrice = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const formatHoursLabel = (value: number) => {
+  const absValue = Math.abs(value)
+  const mod10 = absValue % 10
+  const mod100 = absValue % 100
+  if (mod10 === 1 && mod100 !== 11) return `${value} час`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${value} часа`
+  }
+  return `${value} часов`
+}
+
 const getInitials = (value: string) => {
   const normalized = value.trim()
   if (!normalized) return 'М'
@@ -599,6 +610,45 @@ export const BookingScreen = ({
   const reviewsCountLabel = hasReviews
     ? formatReviewCount(reviewsCount)
     : 'Нет отзывов'
+  const cancelWindowHours =
+    typeof profile?.cancelWindowHours === 'number'
+      ? Math.max(0, Math.round(profile.cancelWindowHours))
+      : null
+  const depositPercent =
+    typeof profile?.depositPercent === 'number'
+      ? Math.max(0, Math.round(profile.depositPercent))
+      : null
+  const lateCancelFeePercent =
+    typeof profile?.lateCancelFeePercent === 'number'
+      ? Math.max(0, Math.round(profile.lateCancelFeePercent))
+      : null
+  const cancelPolicyValue =
+    cancelWindowHours === null
+      ? 'Правила отмены уточняются с мастером'
+      : cancelWindowHours === 0
+        ? 'Без бесплатного окна отмены'
+        : `Бесплатная отмена за ${formatHoursLabel(cancelWindowHours)} до визита`
+  const depositPolicyValue =
+    depositPercent === null
+      ? 'Депозит обсуждается с мастером'
+      : depositPercent > 0
+        ? `Депозит ${depositPercent}% для фиксации слота`
+        : 'Без депозита'
+  const lateCancelPolicyValue =
+    lateCancelFeePercent === null
+      ? 'Условия поздней отмены уточняются'
+      : lateCancelFeePercent > 0
+        ? `Поздняя отмена: удержание ${lateCancelFeePercent}%`
+        : 'Без штрафа за позднюю отмену'
+  const policyHint =
+    cancelWindowHours === null && depositPercent === null && lateCancelFeePercent === null
+      ? 'Политики появятся после подтверждения мастером.'
+      : 'Подтверждая запись, вы соглашаетесь с политиками мастера.'
+  const policyItems = [
+    { label: 'Отмена', value: cancelPolicyValue },
+    { label: 'Депозит', value: depositPolicyValue },
+    { label: 'Поздняя отмена', value: lateCancelPolicyValue },
+  ]
 
   const priceLabel =
     selectedService?.price !== null && selectedService?.price !== undefined
@@ -1311,86 +1361,101 @@ export const BookingScreen = ({
             )}
 
             {safeStep === 2 && (
-              <section className="request-card booking-card animate delay-2">
-                <h2 className="request-card-title">Детали</h2>
-                <div className="request-field">
-                  <span className="request-label">Комментарий</span>
-                  <textarea
-                    className="request-textarea"
-                    placeholder="Пожелания и детали"
-                    value={details}
-                    onChange={(event) => setDetails(event.target.value)}
-                    rows={3}
-                  />
-                </div>
-                <div className="request-field">
-                  <span className="request-label">Фото примера</span>
-                  <input
-                    ref={fileInputRef}
-                    className="request-upload-input"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handlePhotoChange}
-                  />
-                  <div className="request-upload">
-                    <div className="request-upload-media" aria-hidden="true">
-                      <IconPhoto />
-                    </div>
-                    <div className="request-upload-body">
-                      <div className="request-upload-title">
-                        {photos.length > 0 ? 'Фото добавлены' : 'Добавить фото'}
-                      </div>
-                      <div className="request-upload-meta">
-                        {photos.length > 0
-                          ? `Добавлено ${photos.length}/${maxPhotos}`
-                          : '1-5 фото • до 6 МБ'}
-                      </div>
-                    </div>
-                    <button
-                      className="request-upload-button"
-                      type="button"
-                      onClick={handleAddPhotos}
-                      disabled={!canAddPhotos}
-                    >
-                      {photos.length > 0 ? 'Добавить еще' : 'Добавить'}
-                    </button>
+              <>
+                <section className="request-card booking-card animate delay-2">
+                  <h2 className="request-card-title">Детали</h2>
+                  <div className="request-field">
+                    <span className="request-label">Комментарий</span>
+                    <textarea
+                      className="request-textarea"
+                      placeholder="Пожелания и детали"
+                      value={details}
+                      onChange={(event) => setDetails(event.target.value)}
+                      rows={3}
+                    />
                   </div>
-                  {uploadingCount > 0 && (
-                    <p className="request-upload-status">
-                      Загружаем фото: {uploadingCount}
-                    </p>
-                  )}
-                  {uploadError && (
-                    <p className="request-upload-error">{uploadError}</p>
-                  )}
-                  {photos.length > 0 && (
-                    <div className="request-upload-grid" role="list">
-                      {photos.map((photo) => (
-                        <div
-                          className="request-upload-thumb"
-                          role="listitem"
-                          key={photo.url}
-                        >
-                          <img src={photo.url} alt="" loading="lazy" />
-                          <button
-                            className="request-upload-remove"
-                            type="button"
-                            onClick={() => handleRemovePhoto(photo)}
-                            aria-label="Удалить фото"
-                          >
-                            x
-                          </button>
+                  <div className="request-field">
+                    <span className="request-label">Фото примера</span>
+                    <input
+                      ref={fileInputRef}
+                      className="request-upload-input"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoChange}
+                    />
+                    <div className="request-upload">
+                      <div className="request-upload-media" aria-hidden="true">
+                        <IconPhoto />
+                      </div>
+                      <div className="request-upload-body">
+                        <div className="request-upload-title">
+                          {photos.length > 0 ? 'Фото добавлены' : 'Добавить фото'}
                         </div>
-                      ))}
+                        <div className="request-upload-meta">
+                          {photos.length > 0
+                            ? `Добавлено ${photos.length}/${maxPhotos}`
+                            : '1-5 фото • до 6 МБ'}
+                        </div>
+                      </div>
+                      <button
+                        className="request-upload-button"
+                        type="button"
+                        onClick={handleAddPhotos}
+                        disabled={!canAddPhotos}
+                      >
+                        {photos.length > 0 ? 'Добавить еще' : 'Добавить'}
+                      </button>
                     </div>
+                    {uploadingCount > 0 && (
+                      <p className="request-upload-status">
+                        Загружаем фото: {uploadingCount}
+                      </p>
+                    )}
+                    {uploadError && (
+                      <p className="request-upload-error">{uploadError}</p>
+                    )}
+                    {photos.length > 0 && (
+                      <div className="request-upload-grid" role="list">
+                        {photos.map((photo) => (
+                          <div
+                            className="request-upload-thumb"
+                            role="listitem"
+                            key={photo.url}
+                          >
+                            <img src={photo.url} alt="" loading="lazy" />
+                            <button
+                              className="request-upload-remove"
+                              type="button"
+                              onClick={() => handleRemovePhoto(photo)}
+                              aria-label="Удалить фото"
+                            >
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="request-card booking-card booking-policy-card animate delay-3">
+                  <h2 className="request-card-title">Политики записи</h2>
+                  <div className="booking-policy-list">
+                    {policyItems.map((item) => (
+                      <div className="booking-policy-item" key={item.label}>
+                        <span className="booking-policy-label">{item.label}</span>
+                        <span className="booking-policy-value">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="booking-policy-hint">{policyHint}</p>
+                  {submitError && <p className="request-error">{submitError}</p>}
+                  {submitSuccess && (
+                    <p className="request-success">{submitSuccess}</p>
                   )}
-                </div>
-                {submitError && <p className="request-error">{submitError}</p>}
-                {submitSuccess && (
-                  <p className="request-success">{submitSuccess}</p>
-                )}
-              </section>
+                </section>
+              </>
             )}
           </>
         ) : null}
