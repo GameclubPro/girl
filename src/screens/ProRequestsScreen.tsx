@@ -76,6 +76,8 @@ const CALENDAR_RANGE_DAYS = 14
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const DEFAULT_SLOT_RANGE_DAYS = 14
 const BOOKING_DURATION_MIN = 60
+const PRICE_OFFER_HOURS = 12
+const FREE_CANCEL_HOURS = 12
 
 const getDayKey = (date: Date) => dayKeyOrder[date.getDay()] ?? 'mon'
 
@@ -198,6 +200,11 @@ const formatTimeLeft = (value?: string | null) => {
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
 }
 
+const formatTimeLeftFromMs = (value?: number | null) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
+  return formatTimeLeft(new Date(value).toISOString())
+}
+
 const formatTimeWindowList = (windows?: ServiceRequest['timeWindows']) => {
   if (!Array.isArray(windows) || windows.length === 0) return ''
   return windows
@@ -244,6 +251,17 @@ const formatTimeWindowChoice = (
   }
   const fallback = dateLabel || 'По времени'
   return windowLabel ? `${fallback} · ${windowLabel}` : fallback
+}
+
+const formatSlotLabel = (value: string) => {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed)
 }
 
 const formatCountLabel = (
@@ -335,6 +353,8 @@ type ProRequest = ServiceRequest & {
   responsePrice?: number | null
   responseComment?: string | null
   responseProposedTime?: string | null
+  responseProposedSlotAt?: string | null
+  responseHoldExpiresAt?: string | null
   responseCreatedAt?: string | null
 }
 
@@ -342,6 +362,7 @@ type ResponseDraft = {
   price: string
   comment: string
   proposedTime: string
+  proposedSlotAt: string
 }
 
 type BookingCalendarItem = {
@@ -1801,6 +1822,21 @@ export const ProRequestsScreen = ({
       locationLabelMap[booking.locationType] ?? 'Не важно'
     const distanceLabel = formatDistance(booking.distanceKm)
     const scheduledLabel = formatDateTime(booking.scheduledAt)
+    const updatedAtMs = booking.updatedAt
+      ? new Date(booking.updatedAt).getTime()
+      : null
+    const priceOfferExpiresAt = updatedAtMs
+      ? updatedAtMs + PRICE_OFFER_HOURS * 60 * 60 * 1000
+      : null
+    const priceOfferTimeLeft = formatTimeLeftFromMs(priceOfferExpiresAt)
+    const freeCancelUntilMs = booking.scheduledAt
+      ? new Date(booking.scheduledAt).getTime() -
+        FREE_CANCEL_HOURS * 60 * 60 * 1000
+      : null
+    const freeCancelLabel =
+      freeCancelUntilMs && freeCancelUntilMs > Date.now()
+        ? formatDateTime(new Date(freeCancelUntilMs).toISOString())
+        : ''
     const hasServicePrice = typeof booking.servicePrice === 'number'
     const priceLabel = hasServicePrice
       ? `Стоимость: ${formatPrice(booking.servicePrice ?? 0)}`
@@ -1868,6 +1904,16 @@ export const ProRequestsScreen = ({
           </div>
         )}
         <div className="booking-item-price">{priceLabel}</div>
+        {booking.status === 'price_proposed' && priceOfferTimeLeft && (
+          <div className="booking-item-meta booking-item-meta--highlight">
+            Ожидание клиента: {priceOfferTimeLeft}
+          </div>
+        )}
+        {booking.status === 'confirmed' && freeCancelLabel && (
+          <div className="booking-item-meta booking-item-meta--highlight">
+            Бесплатная отмена до: {freeCancelLabel}
+          </div>
+        )}
         {outcomeLabel && (
           <div className="booking-item-outcome">Итог: {outcomeLabel}</div>
         )}
@@ -2110,12 +2156,25 @@ export const ProRequestsScreen = ({
     const priceValue = draft.price.trim()
     const hasPrice = priceValue.length > 0
     const hasComment = draft.comment.trim().length > 0
-    const hasProposedTime = draft.proposedTime.trim().length > 0
+    const proposedSlotRaw = draft.proposedSlotAt.trim()
+    const hasProposedSlot = proposedSlotRaw.length > 0
+    const parsedSlotLabel = hasProposedSlot ? formatSlotLabel(proposedSlotRaw) : ''
+    const proposedTimeValue = draft.proposedTime.trim() || parsedSlotLabel
+    const hasProposedTime = proposedTimeValue.length > 0
 
-    if (!hasPrice && !hasComment && !hasProposedTime) {
+    if (!hasPrice && !hasComment && !hasProposedTime && !hasProposedSlot) {
       setSubmitError((current) => ({
         ...current,
         [requestId]: 'Добавьте цену или комментарий.',
+      }))
+      setSubmittingId(null)
+      return
+    }
+
+    if (hasProposedSlot && !parsedSlotLabel) {
+      setSubmitError((current) => ({
+        ...current,
+        [requestId]: 'Некорректная дата или время.',
       }))
       setSubmittingId(null)
       return
@@ -2131,7 +2190,10 @@ export const ProRequestsScreen = ({
             userId,
             price: hasPrice ? Number(priceValue) : null,
             comment: draft.comment.trim() || null,
-            proposedTime: draft.proposedTime.trim() || null,
+            proposedTime: proposedTimeValue || null,
+            proposedSlotAt: hasProposedSlot
+              ? new Date(proposedSlotRaw).toISOString()
+              : null,
           }),
         }
       )
@@ -2160,6 +2222,54 @@ export const ProRequestsScreen = ({
           setSubmitError((current) => ({
             ...current,
             [requestId]: 'Окно отклика истекло.',
+          }))
+          return
+        }
+
+        if (data?.error === 'proposedSlot_invalid') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Некорректная дата или время.',
+          }))
+          return
+        }
+
+        if (data?.error === 'time_unavailable') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Выбранное время уже занято.',
+          }))
+          return
+        }
+
+        if (data?.error === 'slot_reserved') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Этот слот уже удержан.',
+          }))
+          return
+        }
+
+        if (data?.error === 'schedule_unavailable') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Настройте график, чтобы предлагать время.',
+          }))
+          return
+        }
+
+        if (data?.error === 'day_unavailable') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'В этот день вы не работаете.',
+          }))
+          return
+        }
+
+        if (data?.error === 'service_unavailable') {
+          setSubmitError((current) => ({
+            ...current,
+            [requestId]: 'Эта услуга не доступна в профиле.',
           }))
           return
         }
@@ -2194,6 +2304,10 @@ export const ProRequestsScreen = ({
         throw new Error('Submit response failed')
       }
 
+      const data = (await response.json().catch(() => null)) as
+        | { proposedSlotAt?: string | null; holdExpiresAt?: string | null }
+        | null
+
       setSubmitSuccess((current) => ({
         ...current,
         [requestId]: 'Отклик отправлен.',
@@ -2208,6 +2322,10 @@ export const ProRequestsScreen = ({
                 responsePrice: hasPrice ? Number(priceValue) : null,
                 responseComment: draft.comment.trim() || null,
                 responseProposedTime: draft.proposedTime.trim() || null,
+                responseProposedSlotAt:
+                  data?.proposedSlotAt ??
+                  (hasProposedSlot ? new Date(proposedSlotRaw).toISOString() : null),
+                responseHoldExpiresAt: data?.holdExpiresAt ?? null,
               }
             : item
         )
@@ -2353,6 +2471,11 @@ export const ProRequestsScreen = ({
                     const dispatchBatchLabel = item.dispatchBatch
                       ? `Волна ${item.dispatchBatch}`
                       : ''
+                    const leadScore =
+                      typeof item.leadScore === 'number' ? item.leadScore : null
+                    const leadReasons = Array.isArray(item.leadReasons)
+                      ? item.leadReasons
+                      : []
                     const isFinalResponse = ['accepted', 'rejected', 'expired'].includes(
                       item.responseStatus ?? ''
                     )
@@ -2360,6 +2483,7 @@ export const ProRequestsScreen = ({
                       price: '',
                       comment: '',
                       proposedTime: '',
+                      proposedSlotAt: '',
                     }
                     const isSubmitting = submittingId === item.id
                     const canRespond =
@@ -2383,6 +2507,11 @@ export const ProRequestsScreen = ({
                                 size="sm"
                                 className="booking-item-trust"
                               />
+                              {leadScore !== null && (
+                                <span className="request-lead-score">
+                                  {leadScore}
+                                </span>
+                              )}
                             </div>
                             <div className="booking-item-service">
                               {item.serviceName}
@@ -2432,6 +2561,19 @@ export const ProRequestsScreen = ({
                                   role="listitem"
                                 >
                                   {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {leadReasons.length > 0 && (
+                            <div className="request-tags request-tags--lead" role="list">
+                              {leadReasons.map((reason, index) => (
+                                <span
+                                  className="request-chip"
+                                  key={`${item.id}-lead-${index}`}
+                                  role="listitem"
+                                >
+                                  {reason}
                                 </span>
                               ))}
                             </div>
@@ -2508,6 +2650,20 @@ export const ProRequestsScreen = ({
                                 )
                               }
                               min="0"
+                              disabled={!canRespond}
+                            />
+                            <input
+                              className="pro-response-input"
+                              type="datetime-local"
+                              value={draft.proposedSlotAt}
+                              onChange={(event) => {
+                                const nextValue = event.target.value
+                                handleDraftChange(item.id, 'proposedSlotAt', nextValue)
+                                const nextLabel = nextValue ? formatSlotLabel(nextValue) : ''
+                                if (nextLabel) {
+                                  handleDraftChange(item.id, 'proposedTime', nextLabel)
+                                }
+                              }}
                               disabled={!canRespond}
                             />
                             <input

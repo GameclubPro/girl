@@ -167,6 +167,8 @@ export type ServiceRequest = {
   dispatchExpiresAt?: string | null
   dispatchStatus?: string | null
   dispatchSentAt?: string | null
+  leadScore?: number | null
+  leadReasons?: string[] | null
   responsePreview?: {
     masterId: string
     displayName?: string | null
@@ -212,6 +214,7 @@ export type Booking = {
   photoUrls: string[]
   comment?: string | null
   createdAt: string
+  updatedAt?: string | null
   distanceKm?: number | null
   reviewId?: number | null
 }
@@ -227,6 +230,8 @@ export type RequestResponse = {
   price?: number | null
   comment?: string | null
   proposedTime?: string | null
+  proposedSlotAt?: string | null
+  holdExpiresAt?: string | null
   status: 'sent' | 'accepted' | 'rejected' | 'expired'
   createdAt: string
   avatarUrl?: string | null

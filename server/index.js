@@ -24,12 +24,15 @@ const REQUEST_INITIAL_BATCH_SIZE = 15
 const REQUEST_EXPANDED_BATCH_SIZE = 20
 const REQUEST_RESPONSE_WINDOW_MINUTES = 30
 const REQUEST_TIME_WINDOW_LIMIT = 6
+const RESPONSE_SLOT_HOLD_MINUTES = 20
 const REQUEST_DISPATCH_SCAN_INTERVAL_MS = 60_000
 const REQUEST_DISPATCH_CANDIDATE_LIMIT = 200
 const OUTCOME_PROMPT_SCAN_INTERVAL_MS = 90_000
 const OUTCOME_PROMPT_BATCH_LIMIT = 20
 const OUTCOME_PROMPT_ACTION_WINDOW_HOURS = 48
 const BOOKING_DURATION_FALLBACK_MINUTES = 60
+const BOOKING_FREE_CANCEL_HOURS = 12
+const BOOKING_PRICE_OFFER_HOURS = 12
 const CHAT_MESSAGE_DEFAULT_LIMIT = 30
 const CHAT_MESSAGE_MAX_LIMIT = 80
 const CHAT_STREAM_PATH = '/api/chats/stream'
@@ -44,6 +47,7 @@ const TRUST_EVENT_WEIGHTS = {
   visit_on_time: 5,
   visit_late: -5,
   visit_rescheduled: -3,
+  visit_late_cancel: -8,
   visit_no_show: -30,
 }
 const TRUST_EVENT_TYPE_LIST = Object.keys(TRUST_EVENT_WEIGHTS)
@@ -159,6 +163,14 @@ const parseDateParam = (value) => {
   const parsed = new Date(normalized)
   if (Number.isNaN(parsed.getTime())) return null
   return parsed
+}
+
+const normalizeDateTime = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
 }
 
 const parseRangeDays = (value) => {
@@ -1902,6 +1914,83 @@ const rankDispatchCandidates = (candidates, clientLocation) => {
     })
 }
 
+const formatTimeLeftLabel = (expiresAt) => {
+  if (!expiresAt) return ''
+  const parsed = new Date(expiresAt)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const diffMs = parsed.getTime() - Date.now()
+  if (diffMs <= 0) return ''
+  const minutesTotal = Math.ceil(diffMs / 60000)
+  const hours = Math.floor(minutesTotal / 60)
+  const minutes = minutesTotal % 60
+  if (hours <= 0) return `${minutesTotal} мин`
+  return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
+}
+
+const buildLeadScore = (payload) => {
+  let score = 50
+  const reasons = []
+
+  if (typeof payload.distanceKm === 'number') {
+    const distance = payload.distanceKm
+    if (distance <= 1) {
+      score += 14
+      reasons.push(`Очень близко (${distance} км)`)
+    } else if (distance <= 3) {
+      score += 10
+      reasons.push(`Рядом (${distance} км)`)
+    } else if (distance <= 6) {
+      score += 6
+      reasons.push(`Недалеко (${distance} км)`)
+    } else if (distance >= 10) {
+      score -= 4
+    }
+  }
+
+  if (payload.clientTrust?.confidence) {
+    const confidence = Number(payload.clientTrust.confidence) || 0
+    if (confidence >= 0.7) {
+      score += 8
+      reasons.push('Надежный клиент')
+    } else if (confidence <= 0.35) {
+      score -= 3
+      reasons.push('Новый клиент')
+    }
+  }
+
+  if (payload.dateOption === 'today') {
+    score += 6
+    reasons.push('Сегодня')
+  } else if (payload.dateOption === 'tomorrow') {
+    score += 3
+    reasons.push('Завтра')
+  }
+
+  if (payload.budget) {
+    score += 2
+    reasons.push('Бюджет указан')
+  }
+
+  if (Array.isArray(payload.photoUrls) && payload.photoUrls.length > 0) {
+    score += 2
+    reasons.push('Есть фото')
+  }
+
+  if (payload.details) {
+    score += 1
+    reasons.push('Есть комментарий')
+  }
+
+  const urgency = formatTimeLeftLabel(payload.dispatchExpiresAt)
+  if (urgency) {
+    score += 4
+    reasons.push(`Срочно: ${urgency}`)
+  }
+
+  const normalizedScore = Math.min(100, Math.max(0, Math.round(score)))
+  return { score: normalizedScore, reasons }
+}
+
 const dispatchRequestBatch = async (request, batchSize, batch) => {
   if (!request || request.status !== 'open') {
     return { dispatched: 0, expiresAt: null }
@@ -2612,10 +2701,22 @@ const ensureSchema = async () => {
       price INTEGER,
       comment TEXT,
       proposed_time TEXT,
+      proposed_slot_at TIMESTAMPTZ,
+      hold_expires_at TIMESTAMPTZ,
       status TEXT NOT NULL DEFAULT 'sent',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE request_responses
+    ADD COLUMN IF NOT EXISTS proposed_slot_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE request_responses
+    ADD COLUMN IF NOT EXISTS hold_expires_at TIMESTAMPTZ;
   `)
 
   await pool.query(`
@@ -4820,6 +4921,8 @@ app.get('/api/pro/requests', async (req, res) => {
           rr.price AS "responsePrice",
           rr.comment AS "responseComment",
           rr.proposed_time AS "responseProposedTime",
+          rr.proposed_slot_at AS "responseProposedSlotAt",
+          rr.hold_expires_at AS "responseHoldExpiresAt",
           rr.created_at AS "responseCreatedAt",
           COALESCE(ch.id, legacy_ch.id) AS "chatId",
           ul.lat AS "clientLat",
@@ -4928,7 +5031,24 @@ app.get('/api/pro/requests', async (req, res) => {
         clientTrustUpdatedAt: undefined,
       }
     })
-    res.json({ ...summary, isActive: profile.isActive, requests: payload })
+    const scored = payload
+      .map((item) => {
+        const { score, reasons } = buildLeadScore(item)
+        return {
+          ...item,
+          leadScore: score,
+          leadReasons: reasons,
+        }
+      })
+      .sort((a, b) => {
+        const scoreDiff = (b.leadScore ?? 0) - (a.leadScore ?? 0)
+        if (scoreDiff !== 0) return scoreDiff
+        return (
+          Number(new Date(b.createdAt ?? 0)) - Number(new Date(a.createdAt ?? 0))
+        )
+      })
+
+    res.json({ ...summary, isActive: profile.isActive, requests: scored })
   } catch (error) {
     console.error('GET /api/pro/requests failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -4972,6 +5092,7 @@ app.get('/api/bookings', async (req, res) => {
           b.late_minutes AS "lateMinutes",
           b.outcome_prompted_at AS "outcomePromptedAt",
           b.created_at AS "createdAt",
+          b.updated_at AS "updatedAt",
           mr.id AS "reviewId",
           COALESCE(bc.id, legacy_bc.id) AS "chatId"
         FROM service_bookings b
@@ -5056,6 +5177,7 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.late_minutes AS "lateMinutes",
           b.outcome_prompted_at AS "outcomePromptedAt",
           b.created_at AS "createdAt",
+          b.updated_at AS "updatedAt",
           COALESCE(bc.id, legacy_bc.id) AS "chatId",
           ul.lat AS "clientLat",
           ul.lng AS "clientLng",
@@ -6029,11 +6151,11 @@ app.patch('/api/bookings/:id', async (req, res) => {
       const cancelledDate = new Date()
       const cancelledAt = cancelledDate.toISOString()
       const scheduledAt = new Date(booking.scheduledAt ?? '')
-      const outcomeValue =
+      const isLateCancel =
         !Number.isNaN(scheduledAt.getTime()) &&
-        scheduledAt.getTime() - cancelledDate.getTime() < 24 * 60 * 60 * 1000
-          ? 'late_cancel'
-          : null
+        scheduledAt.getTime() - cancelledDate.getTime() <
+          BOOKING_FREE_CANCEL_HOURS * 60 * 60 * 1000
+      const outcomeValue = isLateCancel ? 'late_cancel' : null
 
       await pool.query(
         `
@@ -6050,7 +6172,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
 
       await logClientTrustEvent({
         userId: booking.clientId,
-        eventType: 'visit_rescheduled',
+        eventType: isLateCancel ? 'visit_late_cancel' : 'visit_rescheduled',
         meta: {
           ref: `booking:${bookingId}`,
           bookingId,
@@ -6625,6 +6747,8 @@ app.get('/api/requests/:id/responses', async (req, res) => {
           rr.price,
           rr.comment,
           rr.proposed_time AS "proposedTime",
+          rr.proposed_slot_at AS "proposedSlotAt",
+          rr.hold_expires_at AS "holdExpiresAt",
           rr.status,
           rr.created_at AS "createdAt",
           COALESCE(ch.id, legacy_ch.id) AS "chatId",
@@ -6693,6 +6817,8 @@ app.get('/api/requests/:id/responses', async (req, res) => {
         price: row.price,
         comment: row.comment,
         proposedTime: row.proposedTime,
+        proposedSlotAt: row.proposedSlotAt,
+        holdExpiresAt: row.holdExpiresAt,
         status: row.status,
         createdAt: row.createdAt,
         chatId: row.chatId ?? null,
@@ -6717,10 +6843,11 @@ app.post('/api/requests/:id/responses', async (req, res) => {
     return
   }
 
-  const { userId, price, comment, proposedTime } = req.body ?? {}
+  const { userId, price, comment, proposedTime, proposedSlotAt } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
   const normalizedComment = normalizeText(comment)
   const normalizedProposedTime = normalizeText(proposedTime)
+  const normalizedProposedSlotAt = normalizeDateTime(proposedSlotAt)
   const parsedPrice = parseOptionalInt(price)
 
   if (!normalizedUserId) {
@@ -6728,12 +6855,22 @@ app.post('/api/requests/:id/responses', async (req, res) => {
     return
   }
 
-  if (!normalizedComment && parsedPrice === null && !normalizedProposedTime) {
-    res.status(400).json({ error: 'response_required' })
-    return
-  }
+    if (
+      !normalizedComment &&
+      parsedPrice === null &&
+      !normalizedProposedTime &&
+      !normalizedProposedSlotAt
+    ) {
+      res.status(400).json({ error: 'response_required' })
+      return
+    }
 
   try {
+    if (proposedSlotAt && !normalizedProposedSlotAt) {
+      res.status(400).json({ error: 'proposedSlot_invalid' })
+      return
+    }
+
     const profile = await loadMasterProfile(normalizedUserId)
     if (!profile) {
       const summary = getProfileStatusSummary(null)
@@ -6759,6 +6896,7 @@ app.post('/api/requests/:id/responses', async (req, res) => {
           city_id AS "cityId",
           district_id AS "districtId",
           category_id AS "categoryId",
+          service_name AS "serviceName",
           location_type AS "locationType",
           status
         FROM service_requests
@@ -6856,6 +6994,128 @@ app.post('/api/requests/:id/responses', async (req, res) => {
       }
     }
 
+    let proposedSlotAtValue = normalizedProposedSlotAt ?? null
+    let holdExpiresAtValue = null
+
+    if (proposedSlotAtValue) {
+      const proposedDate = new Date(proposedSlotAtValue)
+      if (Number.isNaN(proposedDate.getTime())) {
+        res.status(400).json({ error: 'proposedSlot_invalid' })
+        return
+      }
+      if (proposedDate.getTime() <= Date.now()) {
+        res.status(409).json({ error: 'proposedSlot_unavailable' })
+        return
+      }
+
+      const serviceItems = parseServiceItems(profile.services ?? [])
+      const normalizedRequestedService = normalizeServiceName(request.serviceName)
+      const matchedService = serviceItems.find(
+        (item) => normalizeServiceName(item.name) === normalizedRequestedService
+      )
+      if (!matchedService) {
+        res.status(409).json({ error: 'service_unavailable' })
+        return
+      }
+
+      const scheduleDays = Array.isArray(profile.scheduleDays)
+        ? profile.scheduleDays.map((day) => normalizeText(day).toLowerCase())
+        : []
+      const scheduleStartMinutes = parseTimeToMinutes(profile.scheduleStart)
+      const scheduleEndMinutes = parseTimeToMinutes(profile.scheduleEnd)
+
+      if (
+        scheduleDays.length === 0 ||
+        scheduleStartMinutes === null ||
+        scheduleEndMinutes === null ||
+        scheduleStartMinutes >= scheduleEndMinutes
+      ) {
+        res.status(409).json({ error: 'schedule_unavailable' })
+        return
+      }
+
+      const dayKey = getDayKeyFromDate(proposedDate)
+      if (!scheduleDays.includes(dayKey)) {
+        res.status(409).json({ error: 'day_unavailable' })
+        return
+      }
+
+      const serviceDuration = matchedService.duration ?? 60
+      const proposedMinutes =
+        proposedDate.getHours() * 60 + proposedDate.getMinutes()
+      if (
+        proposedMinutes < scheduleStartMinutes ||
+        proposedMinutes + serviceDuration > scheduleEndMinutes
+      ) {
+        res.status(409).json({ error: 'time_unavailable' })
+        return
+      }
+
+      const { start: dayStart, end: dayEnd } = buildDayBounds(proposedDate)
+      const existingBookings = await pool.query(
+        `
+          SELECT
+            scheduled_at AS "scheduledAt",
+            service_duration AS "serviceDuration"
+          FROM service_bookings
+          WHERE master_id = $1
+            AND status NOT IN ('declined', 'cancelled')
+            AND scheduled_at >= $2
+            AND scheduled_at < $3
+        `,
+        [normalizedUserId, dayStart.toISOString(), dayEnd.toISOString()]
+      )
+
+      const existingHolds = await pool.query(
+        `
+          SELECT
+            id,
+            proposed_slot_at AS "proposedSlotAt",
+            hold_expires_at AS "holdExpiresAt"
+          FROM request_responses
+          WHERE master_id = $1
+            AND proposed_slot_at IS NOT NULL
+            AND hold_expires_at IS NOT NULL
+            AND hold_expires_at > NOW()
+            AND ($2::int IS NULL OR id <> $2)
+            AND proposed_slot_at >= $3
+            AND proposed_slot_at < $4
+        `,
+        [
+          normalizedUserId,
+          existingResponse?.id ?? null,
+          dayStart.toISOString(),
+          dayEnd.toISOString(),
+        ]
+      )
+
+      const startMs = proposedDate.getTime()
+      const endMs = startMs + serviceDuration * 60 * 1000
+      const hasBookingConflict = existingBookings.rows.some((row) => {
+        const existingStart = new Date(row.scheduledAt).getTime()
+        const existingDuration = Number(row.serviceDuration) || 60
+        const existingEnd = existingStart + existingDuration * 60 * 1000
+        return startMs < existingEnd && endMs > existingStart
+      })
+      if (hasBookingConflict) {
+        res.status(409).json({ error: 'time_unavailable' })
+        return
+      }
+
+      const hasHoldConflict = existingHolds.rows.some((row) => {
+        const existingStart = new Date(row.proposedSlotAt).getTime()
+        if (Number.isNaN(existingStart)) return false
+        const existingEnd = existingStart + serviceDuration * 60 * 1000
+        return startMs < existingEnd && endMs > existingStart
+      })
+      if (hasHoldConflict) {
+        res.status(409).json({ error: 'slot_reserved' })
+        return
+      }
+
+      holdExpiresAtValue = addMinutes(new Date(), RESPONSE_SLOT_HOLD_MINUTES).toISOString()
+    }
+
     await ensureUser(normalizedUserId)
 
     const result = await pool.query(
@@ -6866,13 +7126,17 @@ app.post('/api/requests/:id/responses', async (req, res) => {
           price,
           comment,
           proposed_time,
+          proposed_slot_at,
+          hold_expires_at,
           status
         )
-        VALUES ($1, $2, $3, $4, $5, 'sent')
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'sent')
         ON CONFLICT (request_id, master_id) DO UPDATE
         SET price = EXCLUDED.price,
             comment = EXCLUDED.comment,
             proposed_time = EXCLUDED.proposed_time,
+            proposed_slot_at = EXCLUDED.proposed_slot_at,
+            hold_expires_at = EXCLUDED.hold_expires_at,
             status = 'sent',
             updated_at = NOW()
         RETURNING id, created_at AS "createdAt"
@@ -6883,6 +7147,8 @@ app.post('/api/requests/:id/responses', async (req, res) => {
         parsedPrice,
         normalizedComment || null,
         normalizedProposedTime || null,
+        proposedSlotAtValue,
+        holdExpiresAtValue,
       ]
     )
 
@@ -6898,7 +7164,13 @@ app.post('/api/requests/:id/responses', async (req, res) => {
       [requestId, normalizedUserId]
     )
 
-    res.json({ ok: true, id: result.rows[0]?.id, createdAt: result.rows[0]?.createdAt })
+    res.json({
+      ok: true,
+      id: result.rows[0]?.id,
+      createdAt: result.rows[0]?.createdAt,
+      proposedSlotAt: proposedSlotAtValue,
+      holdExpiresAt: holdExpiresAtValue,
+    })
   } catch (error) {
     console.error('POST /api/requests/:id/responses failed:', error)
     res.status(500).json({ error: 'server_error' })
@@ -6914,9 +7186,10 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
     return
   }
 
-  const { userId, action } = req.body ?? {}
+  const { userId, action, bookNow } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
   const normalizedAction = normalizeText(action)
+  const shouldBookNow = bookNow === true
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -6929,148 +7202,439 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
   }
 
   try {
-    const requestResult = await pool.query(
-      `
-        SELECT
-          user_id AS "userId",
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      const requestResult = await client.query(
+        `
+          SELECT
+            id,
+            user_id AS "userId",
+            city_id AS "cityId",
+          district_id AS "districtId",
+          address,
+          category_id AS "categoryId",
           service_name AS "serviceName",
+          details,
+          photo_urls AS "photoUrls",
+          location_type AS "locationType",
           status
         FROM service_requests
-        WHERE id = $1
-      `,
-      [requestId]
-    )
+          WHERE id = $1
+          FOR UPDATE
+        `,
+        [requestId]
+      )
 
-    if (requestResult.rows.length === 0) {
-      res.status(404).json({ error: 'not_found' })
-      return
-    }
-
-    const request = requestResult.rows[0]
-    if (request.userId !== normalizedUserId) {
-      res.status(403).json({ error: 'forbidden' })
-      return
-    }
-
-    if (request.status !== 'open') {
-      res.status(409).json({ error: 'request_closed' })
-      return
-    }
-
-    const responseResult = await pool.query(
-      `
-        SELECT
-          id,
-          master_id AS "masterId",
-          status
-        FROM request_responses
-        WHERE id = $1
-          AND request_id = $2
-      `,
-      [responseId, requestId]
-    )
-
-    if (responseResult.rows.length === 0) {
-      res.status(404).json({ error: 'response_not_found' })
-      return
-    }
-
-    const response = responseResult.rows[0]
-
-    if (normalizedAction === 'accept') {
-      if (response.status === 'rejected') {
-        res.status(409).json({ error: 'response_rejected' })
+      if (requestResult.rows.length === 0) {
+        await client.query('ROLLBACK')
+        res.status(404).json({ error: 'not_found' })
         return
       }
 
-      if (response.status !== 'accepted') {
-        await pool.query(
+      const request = requestResult.rows[0]
+      if (request.userId !== normalizedUserId) {
+        await client.query('ROLLBACK')
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+
+      if (request.status !== 'open') {
+        await client.query('ROLLBACK')
+        res.status(409).json({ error: 'request_closed' })
+        return
+      }
+
+      const responseResult = await client.query(
+        `
+          SELECT
+            id,
+            master_id AS "masterId",
+            price,
+            proposed_slot_at AS "proposedSlotAt",
+            hold_expires_at AS "holdExpiresAt",
+            status
+          FROM request_responses
+          WHERE id = $1
+            AND request_id = $2
+          FOR UPDATE
+        `,
+        [responseId, requestId]
+      )
+
+      if (responseResult.rows.length === 0) {
+        await client.query('ROLLBACK')
+        res.status(404).json({ error: 'response_not_found' })
+        return
+      }
+
+      const response = responseResult.rows[0]
+
+      if (normalizedAction === 'accept') {
+        if (response.status === 'rejected') {
+          await client.query('ROLLBACK')
+          res.status(409).json({ error: 'response_rejected' })
+          return
+        }
+
+        let bookingPayload = null
+        if (shouldBookNow) {
+          if (!response.proposedSlotAt) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'slot_missing' })
+            return
+          }
+          if (!response.holdExpiresAt) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'hold_expired' })
+            return
+          }
+          const holdExpiresMs = new Date(response.holdExpiresAt).getTime()
+          if (Number.isNaN(holdExpiresMs) || holdExpiresMs <= Date.now()) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'hold_expired' })
+            return
+          }
+
+          const profile = await loadMasterProfile(response.masterId)
+          if (!profile) {
+            await client.query('ROLLBACK')
+            res.status(404).json({ error: 'master_not_found' })
+            return
+          }
+
+          const serviceItems = parseServiceItems(profile.services ?? [])
+          const normalizedRequestedService = normalizeServiceName(request.serviceName)
+          const matchedService = serviceItems.find(
+            (item) => normalizeServiceName(item.name) === normalizedRequestedService
+          )
+          if (!matchedService) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'service_unavailable' })
+            return
+          }
+
+          const resolvedLocationType =
+            request.locationType === 'any'
+              ? profile.worksAtMaster
+                ? 'master'
+                : 'client'
+              : request.locationType
+
+          if (resolvedLocationType === 'client' && !profile.worksAtClient) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'location_type_mismatch' })
+            return
+          }
+          if (resolvedLocationType === 'master' && !profile.worksAtMaster) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'location_type_mismatch' })
+            return
+          }
+
+          const scheduledDate = new Date(response.proposedSlotAt)
+          if (Number.isNaN(scheduledDate.getTime())) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'slot_invalid' })
+            return
+          }
+
+          const scheduleDays = Array.isArray(profile.scheduleDays)
+            ? profile.scheduleDays.map((day) => normalizeText(day).toLowerCase())
+            : []
+          const scheduleStartMinutes = parseTimeToMinutes(profile.scheduleStart)
+          const scheduleEndMinutes = parseTimeToMinutes(profile.scheduleEnd)
+
+          if (
+            scheduleDays.length === 0 ||
+            scheduleStartMinutes === null ||
+            scheduleEndMinutes === null ||
+            scheduleStartMinutes >= scheduleEndMinutes
+          ) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'schedule_unavailable' })
+            return
+          }
+
+          const dayKey = getDayKeyFromDate(scheduledDate)
+          if (!scheduleDays.includes(dayKey)) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'day_unavailable' })
+            return
+          }
+
+          const serviceDuration = matchedService.duration ?? 60
+          const scheduledMinutes =
+            scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
+          if (
+            scheduledMinutes < scheduleStartMinutes ||
+            scheduledMinutes + serviceDuration > scheduleEndMinutes
+          ) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'time_unavailable' })
+            return
+          }
+
+          if (scheduledDate.getTime() < Date.now()) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'time_unavailable' })
+            return
+          }
+
+          const { start: dayStart, end: dayEnd } = buildDayBounds(scheduledDate)
+          const existing = await client.query(
+            `
+              SELECT
+                scheduled_at AS "scheduledAt",
+                service_duration AS "serviceDuration"
+              FROM service_bookings
+              WHERE master_id = $1
+                AND status NOT IN ('declined', 'cancelled')
+                AND scheduled_at >= $2
+                AND scheduled_at < $3
+            `,
+            [response.masterId, dayStart.toISOString(), dayEnd.toISOString()]
+          )
+
+          const startMs = scheduledDate.getTime()
+          const endMs = startMs + serviceDuration * 60 * 1000
+          const hasConflict = existing.rows.some((row) => {
+            const existingStart = new Date(row.scheduledAt).getTime()
+            const existingDuration = Number(row.serviceDuration) || 60
+            const existingEnd = existingStart + existingDuration * 60 * 1000
+            return startMs < existingEnd && endMs > existingStart
+          })
+          if (hasConflict) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'time_unavailable' })
+            return
+          }
+
+          const servicePrice =
+            response.price !== null && response.price !== undefined
+              ? Number(response.price)
+              : matchedService.price
+          if (servicePrice === null || servicePrice === undefined) {
+            await client.query('ROLLBACK')
+            res.status(409).json({ error: 'price_required' })
+            return
+          }
+
+          const requestPhotoList = Array.isArray(request.photoUrls)
+            ? request.photoUrls
+            : []
+          const requestComment =
+            typeof request.details === 'string' && request.details.trim()
+              ? request.details.trim()
+              : null
+
+          const bookingInsert = await client.query(
+            `
+              INSERT INTO service_bookings (
+                client_id,
+                master_id,
+                city_id,
+                district_id,
+                address,
+                category_id,
+                service_name,
+                service_price,
+                service_duration,
+                location_type,
+                scheduled_at,
+                photo_urls,
+                status,
+                proposed_price,
+                client_comment
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed', NULL, $13)
+              RETURNING id, created_at AS "createdAt"
+            `,
+            [
+              request.userId,
+              response.masterId,
+              request.cityId,
+              request.districtId,
+              request.address ?? null,
+              request.categoryId,
+              request.serviceName,
+              servicePrice,
+              serviceDuration,
+              resolvedLocationType,
+              scheduledDate.toISOString(),
+              requestPhotoList,
+              requestComment,
+            ]
+          )
+
+          bookingPayload = {
+            id: bookingInsert.rows[0]?.id ?? null,
+            createdAt: bookingInsert.rows[0]?.createdAt ?? null,
+          }
+        }
+
+        if (response.status !== 'accepted') {
+          await client.query(
+            `
+              UPDATE request_responses
+              SET status = 'accepted',
+                  updated_at = NOW()
+              WHERE id = $1
+            `,
+            [responseId]
+          )
+
+          await client.query(
+            `
+              UPDATE request_responses
+              SET status = 'rejected',
+                  updated_at = NOW()
+              WHERE request_id = $1
+                AND id <> $2
+                AND status = 'sent'
+            `,
+            [requestId, responseId]
+          )
+
+          await client.query(
+            `
+              UPDATE service_requests
+              SET status = 'closed',
+                  updated_at = NOW()
+              WHERE id = $1
+            `,
+            [requestId]
+          )
+
+          await client.query(
+            `
+              UPDATE request_dispatches
+              SET status = 'expired',
+                  updated_at = NOW()
+              WHERE request_id = $1
+                AND status = 'sent'
+            `,
+            [requestId]
+          )
+        }
+        let chatPayload = null
+        if (bookingPayload?.id) {
+          try {
+            chatPayload = await createChatForBooking(
+              {
+                bookingId: bookingPayload.id,
+                clientId: request.userId,
+                masterId: response.masterId,
+                serviceName: request.serviceName,
+                actorId: normalizedUserId,
+              },
+              { client }
+            )
+          } catch (chatError) {
+            console.error('Failed to create chat for booking:', chatError)
+          }
+        }
+
+        await client.query('COMMIT')
+
+        if (chatPayload?.chatId) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
+            bookingId: bookingPayload?.id ?? null,
+          })
+          if (chatPayload?.systemMessage) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              message: chatPayload.systemMessage,
+            })
+          } else if (chatPayload?.systemMessageId) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              messageId: chatPayload.systemMessageId,
+            })
+          }
+        } else if (!bookingPayload?.id) {
+          try {
+            const requestChat = await createChatForRequest({
+              requestId,
+              responseId,
+              clientId: request.userId,
+              masterId: response.masterId,
+              serviceName: request.serviceName,
+              actorId: normalizedUserId,
+            })
+            if (requestChat?.chatId) {
+              void notifyChatMembers(requestChat.chatId, {
+                type: 'chat:created',
+                chatId: requestChat.chatId,
+                requestId,
+                responseId,
+              })
+              if (requestChat?.systemMessage) {
+                void notifyChatMembers(requestChat.chatId, {
+                  type: 'message:new',
+                  chatId: requestChat.chatId,
+                  message: requestChat.systemMessage,
+                })
+              } else if (requestChat?.systemMessageId) {
+                void notifyChatMembers(requestChat.chatId, {
+                  type: 'message:new',
+                  chatId: requestChat.chatId,
+                  messageId: requestChat.systemMessageId,
+                })
+              }
+            }
+            chatPayload = requestChat
+          } catch (chatError) {
+            console.error('Failed to create chat for request:', chatError)
+          }
+        }
+
+        res.json({
+          ok: true,
+          status: 'accepted',
+          requestStatus: 'closed',
+          chatId: chatPayload?.chatId ?? null,
+          bookingId: bookingPayload?.id ?? null,
+        })
+        return
+      }
+
+      if (response.status === 'accepted') {
+        await client.query('ROLLBACK')
+        res.status(409).json({ error: 'response_accepted' })
+        return
+      }
+
+      if (response.status !== 'rejected') {
+        await client.query(
           `
             UPDATE request_responses
-            SET status = 'accepted',
+            SET status = 'rejected',
                 updated_at = NOW()
             WHERE id = $1
           `,
           [responseId]
         )
-
-        await pool.query(
-          `
-            UPDATE request_responses
-            SET status = 'rejected',
-                updated_at = NOW()
-            WHERE request_id = $1
-              AND id <> $2
-              AND status = 'sent'
-          `,
-          [requestId, responseId]
-        )
-
-        await pool.query(
-          `
-            UPDATE service_requests
-            SET status = 'closed',
-                updated_at = NOW()
-            WHERE id = $1
-          `,
-          [requestId]
-        )
-
-        await pool.query(
-          `
-            UPDATE request_dispatches
-            SET status = 'expired',
-                updated_at = NOW()
-            WHERE request_id = $1
-              AND status = 'sent'
-          `,
-          [requestId]
-        )
       }
 
-      let chatId = null
-      try {
-        const chatPayload = await createChatForRequest({
-          requestId,
-          responseId,
-          clientId: request.userId,
-          masterId: response.masterId,
-          serviceName: request.serviceName,
-          actorId: normalizedUserId,
-        })
-        chatId = chatPayload?.chatId ?? null
-        if (chatId) {
-          void notifyChatMembers(chatId, {
-            type: 'chat:created',
-            chatId,
-            requestId,
-            responseId,
-          })
-          if (chatPayload?.systemMessage) {
-            void notifyChatMembers(chatId, {
-              type: 'message:new',
-              chatId,
-              message: chatPayload.systemMessage,
-            })
-          } else if (chatPayload?.systemMessageId) {
-            void notifyChatMembers(chatId, {
-              type: 'message:new',
-              chatId,
-              messageId: chatPayload.systemMessageId,
-            })
-          }
-        }
-      } catch (chatError) {
-        console.error('Failed to create chat for request:', chatError)
-      }
+      await client.query('COMMIT')
 
-      res.json({
-        ok: true,
-        status: 'accepted',
-        requestStatus: 'closed',
-        chatId,
-      })
+      res.json({ ok: true, status: 'rejected' })
       return
+    } catch (innerError) {
+      try {
+        await client.query('ROLLBACK')
+      } catch (rollbackError) {
+        console.error('Rollback failed:', rollbackError)
+      }
+      throw innerError
+    } finally {
+      client.release()
     }
 
     if (response.status === 'accepted') {

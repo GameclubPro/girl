@@ -51,6 +51,8 @@ const bookingStatusToneMap = {
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const
 const CALENDAR_RANGE_DAYS = 14
 const twelveHoursMs = 12 * 60 * 60 * 1000
+const PRICE_OFFER_HOURS = 12
+const FREE_CANCEL_HOURS = 12
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -129,6 +131,11 @@ const formatTimeLeft = (value?: string | null) => {
   const minutes = minutesTotal % 60
   if (hours <= 0) return `${minutesTotal} мин`
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`
+}
+
+const formatTimeLeftFromMs = (value?: number | null) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
+  return formatTimeLeft(new Date(value).toISOString())
 }
 
 const getTimeUntilMs = (value?: string | null) => {
@@ -655,7 +662,8 @@ export const ClientRequestsScreen = ({
   const handleResponseAction = async (
     requestId: number,
     responseId: number,
-    action: 'accept' | 'reject'
+    action: 'accept' | 'reject',
+    options?: { bookNow?: boolean }
   ) => {
     if (responseActionId !== null) return
 
@@ -668,15 +676,39 @@ export const ClientRequestsScreen = ({
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, action }),
+          body: JSON.stringify({
+            userId,
+            action,
+            bookNow: options?.bookNow === true,
+          }),
         }
       )
       const data = (await response.json().catch(() => null)) as
-        | { status?: string; requestStatus?: string; chatId?: number | null }
+        | {
+            status?: string
+            requestStatus?: string
+            chatId?: number | null
+            bookingId?: number | null
+            error?: string
+          }
         | null
 
       if (!response.ok) {
-        throw new Error('Response update failed')
+        const errorLabel =
+          data?.error === 'hold_expired'
+            ? 'Время удержания слота истекло.'
+            : data?.error === 'slot_missing'
+              ? 'Слот не выбран мастером.'
+              : data?.error === 'time_unavailable'
+                ? 'Время уже занято.'
+                : data?.error === 'price_required'
+                  ? 'Нужна подтвержденная цена.'
+                  : 'Не удалось обновить отклик.'
+        setResponseActionError((current) => ({
+          ...current,
+          [responseId]: errorLabel,
+        }))
+        return
       }
 
       setResponsesByRequestId((current) => {
@@ -1015,10 +1047,20 @@ export const ClientRequestsScreen = ({
                             )
                               ? responseItem.previewUrls
                               : []
+                            const proposedSlotLabel = responseItem.proposedSlotAt
+                              ? formatDateTime(responseItem.proposedSlotAt)
+                              : ''
+                            const holdTimeLeft = responseItem.holdExpiresAt
+                              ? formatTimeLeft(responseItem.holdExpiresAt)
+                              : ''
                             const isAccepted = responseItem.status === 'accepted'
                             const isRejected = responseItem.status === 'rejected'
                             const canRespondAction =
                               item.status === 'open' && responseItem.status === 'sent'
+                            const canInstantBook =
+                              canRespondAction &&
+                              Boolean(proposedSlotLabel) &&
+                              Boolean(holdTimeLeft)
                             const isActionLoading = responseActionId === responseItem.id
 
                             return (
@@ -1083,6 +1125,21 @@ export const ClientRequestsScreen = ({
                                     Время: {responseItem.proposedTime}
                                   </div>
                                 )}
+                                {proposedSlotLabel && (
+                                  <div className="response-meta">
+                                    Слот: {proposedSlotLabel}
+                                  </div>
+                                )}
+                                {!holdTimeLeft && responseItem.proposedSlotAt && (
+                                  <div className="response-meta response-meta--warning">
+                                    Удержание слота истекло
+                                  </div>
+                                )}
+                                {holdTimeLeft && (
+                                  <div className="response-meta response-meta--highlight">
+                                    Удержание слота: {holdTimeLeft}
+                                  </div>
+                                )}
                                 {previewUrls.length > 0 && (
                                   <div className="response-preview" role="list">
                                     {previewUrls.map((url, index) => (
@@ -1102,7 +1159,9 @@ export const ClientRequestsScreen = ({
                                 {canRespondAction && (
                                   <div className="response-actions">
                                     <button
-                                      className="response-action is-primary"
+                                      className={`response-action${
+                                        canInstantBook ? '' : ' is-primary'
+                                      }`}
                                       type="button"
                                       onClick={() =>
                                         handleResponseAction(
@@ -1115,6 +1174,23 @@ export const ClientRequestsScreen = ({
                                     >
                                       Выбрать мастера
                                     </button>
+                                    {canInstantBook && (
+                                      <button
+                                        className="response-action is-primary"
+                                        type="button"
+                                        onClick={() =>
+                                          handleResponseAction(
+                                            item.id,
+                                            responseItem.id,
+                                            'accept',
+                                            { bookNow: true }
+                                          )
+                                        }
+                                        disabled={isActionLoading}
+                                      >
+                                        Записаться
+                                      </button>
+                                    )}
                                     <button
                                       className="response-action"
                                       type="button"
@@ -1210,6 +1286,15 @@ export const ClientRequestsScreen = ({
                       (category) => category.id === booking.categoryId
                     )?.label ?? booking.categoryId
                   const scheduledLabel = formatDateTime(booking.scheduledAt)
+                  const updatedAtMs = booking.updatedAt
+                    ? new Date(booking.updatedAt).getTime()
+                    : null
+                  const priceOfferExpiresAt = updatedAtMs
+                    ? updatedAtMs + PRICE_OFFER_HOURS * 60 * 60 * 1000
+                    : null
+                  const priceOfferTimeLeft = formatTimeLeftFromMs(
+                    priceOfferExpiresAt
+                  )
                   const priceLabel =
                     typeof booking.servicePrice === 'number'
                       ? `Стоимость: ${formatPrice(booking.servicePrice)}`
@@ -1223,6 +1308,15 @@ export const ClientRequestsScreen = ({
                   )
                   const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
                   const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
+                  const freeCancelUntilMs =
+                    typeof timeUntilMs === 'number'
+                      ? new Date(booking.scheduledAt).getTime() -
+                        FREE_CANCEL_HOURS * 60 * 60 * 1000
+                      : null
+                  const freeCancelLabel =
+                    freeCancelUntilMs && freeCancelUntilMs > Date.now()
+                      ? formatDateTime(new Date(freeCancelUntilMs).toISOString())
+                      : ''
                   const canReschedule =
                     booking.status === 'confirmed' &&
                     typeof timeUntilMs === 'number' &&
@@ -1390,6 +1484,23 @@ export const ClientRequestsScreen = ({
                         </div>
                       )}
                       <div className="booking-item-price">{priceLabel}</div>
+                      {booking.status === 'price_proposed' && priceOfferTimeLeft && (
+                        <div className="booking-item-meta booking-item-meta--highlight">
+                          Цена действует: {priceOfferTimeLeft}
+                        </div>
+                      )}
+                      {booking.status === 'confirmed' && freeCancelLabel && (
+                        <div className="booking-item-meta booking-item-meta--highlight">
+                          Бесплатная отмена до: {freeCancelLabel}
+                        </div>
+                      )}
+                      {booking.status === 'confirmed' &&
+                        !freeCancelLabel &&
+                        !isPast && (
+                          <div className="booking-item-meta booking-item-meta--warning">
+                            Отмена с удержанием
+                          </div>
+                        )}
                       {booking.comment && (
                         <div className="booking-item-comment">{booking.comment}</div>
                       )}
