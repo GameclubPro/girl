@@ -363,25 +363,6 @@ function App() {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const webApp = window.Telegram?.WebApp
-    const href = window.location.href
-    const initData = webApp?.initData ?? ''
-    const logPayload = {
-      origin: window.location.origin,
-      host: window.location.host,
-      pathname: window.location.pathname,
-      hasTgWebAppData: href.includes('tgWebAppData='),
-      hasTgWebAppVersion: href.includes('tgWebAppVersion='),
-      hasInitData: Boolean(initData),
-      initDataLength: initData.length,
-      platform: webApp?.platform ?? null,
-      version: webApp?.version ?? null,
-    }
-    console.info('[tg-webapp-check]', logPayload)
-  }, [])
   const [supportChatId, setSupportChatId] = useState<number | null>(null)
   const supportChatPromiseRef = useRef<Promise<number | null> | null>(null)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
