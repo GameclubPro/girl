@@ -746,6 +746,7 @@ export const ProRequestsScreen = ({
                     : '',
                 comment: item.responseComment ?? '',
                 proposedTime: item.responseProposedTime ?? '',
+                proposedSlotAt: item.responseProposedSlotAt ?? '',
               }
             }
           })
