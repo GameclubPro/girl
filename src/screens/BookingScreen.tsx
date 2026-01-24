@@ -78,11 +78,13 @@ const scheduleLabels: Record<string, string> = {
   sun: 'Вс',
 }
 
-const bookingSteps = [
+const bookingBaseSteps = [
   { id: 'service', title: 'Услуга' },
   { id: 'time', title: 'Время' },
   { id: 'details', title: 'Детали' },
 ] as const
+
+const bookingDepositStep = { id: 'deposit', title: 'Предоплата' } as const
 
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const DEPOSIT_HOLD_MINUTES = 20
@@ -214,9 +216,6 @@ export const BookingScreen = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const maxPhotos = 5
   const maxUploadBytes = 6 * 1024 * 1024
-  const stepCount = bookingSteps.length
-  const safeStep = Math.min(Math.max(step, 0), stepCount - 1)
-  const currentStep = bookingSteps[safeStep] ?? bookingSteps[0]
 
   useEffect(() => {
     setHasTelegramMainButton(Boolean(window.Telegram?.WebApp?.MainButton))
@@ -586,13 +585,6 @@ export const BookingScreen = ({
     )
   }, [availableDays, selectedDayKey])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const prefersReducedMotion =
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' })
-  }, [safeStep])
-
   const selectedDay = availableDays.find((item) => item.key === selectedDayKey) ?? null
 
   const masterCityId =
@@ -691,6 +683,26 @@ export const BookingScreen = ({
       ? `К оплате сейчас: ${depositAmountLabel}`
       : 'Сумма депозита уточнится после согласования цены'
 
+  const showDepositStep = showDepositPay
+  const bookingSteps = showDepositStep
+    ? [...bookingBaseSteps, bookingDepositStep]
+    : bookingBaseSteps
+  const stepCount = bookingSteps.length
+  const safeStep = Math.min(Math.max(step, 0), stepCount - 1)
+  const currentStep = bookingSteps[safeStep] ?? bookingBaseSteps[0]
+  const currentStepId = currentStep?.id ?? bookingBaseSteps[0].id
+
+  useEffect(() => {
+    setStep((current) => Math.min(current, stepCount - 1))
+  }, [stepCount])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const prefersReducedMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' })
+  }, [safeStep])
+
   const priceLabel =
     selectedService?.price !== null && selectedService?.price !== undefined
       ? formatPrice(selectedService.price)
@@ -712,11 +724,14 @@ export const BookingScreen = ({
     hasSlots &&
     !isSubmitting &&
     !isUploading
+  const canContinueDetails = canContinueTime && !isSubmitting && !isUploading
   const canContinue = isFinalStep
     ? canSubmit
-    : safeStep === 0
+    : currentStepId === 'service'
       ? canContinueService
-      : canContinueTime
+      : currentStepId === 'time'
+        ? canContinueTime
+        : canContinueDetails
 
   const canAddPhotos =
     photos.length < maxPhotos && !isSubmitting && !isUploading
@@ -1129,6 +1144,9 @@ export const BookingScreen = ({
                 <div className="booking-master-body">
                   <div className="booking-master-row">
                     <span className="booking-master-name">{masterDisplayName}</span>
+                    {showDepositStep && safeStep === 0 && (
+                      <span className="booking-master-badge">Предоплата</span>
+                    )}
                     <div className="booking-master-stats">
                       {hasReviews ? (
                         <span className="booking-master-rating">
@@ -1458,9 +1476,8 @@ export const BookingScreen = ({
               </section>
             )}
 
-            {safeStep === 2 && (
-              <>
-                <section className="request-card booking-card animate delay-2">
+            {currentStepId === 'details' && (
+              <section className="request-card booking-card animate delay-2">
                   <h2 className="request-card-title">Детали</h2>
                   <div className="request-field">
                     <span className="request-label">Комментарий</span>
@@ -1536,85 +1553,89 @@ export const BookingScreen = ({
                     )}
                   </div>
                 </section>
+            )}
 
-                <section className="request-card booking-card booking-policy-card animate delay-3">
-                  <h2 className="request-card-title">Политики записи</h2>
-                  <div className="booking-policy-list">
-                    {policyItems.map((item) => (
-                      <div className="booking-policy-item" key={item.label}>
-                        <span className="booking-policy-label">{item.label}</span>
-                        <span className="booking-policy-value">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="booking-policy-hint">{policyHint}</p>
-                  {showDepositPay && (
-                    <div className="booking-deposit-pay">
-                      <div className="booking-deposit-row">
-                        <span className="booking-deposit-title">
-                          {depositPayLabel}
-                        </span>
-                        {depositAmount > 0 && (
-                          <button
-                            className="booking-deposit-copy"
-                            type="button"
-                            onClick={() =>
-                              handleCopyDeposit(
-                                String(depositAmount),
-                                'Сумма депозита скопирована.'
-                              )
-                            }
-                          >
-                            Скопировать сумму
-                          </button>
-                        )}
-                      </div>
-                      {depositDetails ? (
-                        <div className="booking-deposit-details">
-                          <span className="booking-deposit-label">
-                            Реквизиты мастера
-                          </span>
-                          <p className="booking-deposit-text">{depositDetails}</p>
-                          <button
-                            className="booking-deposit-copy"
-                            type="button"
-                            onClick={() =>
-                              handleCopyDeposit(
-                                depositDetails,
-                                'Реквизиты скопированы.'
-                              )
-                            }
-                          >
-                            Скопировать реквизиты
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="booking-deposit-note">
-                          Реквизиты мастер пришлёт в чате.
-                        </p>
-                      )}
-                      <p className="booking-deposit-note">
-                        Слот удерживается {DEPOSIT_HOLD_MINUTES} минут, затем
-                        автоматически освободится.
-                      </p>
-                      {depositQrUrl && (
-                        <div className="booking-deposit-qr">
-                          <img src={depositQrUrl} alt="QR для оплаты" />
-                        </div>
-                      )}
-                      {depositCopyStatus && (
-                        <p className="booking-deposit-status" role="status">
-                          {depositCopyStatus}
-                        </p>
+            {(currentStepId === 'deposit' ||
+              (!showDepositStep && currentStepId === 'details')) && (
+              <section className="request-card booking-card booking-policy-card animate delay-3">
+                <h2 className="request-card-title">
+                  {showDepositStep ? 'Предоплата и политики' : 'Политики записи'}
+                </h2>
+                <div className="booking-policy-list">
+                  {policyItems.map((item) => (
+                    <div className="booking-policy-item" key={item.label}>
+                      <span className="booking-policy-label">{item.label}</span>
+                      <span className="booking-policy-value">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="booking-policy-hint">{policyHint}</p>
+                {showDepositPay && (
+                  <div className="booking-deposit-pay">
+                    <div className="booking-deposit-row">
+                      <span className="booking-deposit-title">
+                        {depositPayLabel}
+                      </span>
+                      {depositAmount > 0 && (
+                        <button
+                          className="booking-deposit-copy"
+                          type="button"
+                          onClick={() =>
+                            handleCopyDeposit(
+                              String(depositAmount),
+                              'Сумма депозита скопирована.'
+                            )
+                          }
+                        >
+                          Скопировать сумму
+                        </button>
                       )}
                     </div>
-                  )}
-                  {submitError && <p className="request-error">{submitError}</p>}
-                  {submitSuccess && (
-                    <p className="request-success">{submitSuccess}</p>
-                  )}
-                </section>
-              </>
+                    {depositDetails ? (
+                      <div className="booking-deposit-details">
+                        <span className="booking-deposit-label">
+                          Реквизиты мастера
+                        </span>
+                        <p className="booking-deposit-text">{depositDetails}</p>
+                        <button
+                          className="booking-deposit-copy"
+                          type="button"
+                          onClick={() =>
+                            handleCopyDeposit(
+                              depositDetails,
+                              'Реквизиты скопированы.'
+                            )
+                          }
+                        >
+                          Скопировать реквизиты
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="booking-deposit-note">
+                        Реквизиты мастер пришлёт в чате.
+                      </p>
+                    )}
+                    <p className="booking-deposit-note">
+                      Слот удерживается {DEPOSIT_HOLD_MINUTES} минут, затем
+                      автоматически освободится.
+                    </p>
+                    {depositQrUrl && (
+                      <div className="booking-deposit-qr">
+                        <img src={depositQrUrl} alt="QR для оплаты" />
+                      </div>
+                    )}
+                    {depositCopyStatus && (
+                      <p className="booking-deposit-status" role="status">
+                        {depositCopyStatus}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {submitError && <p className="request-error">{submitError}</p>}
+                {submitSuccess && (
+                  <p className="request-success">{submitSuccess}</p>
+                )}
+              </section>
             )}
           </>
         ) : null}
