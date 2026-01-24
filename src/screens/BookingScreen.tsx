@@ -992,6 +992,16 @@ export const BookingScreen = ({
       }))
       setSubmitSuccess('Запись отправлена мастеру.')
       hapticNotification('success')
+      const webApp = window.Telegram?.WebApp
+      if (webApp?.close) {
+        setTimeout(() => {
+          try {
+            webApp?.close?.()
+          } catch (closeError) {
+            console.warn('Failed to close WebApp:', closeError)
+          }
+        }, 900)
+      }
     } catch (error) {
       setSubmitError('Не удалось создать запись. Попробуйте еще раз.')
       hapticNotification('error')
