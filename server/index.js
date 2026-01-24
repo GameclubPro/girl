@@ -84,12 +84,13 @@ app.use(express.json({ limit: '12mb' }))
 app.use('/uploads', express.static(uploadsRoot))
 
 app.use((req, res, next) => {
-  const initData = extractInitData(req)
+  const { value: initData, source: initSource } = extractInitData(req)
   if (!initData) {
     if (AUTH_DEBUG && req.path?.startsWith('/api/')) {
       console.warn('auth_missing', {
         path: req.path,
         method: req.method,
+        source: initSource,
         hasAuthHeader: Boolean(req.get('authorization')),
         hasInitHeader: Boolean(req.get('x-telegram-init-data')),
         hasAuthQuery:
@@ -98,13 +99,15 @@ app.use((req, res, next) => {
     }
     return next()
   }
-  const { auth, reason } = verifyTelegramInitData(initData)
+  const { auth, reason, debug } = verifyTelegramInitData(initData)
   if (!auth) {
     if (AUTH_DEBUG) {
       console.warn('auth_invalid', {
         path: req.path,
         method: req.method,
         reason,
+        source: initSource,
+        ...(debug ? { debug } : {}),
       })
     }
     res.status(401).json(
@@ -252,17 +255,23 @@ const decodeAuthValue = (value) => {
 const extractInitData = (req) => {
   const header = normalizeText(req.get('authorization') ?? '')
   if (header.toLowerCase().startsWith(AUTH_HEADER_PREFIX)) {
-    return header.slice(AUTH_HEADER_PREFIX.length).trim()
+    return {
+      value: header.slice(AUTH_HEADER_PREFIX.length).trim(),
+      source: 'authorization',
+    }
   }
   const alt = normalizeText(req.get('x-telegram-init-data') ?? '')
-  if (alt) return alt
+  if (alt) {
+    return { value: alt, source: 'x-telegram-init-data' }
+  }
   const queryValue =
     typeof req.query?.auth === 'string'
       ? req.query.auth
       : typeof req.query?.initData === 'string'
         ? req.query.initData
         : ''
-  return decodeAuthValue(queryValue)
+  const decoded = decodeAuthValue(queryValue)
+  return { value: decoded, source: decoded ? 'query' : 'none' }
 }
 
 const safeTimingEqual = (a, b) => {
@@ -281,26 +290,39 @@ const buildTelegramDataCheckString = (params) => {
   return entries.map(([key, value]) => `${key}=${value}`).join('\n')
 }
 
+const maskValue = (value, visible = 6) => {
+  if (!value) return ''
+  if (value.length <= visible * 2) return value
+  return `${value.slice(0, visible)}…${value.slice(-visible)}`
+}
+
 const verifyTelegramInitData = (initData) => {
   const normalized = normalizeText(initData)
+  const debugBase = { initDataLength: normalized.length }
   if (!normalized) {
-    return { auth: null, reason: 'init_data_missing' }
+    return { auth: null, reason: 'init_data_missing', debug: debugBase }
   }
   if (!telegramBotToken) {
-    return { auth: null, reason: 'bot_token_missing' }
+    return { auth: null, reason: 'bot_token_missing', debug: debugBase }
   }
   const params = new URLSearchParams(normalized)
   const hash = params.get('hash')
-  if (!hash) return { auth: null, reason: 'hash_missing' }
+  if (!hash) return { auth: null, reason: 'hash_missing', debug: debugBase }
   const authDate = parseOptionalInt(params.get('auth_date'))
-  if (!authDate) return { auth: null, reason: 'auth_date_missing' }
+  if (!authDate) {
+    return { auth: null, reason: 'auth_date_missing', debug: debugBase }
+  }
   const ageSeconds = Math.floor(Date.now() / 1000) - authDate
   if (Number.isFinite(ageSeconds) && ageSeconds > INIT_DATA_MAX_AGE_SEC) {
-    return { auth: null, reason: 'auth_date_expired' }
+    return {
+      auth: null,
+      reason: 'auth_date_expired',
+      debug: { ...debugBase, authDate, ageSeconds },
+    }
   }
   const dataCheckString = buildTelegramDataCheckString(params)
   if (!dataCheckString) {
-    return { auth: null, reason: 'data_check_missing' }
+    return { auth: null, reason: 'data_check_missing', debug: debugBase }
   }
   const secretKey = createHmac('sha256', 'WebAppData')
     .update(telegramBotToken)
@@ -309,17 +331,31 @@ const verifyTelegramInitData = (initData) => {
     .update(dataCheckString)
     .digest('hex')
   if (!safeTimingEqual(computed, hash)) {
-    return { auth: null, reason: 'hash_mismatch' }
+    return {
+      auth: null,
+      reason: 'hash_mismatch',
+      debug: {
+        ...debugBase,
+        hash: maskValue(hash),
+        computed: maskValue(computed),
+        authDate,
+        ageSeconds,
+      },
+    }
   }
   const userRaw = params.get('user')
-  if (!userRaw) return { auth: null, reason: 'user_missing' }
+  if (!userRaw) {
+    return { auth: null, reason: 'user_missing', debug: debugBase }
+  }
   try {
     const user = JSON.parse(userRaw)
     const userId = user?.id ? String(user.id) : ''
-    if (!userId) return { auth: null, reason: 'user_invalid' }
-    return { auth: { userId, user }, reason: null }
+    if (!userId) {
+      return { auth: null, reason: 'user_invalid', debug: debugBase }
+    }
+    return { auth: { userId, user }, reason: null, debug: null }
   } catch (error) {
-    return { auth: null, reason: 'user_parse_failed' }
+    return { auth: null, reason: 'user_parse_failed', debug: debugBase }
   }
 }
 
