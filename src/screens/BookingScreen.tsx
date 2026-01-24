@@ -1681,6 +1681,14 @@ export const BookingScreen = ({
         }`}
       >
         <button
+          className="request-submit request-submit--cancel"
+          type="button"
+          onClick={onBack}
+          disabled={isSubmitting}
+        >
+          Отмена
+        </button>
+        <button
           className="request-submit"
           type="button"
           onClick={handleStepNext}
