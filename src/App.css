@@ -1054,6 +1054,33 @@
   background: rgba(var(--accent-rgb), 0.08);
 }
 
+.booking-step-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.booking-consent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.2);
+  background: rgba(var(--surface-rgb), 0.6);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--request-ink);
+}
+
+.booking-consent input {
+  width: 16px;
+  height: 16px;
+  accent-color: rgb(var(--accent-rgb));
+}
+
 .booking-deposit-pay {
   display: grid;
   gap: 10px;

@@ -205,6 +205,8 @@ export const BookingScreen = ({
   const [uploadError, setUploadError] = useState('')
   const [uploadingCount, setUploadingCount] = useState(0)
   const [depositCopyStatus, setDepositCopyStatus] = useState('')
+  const [depositConsent, setDepositConsent] = useState(false)
+  const [depositConsentError, setDepositConsentError] = useState('')
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] = useState<MasterReviewSummary | null>(
     null
@@ -717,13 +719,15 @@ export const BookingScreen = ({
     Boolean(categoryId) && Boolean(serviceName) && hasLocation && hasServices
   const canContinueTime = hasSlots
   const isFinalStep = safeStep >= stepCount - 1
+  const requiresDepositConsent = showDepositStep
   const canSubmit =
     Boolean(categoryId) &&
     Boolean(serviceName) &&
     hasLocation &&
     hasSlots &&
     !isSubmitting &&
-    !isUploading
+    !isUploading &&
+    (!requiresDepositConsent || depositConsent)
   const canContinueDetails = canContinueTime && !isSubmitting && !isUploading
   const canContinue = isFinalStep
     ? canSubmit
@@ -890,6 +894,7 @@ export const BookingScreen = ({
     if (isSubmitting) return
     setSubmitError('')
     setSubmitSuccess('')
+    setDepositConsentError('')
 
     if (!categoryId || !serviceName) {
       setSubmitError('Укажите услугу для записи.')
@@ -908,6 +913,12 @@ export const BookingScreen = ({
 
     if (isUploading) {
       setSubmitError('Дождитесь загрузки фото.')
+      return
+    }
+
+    if (showDepositStep && !depositConsent) {
+      setDepositConsentError('Подтвердите согласие с предоплатой.')
+      hapticImpact('light')
       return
     }
 
@@ -1044,6 +1055,7 @@ export const BookingScreen = ({
     apiBase,
     categoryId,
     details,
+    depositConsent,
     isSubmitting,
     isUploading,
     locationType,
@@ -1056,6 +1068,7 @@ export const BookingScreen = ({
     selectedDay,
     selectedTime,
     serviceName,
+    showDepositStep,
     userId,
   ])
 
@@ -1559,7 +1572,12 @@ export const BookingScreen = ({
               (!showDepositStep && currentStepId === 'details')) && (
               <section className="request-card booking-card booking-policy-card animate delay-3">
                 <h2 className="request-card-title">
-                  {showDepositStep ? 'Предоплата и политики' : 'Политики записи'}
+                  {showDepositStep ? 'Предоплата' : 'Политики записи'}
+                  {showDepositStep && (
+                    <span className="booking-step-hint">
+                      Предоплата удерживает слот на 20 минут
+                    </span>
+                  )}
                 </h2>
                 <div className="booking-policy-list">
                   {policyItems.map((item) => (
@@ -1630,6 +1648,22 @@ export const BookingScreen = ({
                       </p>
                     )}
                   </div>
+                )}
+                {showDepositStep && (
+                  <label className="booking-consent">
+                    <input
+                      type="checkbox"
+                      checked={depositConsent}
+                      onChange={(event) => {
+                        setDepositConsent(event.target.checked)
+                        setDepositConsentError('')
+                      }}
+                    />
+                    <span>Согласен с предоплатой</span>
+                  </label>
+                )}
+                {depositConsentError && (
+                  <p className="request-error">{depositConsentError}</p>
                 )}
                 {submitError && <p className="request-error">{submitError}</p>}
                 {submitSuccess && (
