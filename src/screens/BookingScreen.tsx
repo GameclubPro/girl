@@ -85,6 +85,7 @@ const bookingSteps = [
 ] as const
 
 const dayKeyOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+const DEPOSIT_HOLD_MINUTES = 20
 
 const getDayKey = (date: Date) => dayKeyOrder[date.getDay()] ?? 'mon'
 
@@ -991,6 +992,16 @@ export const BookingScreen = ({
       }))
       setSubmitSuccess('Запись отправлена мастеру.')
       hapticNotification('success')
+      const webApp = window.Telegram?.WebApp
+      if (webApp?.close) {
+        setTimeout(() => {
+          try {
+            webApp?.close?.()
+          } catch (closeError) {
+            console.warn('Failed to close WebApp:', closeError)
+          }
+        }, 900)
+      }
     } catch (error) {
       setSubmitError('Не удалось создать запись. Попробуйте еще раз.')
       hapticNotification('error')
@@ -1565,6 +1576,10 @@ export const BookingScreen = ({
                           Реквизиты мастер пришлёт в чате.
                         </p>
                       )}
+                      <p className="booking-deposit-note">
+                        Слот удерживается {DEPOSIT_HOLD_MINUTES} минут, затем
+                        автоматически освободится.
+                      </p>
                       {depositQrUrl && (
                         <div className="booking-deposit-qr">
                           <img src={depositQrUrl} alt="QR для оплаты" />

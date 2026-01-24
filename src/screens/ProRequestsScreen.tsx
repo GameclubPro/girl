@@ -2208,9 +2208,11 @@ export const ProRequestsScreen = ({
           ? 'Депозит подтверждён'
           : depositStatus === 'rejected'
             ? 'Чек отклонён'
-            : depositStatus === 'pending'
-              ? 'Ожидает оплаты депозита'
-              : ''
+            : depositStatus === 'expired'
+              ? 'Время оплаты вышло, слот снят'
+              : depositStatus === 'pending'
+                ? 'Ожидает оплаты депозита'
+                : ''
     const lateCancelFeePercent =
       typeof booking.lateCancelFeePercent === 'number'
         ? Math.max(0, Math.round(booking.lateCancelFeePercent))

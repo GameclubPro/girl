@@ -53,6 +53,7 @@ const CALENDAR_RANGE_DAYS = 14
 const PRICE_OFFER_HOURS = 12
 const FREE_CANCEL_HOURS = 12
 const MAX_DEPOSIT_PROOF_BYTES = 6 * 1024 * 1024
+const DEPOSIT_HOLD_MINUTES = 20
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -1510,13 +1511,16 @@ export const ClientRequestsScreen = ({
                         ? 'Депозит подтверждён'
                         : depositStatus === 'rejected'
                           ? 'Депозит отклонён — отправьте чек снова'
-                          : depositStatus === 'pending'
-                            ? 'Ожидаем оплату депозита'
-                            : ''
+                          : depositStatus === 'expired'
+                            ? 'Время оплаты вышло, слот снят'
+                            : depositStatus === 'pending'
+                              ? 'Ожидаем оплату депозита'
+                              : ''
                   const depositDetails = booking.depositDetails?.trim() ?? ''
                   const depositQrUrl = booking.depositQrUrl ?? ''
                   const canSubmitDeposit =
                     depositStatus === 'pending' || depositStatus === 'rejected'
+                  const showDepositHoldNote = canSubmitDeposit
                   const lateCancelFeePercent =
                     typeof booking.lateCancelFeePercent === 'number'
                       ? Math.max(0, Math.round(booking.lateCancelFeePercent))
@@ -1757,6 +1761,12 @@ export const ClientRequestsScreen = ({
                           ) : (
                             <p className="booking-deposit-note">
                               Реквизиты мастер пришлёт в чате.
+                            </p>
+                          )}
+                          {showDepositHoldNote && (
+                            <p className="booking-deposit-note">
+                              Слот удерживается {DEPOSIT_HOLD_MINUTES} минут, затем
+                              автоматически освободится.
                             </p>
                           )}
                           {depositQrUrl && (

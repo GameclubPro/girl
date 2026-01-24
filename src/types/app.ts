@@ -200,6 +200,7 @@ export type DepositStatus =
   | 'submitted'
   | 'confirmed'
   | 'rejected'
+  | 'expired'
 
 export type Booking = {
   id: number
