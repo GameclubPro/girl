@@ -6,10 +6,7 @@ const getTelegramInitData = () => {
 const buildAuthHeaders = () => {
   const initData = getTelegramInitData()
   if (!initData) return {}
-  return {
-    Authorization: `tma ${initData}`,
-    'X-Telegram-Init-Data': initData,
-  }
+  return { Authorization: `tma ${initData}` }
 }
 
 const shouldAttachAuth = (input: RequestInfo | URL, apiBase?: string) => {
@@ -52,3 +49,4 @@ export const buildAuthQuery = () => {
 }
 
 export const getAuthInitData = () => getTelegramInitData()
+
