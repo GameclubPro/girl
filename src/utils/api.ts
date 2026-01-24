@@ -1,47 +1,29 @@
-let cachedInitData = ''
-
-const decodeRaw = (value: string) => {
-  try {
-    return decodeURIComponent(value)
-  } catch (error) {
-    return value
-  }
-}
-
-const pickRawParam = (query: string, key: string) => {
-  if (!query) return ''
-  const normalized = query.startsWith('?') ? query.slice(1) : query
-  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const match = normalized.match(new RegExp(`(?:^|&)${escapedKey}=([^&]*)`))
-  return match?.[1] ?? ''
-}
-
 const extractInitDataFromUrl = () => {
   if (typeof window === 'undefined') return ''
-  const searchRaw = pickRawParam(window.location.search, 'tgWebAppData')
-  if (searchRaw) return decodeRaw(searchRaw)
-  const hash = window.location.hash ? window.location.hash.slice(1) : ''
-  if (!hash) return ''
-  const queryIndex = hash.indexOf('?')
-  const hashQuery = queryIndex >= 0 ? hash.slice(queryIndex + 1) : hash
-  const hashRaw = pickRawParam(hashQuery, 'tgWebAppData')
-  return hashRaw ? decodeRaw(hashRaw) : ''
+  let url: URL
+  try {
+    url = new URL(window.location.href)
+  } catch (error) {
+    return ''
+  }
+  let value = url.searchParams.get('tgWebAppData') ?? ''
+  if (!value) {
+    const rawHash = url.hash ? url.hash.slice(1) : ''
+    if (rawHash) {
+      const queryIndex = rawHash.indexOf('?')
+      const queryPart = queryIndex >= 0 ? rawHash.slice(queryIndex + 1) : rawHash
+      const hashParams = new URLSearchParams(queryPart)
+      value = hashParams.get('tgWebAppData') ?? ''
+    }
+  }
+  return value || ''
 }
 
 const getTelegramInitData = () => {
   if (typeof window === 'undefined') return ''
-  if (cachedInitData) return cachedInitData
   const fromSdk = window.Telegram?.WebApp?.initData ?? ''
-  if (fromSdk) {
-    cachedInitData = fromSdk
-    return cachedInitData
-  }
-  const fromUrl = extractInitDataFromUrl()
-  if (fromUrl) {
-    cachedInitData = fromUrl
-    return cachedInitData
-  }
-  return ''
+  if (fromSdk) return fromSdk
+  return extractInitDataFromUrl()
 }
 
 const buildAuthHeaders = () => {
