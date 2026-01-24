@@ -1720,6 +1720,11 @@
   color: var(--muted);
 }
 
+.requests-alert-meta.is-critical {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .requests-alert-actions {
   display: flex;
   gap: 8px;

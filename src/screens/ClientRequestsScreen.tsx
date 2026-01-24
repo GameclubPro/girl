@@ -54,6 +54,8 @@ const PRICE_OFFER_HOURS = 12
 const FREE_CANCEL_HOURS = 12
 const MAX_DEPOSIT_PROOF_BYTES = 6 * 1024 * 1024
 const DEPOSIT_HOLD_MINUTES = 20
+const CRITICAL_HOLD_MINUTES = 10
+const HOLD_TICK_INTERVAL_MS = 30_000
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -291,6 +293,7 @@ export const ClientRequestsScreen = ({
   >({})
   const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
   const bookingListRef = useRef<HTMLDivElement | null>(null)
+  const [nowTick, setNowTick] = useState(() => Date.now())
   const [bookingFilter, setBookingFilter] = useState<'all' | 'action'>('all')
   const [reviewOpenId, setReviewOpenId] = useState<number | null>(null)
   const [reviewSubmittingId, setReviewSubmittingId] = useState<number | null>(null)
@@ -314,6 +317,13 @@ export const ClientRequestsScreen = ({
       setActiveTab(initialTab)
     }
   }, [initialTab])
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNowTick(Date.now())
+    }, HOLD_TICK_INTERVAL_MS)
+    return () => clearInterval(intervalId)
+  }, [])
 
   useEffect(() => {
     if (!userId) return
@@ -439,7 +449,16 @@ export const ClientRequestsScreen = ({
         (depositStatus === 'pending' || depositStatus === 'rejected')
       )
     })
+    const resolveHoldMsLeft = (booking: Booking) => {
+      if (!booking.depositHoldExpiresAt) return Number.POSITIVE_INFINITY
+      const expiresMs = new Date(booking.depositHoldExpiresAt).getTime()
+      if (Number.isNaN(expiresMs)) return Number.POSITIVE_INFINITY
+      return Math.max(0, expiresMs - nowTick)
+    }
     return list.sort((a, b) => {
+      const aHold = resolveHoldMsLeft(a)
+      const bHold = resolveHoldMsLeft(b)
+      if (aHold !== bHold) return aHold - bHold
       const aTime = new Date(a.scheduledAt).getTime()
       const bTime = new Date(b.scheduledAt).getTime()
       if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0
@@ -447,13 +466,26 @@ export const ClientRequestsScreen = ({
       if (Number.isNaN(bTime)) return -1
       return aTime - bTime
     })
-  }, [bookingItems])
+  }, [bookingItems, nowTick])
   const depositAttentionCount = depositAttentionBookings.length
   const nextDepositBooking = depositAttentionBookings[0] ?? null
-  const nextDepositHoldTimeLeft = useMemo(() => {
-    if (!nextDepositBooking?.depositHoldExpiresAt) return ''
-    return formatTimeLeft(nextDepositBooking.depositHoldExpiresAt)
+  const nextDepositHoldExpiresMs = useMemo(() => {
+    if (!nextDepositBooking?.depositHoldExpiresAt) return null
+    const expiresMs = new Date(nextDepositBooking.depositHoldExpiresAt).getTime()
+    return Number.isNaN(expiresMs) ? null : expiresMs
   }, [nextDepositBooking])
+  const nextDepositHoldMsLeft =
+    nextDepositHoldExpiresMs !== null
+      ? Math.max(0, nextDepositHoldExpiresMs - nowTick)
+      : null
+  const nextDepositHoldTimeLeft =
+    nextDepositHoldExpiresMs !== null
+      ? formatTimeLeftFromMs(nextDepositHoldExpiresMs)
+      : ''
+  const isNextHoldCritical =
+    typeof nextDepositHoldMsLeft === 'number' &&
+    nextDepositHoldMsLeft > 0 &&
+    nextDepositHoldMsLeft <= CRITICAL_HOLD_MINUTES * 60 * 1000
   const bookingCalendarItems = useMemo(() => {
     return bookingItems
       .map((booking): BookingCalendarItem | null => {
@@ -497,7 +529,7 @@ export const ClientRequestsScreen = ({
     [bookingsByDate, selectedDateKey]
   )
   const selectedBookingsAction = useMemo(() => {
-    return selectedBookings.filter((booking) => {
+    const list = selectedBookings.filter((booking) => {
       const depositPercent =
         typeof booking.depositPercent === 'number'
           ? Math.max(0, Math.round(booking.depositPercent))
@@ -525,7 +557,24 @@ export const ClientRequestsScreen = ({
         booking.status === 'pending' || booking.status === 'price_pending'
       return needsDeposit || needsPriceDecision || needsConfirmation
     })
-  }, [selectedBookings])
+    const resolveHoldMsLeft = (booking: Booking) => {
+      if (!booking.depositHoldExpiresAt) return Number.POSITIVE_INFINITY
+      const expiresMs = new Date(booking.depositHoldExpiresAt).getTime()
+      if (Number.isNaN(expiresMs)) return Number.POSITIVE_INFINITY
+      return Math.max(0, expiresMs - nowTick)
+    }
+    return list.sort((a, b) => {
+      const aHold = resolveHoldMsLeft(a)
+      const bHold = resolveHoldMsLeft(b)
+      if (aHold !== bHold) return aHold - bHold
+      const aTime = new Date(a.scheduledAt).getTime()
+      const bTime = new Date(b.scheduledAt).getTime()
+      if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0
+      if (Number.isNaN(aTime)) return 1
+      if (Number.isNaN(bTime)) return -1
+      return aTime - bTime
+    })
+  }, [selectedBookings, nowTick])
   const visibleBookings =
     bookingFilter === 'action' ? selectedBookingsAction : selectedBookings
   const visibleBookingsCount = visibleBookings.length
@@ -1083,6 +1132,17 @@ export const ClientRequestsScreen = ({
                       <p className="requests-alert-meta">
                         Ближайшая: {nextDepositBooking.serviceName} ·{' '}
                         {formatDateTime(nextDepositBooking.scheduledAt)}
+                      </p>
+                    )}
+                    {nextDepositHoldTimeLeft && (
+                      <p
+                        className={`requests-alert-meta${
+                          isNextHoldCritical ? ' is-critical' : ''
+                        }`}
+                      >
+                        {isNextHoldCritical
+                          ? `Критично: осталось ${nextDepositHoldTimeLeft}`
+                          : `Осталось ${nextDepositHoldTimeLeft}`}
                       </p>
                     )}
                   </div>
@@ -1747,9 +1807,25 @@ export const ClientRequestsScreen = ({
                   const depositHoldTimeLeft = booking.depositHoldExpiresAt
                     ? formatTimeLeft(booking.depositHoldExpiresAt)
                     : ''
+                  const depositHoldExpiresMs = booking.depositHoldExpiresAt
+                    ? new Date(booking.depositHoldExpiresAt).getTime()
+                    : null
+                  const depositHoldMsLeft =
+                    typeof depositHoldExpiresMs === 'number' &&
+                    !Number.isNaN(depositHoldExpiresMs)
+                      ? Math.max(0, depositHoldExpiresMs - nowTick)
+                      : null
+                  const isHoldCritical =
+                    typeof depositHoldMsLeft === 'number' &&
+                    depositHoldMsLeft > 0 &&
+                    depositHoldMsLeft <= CRITICAL_HOLD_MINUTES * 60 * 1000
                   const depositHoldLabel = depositHoldTimeLeft
                     ? `Слот удерживается: ${depositHoldTimeLeft}`
                     : `Слот удерживается ${DEPOSIT_HOLD_MINUTES} минут`
+                  const criticalHoldLabel =
+                    isHoldCritical && depositHoldTimeLeft
+                      ? `Критично: осталось ${depositHoldTimeLeft}`
+                      : ''
                   const lateCancelFeePercent =
                     typeof booking.lateCancelFeePercent === 'number'
                       ? Math.max(0, Math.round(booking.lateCancelFeePercent))
@@ -1965,6 +2041,11 @@ export const ClientRequestsScreen = ({
                           {depositStatusLabel}
                         </div>
                       )}
+                      {criticalHoldLabel && (
+                        <div className="booking-item-meta booking-item-meta--danger">
+                          {criticalHoldLabel}
+                        </div>
+                      )}
                       {showDepositPay && (
                         <div className="booking-deposit-pay">
                           <div className="booking-deposit-row">
@@ -2012,7 +2093,13 @@ export const ClientRequestsScreen = ({
                               Реквизиты мастер пришлёт в чате.
                             </p>
                           )}
-                          <p className="booking-deposit-note">{depositHoldLabel}</p>
+                          <p
+                            className={`booking-deposit-note${
+                              isHoldCritical ? ' is-error' : ''
+                            }`}
+                          >
+                            {isHoldCritical ? criticalHoldLabel : depositHoldLabel}
+                          </p>
                           {depositQrUrl && (
                             <div className="booking-deposit-qr">
                               <img src={depositQrUrl} alt="QR для оплаты" />
