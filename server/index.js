@@ -86,27 +86,10 @@ app.use('/uploads', express.static(uploadsRoot))
 app.use((req, res, next) => {
   const initData = extractInitData(req)
   if (!initData) {
-    if (AUTH_DEBUG && req.path?.startsWith('/api/')) {
-      console.warn('auth_missing', {
-        path: req.path,
-        method: req.method,
-        hasAuthHeader: Boolean(req.get('authorization')),
-        hasInitHeader: Boolean(req.get('x-telegram-init-data')),
-        hasAuthQuery:
-          typeof req.query?.auth === 'string' || typeof req.query?.initData === 'string',
-      })
-    }
     return next()
   }
   const { auth, reason } = verifyTelegramInitData(initData)
   if (!auth) {
-    if (AUTH_DEBUG) {
-      console.warn('auth_invalid', {
-        path: req.path,
-        method: req.method,
-        reason,
-      })
-    }
     res.status(401).json(
       AUTH_DEBUG ? { error: 'auth_invalid', reason } : { error: 'auth_invalid' }
     )
