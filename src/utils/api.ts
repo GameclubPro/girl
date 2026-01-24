@@ -1,37 +1,6 @@
-const decodeValue = (value: string) => {
-  try {
-    return decodeURIComponent(value)
-  } catch (error) {
-    return value
-  }
-}
-
-const extractInitDataFromUrl = () => {
-  if (typeof window === 'undefined') return ''
-  let url: URL
-  try {
-    url = new URL(window.location.href)
-  } catch (error) {
-    return ''
-  }
-  let value = url.searchParams.get('tgWebAppData') ?? ''
-  if (!value) {
-    const rawHash = url.hash ? url.hash.slice(1) : ''
-    if (rawHash) {
-      const queryIndex = rawHash.indexOf('?')
-      const queryPart = queryIndex >= 0 ? rawHash.slice(queryIndex + 1) : rawHash
-      const hashParams = new URLSearchParams(queryPart)
-      value = hashParams.get('tgWebAppData') ?? ''
-    }
-  }
-  return value ? decodeValue(value) : ''
-}
-
 const getTelegramInitData = () => {
   if (typeof window === 'undefined') return ''
-  const fromSdk = window.Telegram?.WebApp?.initData ?? ''
-  if (fromSdk) return fromSdk
-  return extractInitDataFromUrl()
+  return window.Telegram?.WebApp?.initData ?? ''
 }
 
 const buildAuthHeaders = () => {
