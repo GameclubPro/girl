@@ -15,6 +15,7 @@ import type {
   MasterProfile,
   ProfileStatus,
   ProProfileSection,
+  RequestTimeWindow,
   ServiceRequest,
 } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
@@ -214,7 +215,7 @@ const formatTimeWindowList = (windows?: ServiceRequest['timeWindows']) => {
     .join(', ')
 }
 
-const formatTimeWindowChip = (window?: ServiceRequest['timeWindows'][number]) => {
+const formatTimeWindowChip = (window?: RequestTimeWindow | null) => {
   if (!window) return ''
   if (window.label) return window.label
   if (window.start && window.end) {
@@ -227,7 +228,7 @@ const formatTimeWindowChip = (window?: ServiceRequest['timeWindows'][number]) =>
 
 const formatTimeWindowChoice = (
   dateOption: ServiceRequest['dateOption'] | undefined,
-  window?: ServiceRequest['timeWindows'][number]
+  window?: RequestTimeWindow | null
 ) => {
   const windowLabel = formatTimeWindowChip(window)
   let dateLabel = ''
