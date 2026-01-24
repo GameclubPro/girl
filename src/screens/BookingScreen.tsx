@@ -218,8 +218,6 @@ export const BookingScreen = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const maxPhotos = 5
   const maxUploadBytes = 6 * 1024 * 1024
-  const showInlineActions = true
-  const useNativeMainButton = hasTelegramMainButton && !showInlineActions
 
   useEffect(() => {
     setHasTelegramMainButton(Boolean(window.Telegram?.WebApp?.MainButton))
@@ -1103,7 +1101,7 @@ export const BookingScreen = ({
 
   useTelegramMainButton({
     text: isFinalStep ? 'Записаться' : 'Далее',
-    isVisible: useNativeMainButton,
+    isVisible: hasTelegramMainButton,
     isEnabled: canContinue,
     isLoading: isSubmitting,
     onClick: handleStepNext,
@@ -1112,7 +1110,7 @@ export const BookingScreen = ({
   return (
     <div
       className={`screen screen--request screen--booking${
-        useNativeMainButton ? ' is-main-button' : ''
+        hasTelegramMainButton ? ' is-main-button' : ''
       }`}
     >
       <div className="request-shell booking-shell">
@@ -1680,17 +1678,9 @@ export const BookingScreen = ({
 
       <div
         className={`request-submit-bar${
-          useNativeMainButton ? ' is-hidden' : ''
-        }${showInlineActions ? ' is-dual' : ''}`}
+          hasTelegramMainButton ? ' is-hidden' : ''
+        }`}
       >
-        <button
-          className="request-submit request-submit--cancel"
-          type="button"
-          onClick={onBack}
-          disabled={isSubmitting}
-        >
-          Отмена
-        </button>
         <button
           className="request-submit"
           type="button"
