@@ -290,12 +290,14 @@ export const ClientRequestsScreen = ({
     Record<number, string>
   >({})
   const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const bookingListRef = useRef<HTMLDivElement | null>(null)
   const [reviewOpenId, setReviewOpenId] = useState<number | null>(null)
   const [reviewSubmittingId, setReviewSubmittingId] = useState<number | null>(null)
   const [reviewErrors, setReviewErrors] = useState<Record<number, string>>({})
   const [reviewDrafts, setReviewDrafts] = useState<
     Record<number, { rating: number; comment: string }>
   >({})
+  const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
   )
@@ -386,8 +388,67 @@ export const ClientRequestsScreen = ({
     }
   }, [apiBase, userId])
 
+  useEffect(() => {
+    if (focusedBookingId === null) return
+    const timeout = setTimeout(() => {
+      setFocusedBookingId(null)
+    }, 4000)
+    return () => clearTimeout(timeout)
+  }, [focusedBookingId])
+
   const items = useMemo(() => requests, [requests])
   const bookingItems = useMemo(() => bookings, [bookings])
+  const openRequestsCount = useMemo(
+    () => items.filter((request) => request.status === 'open').length,
+    [items]
+  )
+  const activeBookingsCount = useMemo(
+    () =>
+      bookingItems.filter(
+        (booking) => booking.status !== 'cancelled' && booking.status !== 'declined'
+      ).length,
+    [bookingItems]
+  )
+  const depositAttentionBookings = useMemo(() => {
+    const list = bookingItems.filter((booking) => {
+      const depositPercent =
+        typeof booking.depositPercent === 'number'
+          ? Math.max(0, Math.round(booking.depositPercent))
+          : 0
+      const basePrice =
+        typeof booking.servicePrice === 'number'
+          ? booking.servicePrice
+          : typeof booking.proposedPrice === 'number'
+            ? booking.proposedPrice
+            : null
+      const depositAmount =
+        typeof booking.depositAmount === 'number'
+          ? booking.depositAmount
+          : basePrice && depositPercent > 0
+            ? Math.round((basePrice * depositPercent) / 100)
+            : 0
+      const depositStatus =
+        booking.depositStatus ??
+        (depositAmount > 0 ? 'pending' : 'not_required')
+      const isActive =
+        booking.status !== 'cancelled' && booking.status !== 'declined'
+      return (
+        isActive &&
+        depositAmount > 0 &&
+        (depositStatus === 'pending' || depositStatus === 'rejected')
+      )
+    })
+    return list.sort((a, b) => {
+      const aTime = new Date(a.scheduledAt).getTime()
+      const bTime = new Date(b.scheduledAt).getTime()
+      if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0
+      if (Number.isNaN(aTime)) return 1
+      if (Number.isNaN(bTime)) return -1
+      return aTime - bTime
+    })
+  }, [bookingItems])
+  const depositAttentionCount = depositAttentionBookings.length
+  const nextDepositBooking = depositAttentionBookings[0] ?? null
   const bookingCalendarItems = useMemo(() => {
     return bookingItems
       .map((booking): BookingCalendarItem | null => {
@@ -480,6 +541,18 @@ export const ClientRequestsScreen = ({
     setWeekStartDate((current) => addDays(current, direction * CALENDAR_RANGE_DAYS))
     setSelectedDate((current) => addDays(current, direction * CALENDAR_RANGE_DAYS))
     setCalendarInitialized(true)
+  }
+
+  const focusBooking = (booking: Booking) => {
+    const date = parseDateOnly(booking.scheduledAt)
+    if (!date) return
+    setSelectedDate(date)
+    setWeekStartDate(startOfWeek(date))
+    setCalendarInitialized(true)
+    setFocusedBookingId(booking.id)
+    requestAnimationFrame(() => {
+      bookingListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   const toggleResponses = async (requestId: number) => {
@@ -912,6 +985,7 @@ export const ClientRequestsScreen = ({
               onClick={() => setActiveTab('requests')}
             >
               Заявки
+              <span className="requests-tab-count">{openRequestsCount}</span>
             </button>
             <button
               className={`requests-tab${activeTab === 'bookings' ? ' is-active' : ''}`}
@@ -921,7 +995,24 @@ export const ClientRequestsScreen = ({
               onClick={() => setActiveTab('bookings')}
             >
               Записи
+              <span className="requests-tab-count">{activeBookingsCount}</span>
+              {depositAttentionCount > 0 && (
+                <span className="requests-tab-count is-alert">
+                  {depositAttentionCount}
+                </span>
+              )}
             </button>
+          </div>
+          <div className="requests-explainer">
+            {activeTab === 'requests' ? (
+              <>
+                <strong>Заявки</strong> — вы ищете мастера и ждёте отклики.
+              </>
+            ) : (
+              <>
+                <strong>Записи</strong> — подтверждённые слоты и депозиты.
+              </>
+            )}
           </div>
           {activeTab === 'requests' && (
             <div className="requests-top">
@@ -937,36 +1028,82 @@ export const ClientRequestsScreen = ({
           )}
 
           {activeTab === 'bookings' && (
-            <section
-              className="booking-calendar-card"
-              aria-label="Календарь записей"
-            >
-              <div className="booking-calendar-top">
-                <button
-                  className="booking-calendar-nav"
-                  type="button"
-                  aria-label="Предыдущие две недели"
-                  onClick={() => handleShiftRange(-1)}
-                >
-                  ‹
-                </button>
-                <div className="booking-calendar-month">
-                  <span className="booking-calendar-month-label">
-                    {monthLabel}
-                  </span>
-                  <span className="booking-calendar-range">
-                    {calendarRangeLabel}
-                  </span>
+            <>
+              {depositAttentionCount > 0 && (
+                <div className="requests-alert">
+                  <div className="requests-alert-main">
+                    <div className="requests-alert-title">Нужен депозит</div>
+                    <p className="requests-alert-text">
+                      {depositAttentionCount === 1
+                        ? 'У вас есть запись, где нужно оплатить депозит.'
+                        : `У вас ${depositAttentionCount} записи, где нужно оплатить депозит.`}{' '}
+                      Слот удерживается {DEPOSIT_HOLD_MINUTES} минут.
+                    </p>
+                    {nextDepositBooking && (
+                      <p className="requests-alert-meta">
+                        Ближайшая: {nextDepositBooking.serviceName} ·{' '}
+                        {formatDateTime(nextDepositBooking.scheduledAt)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="requests-alert-actions">
+                    {nextDepositBooking && (
+                      <button
+                        className="booking-action-icon is-alert"
+                        type="button"
+                        onClick={() => focusBooking(nextDepositBooking)}
+                      >
+                        Перейти
+                      </button>
+                    )}
+                    {nextDepositBooking?.chatId && (
+                      <button
+                        className="booking-action-icon"
+                        type="button"
+                        onClick={() => onOpenChat(nextDepositBooking.chatId!)}
+                      >
+                        <span
+                          className="booking-action-icon-symbol"
+                          aria-hidden="true"
+                        >
+                          <IconChat />
+                        </span>
+                        Чат
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <button
-                  className="booking-calendar-nav"
-                  type="button"
-                  aria-label="Следующие две недели"
-                  onClick={() => handleShiftRange(1)}
-                >
-                  ›
-                </button>
-              </div>
+              )}
+              <section
+                className="booking-calendar-card"
+                aria-label="Календарь записей"
+              >
+                <div className="booking-calendar-top">
+                  <button
+                    className="booking-calendar-nav"
+                    type="button"
+                    aria-label="Предыдущие две недели"
+                    onClick={() => handleShiftRange(-1)}
+                  >
+                    ‹
+                  </button>
+                  <div className="booking-calendar-month">
+                    <span className="booking-calendar-month-label">
+                      {monthLabel}
+                    </span>
+                    <span className="booking-calendar-range">
+                      {calendarRangeLabel}
+                    </span>
+                  </div>
+                  <button
+                    className="booking-calendar-nav"
+                    type="button"
+                    aria-label="Следующие две недели"
+                    onClick={() => handleShiftRange(1)}
+                  >
+                    ›
+                  </button>
+                </div>
 
                 <div className="booking-calendar-week" role="tablist">
                   {calendarDays.map((day, index) => {
@@ -977,18 +1114,18 @@ export const ClientRequestsScreen = ({
                     const isToday = dayKey === todayKey
                     return (
                       <button
-                      key={dayKey}
-                      className={`booking-calendar-day${
-                        isSelected ? ' is-selected' : ''
-                      }${isToday ? ' is-today' : ''}`}
-                      type="button"
-                      role="tab"
-                      aria-selected={isSelected}
-                      onClick={() => handleSelectDate(day)}
-                    >
-                      <span className="booking-calendar-day-name">
-                        {weekDayLabels[index % weekDayLabels.length]}
-                      </span>
+                        key={dayKey}
+                        className={`booking-calendar-day${
+                          isSelected ? ' is-selected' : ''
+                        }${isToday ? ' is-today' : ''}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={isSelected}
+                        onClick={() => handleSelectDate(day)}
+                      >
+                        <span className="booking-calendar-day-name">
+                          {weekDayLabels[index % weekDayLabels.length]}
+                        </span>
                         <span className="booking-calendar-day-number">
                           {day.getDate()}
                         </span>
@@ -1009,6 +1146,7 @@ export const ClientRequestsScreen = ({
                 </span>
               </div>
             </section>
+            </>
           )}
 
           {activeTab === 'requests' && (
@@ -1419,7 +1557,7 @@ export const ClientRequestsScreen = ({
                 )}
 
               {selectedBookings.length > 0 && (
-                <div className="requests-list booking-list">
+                <div className="requests-list booking-list" ref={bookingListRef}>
                   {selectedBookings.map((booking) => {
                   const statusLabel =
                     bookingStatusLabelMap[booking.status] ?? booking.status
@@ -1516,6 +1654,12 @@ export const ClientRequestsScreen = ({
                             : depositStatus === 'pending'
                               ? 'Ожидаем оплату депозита'
                               : ''
+                  const depositStatusTone =
+                    depositStatus === 'pending' ||
+                    depositStatus === 'rejected' ||
+                    depositStatus === 'expired'
+                      ? 'booking-item-meta--danger'
+                      : 'booking-item-meta--highlight'
                   const depositDetails = booking.depositDetails?.trim() ?? ''
                   const depositQrUrl = booking.depositQrUrl ?? ''
                   const canSubmitDeposit =
@@ -1552,7 +1696,12 @@ export const ClientRequestsScreen = ({
                   }
 
                   return (
-                    <div className="booking-item" key={booking.id}>
+                    <div
+                      className={`booking-item${
+                        focusedBookingId === booking.id ? ' is-focus' : ''
+                      }`}
+                      key={booking.id}
+                    >
                       <div className="booking-item-head">
                         <span className="booking-item-avatar" aria-hidden="true">
                           {booking.masterAvatarUrl ? (
@@ -1579,6 +1728,21 @@ export const ClientRequestsScreen = ({
                             <span className={`booking-status ${statusTone}`}>
                               {statusLabel}
                             </span>
+                          )}
+                          {booking.chatId && (
+                            <button
+                              className="booking-action-icon is-chat"
+                              type="button"
+                              onClick={() => onOpenChat(booking.chatId!)}
+                            >
+                              <span
+                                className="booking-action-icon-symbol"
+                                aria-hidden="true"
+                              >
+                                <IconChat />
+                              </span>
+                              Чат
+                            </button>
                           )}
                           {actionVariant && actionVariant !== 'reviewed' && (
                             <div className="booking-action-row booking-action-row--top">
@@ -1712,7 +1876,7 @@ export const ClientRequestsScreen = ({
                         </div>
                       )}
                       {depositAmount > 0 && depositStatusLabel && (
-                        <div className="booking-item-meta booking-item-meta--highlight">
+                        <div className={`booking-item-meta ${depositStatusTone}`}>
                           {depositStatusLabel}
                         </div>
                       )}
@@ -1977,7 +2141,7 @@ export const ClientRequestsScreen = ({
           <span className="nav-icon" aria-hidden="true">
             <IconList />
           </span>
-          Мои заявки
+          Заявки и записи
         </button>
         <button className="nav-item" type="button">
           <span className="nav-icon" aria-hidden="true">

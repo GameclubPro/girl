@@ -1600,6 +1600,11 @@
   justify-content: center;
 }
 
+.requests-tab-count.is-alert {
+  background: rgba(var(--danger-rgb), 0.18);
+  color: var(--danger);
+}
+
 .requests-tab.is-active .requests-tab-count {
   background: rgba(var(--accent-rgb), 0.2);
   color: var(--accent-strong);
@@ -1614,6 +1619,56 @@
 .requests-tab:focus-visible {
   outline: 3px solid rgba(var(--accent-rgb), 0.28);
   outline-offset: 2px;
+}
+
+.requests-explainer {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(var(--shadow-rgb), 0.08);
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+}
+
+.requests-explainer strong {
+  color: var(--ink);
+}
+
+.requests-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--danger-rgb), 0.28);
+  background: rgba(var(--danger-rgb), 0.08);
+}
+
+.requests-alert-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.requests-alert-text {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.requests-alert-meta {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.requests-alert-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .requests-list {
@@ -1700,6 +1755,11 @@
 
 .booking-item.is-archived {
   opacity: 0.72;
+}
+
+.booking-item.is-focus {
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.28),
+    0 12px 24px rgba(var(--shadow-rgb), 0.16);
 }
 
 .request-item {
@@ -2120,6 +2180,17 @@
   color: rgb(var(--warning-rgb));
 }
 
+.booking-item-meta--danger {
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.12);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  width: fit-content;
+  margin-top: 4px;
+}
+
 .booking-item-price {
   font-size: 13px;
   font-weight: 700;
@@ -2272,6 +2343,12 @@
 .booking-action-icon:focus-visible {
   outline: 3px solid rgba(var(--accent-rgb), 0.28);
   outline-offset: 2px;
+}
+
+.booking-action-icon.is-alert {
+  border-color: rgba(var(--danger-rgb), 0.4);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.1);
 }
 
 .booking-action-icon.is-reschedule {
