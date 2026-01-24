@@ -24,7 +24,6 @@ server {
     gzip_comp_level 5;
     gzip_disable "msie6";
     gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript application/javascript image/svg+xml;
-    client_max_body_size 16m;
 
     # index.html НЕ кешируем
     location = /index.html {
@@ -50,8 +49,6 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Telegram-Init-Data $http_x_telegram_init_data;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -62,8 +59,6 @@ server {
     location /api/ {
         proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Telegram-Init-Data $http_x_telegram_init_data;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -72,8 +67,6 @@ server {
     location ^~ /uploads/ {
         proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Telegram-Init-Data $http_x_telegram_init_data;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -118,7 +111,6 @@ server {
     gzip_comp_level 5;
     gzip_disable "msie6";
     gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript application/javascript image/svg+xml;
-    client_max_body_size 16m;
 
     location = /index.html {
         add_header Cache-Control "no-cache";
@@ -141,8 +133,6 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Telegram-Init-Data $http_x_telegram_init_data;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -153,8 +143,6 @@ server {
     location /api/ {
         proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Telegram-Init-Data $http_x_telegram_init_data;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -163,8 +151,6 @@ server {
     location ^~ /uploads/ {
         proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host $host;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Telegram-Init-Data $http_x_telegram_init_data;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
