@@ -79,6 +79,9 @@ const getServicePriceRange = (items: ServiceItem[]) => {
   }
 }
 
+const formatPrice = (value: number) =>
+  `${Math.round(value).toLocaleString('ru-RU')} ₽`
+
 const formatCount = (value: number, one: string, few: string, many: string) => {
   const mod10 = value % 10
   const mod100 = value % 100
@@ -288,6 +291,10 @@ type ProfilePayload = {
   scheduleEnd: string | null
   cancelWindowHours: number | null
   depositPercent: number | null
+  depositType: 'none' | 'percent' | 'fixed' | null
+  depositFixed: number | null
+  depositDetails: string | null
+  depositQrUrl: string | null
   lateCancelFeePercent: number | null
   worksAtClient: boolean
   worksAtMaster: boolean
@@ -379,6 +386,14 @@ export const ProProfileScreen = ({
   const [scheduleEnd, setScheduleEnd] = useState('')
   const [cancelWindowHours, setCancelWindowHours] = useState('')
   const [depositPercent, setDepositPercent] = useState('')
+  const [depositType, setDepositType] = useState<'none' | 'percent' | 'fixed'>(
+    'none'
+  )
+  const [depositFixed, setDepositFixed] = useState('')
+  const [depositDetails, setDepositDetails] = useState('')
+  const [depositQrUrl, setDepositQrUrl] = useState<string | null>(null)
+  const [depositQrUploading, setDepositQrUploading] = useState(false)
+  const [depositQrError, setDepositQrError] = useState('')
   const [lateCancelFeePercent, setLateCancelFeePercent] = useState('')
   const [proLocation, setProLocation] = useState<UserLocation | null>(null)
   const [isLocating, setIsLocating] = useState(false)
@@ -527,6 +542,10 @@ export const ProProfileScreen = ({
       scheduleEnd: scheduleEnd.trim() || null,
       cancelWindowHours: parseNumber(cancelWindowHours),
       depositPercent: parseNumber(depositPercent),
+      depositType,
+      depositFixed: parseNumber(depositFixed),
+      depositDetails: depositDetails.trim() || null,
+      depositQrUrl: depositQrUrl?.trim() || null,
       lateCancelFeePercent: parseNumber(lateCancelFeePercent),
       worksAtClient,
       worksAtMaster,
@@ -543,7 +562,11 @@ export const ProProfileScreen = ({
     cancelWindowHours,
     displayName,
     districtId,
+    depositDetails,
+    depositFixed,
     depositPercent,
+    depositQrUrl,
+    depositType,
     experienceYears,
     isActive,
     lateCancelFeePercent,
@@ -799,22 +822,34 @@ export const ProProfileScreen = ({
       : 'График не задан'
   const cancelWindowValue = parseNumber(cancelWindowHours)
   const depositPercentValue = parseNumber(depositPercent)
+  const depositFixedValue = parseNumber(depositFixed)
   const lateCancelFeeValue = parseNumber(lateCancelFeePercent)
   const cancelWindowLabel =
     cancelWindowValue !== null
       ? `Бесплатная отмена за ${cancelWindowValue} ч`
       : 'Окно отмены не задано'
   const depositLabel =
-    depositPercentValue !== null && depositPercentValue > 0
-      ? `Депозит ${depositPercentValue}%`
-      : 'Без депозита'
+    depositType === 'fixed'
+      ? depositFixedValue !== null && depositFixedValue > 0
+        ? `Депозит ${formatPrice(depositFixedValue)}`
+        : 'Без депозита'
+      : depositType === 'percent'
+        ? depositPercentValue !== null && depositPercentValue > 0
+          ? `Депозит ${depositPercentValue}%`
+          : 'Без депозита'
+        : 'Без депозита'
   const lateCancelLabel =
     lateCancelFeeValue !== null && lateCancelFeeValue > 0
       ? `Поздняя отмена ${lateCancelFeeValue}%`
       : 'Без штрафа за отмену'
   const hasCustomPolicies =
     (cancelWindowValue !== null && cancelWindowValue !== 12) ||
-    (depositPercentValue !== null && depositPercentValue > 0) ||
+    ((depositType === 'fixed' &&
+      depositFixedValue !== null &&
+      depositFixedValue > 0) ||
+      (depositType === 'percent' &&
+        depositPercentValue !== null &&
+        depositPercentValue > 0)) ||
     (lateCancelFeeValue !== null && lateCancelFeeValue > 0)
   const policiesSummary =
     cancelWindowLabel || depositLabel || lateCancelLabel
@@ -1732,6 +1767,23 @@ export const ProProfileScreen = ({
           typeof data.depositPercent === 'number'
             ? Math.max(0, Math.round(data.depositPercent))
             : 0
+        const nextDepositFixed =
+          typeof data.depositFixed === 'number'
+            ? Math.max(0, Math.round(data.depositFixed))
+            : 0
+        const normalizedDepositType =
+          data.depositType === 'fixed' ||
+          data.depositType === 'percent' ||
+          data.depositType === 'none'
+            ? data.depositType
+            : null
+        const nextDepositType =
+          normalizedDepositType ??
+          (nextDepositFixed > 0 ? 'fixed' : nextDepositPercent > 0 ? 'percent' : 'none')
+        const nextDepositDetails =
+          typeof data.depositDetails === 'string' ? data.depositDetails : ''
+        const nextDepositQrUrl =
+          typeof data.depositQrUrl === 'string' ? data.depositQrUrl : ''
         const nextLateCancelFeePercent =
           typeof data.lateCancelFeePercent === 'number'
             ? Math.max(0, Math.round(data.lateCancelFeePercent))
@@ -1763,6 +1815,10 @@ export const ProProfileScreen = ({
         setScheduleEnd(nextScheduleEnd)
         setCancelWindowHours(String(nextCancelWindowHours))
         setDepositPercent(String(nextDepositPercent))
+        setDepositType(nextDepositType)
+        setDepositFixed(String(nextDepositFixed || ''))
+        setDepositDetails(nextDepositDetails)
+        setDepositQrUrl(nextDepositQrUrl || null)
         setLateCancelFeePercent(String(nextLateCancelFeePercent))
         setWorksAtClient(nextWorksAtClient)
         setWorksAtMaster(nextWorksAtMaster)
@@ -1803,6 +1859,10 @@ export const ProProfileScreen = ({
           scheduleEnd: nextScheduleEnd.trim() || null,
           cancelWindowHours: nextCancelWindowHours,
           depositPercent: nextDepositPercent,
+          depositType: nextDepositType,
+          depositFixed: nextDepositFixed,
+          depositDetails: nextDepositDetails.trim() || null,
+          depositQrUrl: nextDepositQrUrl.trim() || null,
           lateCancelFeePercent: nextLateCancelFeePercent,
           worksAtClient: nextWorksAtClient,
           worksAtMaster: nextWorksAtMaster,
@@ -2316,6 +2376,39 @@ export const ProProfileScreen = ({
     certificateReplaceInputRef.current?.click()
   }
 
+  const handleDepositQrUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const file = files[0]
+    const errorMessage = validatePortfolioFile(file)
+    if (errorMessage) {
+      setDepositQrError(errorMessage)
+      return
+    }
+    setDepositQrUploading(true)
+    setDepositQrError('')
+    try {
+      const url = await uploadDepositQrFile(file)
+      setDepositQrUrl(url)
+    } catch (error) {
+      setDepositQrError(
+        error instanceof Error ? error.message : 'Не удалось загрузить файл.'
+      )
+    } finally {
+      setDepositQrUploading(false)
+    }
+  }
+
+  const handleDepositQrUploadChange = (event: ChangeEvent<HTMLInputElement>) => {
+    void handleDepositQrUpload(event.target.files)
+    event.target.value = ''
+  }
+
+  const handleDepositQrRemove = () => {
+    if (depositQrUploading) return
+    setDepositQrUrl(null)
+    setDepositQrError('')
+  }
+
   const validatePortfolioFile = (file: File) => {
     if (!allowedImageTypes.has(file.type)) {
       return 'Поддерживаются только PNG, JPG или WebP.'
@@ -2398,6 +2491,28 @@ export const ProProfileScreen = ({
     return payload.url
   }
 
+  const uploadDepositQrDataUrl = async (dataUrl: string) => {
+    if (!userId) {
+      throw new Error('Не удалось загрузить файл. Нет пользователя.')
+    }
+    const response = await fetch(`${apiBase}/api/requests/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, dataUrl }),
+    })
+    const payload = (await response.json().catch(() => null)) as {
+      url?: string
+      error?: string
+    } | null
+    if (!response.ok) {
+      throw new Error(resolvePortfolioUploadError(payload))
+    }
+    if (!payload?.url) {
+      throw new Error('Не удалось загрузить файл.')
+    }
+    return payload.url
+  }
+
   const uploadPortfolioFile = async (file: File) => {
     const dataUrl = await readImageFileAsync(file)
     return uploadPortfolioDataUrl(dataUrl)
@@ -2406,6 +2521,11 @@ export const ProProfileScreen = ({
   const uploadCertificateFile = async (file: File) => {
     const dataUrl = await readImageFileAsync(file)
     return uploadCertificateDataUrl(dataUrl)
+  }
+
+  const uploadDepositQrFile = async (file: File) => {
+    const dataUrl = await readImageFileAsync(file)
+    return uploadDepositQrDataUrl(dataUrl)
   }
 
   const handlePortfolioUpload = async (files: FileList | null) => {
@@ -5246,25 +5366,189 @@ export const ProProfileScreen = ({
                       </p>
                     </div>
                     <div className="pro-field">
-                      <label className="pro-label" htmlFor="policy-deposit">
-                        Размер депозита, %
+                      <span className="pro-label">Формат депозита</span>
+                      <div className="pro-profile-editor-toggle-grid">
+                        <label
+                          className={`pro-profile-editor-toggle-card${
+                            depositType === 'none' ? ' is-active' : ''
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="deposit-type"
+                            checked={depositType === 'none'}
+                            onChange={() => setDepositType('none')}
+                          />
+                          <span className="pro-profile-editor-toggle-icon">
+                            <IconPrice />
+                          </span>
+                          <span className="pro-profile-editor-toggle-body">
+                            <span className="pro-profile-editor-toggle-title">
+                              Без депозита
+                            </span>
+                            <span className="pro-profile-editor-toggle-subtitle">
+                              Оплата после визита
+                            </span>
+                          </span>
+                          <span
+                            className="pro-profile-editor-toggle-check"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+                        </label>
+                        <label
+                          className={`pro-profile-editor-toggle-card${
+                            depositType === 'percent' ? ' is-active' : ''
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="deposit-type"
+                            checked={depositType === 'percent'}
+                            onChange={() => setDepositType('percent')}
+                          />
+                          <span className="pro-profile-editor-toggle-icon">
+                            <IconPrice />
+                          </span>
+                          <span className="pro-profile-editor-toggle-body">
+                            <span className="pro-profile-editor-toggle-title">
+                              Процент
+                            </span>
+                            <span className="pro-profile-editor-toggle-subtitle">
+                              Авто‑расчёт от цены услуги
+                            </span>
+                          </span>
+                          <span
+                            className="pro-profile-editor-toggle-check"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+                        </label>
+                        <label
+                          className={`pro-profile-editor-toggle-card${
+                            depositType === 'fixed' ? ' is-active' : ''
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="deposit-type"
+                            checked={depositType === 'fixed'}
+                            onChange={() => setDepositType('fixed')}
+                          />
+                          <span className="pro-profile-editor-toggle-icon">
+                            <IconPrice />
+                          </span>
+                          <span className="pro-profile-editor-toggle-body">
+                            <span className="pro-profile-editor-toggle-title">
+                              Фиксированная сумма
+                            </span>
+                            <span className="pro-profile-editor-toggle-subtitle">
+                              Удобно при гибких ценах
+                            </span>
+                          </span>
+                          <span
+                            className="pro-profile-editor-toggle-check"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                    {depositType === 'percent' && (
+                      <div className="pro-field">
+                        <label className="pro-label" htmlFor="policy-deposit">
+                          Размер депозита, %
+                        </label>
+                        <input
+                          id="policy-deposit"
+                          className="pro-input"
+                          type="number"
+                          min="0"
+                          max="100"
+                          inputMode="numeric"
+                          value={depositPercent}
+                          onChange={(event) =>
+                            setDepositPercent(event.target.value)
+                          }
+                          placeholder="20"
+                        />
+                        <span className="pro-profile-editor-help">
+                          20–30% — комфортный уровень, 0% — без депозита.
+                        </span>
+                      </div>
+                    )}
+                    {depositType === 'fixed' && (
+                      <div className="pro-field">
+                        <label className="pro-label" htmlFor="policy-deposit-fixed">
+                          Размер депозита, ₽
+                        </label>
+                        <input
+                          id="policy-deposit-fixed"
+                          className="pro-input"
+                          type="number"
+                          min="0"
+                          inputMode="numeric"
+                          value={depositFixed}
+                          onChange={(event) => setDepositFixed(event.target.value)}
+                          placeholder="500"
+                        />
+                        <span className="pro-profile-editor-help">
+                          Используйте фикс, если цена услуги обсуждается.
+                        </span>
+                      </div>
+                    )}
+                    <div className="pro-field">
+                      <label className="pro-label" htmlFor="policy-deposit-details">
+                        Реквизиты для депозита
                       </label>
-                      <input
-                        id="policy-deposit"
-                        className="pro-input"
-                        type="number"
-                        min="0"
-                        max="100"
-                        inputMode="numeric"
-                        value={depositPercent}
-                        onChange={(event) =>
-                          setDepositPercent(event.target.value)
-                        }
-                        placeholder="0"
+                      <textarea
+                        id="policy-deposit-details"
+                        className="pro-textarea"
+                        rows={3}
+                        placeholder="Телефон, банк, комментарий для перевода"
+                        value={depositDetails}
+                        onChange={(event) => setDepositDetails(event.target.value)}
                       />
                       <span className="pro-profile-editor-help">
-                        0% — без депозита, 20–30% — комфортный уровень.
+                        Например: «Сбербанк • 8 999 123‑45‑67 • Иван И.»
                       </span>
+                    </div>
+                    <div className="pro-field">
+                      <span className="pro-label">QR‑код для оплаты</span>
+                      <div className="pro-deposit-qr">
+                        <input
+                          className="pro-deposit-qr-input"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleDepositQrUploadChange}
+                          disabled={depositQrUploading}
+                        />
+                        {depositQrUrl ? (
+                          <div className="pro-deposit-qr-preview">
+                            <img src={depositQrUrl} alt="QR депозита" />
+                            <button
+                              className="pro-deposit-qr-remove"
+                              type="button"
+                              onClick={handleDepositQrRemove}
+                              disabled={depositQrUploading}
+                            >
+                              Удалить
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="pro-deposit-qr-placeholder">
+                            <span>Загрузить QR</span>
+                          </div>
+                        )}
+                      </div>
+                      {depositQrError && (
+                        <span className="pro-profile-editor-help is-error">
+                          {depositQrError}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -5279,9 +5563,7 @@ export const ProProfileScreen = ({
                           : 'Бесплатная отмена не задана'}
                       </p>
                       <p className="pro-policy-preview-item">
-                        {depositPercentValue !== null && depositPercentValue > 0
-                          ? `Депозит ${depositPercentValue}%`
-                          : 'Депозит не нужен'}
+                        {depositLabel}
                       </p>
                       <p className="pro-policy-preview-item">
                         {lateCancelFeeValue !== null && lateCancelFeeValue > 0

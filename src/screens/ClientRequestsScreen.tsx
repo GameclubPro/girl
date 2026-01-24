@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   IconChat,
   IconClose,
@@ -52,6 +52,7 @@ const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] a
 const CALENDAR_RANGE_DAYS = 14
 const PRICE_OFFER_HOURS = 12
 const FREE_CANCEL_HOURS = 12
+const MAX_DEPOSIT_PROOF_BYTES = 6 * 1024 * 1024
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -278,6 +279,16 @@ export const ClientRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
+  const [depositUploadingId, setDepositUploadingId] = useState<number | null>(
+    null
+  )
+  const [depositUploadError, setDepositUploadError] = useState<
+    Record<number, string>
+  >({})
+  const [depositCopyStatus, setDepositCopyStatus] = useState<
+    Record<number, string>
+  >({})
+  const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
   const [reviewOpenId, setReviewOpenId] = useState<number | null>(null)
   const [reviewSubmittingId, setReviewSubmittingId] = useState<number | null>(null)
   const [reviewErrors, setReviewErrors] = useState<Record<number, string>>({})
@@ -505,6 +516,122 @@ export const ClientRequestsScreen = ({
     }
   }
 
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result === 'string') {
+          resolve(result)
+        } else {
+          reject(new Error('invalid_data'))
+        }
+      }
+      reader.onerror = () => reject(new Error('read_failed'))
+      reader.readAsDataURL(file)
+    })
+
+  const handleDepositCopy = async (
+    bookingId: number,
+    value: string,
+    successMessage: string
+  ) => {
+    if (!value) return
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = value
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        if (!ok) throw new Error('copy_failed')
+      }
+      setDepositCopyStatus((current) => ({ ...current, [bookingId]: successMessage }))
+    } catch (error) {
+      setDepositCopyStatus((current) => ({
+        ...current,
+        [bookingId]: 'Не удалось скопировать.',
+      }))
+    } finally {
+      window.setTimeout(() => {
+        setDepositCopyStatus((current) => ({ ...current, [bookingId]: '' }))
+      }, 2400)
+    }
+  }
+
+  const handleDepositProofUpload = async (bookingId: number, file: File) => {
+    if (depositUploadingId !== null) return
+    setDepositUploadingId(bookingId)
+    setDepositUploadError((current) => ({ ...current, [bookingId]: '' }))
+
+    if (!file.type.startsWith('image/')) {
+      setDepositUploadError((current) => ({
+        ...current,
+        [bookingId]: 'Поддерживаются только изображения.',
+      }))
+      setDepositUploadingId(null)
+      return
+    }
+    if (file.size > MAX_DEPOSIT_PROOF_BYTES) {
+      setDepositUploadError((current) => ({
+        ...current,
+        [bookingId]: 'Файл слишком большой. Максимум 6 МБ.',
+      }))
+      setDepositUploadingId(null)
+      return
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      const response = await fetch(`${apiBase}/api/requests/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, dataUrl }),
+      })
+      if (response.status === 413) {
+        throw new Error('too_large')
+      }
+      if (!response.ok) {
+        throw new Error('upload_failed')
+      }
+      const payload = (await response.json()) as {
+        url?: string | null
+      }
+      if (!payload?.url) {
+        throw new Error('upload_failed')
+      }
+      await handleBookingAction(bookingId, 'client-deposit-submit', {
+        depositProofUrl: payload.url,
+      })
+    } catch (error) {
+      setDepositUploadError((current) => ({
+        ...current,
+        [bookingId]:
+          error instanceof Error && error.message === 'too_large'
+            ? 'Файл слишком большой. Максимум 6 МБ.'
+            : 'Не удалось загрузить чек.',
+      }))
+    } finally {
+      setDepositUploadingId((current) => (current === bookingId ? null : current))
+    }
+  }
+
+  const handleDepositProofChange = (
+    bookingId: number,
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    void handleDepositProofUpload(bookingId, file)
+  }
+
   const handleBookingAction = async (
     bookingId: number,
     action:
@@ -512,6 +639,8 @@ export const ClientRequestsScreen = ({
       | 'client-decline-price'
       | 'client-cancel'
       | 'client-delete'
+      | 'client-deposit-submit',
+    payload?: { depositProofUrl?: string | null }
   ) => {
     if (bookingActionId !== null) return
 
@@ -522,7 +651,7 @@ export const ClientRequestsScreen = ({
       const response = await fetch(`${apiBase}/api/bookings/${bookingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, action }),
+        body: JSON.stringify({ userId, action, ...payload }),
       })
 
       if (!response.ok) {
@@ -530,7 +659,13 @@ export const ClientRequestsScreen = ({
       }
 
       const data = (await response.json().catch(() => null)) as
-        | { status?: Booking['status']; servicePrice?: number | null }
+        | {
+            status?: Booking['status']
+            servicePrice?: number | null
+            depositStatus?: Booking['depositStatus']
+            depositAmount?: number | null
+            depositProofUrl?: string | null
+          }
         | null
 
       setBookings((current) => {
@@ -555,6 +690,15 @@ export const ClientRequestsScreen = ({
             next.servicePrice = acceptedPrice
             next.proposedPrice = null
           }
+          if (data?.depositStatus) {
+            next.depositStatus = data.depositStatus
+          }
+          if (typeof data?.depositAmount === 'number') {
+            next.depositAmount = data.depositAmount
+          }
+          if (typeof data?.depositProofUrl === 'string') {
+            next.depositProofUrl = data.depositProofUrl
+          }
           return next
         })
       })
@@ -564,6 +708,8 @@ export const ClientRequestsScreen = ({
         [bookingId]:
           action === 'client-delete'
             ? 'Не удалось удалить запись.'
+            : action === 'client-deposit-submit'
+              ? 'Не удалось отметить депозит.'
             : 'Не удалось обновить запись.',
       }))
     } finally {
@@ -1338,6 +1484,39 @@ export const ClientRequestsScreen = ({
                     typeof booking.depositPercent === 'number'
                       ? Math.max(0, Math.round(booking.depositPercent))
                       : 0
+                  const basePrice =
+                    typeof booking.servicePrice === 'number'
+                      ? booking.servicePrice
+                      : typeof booking.proposedPrice === 'number'
+                        ? booking.proposedPrice
+                        : null
+                  const resolvedDepositAmount =
+                    typeof booking.depositAmount === 'number'
+                      ? booking.depositAmount
+                      : basePrice && depositPercent > 0
+                        ? Math.round((basePrice * depositPercent) / 100)
+                        : 0
+                  const depositAmount =
+                    typeof resolvedDepositAmount === 'number'
+                      ? resolvedDepositAmount
+                      : 0
+                  const depositStatus =
+                    booking.depositStatus ??
+                    (depositAmount > 0 ? 'pending' : 'not_required')
+                  const depositStatusLabel =
+                    depositStatus === 'submitted'
+                      ? 'Чек отправлен, ждём подтверждения'
+                      : depositStatus === 'confirmed'
+                        ? 'Депозит подтверждён'
+                        : depositStatus === 'rejected'
+                          ? 'Депозит отклонён — отправьте чек снова'
+                          : depositStatus === 'pending'
+                            ? 'Ожидаем оплату депозита'
+                            : ''
+                  const depositDetails = booking.depositDetails?.trim() ?? ''
+                  const depositQrUrl = booking.depositQrUrl ?? ''
+                  const canSubmitDeposit =
+                    depositStatus === 'pending' || depositStatus === 'rejected'
                   const lateCancelFeePercent =
                     typeof booking.lateCancelFeePercent === 'number'
                       ? Math.max(0, Math.round(booking.lateCancelFeePercent))
@@ -1518,9 +1697,135 @@ export const ClientRequestsScreen = ({
                           Депозит: {depositPercent}%
                         </div>
                       )}
+                      {depositAmount > 0 && (
+                        <div className="booking-item-meta">
+                          Депозит к оплате: {formatPrice(depositAmount)}
+                        </div>
+                      )}
                       {lateCancelFeePercent > 0 && (
                         <div className="booking-item-meta booking-item-meta--warning">
                           Поздняя отмена: {lateCancelFeePercent}%
+                        </div>
+                      )}
+                      {depositAmount > 0 && depositStatusLabel && (
+                        <div className="booking-item-meta booking-item-meta--highlight">
+                          {depositStatusLabel}
+                        </div>
+                      )}
+                      {depositAmount > 0 && (
+                        <div className="booking-deposit-pay">
+                          <div className="booking-deposit-row">
+                            <span className="booking-deposit-title">
+                              Депозит: {formatPrice(depositAmount)}
+                            </span>
+                            <button
+                              className="booking-deposit-copy"
+                              type="button"
+                              onClick={() =>
+                                handleDepositCopy(
+                                  booking.id,
+                                  String(depositAmount),
+                                  'Сумма депозита скопирована.'
+                                )
+                              }
+                            >
+                              Скопировать сумму
+                            </button>
+                          </div>
+                          {depositDetails ? (
+                            <div className="booking-deposit-details">
+                              <span className="booking-deposit-label">
+                                Реквизиты мастера
+                              </span>
+                              <p className="booking-deposit-text">
+                                {depositDetails}
+                              </p>
+                              <button
+                                className="booking-deposit-copy"
+                                type="button"
+                                onClick={() =>
+                                  handleDepositCopy(
+                                    booking.id,
+                                    depositDetails,
+                                    'Реквизиты скопированы.'
+                                  )
+                                }
+                              >
+                                Скопировать реквизиты
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="booking-deposit-note">
+                              Реквизиты мастер пришлёт в чате.
+                            </p>
+                          )}
+                          {depositQrUrl && (
+                            <div className="booking-deposit-qr">
+                              <img src={depositQrUrl} alt="QR для оплаты" />
+                            </div>
+                          )}
+                          {canSubmitDeposit && (
+                            <div className="booking-deposit-actions">
+                              <input
+                                ref={(node) => {
+                                  depositInputRefs.current[booking.id] = node
+                                }}
+                                className="booking-deposit-input"
+                                type="file"
+                                accept="image/*"
+                                onChange={(event) =>
+                                  handleDepositProofChange(booking.id, event)
+                                }
+                                disabled={depositUploadingId === booking.id}
+                              />
+                              <button
+                                className="booking-action is-primary"
+                                type="button"
+                                onClick={() =>
+                                  handleBookingAction(
+                                    booking.id,
+                                    'client-deposit-submit'
+                                  )
+                                }
+                                disabled={depositUploadingId === booking.id}
+                              >
+                                Я оплатил
+                              </button>
+                              <button
+                                className="booking-action"
+                                type="button"
+                                onClick={() =>
+                                  depositInputRefs.current[booking.id]?.click()
+                                }
+                                disabled={depositUploadingId === booking.id}
+                              >
+                                Приложить чек
+                              </button>
+                            </div>
+                          )}
+                          {booking.depositProofUrl && (
+                            <div className="booking-deposit-proof">
+                              <img
+                                src={booking.depositProofUrl}
+                                alt="Чек оплаты"
+                              />
+                            </div>
+                          )}
+                          {depositUploadingId === booking.id && (
+                            <p className="booking-deposit-note">
+                              Загружаем чек...
+                            </p>
+                          )}
+                          {depositUploadError[booking.id] && (
+                            <p className="booking-deposit-note is-error">
+                              {depositUploadError[booking.id]}
+                            </p>
+                          )}
+                          {depositCopyStatus[booking.id] && (
+                            <p className="booking-deposit-status" role="status">
+                              {depositCopyStatus[booking.id]}
+                            </p>
+                          )}
                         </div>
                       )}
                       {booking.comment && (

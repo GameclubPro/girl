@@ -86,6 +86,10 @@ export type MasterProfile = {
   scheduleEnd?: string | null
   cancelWindowHours?: number | null
   depositPercent?: number | null
+  depositType?: 'none' | 'percent' | 'fixed' | null
+  depositFixed?: number | null
+  depositDetails?: string | null
+  depositQrUrl?: string | null
   lateCancelFeePercent?: number | null
   updatedAt?: string | null
   reviewsCount?: number | null
@@ -190,6 +194,13 @@ export type BookingStatus =
   | 'declined'
   | 'cancelled'
 
+export type DepositStatus =
+  | 'not_required'
+  | 'pending'
+  | 'submitted'
+  | 'confirmed'
+  | 'rejected'
+
 export type Booking = {
   id: number
   clientId: string
@@ -212,6 +223,12 @@ export type Booking = {
   scheduledAt: string
   cancelWindowHours?: number | null
   depositPercent?: number | null
+  depositAmount?: number | null
+  depositStatus?: DepositStatus | null
+  depositPaidAt?: string | null
+  depositProofUrl?: string | null
+  depositDetails?: string | null
+  depositQrUrl?: string | null
   lateCancelFeePercent?: number | null
   status: BookingStatus
   outcome?: string | null

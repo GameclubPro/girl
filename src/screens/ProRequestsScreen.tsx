@@ -2185,10 +2185,37 @@ export const ProRequestsScreen = ({
       typeof booking.depositPercent === 'number'
         ? Math.max(0, Math.round(booking.depositPercent))
         : 0
+    const basePrice =
+      typeof booking.servicePrice === 'number'
+        ? booking.servicePrice
+        : typeof booking.proposedPrice === 'number'
+          ? booking.proposedPrice
+          : null
+    const resolvedDepositAmount =
+      typeof booking.depositAmount === 'number'
+        ? booking.depositAmount
+        : basePrice && depositPercent > 0
+          ? Math.round((basePrice * depositPercent) / 100)
+          : 0
+    const depositAmount =
+      typeof resolvedDepositAmount === 'number' ? resolvedDepositAmount : 0
+    const depositStatus =
+      booking.depositStatus ?? (depositAmount > 0 ? 'pending' : 'not_required')
+    const depositStatusLabel =
+      depositStatus === 'submitted'
+        ? 'Чек загружен, ждёт подтверждения'
+        : depositStatus === 'confirmed'
+          ? 'Депозит подтверждён'
+          : depositStatus === 'rejected'
+            ? 'Чек отклонён'
+            : depositStatus === 'pending'
+              ? 'Ожидает оплаты депозита'
+              : ''
     const lateCancelFeePercent =
       typeof booking.lateCancelFeePercent === 'number'
         ? Math.max(0, Math.round(booking.lateCancelFeePercent))
         : 0
+    const canConfirmDeposit = depositStatus === 'submitted'
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
@@ -2250,9 +2277,48 @@ export const ProRequestsScreen = ({
             Депозит: {depositPercent}%
           </div>
         )}
+        {depositAmount > 0 && (
+          <div className="booking-item-meta">
+            Депозит к оплате: {formatPrice(depositAmount)}
+          </div>
+        )}
         {lateCancelFeePercent > 0 && (
           <div className="booking-item-meta booking-item-meta--warning">
             Поздняя отмена: {lateCancelFeePercent}%
+          </div>
+        )}
+        {depositAmount > 0 && depositStatusLabel && (
+          <div className="booking-item-meta booking-item-meta--highlight">
+            {depositStatusLabel}
+          </div>
+        )}
+        {booking.depositProofUrl && (
+          <div className="booking-deposit-proof">
+            <img src={booking.depositProofUrl} alt="Чек оплаты" />
+          </div>
+        )}
+        {canConfirmDeposit && (
+          <div className="booking-actions">
+            <button
+              className="booking-action is-primary"
+              type="button"
+              onClick={() =>
+                handleBookingAction(booking.id, 'master-deposit-confirm')
+              }
+              disabled={isActionLoading}
+            >
+              Подтвердить депозит
+            </button>
+            <button
+              className="booking-action"
+              type="button"
+              onClick={() =>
+                handleBookingAction(booking.id, 'master-deposit-reject')
+              }
+              disabled={isActionLoading}
+            >
+              Отклонить
+            </button>
           </div>
         )}
         {outcomeLabel && (
@@ -2385,7 +2451,12 @@ export const ProRequestsScreen = ({
 
   const handleBookingAction = async (
     bookingId: number,
-    action: 'master-accept' | 'master-decline' | 'master-propose-price',
+    action:
+      | 'master-accept'
+      | 'master-decline'
+      | 'master-propose-price'
+      | 'master-deposit-confirm'
+      | 'master-deposit-reject',
     price?: string
   ) => {
     if (bookingActionId !== null) return
@@ -2424,7 +2495,12 @@ export const ProRequestsScreen = ({
       }
 
       const data = (await response.json().catch(() => null)) as
-        | { status?: Booking['status']; proposedPrice?: number | null }
+        | {
+            status?: Booking['status']
+            proposedPrice?: number | null
+            depositStatus?: Booking['depositStatus']
+            depositAmount?: number | null
+          }
         | null
 
       setBookings((current) =>
@@ -2446,6 +2522,12 @@ export const ProRequestsScreen = ({
                 ? data.proposedPrice
                 : Number(price)
             next.proposedPrice = updatedPrice
+          }
+          if (data?.depositStatus) {
+            next.depositStatus = data.depositStatus
+          }
+          if (typeof data?.depositAmount === 'number') {
+            next.depositAmount = data.depositAmount
           }
           return next
         })

@@ -138,6 +138,38 @@ const parseOptionalInt = (value) => {
   return Number.isInteger(parsed) ? parsed : null
 }
 
+const resolveDepositType = (profile) => {
+  const normalized = normalizeText(profile?.depositType).toLowerCase()
+  if (['none', 'percent', 'fixed'].includes(normalized)) return normalized
+  const depositFixed = parseOptionalInt(profile?.depositFixed) ?? 0
+  const depositPercent = parseOptionalInt(profile?.depositPercent) ?? 0
+  if (depositFixed > 0) return 'fixed'
+  if (depositPercent > 0) return 'percent'
+  return 'none'
+}
+
+const calculateDepositAmount = (profile, servicePrice) => {
+  const depositPercent = clampValue(
+    parseOptionalInt(profile?.depositPercent) ?? 0,
+    0,
+    100
+  )
+  const depositFixed = clampValue(
+    parseOptionalInt(profile?.depositFixed) ?? 0,
+    0,
+    1_000_000
+  )
+  const depositType = resolveDepositType(profile)
+  if (depositType === 'fixed') return depositFixed
+  if (depositType === 'percent') {
+    if (typeof servicePrice === 'number' && Number.isFinite(servicePrice)) {
+      return Math.max(0, Math.round((servicePrice * depositPercent) / 100))
+    }
+    return depositFixed > 0 ? depositFixed : 0
+  }
+  return 0
+}
+
 const resolveBookingDurationMinutes = (value) => {
   const parsed = parseOptionalInt(value)
   if (!parsed || parsed <= 0) return BOOKING_DURATION_FALLBACK_MINUTES
@@ -1742,6 +1774,10 @@ const loadMasterProfile = async (userId) => {
         schedule_end AS "scheduleEnd",
         cancel_window_hours AS "cancelWindowHours",
         deposit_percent AS "depositPercent",
+        deposit_type AS "depositType",
+        deposit_fixed AS "depositFixed",
+        deposit_details AS "depositDetails",
+        deposit_qr_path AS "depositQrPath",
         late_cancel_fee_percent AS "lateCancelFeePercent",
         works_at_client AS "worksAtClient",
         works_at_master AS "worksAtMaster"
@@ -2644,6 +2680,10 @@ const ensureSchema = async () => {
       schedule_end TEXT,
       cancel_window_hours INTEGER NOT NULL DEFAULT 12,
       deposit_percent INTEGER NOT NULL DEFAULT 0,
+      deposit_type TEXT,
+      deposit_fixed INTEGER,
+      deposit_details TEXT,
+      deposit_qr_path TEXT,
       late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -2798,6 +2838,26 @@ const ensureSchema = async () => {
 
   await pool.query(`
     ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS deposit_type TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS deposit_fixed INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS deposit_details TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
+    ADD COLUMN IF NOT EXISTS deposit_qr_path TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_profiles
     ADD COLUMN IF NOT EXISTS late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0;
   `)
 
@@ -2847,6 +2907,10 @@ const ensureSchema = async () => {
       status TEXT NOT NULL DEFAULT 'pending',
       cancel_window_hours INTEGER NOT NULL DEFAULT 12,
       deposit_percent INTEGER NOT NULL DEFAULT 0,
+      deposit_amount INTEGER,
+      deposit_status TEXT,
+      deposit_paid_at TIMESTAMPTZ,
+      deposit_proof_path TEXT,
       late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0,
       proposed_price INTEGER,
       client_comment TEXT,
@@ -2879,6 +2943,26 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS deposit_percent INTEGER NOT NULL DEFAULT 0;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS deposit_amount INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS deposit_status TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS deposit_paid_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS deposit_proof_path TEXT;
   `)
 
   await pool.query(`
@@ -3815,6 +3899,10 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.schedule_end AS "scheduleEnd",
           mp.cancel_window_hours AS "cancelWindowHours",
           mp.deposit_percent AS "depositPercent",
+          mp.deposit_type AS "depositType",
+          mp.deposit_fixed AS "depositFixed",
+          mp.deposit_details AS "depositDetails",
+          mp.deposit_qr_path AS "depositQrPath",
           mp.late_cancel_fee_percent AS "lateCancelFeePercent",
           mp.works_at_client AS "worksAtClient",
           mp.works_at_master AS "worksAtMaster",
@@ -3870,10 +3958,12 @@ app.get('/api/masters/:userId', async (req, res) => {
     const certificates = resolveCertificateUrls(req, row.certificates)
     res.json({
       ...row,
+      depositQrPath: undefined,
       certificates,
       reviewsAverage,
       reviewsCount,
       followersCount,
+      depositQrUrl: buildPublicUrl(req, row.depositQrPath),
       avatarUrl: buildPublicUrl(req, row.avatarPath),
       coverUrl: buildPublicUrl(req, row.coverPath),
       ...summary,
@@ -4868,6 +4958,11 @@ app.post('/api/masters', async (req, res) => {
     scheduleEnd,
     cancelWindowHours,
     depositPercent,
+    depositType,
+    depositFixed,
+    depositDetails,
+    depositQrPath,
+    depositQrUrl,
     lateCancelFeePercent,
     worksAtClient,
     worksAtMaster,
@@ -4895,13 +4990,21 @@ app.post('/api/masters', async (req, res) => {
   const normalizedScheduleEnd = normalizeText(scheduleEnd) || null
   const parsedCancelWindowHours = parseOptionalInt(cancelWindowHours)
   const parsedDepositPercent = parseOptionalInt(depositPercent)
+  const parsedDepositFixed = parseOptionalInt(depositFixed)
   const parsedLateCancelFeePercent = parseOptionalInt(lateCancelFeePercent)
+  const normalizedDepositType = normalizeText(depositType)
+  const normalizedDepositDetails = normalizeText(depositDetails)
+  const normalizedDepositQrPath = normalizeText(depositQrPath ?? depositQrUrl)
+  const safeDepositType = ['none', 'percent', 'fixed'].includes(normalizedDepositType)
+    ? normalizedDepositType
+    : null
   const normalizedCancelWindowHours = clampValue(
     parsedCancelWindowHours ?? BOOKING_FREE_CANCEL_HOURS,
     0,
     72
   )
   const normalizedDepositPercent = clampValue(parsedDepositPercent ?? 0, 0, 100)
+  const normalizedDepositFixed = clampValue(parsedDepositFixed ?? 0, 0, 1000000)
   const normalizedLateCancelFeePercent = clampValue(
     parsedLateCancelFeePercent ?? 0,
     0,
@@ -4981,6 +5084,10 @@ app.post('/api/masters', async (req, res) => {
           schedule_end,
           cancel_window_hours,
           deposit_percent,
+          deposit_type,
+          deposit_fixed,
+          deposit_details,
+          deposit_qr_path,
           late_cancel_fee_percent,
           works_at_client,
           works_at_master,
@@ -5009,8 +5116,12 @@ app.post('/api/masters', async (req, res) => {
           $17,
           $18,
           $19,
-          COALESCE($20, '{}'::text[]),
-          $21::jsonb
+          $20,
+          $21,
+          $22,
+          $23,
+          COALESCE($24, '{}'::text[]),
+          $25::jsonb
         )
         ON CONFLICT (user_id) DO UPDATE
         SET display_name = EXCLUDED.display_name,
@@ -5026,6 +5137,10 @@ app.post('/api/masters', async (req, res) => {
             schedule_end = EXCLUDED.schedule_end,
             cancel_window_hours = EXCLUDED.cancel_window_hours,
             deposit_percent = EXCLUDED.deposit_percent,
+            deposit_type = EXCLUDED.deposit_type,
+            deposit_fixed = EXCLUDED.deposit_fixed,
+            deposit_details = EXCLUDED.deposit_details,
+            deposit_qr_path = EXCLUDED.deposit_qr_path,
             late_cancel_fee_percent = EXCLUDED.late_cancel_fee_percent,
             works_at_client = EXCLUDED.works_at_client,
             works_at_master = EXCLUDED.works_at_master,
@@ -5033,8 +5148,8 @@ app.post('/api/masters', async (req, res) => {
             services = EXCLUDED.services,
             portfolio_urls =
               CASE
-                WHEN $20 IS NULL THEN master_profiles.portfolio_urls
-                ELSE $20
+                WHEN $24 IS NULL THEN master_profiles.portfolio_urls
+                ELSE $24
               END,
             certificates = EXCLUDED.certificates,
             updated_at = NOW()
@@ -5054,6 +5169,10 @@ app.post('/api/masters', async (req, res) => {
         normalizedScheduleEnd,
         normalizedCancelWindowHours,
         normalizedDepositPercent,
+        safeDepositType,
+        normalizedDepositFixed,
+        normalizedDepositDetails || null,
+        normalizedDepositQrPath || null,
         normalizedLateCancelFeePercent,
         workAtClient,
         workAtMaster,
@@ -5398,6 +5517,10 @@ app.get('/api/bookings', async (req, res) => {
           b.status,
           b.cancel_window_hours AS "cancelWindowHours",
           b.deposit_percent AS "depositPercent",
+          b.deposit_amount AS "depositAmount",
+          b.deposit_status AS "depositStatus",
+          b.deposit_paid_at AS "depositPaidAt",
+          b.deposit_proof_path AS "depositProofPath",
           b.late_cancel_fee_percent AS "lateCancelFeePercent",
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
@@ -5408,7 +5531,9 @@ app.get('/api/bookings', async (req, res) => {
           b.created_at AS "createdAt",
           b.updated_at AS "updatedAt",
           mr.id AS "reviewId",
-          COALESCE(bc.id, legacy_bc.id) AS "chatId"
+          COALESCE(bc.id, legacy_bc.id) AS "chatId",
+          mp.deposit_details AS "depositDetails",
+          mp.deposit_qr_path AS "depositQrPath"
         FROM service_bookings b
         LEFT JOIN master_profiles mp ON mp.user_id = b.master_id
         LEFT JOIN users u ON u.user_id = b.master_id
@@ -5443,6 +5568,10 @@ app.get('/api/bookings', async (req, res) => {
       ...row,
       masterName: row.masterName || 'Мастер',
       masterAvatarUrl: buildPublicUrl(req, row.masterAvatarPath),
+      depositProofPath: undefined,
+      depositQrPath: undefined,
+      depositProofUrl: buildPublicUrl(req, row.depositProofPath),
+      depositQrUrl: buildPublicUrl(req, row.depositQrPath),
     }))
 
     res.json(payload)
@@ -5486,6 +5615,10 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.status,
           b.cancel_window_hours AS "cancelWindowHours",
           b.deposit_percent AS "depositPercent",
+          b.deposit_amount AS "depositAmount",
+          b.deposit_status AS "depositStatus",
+          b.deposit_paid_at AS "depositPaidAt",
+          b.deposit_proof_path AS "depositProofPath",
           b.late_cancel_fee_percent AS "lateCancelFeePercent",
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
@@ -5564,6 +5697,8 @@ app.get('/api/pro/bookings', async (req, res) => {
         clientName,
         distanceKm,
         clientTrust,
+        depositProofPath: undefined,
+        depositProofUrl: buildPublicUrl(req, row.depositProofPath),
         clientLat: undefined,
         clientLng: undefined,
         clientShareToMasters: undefined,
@@ -6081,6 +6216,11 @@ app.post('/api/bookings', async (req, res) => {
       0,
       100
     )
+    const depositAmount = calculateDepositAmount(
+      profile,
+      matchedService.price ?? null
+    )
+    const depositStatus = depositAmount > 0 ? 'pending' : 'not_required'
 
     if (normalizedLocationType === 'client' && !profile.worksAtClient) {
       res.status(403).json({ error: 'location_type_mismatch' })
@@ -6189,11 +6329,13 @@ app.post('/api/bookings', async (req, res) => {
           status,
           cancel_window_hours,
           deposit_percent,
+          deposit_amount,
+          deposit_status,
           late_cancel_fee_percent,
           proposed_price,
           client_comment
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL, $17)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NULL, $19)
         RETURNING id, created_at AS "createdAt"
       `,
       [
@@ -6212,6 +6354,8 @@ app.post('/api/bookings', async (req, res) => {
         status,
         normalizedCancelWindowHours,
         normalizedDepositPercent,
+        depositAmount,
+        depositStatus,
         normalizedLateCancelFeePercent,
         normalizedComment || null,
       ]
@@ -6236,12 +6380,16 @@ app.patch('/api/bookings/:id', async (req, res) => {
     return
   }
 
-  const { userId, action, price, outcome, lateMinutes } = req.body ?? {}
+  const { userId, action, price, outcome, lateMinutes, depositProofPath, depositProofUrl } =
+    req.body ?? {}
   const normalizedUserId = normalizeText(userId)
   const normalizedAction = normalizeText(action)
   const parsedPrice = parseOptionalInt(price)
   const normalizedOutcome = normalizeText(outcome)
   const parsedLateMinutes = parseOptionalInt(lateMinutes)
+  const normalizedDepositProofPath = normalizeUploadPath(
+    depositProofPath ?? depositProofUrl
+  )
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -6268,6 +6416,10 @@ app.patch('/api/bookings/:id', async (req, res) => {
           cancelled_at AS "cancelledAt",
           cancel_window_hours AS "cancelWindowHours",
           deposit_percent AS "depositPercent",
+          deposit_amount AS "depositAmount",
+          deposit_status AS "depositStatus",
+          deposit_paid_at AS "depositPaidAt",
+          deposit_proof_path AS "depositProofPath",
           late_cancel_fee_percent AS "lateCancelFeePercent",
           outcome
         FROM service_bookings
@@ -6383,18 +6535,44 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
+      const depositPercentValue = clampValue(
+        parseOptionalInt(booking.depositPercent) ?? 0,
+        0,
+        100
+      )
+      let nextDepositAmount =
+        typeof booking.depositAmount === 'number' ? booking.depositAmount : null
+      let nextDepositStatus = booking.depositStatus ?? null
+      if (depositPercentValue > 0 && (!nextDepositAmount || nextDepositAmount <= 0)) {
+        nextDepositAmount = Math.round((parsedPrice * depositPercentValue) / 100)
+        if (
+          nextDepositAmount > 0 &&
+          (!nextDepositStatus || nextDepositStatus === 'not_required')
+        ) {
+          nextDepositStatus = 'pending'
+        }
+      }
+
       await pool.query(
         `
           UPDATE service_bookings
           SET proposed_price = $2,
               status = 'price_proposed',
+              deposit_amount = $3,
+              deposit_status = $4,
               updated_at = NOW()
           WHERE id = $1
         `,
-        [bookingId, parsedPrice]
+        [bookingId, parsedPrice, nextDepositAmount, nextDepositStatus]
       )
 
-      res.json({ ok: true, status: 'price_proposed', proposedPrice: parsedPrice })
+      res.json({
+        ok: true,
+        status: 'price_proposed',
+        proposedPrice: parsedPrice,
+        depositAmount: nextDepositAmount,
+        depositStatus: nextDepositStatus,
+      })
       return
     }
 
@@ -6408,16 +6586,38 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
+      const depositPercentValue = clampValue(
+        parseOptionalInt(booking.depositPercent) ?? 0,
+        0,
+        100
+      )
+      let nextDepositAmount =
+        typeof booking.depositAmount === 'number' ? booking.depositAmount : null
+      let nextDepositStatus = booking.depositStatus ?? null
+      if (depositPercentValue > 0 && (!nextDepositAmount || nextDepositAmount <= 0)) {
+        nextDepositAmount = Math.round(
+          (booking.proposedPrice * depositPercentValue) / 100
+        )
+        if (
+          nextDepositAmount > 0 &&
+          (!nextDepositStatus || nextDepositStatus === 'not_required')
+        ) {
+          nextDepositStatus = 'pending'
+        }
+      }
+
       await pool.query(
         `
           UPDATE service_bookings
           SET service_price = $2,
               proposed_price = NULL,
               status = 'confirmed',
+              deposit_amount = $3,
+              deposit_status = $4,
               updated_at = NOW()
           WHERE id = $1
         `,
-        [bookingId, booking.proposedPrice]
+        [bookingId, booking.proposedPrice, nextDepositAmount, nextDepositStatus]
       )
 
       let chatPayload = null
@@ -6457,6 +6657,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
         ok: true,
         status: 'confirmed',
         servicePrice: booking.proposedPrice,
+        depositAmount: nextDepositAmount,
+        depositStatus: nextDepositStatus,
         chatId: chatPayload?.chatId ?? null,
       })
       return
@@ -6487,6 +6689,111 @@ app.patch('/api/bookings/:id', async (req, res) => {
       )
 
       res.json({ ok: true, status: 'cancelled' })
+      return
+    }
+
+    if (normalizedAction === 'client-deposit-submit') {
+      if (!isClient) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (['declined', 'cancelled'].includes(booking.status)) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+      const basePrice =
+        typeof booking.servicePrice === 'number'
+          ? booking.servicePrice
+          : typeof booking.proposedPrice === 'number'
+            ? booking.proposedPrice
+            : null
+      const depositAmount =
+        typeof booking.depositAmount === 'number' && booking.depositAmount > 0
+          ? booking.depositAmount
+          : basePrice && booking.depositPercent
+            ? Math.round((basePrice * booking.depositPercent) / 100)
+            : 0
+      if (!depositAmount || depositAmount <= 0) {
+        res.status(409).json({ error: 'deposit_not_required' })
+        return
+      }
+      if (booking.depositStatus === 'confirmed') {
+        res.status(409).json({ error: 'deposit_already_confirmed' })
+        return
+      }
+      if (normalizedDepositProofPath) {
+        const safeUserId = sanitizePathSegment(normalizedUserId)
+        if (!isSafeRequestUploadPath(safeUserId, normalizedDepositProofPath)) {
+          res.status(403).json({ error: 'deposit_proof_forbidden' })
+          return
+        }
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET deposit_amount = $2,
+              deposit_status = 'submitted',
+              deposit_paid_at = NOW(),
+              deposit_proof_path = COALESCE($3, deposit_proof_path),
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId, depositAmount, normalizedDepositProofPath || null]
+      )
+
+      res.json({
+        ok: true,
+        depositStatus: 'submitted',
+        depositAmount,
+        depositProofUrl: normalizedDepositProofPath
+          ? buildPublicUrl(req, normalizedDepositProofPath)
+          : null,
+      })
+      return
+    }
+
+    if (normalizedAction === 'master-deposit-confirm') {
+      if (!isMaster) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.depositStatus !== 'submitted') {
+        res.status(409).json({ error: 'deposit_status_invalid' })
+        return
+      }
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET deposit_status = 'confirmed',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+      res.json({ ok: true, depositStatus: 'confirmed' })
+      return
+    }
+
+    if (normalizedAction === 'master-deposit-reject') {
+      if (!isMaster) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.depositStatus !== 'submitted') {
+        res.status(409).json({ error: 'deposit_status_invalid' })
+        return
+      }
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET deposit_status = 'rejected',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+      res.json({ ok: true, depositStatus: 'rejected' })
       return
     }
 
@@ -7810,6 +8117,8 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             res.status(409).json({ error: 'price_required' })
             return
           }
+          const depositAmount = calculateDepositAmount(profile, servicePrice)
+          const depositStatus = depositAmount > 0 ? 'pending' : 'not_required'
 
           const requestPhotoList = Array.isArray(request.photoUrls)
             ? request.photoUrls
@@ -7837,11 +8146,13 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
                 status,
                 cancel_window_hours,
                 deposit_percent,
+                deposit_amount,
+                deposit_status,
                 late_cancel_fee_percent,
                 proposed_price,
                 client_comment
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed', $13, $14, $15, NULL, $16)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed', $13, $14, $15, $16, $17, NULL, $18)
               RETURNING id, created_at AS "createdAt"
             `,
             [
@@ -7859,6 +8170,8 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
               requestPhotoList,
               normalizedCancelWindowHours,
               normalizedDepositPercent,
+              depositAmount,
+              depositStatus,
               normalizedLateCancelFeePercent,
               requestComment,
             ]

@@ -722,6 +722,20 @@ export const ClientMasterProfileScreen = ({
     typeof profile?.depositPercent === 'number'
       ? Math.max(0, Math.round(profile.depositPercent))
       : null
+  const depositFixed =
+    typeof profile?.depositFixed === 'number'
+      ? Math.max(0, Math.round(profile.depositFixed))
+      : null
+  const depositType =
+    profile?.depositType === 'fixed' ||
+    profile?.depositType === 'percent' ||
+    profile?.depositType === 'none'
+      ? profile.depositType
+      : depositFixed && depositFixed > 0
+        ? 'fixed'
+        : depositPercent && depositPercent > 0
+          ? 'percent'
+          : 'none'
   const lateCancelFeePercent =
     typeof profile?.lateCancelFeePercent === 'number'
       ? Math.max(0, Math.round(profile.lateCancelFeePercent))
@@ -739,13 +753,18 @@ export const ClientMasterProfileScreen = ({
         : 'После этого окна условия уточняются.'
       : 'Лучше предупредить заранее.'
   const depositPolicyValue =
-    depositPercent === null
-      ? 'Обсуждается с мастером'
-      : depositPercent > 0
-        ? `${depositPercent}% для фиксации слота`
+    depositType === 'fixed'
+      ? depositFixed && depositFixed > 0
+        ? `${formatPrice(depositFixed)} для фиксации слота`
+        : 'Без депозита'
+      : depositType === 'percent'
+        ? depositPercent !== null && depositPercent > 0
+          ? `${depositPercent}% для фиксации слота`
+          : 'Без депозита'
         : 'Без депозита'
   const depositPolicyNote =
-    depositPercent && depositPercent > 0
+    (depositType === 'fixed' && depositFixed && depositFixed > 0) ||
+    (depositType === 'percent' && depositPercent && depositPercent > 0)
       ? 'Депозит засчитывается в стоимость услуги.'
       : 'Оплата после подтверждения.'
   const lateCancelPolicyValue =

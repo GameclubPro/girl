@@ -200,6 +200,7 @@ export const BookingScreen = ({
   )
   const [uploadError, setUploadError] = useState('')
   const [uploadingCount, setUploadingCount] = useState(0)
+  const [depositCopyStatus, setDepositCopyStatus] = useState('')
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] = useState<MasterReviewSummary | null>(
     null
@@ -618,6 +619,32 @@ export const BookingScreen = ({
     typeof profile?.depositPercent === 'number'
       ? Math.max(0, Math.round(profile.depositPercent))
       : null
+  const depositFixed =
+    typeof profile?.depositFixed === 'number'
+      ? Math.max(0, Math.round(profile.depositFixed))
+      : null
+  const depositType =
+    profile?.depositType === 'fixed' ||
+    profile?.depositType === 'percent' ||
+    profile?.depositType === 'none'
+      ? profile.depositType
+      : depositFixed && depositFixed > 0
+        ? 'fixed'
+        : depositPercent && depositPercent > 0
+          ? 'percent'
+          : 'none'
+  const depositDetails = profile?.depositDetails?.trim() || ''
+  const depositQrUrl = profile?.depositQrUrl ?? null
+  const depositAmount =
+    depositType === 'fixed'
+      ? depositFixed ?? 0
+      : depositType === 'percent'
+        ? typeof selectedService?.price === 'number'
+          ? Math.round((selectedService.price * (depositPercent ?? 0)) / 100)
+          : depositFixed ?? 0
+        : 0
+  const depositAmountLabel =
+    depositAmount > 0 ? formatPrice(depositAmount) : ''
   const lateCancelFeePercent =
     typeof profile?.lateCancelFeePercent === 'number'
       ? Math.max(0, Math.round(profile.lateCancelFeePercent))
@@ -629,10 +656,14 @@ export const BookingScreen = ({
         ? 'Без бесплатного окна отмены'
         : `Бесплатная отмена за ${formatHoursLabel(cancelWindowHours)} до визита`
   const depositPolicyValue =
-    depositPercent === null
-      ? 'Депозит обсуждается с мастером'
-      : depositPercent > 0
-        ? `Депозит ${depositPercent}% для фиксации слота`
+    depositType === 'fixed'
+      ? depositFixed && depositFixed > 0
+        ? `Депозит ${formatPrice(depositFixed)} для фиксации слота`
+        : 'Без депозита'
+      : depositType === 'percent'
+        ? depositPercent !== null && depositPercent > 0
+          ? `Депозит ${depositPercent}% для фиксации слота`
+          : 'Без депозита'
         : 'Без депозита'
   const lateCancelPolicyValue =
     lateCancelFeePercent === null
@@ -649,6 +680,14 @@ export const BookingScreen = ({
     { label: 'Депозит', value: depositPolicyValue },
     { label: 'Поздняя отмена', value: lateCancelPolicyValue },
   ]
+  const showDepositPay =
+    depositType !== 'none' &&
+    ((depositFixed !== null && depositFixed > 0) ||
+      (depositPercent !== null && depositPercent > 0))
+  const depositPayLabel =
+    depositAmount > 0
+      ? `К оплате сейчас: ${depositAmountLabel}`
+      : 'Сумма депозита уточнится после согласования цены'
 
   const priceLabel =
     selectedService?.price !== null && selectedService?.price !== undefined
@@ -710,6 +749,37 @@ export const BookingScreen = ({
       reader.onerror = () => reject(new Error('read_failed'))
       reader.readAsDataURL(file)
     })
+
+  const handleCopyDeposit = async (value: string, successMessage: string) => {
+    if (!value) return
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = value
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        if (!ok) {
+          throw new Error('copy_failed')
+        }
+      }
+      setDepositCopyStatus(successMessage)
+      hapticImpact('light')
+    } catch (error) {
+      setDepositCopyStatus('Не удалось скопировать. Попробуйте еще раз.')
+      hapticNotification('error')
+    } finally {
+      window.setTimeout(() => {
+        setDepositCopyStatus('')
+      }, 2400)
+    }
+  }
 
   const handleAddPhotos = () => {
     hapticImpact('light')
@@ -1450,6 +1520,63 @@ export const BookingScreen = ({
                     ))}
                   </div>
                   <p className="booking-policy-hint">{policyHint}</p>
+                  {showDepositPay && (
+                    <div className="booking-deposit-pay">
+                      <div className="booking-deposit-row">
+                        <span className="booking-deposit-title">
+                          {depositPayLabel}
+                        </span>
+                        {depositAmount > 0 && (
+                          <button
+                            className="booking-deposit-copy"
+                            type="button"
+                            onClick={() =>
+                              handleCopyDeposit(
+                                String(depositAmount),
+                                'Сумма депозита скопирована.'
+                              )
+                            }
+                          >
+                            Скопировать сумму
+                          </button>
+                        )}
+                      </div>
+                      {depositDetails ? (
+                        <div className="booking-deposit-details">
+                          <span className="booking-deposit-label">
+                            Реквизиты мастера
+                          </span>
+                          <p className="booking-deposit-text">{depositDetails}</p>
+                          <button
+                            className="booking-deposit-copy"
+                            type="button"
+                            onClick={() =>
+                              handleCopyDeposit(
+                                depositDetails,
+                                'Реквизиты скопированы.'
+                              )
+                            }
+                          >
+                            Скопировать реквизиты
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="booking-deposit-note">
+                          Реквизиты мастер пришлёт в чате.
+                        </p>
+                      )}
+                      {depositQrUrl && (
+                        <div className="booking-deposit-qr">
+                          <img src={depositQrUrl} alt="QR для оплаты" />
+                        </div>
+                      )}
+                      {depositCopyStatus && (
+                        <p className="booking-deposit-status" role="status">
+                          {depositCopyStatus}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {submitError && <p className="request-error">{submitError}</p>}
                   {submitSuccess && (
                     <p className="request-success">{submitSuccess}</p>
