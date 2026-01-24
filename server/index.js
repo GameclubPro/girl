@@ -252,10 +252,10 @@ const decodeAuthValue = (value) => {
 const extractInitData = (req) => {
   const header = normalizeText(req.get('authorization') ?? '')
   if (header.toLowerCase().startsWith(AUTH_HEADER_PREFIX)) {
-    return header.slice(AUTH_HEADER_PREFIX.length).trim()
+    return decodeAuthValue(header.slice(AUTH_HEADER_PREFIX.length).trim())
   }
   const alt = normalizeText(req.get('x-telegram-init-data') ?? '')
-  if (alt) return alt
+  if (alt) return decodeAuthValue(alt)
   const queryValue =
     typeof req.query?.auth === 'string'
       ? req.query.auth
