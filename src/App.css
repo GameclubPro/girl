@@ -27055,6 +27055,8 @@ h2 {
   border-color: var(--pro-border);
   box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.1);
   position: static;
+  justify-content: center;
+  align-items: center;
   width: 36px;
   height: 36px;
   padding: 0;
