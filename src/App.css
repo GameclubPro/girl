@@ -27061,6 +27061,79 @@ h2 {
   border-radius: 12px;
 }
 
+/* Metallic button treatment */
+.screen--pro-profile .pro-profile-hero-action,
+.screen--pro-profile .pro-profile-ig-button,
+.screen--pro-profile .pro-profile-ig-button--fab,
+.screen--pro-profile .pro-profile-portfolio-panel-action,
+.screen--pro-profile .pro-profile-certificates-action,
+.pro-profile-settings-screen .pro-profile-settings-action,
+.pro-profile-editor-screen .pro-profile-editor-save {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fdfefe 0%, #e9eef7 55%, #dee6f2 100%);
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  color: var(--pro-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+    0 10px 16px rgba(var(--shadow-rgb), 0.12);
+}
+
+.screen--pro-profile .pro-profile-hero-action::after,
+.screen--pro-profile .pro-profile-ig-button::after,
+.screen--pro-profile .pro-profile-ig-button--fab::after,
+.screen--pro-profile .pro-profile-portfolio-panel-action::after,
+.screen--pro-profile .pro-profile-certificates-action::after,
+.pro-profile-settings-screen .pro-profile-settings-action::after,
+.pro-profile-editor-screen .pro-profile-editor-save::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(255, 255, 255, 0.1) 35%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.screen--pro-profile .pro-profile-hero-action.is-primary,
+.screen--pro-profile .pro-profile-portfolio-panel-action.is-primary,
+.screen--pro-profile .pro-profile-ig-button--primary,
+.screen--pro-profile .pro-profile-certificates-action:not(.is-toggle),
+.pro-profile-editor-screen .pro-profile-editor-save {
+  background: linear-gradient(180deg, #0d86ee 0%, #0777d7 52%, #055aa5 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
+    0 12px 18px rgba(7, 119, 215, 0.35);
+}
+
+.screen--pro-profile .pro-profile-hero-action.is-ghost {
+  background: linear-gradient(180deg, #f7f9ff 0%, #eef3fb 100%);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: var(--pro-muted);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
+    0 8px 14px rgba(var(--shadow-rgb), 0.08);
+}
+
+.screen--pro-profile .pro-profile-certificates-action.is-toggle {
+  background: linear-gradient(180deg, #f7f9ff 0%, #eef3fb 100%);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: var(--pro-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
+    0 8px 14px rgba(var(--shadow-rgb), 0.08);
+}
+
 .screen--pro-profile .pro-profile-ig-body {
   --pro-ig-card-radius: 20px;
   --pro-ig-card-radius-sm: 16px;
