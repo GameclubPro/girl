@@ -3163,6 +3163,11 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    ALTER TABLE master_profiles
+    DROP COLUMN IF EXISTS late_cancel_fee_percent;
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS service_requests (
       id SERIAL PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -3269,6 +3274,11 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS deposit_proof_path TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    DROP COLUMN IF EXISTS late_cancel_fee_percent;
   `)
 
   await pool.query(`
@@ -4133,6 +4143,7 @@ app.get('/api/masters', async (req, res) => {
         showcaseUrls: row.showcaseUrls,
         updatedAt: row.updatedAt,
         distanceKm,
+        lateCancelFeePercent: 0,
         reviewsAverage: Number.isFinite(average) ? average : 0,
         reviewsCount: Number.isFinite(Number(row.reviewsCount))
           ? Number(row.reviewsCount)
@@ -4257,6 +4268,7 @@ app.get('/api/masters/:userId', async (req, res) => {
       reviewsCount,
       followersCount,
       depositQrUrl: buildPublicUrl(req, row.depositQrPath),
+      lateCancelFeePercent: 0,
       avatarUrl: buildPublicUrl(req, row.avatarPath),
       coverUrl: buildPublicUrl(req, row.coverPath),
       ...summary,
@@ -5854,6 +5866,7 @@ app.get('/api/bookings', async (req, res) => {
       depositQrPath: undefined,
       depositProofUrl: buildPublicUrl(req, row.depositProofPath),
       depositQrUrl: buildPublicUrl(req, row.depositQrPath),
+      lateCancelFeePercent: 0,
     }))
 
     res.json(payload)
@@ -5987,6 +6000,7 @@ app.get('/api/pro/bookings', async (req, res) => {
         clientTrustScore: undefined,
         clientTrustConfidence: undefined,
         clientTrustUpdatedAt: undefined,
+        lateCancelFeePercent: 0,
       }
     })
 
@@ -7348,6 +7362,55 @@ app.patch('/api/bookings/:id', async (req, res) => {
     if (normalizedAction === 'set-outcome') {
       if (!isMaster) {
         res.status(403).json({ error: 'forbidden' })
+        return
+      }
+
+      if (normalizedOutcome === 'late_cancel') {
+        if (booking.status !== 'confirmed') {
+          res.status(409).json({ error: 'status_invalid' })
+          return
+        }
+        if (booking.outcome) {
+          res.status(409).json({ error: 'outcome_locked' })
+          return
+        }
+
+        const cancelledAt = new Date().toISOString()
+        await pool.query(
+          `
+            UPDATE service_bookings
+            SET status = 'cancelled',
+                cancelled_by = COALESCE(cancelled_by, 'client'),
+                cancelled_at = COALESCE(cancelled_at, $2),
+                outcome = NULL,
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [bookingId, cancelledAt]
+        )
+
+        await logClientTrustEvent({
+          userId: booking.clientId,
+          eventType: 'visit_rescheduled',
+          meta: {
+            ref: `booking:${bookingId}`,
+            bookingId,
+            scheduledAt: booking.scheduledAt,
+            cancelWindowHours: booking.cancelWindowHours,
+            depositPercent: booking.depositPercent,
+            legacyOutcome: 'late_cancel',
+          },
+          skipRefresh: true,
+        })
+        const trust = await refreshClientTrustScore(booking.clientId)
+
+        res.json({
+          ok: true,
+          status: 'cancelled',
+          outcome: null,
+          legacyOutcome: 'late_cancel',
+          trust,
+        })
         return
       }
 
