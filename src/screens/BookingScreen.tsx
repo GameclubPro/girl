@@ -214,16 +214,11 @@ export const BookingScreen = ({
   const [isReviewsLoading, setIsReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
   const [step, setStep] = useState(0)
-  const [hasTelegramMainButton, setHasTelegramMainButton] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const maxPhotos = 5
   const maxUploadBytes = 6 * 1024 * 1024
-  const showInlineActions = !hasTelegramMainButton
-  const useNativeMainButton = hasTelegramMainButton
-
-  useEffect(() => {
-    setHasTelegramMainButton(Boolean(window.Telegram?.WebApp?.MainButton))
-  }, [])
+  const showInlineActions = true
+  const useNativeMainButton = false
 
   useEffect(() => {
     if (!masterId) return
@@ -1106,7 +1101,7 @@ export const BookingScreen = ({
     isVisible: useNativeMainButton,
     isEnabled: canContinue,
     isLoading: isSubmitting,
-    onClick: handleStepNext,
+    onClick: useNativeMainButton ? handleStepNext : undefined,
   })
 
   return (
