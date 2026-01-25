@@ -637,6 +637,12 @@
   display: none;
 }
 
+.request-submit-bar.is-dual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 10px;
+}
+
 .request-submit {
   width: 100%;
   border: none;
@@ -648,6 +654,22 @@
   background: var(--sapphire-dark);
   box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.32);
   cursor: pointer;
+}
+
+.request-submit--cancel {
+  border: 1px solid rgba(var(--danger-rgb), 0.55);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--danger-rgb), 0.95),
+    rgba(var(--danger-rgb), 0.82)
+  );
+  color: #ffffff;
+  box-shadow: 0 12px 18px rgba(var(--danger-rgb), 0.25);
+}
+
+.request-submit--cancel:focus-visible {
+  outline: 3px solid rgba(var(--danger-rgb), 0.35);
+  outline-offset: 2px;
 }
 
 .request-submit:disabled {
