@@ -3185,13 +3185,6 @@ export const ProProfileScreen = ({
                     <h1 className="pro-profile-hero-name">{displayNameValue}</h1>
                   </div>
                 </div>
-                <p
-                  className={`pro-profile-hero-about${
-                    about.trim() ? '' : ' is-muted'
-                  }`}
-                >
-                  {aboutPreview}
-                </p>
               </div>
             </div>
             <div className="pro-profile-hero-status-row">
@@ -3212,6 +3205,11 @@ export const ProProfileScreen = ({
                 <span className="pro-profile-ig-status-chevron" aria-hidden="true" />
               </button>
             </div>
+            <p
+              className={`pro-profile-hero-about${about.trim() ? '' : ' is-muted'}`}
+            >
+              {aboutPreview}
+            </p>
             <div className="pro-profile-hero-tags pro-profile-ig-tags">
               {previewTags.length > 0 ? (
                 <>
