@@ -2772,8 +2772,8 @@
 }
 
 .screen--pro-profile {
-  --pro-ink: #0a162b;
-  --pro-muted: #5f7aa1;
+  --pro-ink: #eef5ff;
+  --pro-muted: #b4c7e6;
   --pro-border: rgba(12, 28, 56, 0.18);
   --pro-surface: rgba(40, 110, 180, 0.22);
   --pro-surface-strong: rgba(40, 110, 180, 0.32);
@@ -2782,30 +2782,45 @@
   --pro-accent-3: #b1ecff;
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
-  --ink: #0a162b;
-  --ink-rgb: 10, 22, 43;
-  --muted: #5f7aa1;
-  --muted-rgb: 95, 122, 161;
+  --ink: #eef5ff;
+  --ink-rgb: 238, 245, 255;
+  --muted: #b4c7e6;
+  --muted-rgb: 180, 199, 230;
   --accent: #3fb4ff;
   --accent-rgb: 63, 180, 255;
-  --accent-strong: #1480c5;
+  --accent-strong: #66c5ff;
   --accent-soft: rgba(63, 180, 255, 0.22);
-  --surface: #b7dafc;
-  --surface-rgb: 183, 218, 252;
-  --surface-muted: #a8d2fb;
-  --surface-muted-rgb: 168, 210, 251;
+  --surface: #8fc4f6;
+  --surface-rgb: 143, 196, 246;
+  --surface-muted: #82bbf2;
+  --surface-muted-rgb: 130, 187, 242;
+  --paper-rgb: 114, 170, 232;
   --raspberry: #8ac4ff;
   --raspberry-rgb: 138, 196, 255;
   --shadow-rgb: 10, 22, 43;
-  --glass-bg: rgba(28, 106, 182, 0.24);
-  --glass-bg-strong: rgba(28, 106, 182, 0.34);
-  --glass-bg-soft: rgba(28, 106, 182, 0.18);
+  --glass-bg: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.38),
+    rgba(16, 70, 130, 0.3)
+  );
+  --glass-bg-strong: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.52),
+    rgba(16, 70, 130, 0.44)
+  );
+  --glass-bg-soft: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.28),
+    rgba(16, 70, 130, 0.24)
+  );
   --glass-border: rgba(170, 228, 255, 0.55);
   --glass-stroke: rgba(12, 28, 56, 0.25);
   --glass-shadow: 0 26px 44px rgba(10, 22, 43, 0.28);
   --glass-shadow-soft: 0 18px 32px rgba(10, 22, 43, 0.22);
-  --glass-inset: inset 0 1px 0 rgba(170, 228, 255, 0.35);
-  --glass-blur: 26px;
+  --glass-inset: inset 0 1px 0 rgba(170, 228, 255, 0.4);
+  --glass-blur: 30px;
+  --glass-frost: blur(30px) saturate(1.15);
+  --glass-frost-soft: blur(22px) saturate(1.1);
   background:
     radial-gradient(
       120% 120% at 8% -10%,
@@ -2822,7 +2837,7 @@
       rgba(40, 120, 220, 0.25),
       transparent 62%
     ),
-    linear-gradient(180deg, #a7cff9 0%, #c1e2ff 55%, #d3ecff 100%);
+    linear-gradient(180deg, #8fc4f6 0%, #a6d6ff 55%, #bbe6ff 100%);
 }
 
 .screen--pro::before {
@@ -7346,11 +7361,13 @@
   grid-column: 1 / -1;
   padding: 12px;
   border-radius: 16px;
-  border: 1px dashed rgba(var(--shadow-rgb), 0.2);
-  background: rgba(var(--paper-rgb), 0.7);
+  border: 1px dashed rgba(170, 228, 255, 0.45);
+  background: rgba(28, 106, 182, 0.18);
   font-size: 12px;
   font-weight: 600;
   color: var(--pro-muted);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-grid {
@@ -7363,12 +7380,14 @@
   position: relative;
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.9);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  background: rgba(28, 106, 182, 0.22);
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.18);
   display: flex;
   flex-direction: column;
   cursor: grab;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-card.is-drag-over {
@@ -7400,8 +7419,8 @@
 .pro-portfolio-thumb-label {
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(var(--paper-rgb), 0.6);
-  background: rgba(var(--shadow-rgb), 0.45);
+  border: 1px solid rgba(170, 228, 255, 0.5);
+  background: rgba(28, 106, 182, 0.32);
 }
 
 .pro-portfolio-body {
@@ -7413,13 +7432,15 @@
 
 .pro-portfolio-title {
   width: 100%;
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: 1px solid rgba(170, 228, 255, 0.5);
+  background: rgba(28, 106, 182, 0.2);
   border-radius: 12px;
   padding: 8px 10px;
   font-size: 12px;
   font-weight: 600;
   color: var(--pro-ink);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-title:focus-visible {
@@ -7447,12 +7468,14 @@
   width: 26px;
   height: 26px;
   border-radius: 10px;
-  border: 1px solid rgba(var(--paper-rgb), 0.9);
-  background: rgba(var(--paper-rgb), 0.85);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  background: rgba(28, 106, 182, 0.22);
   font-size: 14px;
   font-weight: 700;
   color: var(--pro-ink);
   cursor: pointer;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-actions-row {
@@ -7465,13 +7488,16 @@
 
 .pro-portfolio-action {
   border: none;
-  background: rgba(var(--accent-rgb), 0.12);
+  background: rgba(28, 106, 182, 0.2);
   color: var(--pro-ink);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
+  border: 1px solid rgba(170, 228, 255, 0.45);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-action:focus-visible {
@@ -7491,9 +7517,9 @@
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(var(--surface-muted-rgb), 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(6, 18, 38, 0.62);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7505,12 +7531,14 @@
   width: min(520px, 100%);
   border-radius: 24px;
   padding: 14px;
-  background: rgba(var(--paper-rgb), 0.96);
-  border: 1px solid rgba(var(--paper-rgb), 0.7);
-  box-shadow: 0 22px 34px rgba(var(--shadow-rgb), 0.16);
+  background: rgba(28, 106, 182, 0.24);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  box-shadow: 0 22px 34px rgba(var(--shadow-rgb), 0.24);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-portfolio-focus-header {
@@ -7543,10 +7571,13 @@
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink);
-  background: rgba(var(--accent-rgb), 0.08);
-  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.12);
+  color: var(--pro-ink);
+  background: rgba(28, 106, 182, 0.22);
+  border: 1px solid rgba(170, 228, 255, 0.5);
+  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.18);
   cursor: pointer;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-focus-close:focus-visible {
@@ -7560,8 +7591,8 @@
   aspect-ratio: 3 / 4;
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  background: rgba(28, 106, 182, 0.22);
   touch-action: none;
 }
 
@@ -7577,7 +7608,7 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  border: 2px solid #ffffff;
+  border: 2px solid rgba(170, 228, 255, 0.9);
   background: rgba(var(--accent-rgb), 0.95);
   transform: translate(-50%, -50%);
   box-shadow: 0 8px 16px rgba(var(--shadow-rgb), 0.2);
@@ -7603,9 +7634,12 @@
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  background: rgba(var(--accent-rgb), 0.12);
+  background: rgba(28, 106, 182, 0.22);
   color: var(--pro-ink);
   cursor: pointer;
+  border: 1px solid rgba(170, 228, 255, 0.45);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-focus-action.is-danger {
@@ -7627,11 +7661,13 @@
   grid-column: 1 / -1;
   padding: 12px;
   border-radius: 16px;
-  border: 1px dashed rgba(var(--shadow-rgb), 0.2);
-  background: rgba(var(--paper-rgb), 0.7);
+  border: 1px dashed rgba(170, 228, 255, 0.45);
+  background: rgba(28, 106, 182, 0.18);
   font-size: 12px;
   font-weight: 600;
   color: var(--pro-muted);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-toggle {
@@ -8508,8 +8544,8 @@
   border-color: var(--glass-border);
   color: var(--pro-ink);
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.16);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-hero-card {
@@ -8523,8 +8559,8 @@
   );
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -8611,8 +8647,8 @@
   background: var(--glass-bg-soft);
   border-color: var(--glass-border);
   box-shadow: var(--glass-inset);
-  backdrop-filter: blur(16px) saturate(1.15);
-  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-hero-card .pro-profile-ig-stats {
@@ -8621,8 +8657,8 @@
   --ig-stats-border: var(--glass-border);
   padding: 8px;
   box-shadow: var(--glass-inset);
-  backdrop-filter: blur(16px) saturate(1.15);
-  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-hero-actions {
@@ -8642,8 +8678,8 @@
   color: var(--pro-ink);
   cursor: pointer;
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -8748,7 +8784,7 @@
 
 .screen--pro-profile .pro-profile-ig-avatar-badge {
   background: linear-gradient(160deg, #1fa7c6, #7be6ff);
-  border-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(170, 228, 255, 0.9);
   box-shadow: 0 10px 18px rgba(43, 185, 214, 0.28);
 }
 
@@ -8809,6 +8845,11 @@
   z-index: 2;
 }
 
+.screen--pro-profile .pro-profile-ig-avatar.is-loading::after {
+  border-color: rgba(170, 228, 255, 0.55);
+  border-top-color: rgba(170, 228, 255, 0.2);
+}
+
 .pro-profile-ig-stats {
   --ig-stats-radius: 22px;
   --ig-stats-bg: #ffffff;
@@ -8838,8 +8879,8 @@
   --ig-stats-border: var(--glass-border);
   padding: 10px;
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(16px) saturate(1.15);
-  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-ig-stats::before {
@@ -9140,8 +9181,8 @@
   background: var(--pro-ig-card-bg);
   border-color: var(--glass-border);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-facts {
@@ -9184,8 +9225,8 @@
   background: rgba(28, 106, 182, 0.22);
   border-color: rgba(170, 228, 255, 0.5);
   box-shadow: var(--glass-inset);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-fact-card.is-muted {
@@ -9303,8 +9344,8 @@
   background: var(--pro-ig-card-bg);
   border-color: var(--glass-border);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-certificates-head {
@@ -9399,12 +9440,12 @@
 }
 
 .screen--pro-profile .pro-profile-certificates-action {
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(170, 228, 255, 0.55);
   background: linear-gradient(135deg, rgba(43, 144, 232, 0.95), rgba(108, 201, 255, 0.9));
   color: #ffffff;
   box-shadow:
     0 14px 22px rgba(63, 180, 255, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    inset 0 1px 0 rgba(170, 228, 255, 0.35);
 }
 
 .screen--pro-profile .pro-profile-certificates-action.is-toggle {
@@ -9502,8 +9543,8 @@
   background: var(--glass-bg);
   border-color: rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-certificate-card:active {
@@ -9724,8 +9765,8 @@
   border: 1px solid var(--glass-border);
   color: var(--pro-ink);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-ig-status:active {
@@ -9821,8 +9862,8 @@
   background: var(--glass-bg);
   border-color: var(--glass-border);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   mask-image: linear-gradient(
     90deg,
     transparent 0%,
@@ -9970,8 +10011,8 @@
   border: 1px solid rgba(170, 228, 255, 0.55);
   color: #eaf5ff;
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-ig-button:focus-visible {
@@ -10538,19 +10579,19 @@
 .screen--pro-profile .pro-profile-portfolio-panel {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.68),
-    rgba(255, 255, 255, 0.42)
+    rgba(50, 140, 220, 0.32),
+    rgba(20, 90, 160, 0.22)
   );
   border-color: var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(20px) saturate(1.1);
-  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel::before {
   background:
-    radial-gradient(120% 120% at 0% 0%, rgba(255, 255, 255, 0.55), transparent 55%),
-    radial-gradient(140% 140% at 100% 0%, rgba(43, 185, 214, 0.25), transparent 60%);
+    radial-gradient(120% 120% at 0% 0%, rgba(120, 200, 255, 0.4), transparent 55%),
+    radial-gradient(140% 140% at 100% 0%, rgba(63, 180, 255, 0.3), transparent 60%);
   opacity: 0.6;
 }
 
@@ -10606,10 +10647,10 @@
 
 .screen--pro-profile .pro-profile-portfolio-panel-count {
   background: var(--glass-bg);
-  border-color: rgba(255, 255, 255, 0.65);
+  border-color: rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-portfolio-panel-nav {
@@ -10628,10 +10669,10 @@
 
 .screen--pro-profile .pro-profile-portfolio-panel-nav {
   background: var(--glass-bg);
-  border-color: rgba(255, 255, 255, 0.65);
+  border-color: rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-portfolio-panel-tab {
@@ -10749,8 +10790,8 @@
   border-color: rgba(170, 228, 255, 0.55);
   background: var(--glass-bg);
   box-shadow: var(--glass-inset);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-showcase-subtitle {
@@ -10897,8 +10938,8 @@
   border-color: rgba(170, 228, 255, 0.5);
   background: rgba(28, 106, 182, 0.22);
   box-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(8px) saturate(1.05);
-  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-portfolio-item img {
@@ -11122,7 +11163,7 @@
     rgba(63, 180, 255, 0.35),
     rgba(28, 106, 182, 0.22)
   );
-  color: #0a4f85;
+  color: var(--pro-ink);
   box-shadow: 0 16px 24px rgba(63, 180, 255, 0.3);
 }
 
@@ -11279,14 +11320,16 @@
 }
 
 .pro-followers-sheet-close {
-  border: none;
+  border: 1px solid rgba(170, 228, 255, 0.55);
   border-radius: 14px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(var(--shadow-rgb), 0.08);
+  background: rgba(28, 106, 182, 0.22);
   cursor: pointer;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-followers-sheet-search {
@@ -11300,14 +11343,16 @@
 }
 
 .pro-followers-sheet-clear {
-  border: none;
+  border: 1px solid rgba(170, 228, 255, 0.45);
   border-radius: 14px;
   padding: 8px 10px;
   font-size: 11px;
   font-weight: 700;
   color: var(--pro-muted);
-  background: rgba(var(--shadow-rgb), 0.08);
+  background: rgba(28, 106, 182, 0.2);
   cursor: pointer;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-followers-sheet-list {
@@ -11327,14 +11372,16 @@
 }
 
 .pro-followers-card {
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: rgba(var(--paper-rgb), 0.94);
+  border: 1px solid rgba(170, 228, 255, 0.5);
+  background: rgba(28, 106, 182, 0.22);
   border-radius: 18px;
   padding: 10px 12px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.1);
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-followers-avatar {
@@ -11417,14 +11464,17 @@
 }
 
 .pro-followers-sheet-load {
-  border: none;
+  border: 1px solid rgba(170, 228, 255, 0.55);
   border-radius: 16px;
   padding: 12px;
   font-size: 13px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(var(--accent-rgb), 0.16);
+  background: rgba(28, 106, 182, 0.22);
   cursor: pointer;
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.16);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-followers-sheet-close:focus-visible,
@@ -11597,9 +11647,9 @@
   position: fixed;
   inset: 0;
   z-index: 75;
-  background: rgba(var(--surface-muted-rgb), 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(6, 18, 38, 0.62);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11612,13 +11662,15 @@
   max-height: min(760px, 86dvh);
   border-radius: 24px;
   padding: 14px;
-  background: rgba(var(--paper-rgb), 0.96);
-  border: 1px solid rgba(var(--paper-rgb), 0.7);
-  box-shadow: 0 22px 34px rgba(var(--shadow-rgb), 0.16);
+  background: rgba(28, 106, 182, 0.24);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  box-shadow: 0 22px 34px rgba(var(--shadow-rgb), 0.24);
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow: auto;
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-portfolio-lightbox-head {
@@ -11653,15 +11705,17 @@
 }
 
 .pro-portfolio-lightbox-close {
-  border: none;
+  border: 1px solid rgba(170, 228, 255, 0.5);
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink);
-  background: rgba(var(--accent-rgb), 0.08);
-  box-shadow: 0 8px 12px rgba(var(--accent-rgb), 0.12);
+  color: var(--pro-ink);
+  background: rgba(28, 106, 182, 0.22);
+  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.18);
   cursor: pointer;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-lightbox-close:focus-visible {
@@ -11675,8 +11729,8 @@
   aspect-ratio: 4 / 5;
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  background: rgba(28, 106, 182, 0.22);
 }
 
 .pro-portfolio-lightbox-media img {
@@ -11692,7 +11746,7 @@
 
 .pro-portfolio-lightbox-media.is-certificate {
   aspect-ratio: var(--certificate-ratio, 4 / 3);
-  background: rgba(var(--paper-rgb), 0.92);
+  background: rgba(28, 106, 182, 0.22);
 }
 
 .pro-portfolio-lightbox-media.is-certificate img {
@@ -11729,9 +11783,12 @@
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  background: rgba(var(--accent-rgb), 0.12);
+  background: rgba(28, 106, 182, 0.22);
   color: var(--pro-ink);
   cursor: pointer;
+  border: 1px solid rgba(170, 228, 255, 0.45);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-portfolio-lightbox-action:disabled {
@@ -11753,9 +11810,9 @@
   position: fixed;
   inset: 0;
   z-index: 75;
-  background: rgba(var(--surface-muted-rgb), 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(6, 18, 38, 0.62);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11768,12 +11825,14 @@
   max-height: min(760px, 82dvh);
   border-radius: 24px;
   padding: 14px;
-  background: rgba(var(--paper-rgb), 0.96);
-  border: 1px solid rgba(var(--paper-rgb), 0.7);
-  box-shadow: 0 22px 34px rgba(var(--shadow-rgb), 0.16);
+  background: rgba(28, 106, 182, 0.24);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  box-shadow: 0 22px 34px rgba(var(--shadow-rgb), 0.24);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-portfolio-modal-head {
@@ -11820,8 +11879,8 @@
 .pro-profile-portfolio-modal-item {
   border-radius: 16px;
   overflow: hidden;
-  background: rgba(var(--paper-rgb), 0.85);
-  border: 1px solid rgba(var(--paper-rgb), 0.85);
+  background: rgba(28, 106, 182, 0.22);
+  border: 1px solid rgba(170, 228, 255, 0.5);
   aspect-ratio: 1 / 1;
 }
 
@@ -11877,8 +11936,8 @@
   background: var(--glass-bg);
   border-color: rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-card:focus-visible {
@@ -11911,7 +11970,7 @@
 
 .screen--pro-profile .pro-profile-card-icon {
   background: rgba(63, 180, 255, 0.2);
-  color: #0a4f85;
+  color: var(--pro-ink);
 }
 
 .pro-profile-card-icon svg,
@@ -11979,8 +12038,8 @@
   );
   border-color: var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-reviews-head {
@@ -12041,8 +12100,8 @@
   background: var(--glass-bg);
   border-color: var(--glass-border);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-reviews-score {
@@ -12121,8 +12180,8 @@
   background: var(--glass-bg);
   border-color: rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(10px) saturate(1.05);
-  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-review-avatar {
@@ -12270,33 +12329,48 @@
 
 .pro-profile-editor-screen {
   --pro-editor-savebar: 120px;
-  --pro-ink: #0a162b;
-  --pro-muted: #5f7aa1;
+  --pro-ink: #eef5ff;
+  --pro-muted: #b4c7e6;
   --accent: #3fb4ff;
   --accent-rgb: 63, 180, 255;
-  --accent-strong: #1480c5;
+  --accent-strong: #66c5ff;
   --accent-soft: rgba(63, 180, 255, 0.22);
   --raspberry: #8ac4ff;
   --raspberry-rgb: 138, 196, 255;
-  --surface: #b7dafc;
-  --surface-rgb: 183, 218, 252;
-  --surface-muted: #a8d2fb;
-  --surface-muted-rgb: 168, 210, 251;
+  --surface: #8fc4f6;
+  --surface-rgb: 143, 196, 246;
+  --surface-muted: #82bbf2;
+  --surface-muted-rgb: 130, 187, 242;
+  --paper-rgb: 114, 170, 232;
   --shadow-rgb: 10, 22, 43;
-  --glass-bg: rgba(28, 106, 182, 0.24);
-  --glass-bg-strong: rgba(28, 106, 182, 0.34);
-  --glass-bg-soft: rgba(28, 106, 182, 0.18);
+  --glass-bg: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.38),
+    rgba(16, 70, 130, 0.3)
+  );
+  --glass-bg-strong: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.52),
+    rgba(16, 70, 130, 0.44)
+  );
+  --glass-bg-soft: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.28),
+    rgba(16, 70, 130, 0.24)
+  );
   --glass-border: rgba(170, 228, 255, 0.55);
   --glass-shadow: 0 26px 44px rgba(10, 22, 43, 0.28);
   --glass-shadow-soft: 0 18px 32px rgba(10, 22, 43, 0.22);
-  --glass-inset: inset 0 1px 0 rgba(170, 228, 255, 0.35);
+  --glass-inset: inset 0 1px 0 rgba(170, 228, 255, 0.4);
+  --glass-frost: blur(30px) saturate(1.15);
+  --glass-frost-soft: blur(22px) saturate(1.1);
   position: fixed;
   inset: 0;
   z-index: 60;
   background:
     radial-gradient(120% 120% at 8% -10%, rgba(80, 170, 255, 0.45), transparent 55%),
     radial-gradient(140% 120% at 98% -5%, rgba(70, 140, 255, 0.35), transparent 60%),
-    linear-gradient(180deg, #a7cff9 0%, #c1e2ff 55%, #d3ecff 100%);
+    linear-gradient(180deg, #8fc4f6 0%, #a6d6ff 55%, #bbe6ff 100%);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -12359,17 +12433,17 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  background: rgba(28, 106, 182, 0.22);
   border-radius: 16px;
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
   cursor: pointer;
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.18);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   appearance: none;
   font-family: inherit;
 }
@@ -12394,10 +12468,14 @@
 }
 
 .pro-profile-editor-tab.is-active {
-  border: 1px solid rgba(43, 185, 214, 0.4);
-  color: #0b6b8b;
-  background: rgba(43, 185, 214, 0.2);
-  box-shadow: none;
+  border: 1px solid rgba(170, 228, 255, 0.75);
+  color: var(--pro-ink);
+  background: linear-gradient(
+    135deg,
+    rgba(63, 180, 255, 0.35),
+    rgba(28, 106, 182, 0.28)
+  );
+  box-shadow: 0 10px 18px rgba(63, 180, 255, 0.25);
 }
 
 .pro-profile-editor-tab:focus-visible {
@@ -12495,8 +12573,8 @@
   color: var(--pro-ink);
   cursor: pointer;
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   appearance: none;
   font-family: inherit;
 }
@@ -12537,6 +12615,8 @@
   color: var(--ink);
   font-size: 12px;
   font-weight: 700;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-media-cover.has-image {
@@ -12554,19 +12634,21 @@
   border-radius: 999px;
   background: rgba(28, 106, 182, 0.22);
   border: 1px solid rgba(170, 228, 255, 0.6);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-card {
   border-radius: 22px;
   padding: 14px;
   background: var(--glass-bg);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-editor-stack {
@@ -12577,20 +12659,20 @@
 .pro-profile-editor-section {
   border-radius: 20px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: var(--glass-bg-soft);
+  border: 1px solid rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  backdrop-filter: blur(14px) saturate(1.05);
-  -webkit-backdrop-filter: blur(14px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-section--summary {
   background:
-    radial-gradient(120% 120% at 0% 0%, rgba(43, 185, 214, 0.18), transparent 60%),
-    rgba(255, 255, 255, 0.6);
+    radial-gradient(120% 120% at 0% 0%, rgba(63, 180, 255, 0.28), transparent 60%),
+    var(--glass-bg);
 }
 
 .pro-profile-editor-section-head {
@@ -12657,11 +12739,11 @@
   gap: 12px;
   border-radius: 18px;
   padding: 12px;
-  background: rgba(28, 106, 182, 0.24);
+  background: var(--glass-bg-soft);
   border: 1px solid rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-deposit-qr {
@@ -12797,6 +12879,8 @@
   cursor: pointer;
   position: relative;
   font-family: inherit;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-toggle-card:focus-within {
@@ -12895,6 +12979,8 @@
   background: rgba(28, 106, 182, 0.2);
   border: 1px solid rgba(170, 228, 255, 0.5);
   cursor: pointer;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-preset:focus-visible {
@@ -12905,7 +12991,7 @@
 .pro-profile-editor-preset.is-active {
   border-color: rgba(63, 180, 255, 0.55);
   background: rgba(63, 180, 255, 0.22);
-  color: #0a4f85;
+  color: var(--pro-ink);
 }
 
 .pro-profile-editor-preset.is-ghost {
@@ -12927,6 +13013,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-metric-label {
@@ -12953,8 +13041,8 @@
   grid-template-columns: auto 1fr auto;
   gap: 12px;
   align-items: center;
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-highlight-icon {
@@ -12962,7 +13050,7 @@
   height: 42px;
   border-radius: 14px;
   background: rgba(63, 180, 255, 0.25);
-  color: #0a4f85;
+  color: var(--pro-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -13001,39 +13089,54 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   background: rgba(63, 180, 255, 0.22);
-  color: #0a4f85;
+  color: var(--pro-ink);
   border: 1px solid rgba(170, 228, 255, 0.55);
 }
 
 .pro-profile-settings-screen {
   --pro-editor-savebar: 0px;
-  --pro-ink: #0a162b;
-  --pro-muted: #5f7aa1;
+  --pro-ink: #eef5ff;
+  --pro-muted: #b4c7e6;
   --accent: #3fb4ff;
   --accent-rgb: 63, 180, 255;
-  --accent-strong: #1480c5;
+  --accent-strong: #66c5ff;
   --accent-soft: rgba(63, 180, 255, 0.22);
   --raspberry: #8ac4ff;
   --raspberry-rgb: 138, 196, 255;
-  --surface: #b7dafc;
-  --surface-rgb: 183, 218, 252;
-  --surface-muted: #a8d2fb;
-  --surface-muted-rgb: 168, 210, 251;
+  --surface: #8fc4f6;
+  --surface-rgb: 143, 196, 246;
+  --surface-muted: #82bbf2;
+  --surface-muted-rgb: 130, 187, 242;
+  --paper-rgb: 114, 170, 232;
   --shadow-rgb: 10, 22, 43;
-  --glass-bg: rgba(28, 106, 182, 0.24);
-  --glass-bg-strong: rgba(28, 106, 182, 0.34);
-  --glass-bg-soft: rgba(28, 106, 182, 0.18);
+  --glass-bg: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.38),
+    rgba(16, 70, 130, 0.3)
+  );
+  --glass-bg-strong: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.52),
+    rgba(16, 70, 130, 0.44)
+  );
+  --glass-bg-soft: linear-gradient(
+    145deg,
+    rgba(28, 106, 182, 0.28),
+    rgba(16, 70, 130, 0.24)
+  );
   --glass-border: rgba(170, 228, 255, 0.55);
   --glass-shadow: 0 26px 44px rgba(10, 22, 43, 0.28);
   --glass-shadow-soft: 0 18px 32px rgba(10, 22, 43, 0.22);
-  --glass-inset: inset 0 1px 0 rgba(170, 228, 255, 0.35);
+  --glass-inset: inset 0 1px 0 rgba(170, 228, 255, 0.4);
+  --glass-frost: blur(30px) saturate(1.15);
+  --glass-frost-soft: blur(22px) saturate(1.1);
   isolation: isolate;
   background:
     radial-gradient(120% 120% at 8% -10%, rgba(80, 170, 255, 0.45), transparent
         55%),
     radial-gradient(140% 120% at 98% -5%, rgba(70, 140, 255, 0.35), transparent
         60%),
-    linear-gradient(180deg, #a7cff9 0%, #c1e2ff 55%, #d3ecff 100%);
+    linear-gradient(180deg, #8fc4f6 0%, #a6d6ff 55%, #bbe6ff 100%);
 }
 
 .pro-profile-settings-shell {
@@ -13054,8 +13157,8 @@
   border: 1px solid rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow);
   overflow: hidden;
-  backdrop-filter: blur(20px) saturate(1.15);
-  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-settings-hero::before {
@@ -13202,8 +13305,8 @@
   border: 1px solid rgba(170, 228, 255, 0.55);
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-settings-summary::before {
@@ -13363,7 +13466,7 @@
   transition: width 0.3s ease;
   box-shadow:
     0 4px 10px rgba(var(--accent-rgb), 0.35),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.25);
+    inset 0 -1px 0 rgba(170, 228, 255, 0.25);
 }
 
 .pro-profile-settings-actions {
@@ -13381,12 +13484,14 @@
   padding: 7px 12px;
   font-size: 9.5px;
   font-weight: 700;
-  color: #0b6b8b;
+  color: #eaf4ff;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   background: rgba(28, 106, 182, 0.22);
   border: 1px solid rgba(170, 228, 255, 0.55);
   box-shadow: 0 12px 20px rgba(63, 180, 255, 0.28);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   cursor: pointer;
   font-family: inherit;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
@@ -13410,8 +13515,8 @@
   box-shadow: var(--glass-shadow-soft);
   overflow: hidden;
   border: 1px solid rgba(170, 228, 255, 0.55);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-settings-group-head {
@@ -13459,8 +13564,8 @@
   transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease,
     border-color 0.18s ease;
   box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.1);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-settings-item.is-required .pro-profile-settings-icon {
@@ -13576,10 +13681,10 @@
 .pro-profile-settings-screen .pro-bottom-nav {
   z-index: 8;
   background: var(--glass-bg-strong);
-  border-color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(170, 228, 255, 0.55);
   box-shadow: 0 -16px 26px rgba(var(--shadow-rgb), 0.18);
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-certificates {
@@ -13621,19 +13726,19 @@
 }
 
 .pro-profile-editor-certificates-add {
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(170, 228, 255, 0.55);
+  background: rgba(28, 106, 182, 0.22);
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 11px;
   font-weight: 700;
-  color: #0b6b8b;
+  color: var(--pro-ink);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   cursor: pointer;
-  box-shadow: 0 12px 18px rgba(43, 185, 214, 0.22);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  box-shadow: 0 12px 18px rgba(63, 180, 255, 0.22);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   white-space: nowrap;
 }
 
@@ -13656,19 +13761,19 @@
 .pro-profile-editor-certificate-card {
   border-radius: 18px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: var(--glass-bg-soft);
+  border: 1px solid rgba(170, 228, 255, 0.55);
   display: flex;
   flex-direction: column;
   gap: 12px;
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-certificate-media {
-  border: 1px dashed rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px dashed rgba(170, 228, 255, 0.55);
+  background: rgba(28, 106, 182, 0.22);
   border-radius: 16px;
   aspect-ratio: var(--certificate-ratio, 4 / 3);
   display: flex;
@@ -13681,6 +13786,8 @@
   color: inherit;
   font: inherit;
   transition: transform 0.2s ease;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-certificate-media:active {
@@ -13728,15 +13835,17 @@
 }
 
 .pro-profile-editor-certificate-action {
-  border: 1px solid var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.95);
+  border: 1px solid rgba(170, 228, 255, 0.5);
+  background: rgba(28, 106, 182, 0.22);
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 11px;
   font-weight: 700;
   color: var(--pro-ink);
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.1);
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.16);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-certificate-action.is-danger {
@@ -13752,11 +13861,13 @@
 .pro-profile-editor-certificates-empty {
   padding: 12px;
   border-radius: 16px;
-  border: 1px dashed rgba(var(--shadow-rgb), 0.2);
-  background: rgba(var(--paper-rgb), 0.8);
+  border: 1px dashed rgba(170, 228, 255, 0.45);
+  background: rgba(28, 106, 182, 0.18);
   font-size: 12px;
   font-weight: 600;
   color: var(--pro-muted);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 @media (max-width: 360px) {
@@ -26354,7 +26465,7 @@ h2 {
 }
 
 .pro-profile-editor-screen[data-editor-section] {
-  --editor-card-bg: rgba(28, 106, 182, 0.24);
+  --editor-card-bg: var(--glass-bg);
   --editor-card-border: rgba(170, 228, 255, 0.55);
   --editor-card-shadow: var(--glass-shadow-soft);
   background:
@@ -26377,14 +26488,14 @@ h2 {
   background: var(--editor-card-bg);
   border: 1px solid var(--editor-card-border);
   box-shadow: var(--editor-card-shadow);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-editor-screen[data-editor-section] .pro-profile-editor-section--summary {
   background:
-    radial-gradient(120% 120% at 0% 0%, rgba(43, 185, 214, 0.2), transparent 60%),
-    var(--editor-card-bg);
+    radial-gradient(120% 120% at 0% 0%, rgba(63, 180, 255, 0.28), transparent 60%),
+    var(--glass-bg);
 }
 
 .pro-profile-editor-screen[data-editor-section] .pro-profile-editor-section-title {
@@ -26406,8 +26517,8 @@ h2 {
   background: rgba(28, 106, 182, 0.2);
   border: 1px solid rgba(170, 228, 255, 0.5);
   box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.1);
-  backdrop-filter: blur(10px) saturate(1.05);
-  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-screen[data-editor-section="basic"] .pro-profile-editor-preview-card {
@@ -26431,16 +26542,13 @@ h2 {
 
 .pro-profile-editor-screen[data-editor-section="location"] .pro-geo-card {
   border-style: solid;
-  border-color: rgba(var(--shadow-rgb), 0.12);
-  background:
-    linear-gradient(
-      135deg,
-      rgba(var(--paper-rgb), 0.96),
-      rgba(var(--paper-rgb), 0.88)
-    );
-  box-shadow: 0 14px 22px rgba(var(--shadow-rgb), 0.1);
+  border-color: rgba(170, 228, 255, 0.55);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-shadow-soft);
   position: relative;
   overflow: hidden;
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-editor-screen[data-editor-section="location"] .pro-geo-card::before {
@@ -26448,16 +26556,15 @@ h2 {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 120% at 0% 0%, rgba(var(--accent-rgb), 0.12), transparent
-        60%),
+    radial-gradient(120% 120% at 0% 0%, rgba(63, 180, 255, 0.2), transparent 60%),
     repeating-linear-gradient(
       0deg,
-      rgba(var(--shadow-rgb), 0.04),
-      rgba(var(--shadow-rgb), 0.04) 1px,
+      rgba(170, 228, 255, 0.08),
+      rgba(170, 228, 255, 0.08) 1px,
       transparent 1px,
       transparent 8px
     );
-  opacity: 0.6;
+  opacity: 0.55;
   pointer-events: none;
 }
 
@@ -26471,7 +26578,7 @@ h2 {
   background: linear-gradient(
     120deg,
     rgba(var(--accent-rgb), 0.98),
-    rgba(var(--raspberry-rgb), 0.9)
+    rgba(var(--accent-rgb), 0.7)
   );
   box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
 }
@@ -26486,9 +26593,11 @@ h2 {
 .pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-presets {
   padding: 6px;
   border-radius: 16px;
-  background: rgba(var(--paper-rgb), 0.92);
-  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  background: rgba(28, 106, 182, 0.22);
+  border: 1px solid rgba(170, 228, 255, 0.45);
   gap: 6px;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-preset {
@@ -26496,16 +26605,19 @@ h2 {
   font-size: 10px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  background: rgba(var(--paper-rgb), 0.98);
+  background: rgba(28, 106, 182, 0.2);
+  border: 1px solid rgba(170, 228, 255, 0.4);
+  color: var(--pro-ink);
 }
 
 .pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-preset.is-active {
   background: linear-gradient(
     120deg,
     rgba(var(--accent-rgb), 0.2),
-    rgba(var(--raspberry-rgb), 0.18)
+    rgba(var(--accent-rgb), 0.1)
   );
-  color: var(--accent-strong);
+  color: var(--pro-ink);
+  border-color: rgba(170, 228, 255, 0.65);
 }
 
 .pro-profile-editor-screen[data-editor-section="availability"] .request-chips {
@@ -26516,9 +26628,11 @@ h2 {
   padding: 6px 10px;
   font-size: 12px;
   border-radius: 12px;
-  background: rgba(var(--paper-rgb), 0.95);
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  background: rgba(28, 106, 182, 0.22);
+  border: 1px solid rgba(170, 228, 255, 0.45);
+  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.12);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-screen[data-editor-section="availability"] .request-chip.is-active {
@@ -26534,14 +26648,16 @@ h2 {
 .pro-profile-editor-screen[data-editor-section="services"] .pro-service-block {
   border-radius: 20px;
   padding: 12px;
-  background: rgba(var(--paper-rgb), 0.92);
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  box-shadow: 0 14px 24px rgba(var(--shadow-rgb), 0.1);
+  background: var(--glass-bg);
+  border: 1px solid rgba(170, 228, 255, 0.5);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-editor-screen[data-editor-section="services"] .pro-service-panel-head {
   padding-bottom: 6px;
-  border-bottom: 1px dashed rgba(var(--shadow-rgb), 0.12);
+  border-bottom: 1px dashed rgba(170, 228, 255, 0.35);
 }
 
 .pro-profile-editor-screen[data-editor-section="services"] .pro-service-suggestion {
@@ -26549,6 +26665,8 @@ h2 {
   background: rgba(28, 106, 182, 0.2);
   border: 1px solid rgba(170, 228, 255, 0.5);
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.18);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-screen[data-editor-section="services"] .pro-service-suggestion.is-active {
@@ -26567,8 +26685,8 @@ h2 {
   background: var(--glass-bg);
   border: 1px solid rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-screen[data-editor-section="services"] .pro-service-name {
@@ -26578,8 +26696,8 @@ h2 {
 
 .pro-profile-editor-screen[data-editor-section="services"] .pro-service-add-overlay {
   background: rgba(28, 106, 182, 0.22);
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"] .pro-profile-editor-highlight {
@@ -26640,8 +26758,8 @@ h2 {
   background: var(--glass-bg);
   border: 1px solid rgba(170, 228, 255, 0.55);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-profile-editor-screen[data-editor-section="certificates"]
