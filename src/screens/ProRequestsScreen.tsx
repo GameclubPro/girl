@@ -69,7 +69,6 @@ const bookingOutcomeLabelMap: Record<string, string> = {
   on_time: 'Вовремя',
   late: 'Опоздал',
   no_show: 'Не пришёл',
-  late_cancel: 'Поздняя отмена',
 }
 
 const weekDayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
@@ -335,7 +334,7 @@ const formatOutcomeLabel = (
   if (outcome === 'late' && typeof lateMinutes === 'number') {
     return `Опоздал на ${lateMinutes} мин.`
   }
-  return bookingOutcomeLabelMap[outcome] ?? outcome
+  return bookingOutcomeLabelMap[outcome] ?? 'Отменено'
 }
 
 const isOutcomePending = (booking: Booking) => {
@@ -2213,10 +2212,6 @@ export const ProRequestsScreen = ({
               : depositStatus === 'pending'
                 ? 'Ожидает оплаты депозита'
                 : ''
-    const lateCancelFeePercent =
-      typeof booking.lateCancelFeePercent === 'number'
-        ? Math.max(0, Math.round(booking.lateCancelFeePercent))
-        : 0
     const canConfirmDeposit = depositStatus === 'submitted'
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
@@ -2282,11 +2277,6 @@ export const ProRequestsScreen = ({
         {depositAmount > 0 && (
           <div className="booking-item-meta">
             Депозит к оплате: {formatPrice(depositAmount)}
-          </div>
-        )}
-        {lateCancelFeePercent > 0 && (
-          <div className="booking-item-meta booking-item-meta--warning">
-            Поздняя отмена: {lateCancelFeePercent}%
           </div>
         )}
         {depositAmount > 0 && depositStatusLabel && (

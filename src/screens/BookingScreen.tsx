@@ -643,10 +643,6 @@ export const BookingScreen = ({
         : 0
   const depositAmountLabel =
     depositAmount > 0 ? formatPrice(depositAmount) : ''
-  const lateCancelFeePercent =
-    typeof profile?.lateCancelFeePercent === 'number'
-      ? Math.max(0, Math.round(profile.lateCancelFeePercent))
-      : null
   const cancelPolicyValue =
     cancelWindowHours === null
       ? 'Правила отмены уточняются с мастером'
@@ -660,23 +656,16 @@ export const BookingScreen = ({
         : 'Депозит подтвержден, сумма уточняется'
       : depositType === 'percent'
         ? depositPercent !== null && depositPercent > 0
-          ? `Депозит ${depositPercent}% для фиксации слота`
-          : 'Депозит подтвержден, процент уточняется'
+        ? `Депозит ${depositPercent}% для фиксации слота`
+        : 'Депозит подтвержден, процент уточняется'
         : 'Без депозита'
-  const lateCancelPolicyValue =
-    lateCancelFeePercent === null
-      ? 'Условия поздней отмены уточняются'
-      : lateCancelFeePercent > 0
-        ? `Поздняя отмена: удержание ${lateCancelFeePercent}%`
-        : 'Без штрафа за позднюю отмену'
   const policyHint =
-    cancelWindowHours === null && depositPercent === null && lateCancelFeePercent === null
+    cancelWindowHours === null && depositPercent === null
       ? 'Политики появятся после ответа мастера — при необходимости уточните в чате.'
       : 'Подтверждая запись, вы соглашаетесь с политиками мастера.'
   const policyItems = [
     { label: 'Отмена', value: cancelPolicyValue },
     { label: 'Депозит', value: depositPolicyValue },
-    { label: 'Поздняя отмена', value: lateCancelPolicyValue },
   ]
   const showDepositPay = depositType !== 'none'
   const depositPayLabel =

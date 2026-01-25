@@ -295,7 +295,6 @@ type ProfilePayload = {
   depositFixed: number | null
   depositDetails: string | null
   depositQrUrl: string | null
-  lateCancelFeePercent: number | null
   worksAtClient: boolean
   worksAtMaster: boolean
   categories: string[]
@@ -394,7 +393,6 @@ export const ProProfileScreen = ({
   const [depositQrUrl, setDepositQrUrl] = useState<string | null>(null)
   const [depositQrUploading, setDepositQrUploading] = useState(false)
   const [depositQrError, setDepositQrError] = useState('')
-  const [lateCancelFeePercent, setLateCancelFeePercent] = useState('')
   const [proLocation, setProLocation] = useState<UserLocation | null>(null)
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
@@ -546,7 +544,6 @@ export const ProProfileScreen = ({
       depositFixed: parseNumber(depositFixed),
       depositDetails: depositDetails.trim() || null,
       depositQrUrl: depositQrUrl?.trim() || null,
-      lateCancelFeePercent: parseNumber(lateCancelFeePercent),
       worksAtClient,
       worksAtMaster,
       categories: [...categories],
@@ -569,7 +566,6 @@ export const ProProfileScreen = ({
     depositType,
     experienceYears,
     isActive,
-    lateCancelFeePercent,
     portfolioStrings,
     priceFromValue,
     priceToValue,
@@ -823,7 +819,6 @@ export const ProProfileScreen = ({
   const cancelWindowValue = parseNumber(cancelWindowHours)
   const depositPercentValue = parseNumber(depositPercent)
   const depositFixedValue = parseNumber(depositFixed)
-  const lateCancelFeeValue = parseNumber(lateCancelFeePercent)
   const cancelWindowLabel =
     cancelWindowValue !== null
       ? `Бесплатная отмена за ${cancelWindowValue} ч`
@@ -838,10 +833,6 @@ export const ProProfileScreen = ({
           ? `Депозит ${depositPercentValue}%`
           : 'Без депозита'
         : 'Без депозита'
-  const lateCancelLabel =
-    lateCancelFeeValue !== null && lateCancelFeeValue > 0
-      ? `Поздняя отмена ${lateCancelFeeValue}%`
-      : 'Без штрафа за отмену'
   const hasCustomPolicies =
     (cancelWindowValue !== null && cancelWindowValue !== 12) ||
     ((depositType === 'fixed' &&
@@ -849,11 +840,10 @@ export const ProProfileScreen = ({
       depositFixedValue > 0) ||
       (depositType === 'percent' &&
         depositPercentValue !== null &&
-        depositPercentValue > 0)) ||
-    (lateCancelFeeValue !== null && lateCancelFeeValue > 0)
+        depositPercentValue > 0))
   const policiesSummary =
-    cancelWindowLabel || depositLabel || lateCancelLabel
-      ? [cancelWindowLabel, depositLabel, lateCancelLabel]
+    cancelWindowLabel || depositLabel
+      ? [cancelWindowLabel, depositLabel]
           .filter(Boolean)
           .join(' · ')
       : 'Политики не настроены'
@@ -1784,10 +1774,6 @@ export const ProProfileScreen = ({
           typeof data.depositDetails === 'string' ? data.depositDetails : ''
         const nextDepositQrUrl =
           typeof data.depositQrUrl === 'string' ? data.depositQrUrl : ''
-        const nextLateCancelFeePercent =
-          typeof data.lateCancelFeePercent === 'number'
-            ? Math.max(0, Math.round(data.lateCancelFeePercent))
-            : 0
         const nextWorksAtClient = data.worksAtClient
         const nextWorksAtMaster = data.worksAtMaster
         const nextCategories = data.categories ?? []
@@ -1819,7 +1805,6 @@ export const ProProfileScreen = ({
         setDepositFixed(String(nextDepositFixed || ''))
         setDepositDetails(nextDepositDetails)
         setDepositQrUrl(nextDepositQrUrl || null)
-        setLateCancelFeePercent(String(nextLateCancelFeePercent))
         setWorksAtClient(nextWorksAtClient)
         setWorksAtMaster(nextWorksAtMaster)
         setCategories(nextCategories)
@@ -1863,7 +1848,6 @@ export const ProProfileScreen = ({
           depositFixed: nextDepositFixed,
           depositDetails: nextDepositDetails.trim() || null,
           depositQrUrl: nextDepositQrUrl.trim() || null,
-          lateCancelFeePercent: nextLateCancelFeePercent,
           worksAtClient: nextWorksAtClient,
           worksAtMaster: nextWorksAtMaster,
           categories: [...nextCategories],
@@ -5312,7 +5296,7 @@ export const ProProfileScreen = ({
                         Задайте сроки бесплатной отмены и правила удержания.
                       </p>
                     </div>
-                    <div className="pro-field pro-field--split">
+                    <div className="pro-field">
                       <div>
                         <label className="pro-label" htmlFor="policy-cancel-window">
                           Бесплатная отмена, ч
@@ -5331,28 +5315,7 @@ export const ProProfileScreen = ({
                           placeholder="12"
                         />
                       </div>
-                      <div>
-                        <label className="pro-label" htmlFor="policy-late-fee">
-                          Поздняя отмена, %
-                        </label>
-                        <input
-                          id="policy-late-fee"
-                          className="pro-input"
-                          type="number"
-                          min="0"
-                          max="100"
-                          inputMode="numeric"
-                          value={lateCancelFeePercent}
-                          onChange={(event) =>
-                            setLateCancelFeePercent(event.target.value)
-                          }
-                          placeholder="0"
-                        />
-                      </div>
                     </div>
-                    <span className="pro-profile-editor-help">
-                      Если клиент отменяет позже окна, удерживается штраф.
-                    </span>
                   </div>
 
                   <div className="pro-profile-editor-section">
@@ -5564,11 +5527,6 @@ export const ProProfileScreen = ({
                       </p>
                       <p className="pro-policy-preview-item">
                         {depositLabel}
-                      </p>
-                      <p className="pro-policy-preview-item">
-                        {lateCancelFeeValue !== null && lateCancelFeeValue > 0
-                          ? `Поздняя отмена: ${lateCancelFeeValue}%`
-                          : 'Штраф за отмену не удерживается'}
                       </p>
                     </div>
                   </div>

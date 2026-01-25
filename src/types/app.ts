@@ -90,7 +90,6 @@ export type MasterProfile = {
   depositFixed?: number | null
   depositDetails?: string | null
   depositQrUrl?: string | null
-  lateCancelFeePercent?: number | null
   updatedAt?: string | null
   reviewsCount?: number | null
   reviewsAverage?: number | null
@@ -231,7 +230,6 @@ export type Booking = {
   depositProofUrl?: string | null
   depositDetails?: string | null
   depositQrUrl?: string | null
-  lateCancelFeePercent?: number | null
   status: BookingStatus
   outcome?: string | null
   attendanceAt?: string | null

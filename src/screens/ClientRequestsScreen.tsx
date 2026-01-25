@@ -1826,10 +1826,6 @@ export const ClientRequestsScreen = ({
                     isHoldCritical && depositHoldTimeLeft
                       ? `Критично: осталось ${depositHoldTimeLeft}`
                       : ''
-                  const lateCancelFeePercent =
-                    typeof booking.lateCancelFeePercent === 'number'
-                      ? Math.max(0, Math.round(booking.lateCancelFeePercent))
-                      : 0
                   const canDelete =
                     booking.status === 'cancelled' || booking.status === 'declined'
                   const isConfirmed = booking.status === 'confirmed'
@@ -2018,7 +2014,7 @@ export const ClientRequestsScreen = ({
                         !freeCancelLabel &&
                         !isPast && (
                           <div className="booking-item-meta booking-item-meta--warning">
-                            Отмена с удержанием
+                            Отмена без бесплатного окна
                           </div>
                         )}
                       {depositPercent > 0 && (
@@ -2029,11 +2025,6 @@ export const ClientRequestsScreen = ({
                       {depositAmount > 0 && (
                         <div className="booking-item-meta">
                           Депозит к оплате: {formatPrice(depositAmount)}
-                        </div>
-                      )}
-                      {lateCancelFeePercent > 0 && (
-                        <div className="booking-item-meta booking-item-meta--warning">
-                          Поздняя отмена: {lateCancelFeePercent}%
                         </div>
                       )}
                       {depositAmount > 0 && depositStatusLabel && (

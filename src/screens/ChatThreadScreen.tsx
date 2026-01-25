@@ -44,7 +44,6 @@ const bookingOutcomeLabelMap: Record<string, string> = {
   on_time: 'Вовремя',
   late: 'Опоздал',
   no_show: 'Не пришёл',
-  late_cancel: 'Поздняя отмена',
 }
 
 const bookingStatusLabelMap: Record<string, string> = {
@@ -110,7 +109,7 @@ const formatOutcomeSummary = (outcome?: string | null, lateMinutes?: number | nu
   if (outcome === 'late' && typeof lateMinutes === 'number') {
     return `Опоздал на ${lateMinutes} мин.`
   }
-  return bookingOutcomeLabelMap[outcome] ?? outcome
+  return bookingOutcomeLabelMap[outcome] ?? 'Отменено'
 }
 
 const formatDateTime = (value?: string | null) => {
@@ -1980,19 +1979,6 @@ export const ChatThreadScreen = ({
                             }
                           >
                             Не пришёл
-                          </button>
-                          <button
-                            className="chat-outcome-action is-neutral"
-                            type="button"
-                            disabled={!canAct || isSubmitting}
-                            onClick={() =>
-                              void submitBookingOutcome(
-                                outcomePrompt.bookingId,
-                                'late_cancel'
-                              )
-                            }
-                          >
-                            Поздняя отмена
                           </button>
                         </div>
                       ) : !isProViewer ? (

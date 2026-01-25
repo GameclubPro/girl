@@ -65,7 +65,6 @@ const TRUST_EVENT_WEIGHTS = {
   visit_on_time: 5,
   visit_late: -5,
   visit_rescheduled: -3,
-  visit_late_cancel: -8,
   visit_no_show: -30,
 }
 const TRUST_EVENT_TYPE_LIST = Object.keys(TRUST_EVENT_WEIGHTS)
@@ -74,7 +73,6 @@ const BOOKING_OUTCOME_LABELS = {
   on_time: 'Вовремя',
   late: 'Опоздал',
   no_show: 'Не пришёл',
-  late_cancel: 'Поздняя отмена',
 }
 const MAX_CERTIFICATES = 12
 const SUPPORT_AGENT_IDS = Array.from(
@@ -1949,7 +1947,6 @@ const loadMasterProfile = async (userId) => {
         deposit_fixed AS "depositFixed",
         deposit_details AS "depositDetails",
         deposit_qr_path AS "depositQrPath",
-        late_cancel_fee_percent AS "lateCancelFeePercent",
         works_at_client AS "worksAtClient",
         works_at_master AS "worksAtMaster"
       FROM master_profiles
@@ -2994,7 +2991,6 @@ const ensureSchema = async () => {
       deposit_fixed INTEGER,
       deposit_details TEXT,
       deposit_qr_path TEXT,
-      late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -3167,11 +3163,6 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
-    ALTER TABLE master_profiles
-    ADD COLUMN IF NOT EXISTS late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0;
-  `)
-
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS service_requests (
       id SERIAL PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -3222,7 +3213,6 @@ const ensureSchema = async () => {
       deposit_hold_expires_at TIMESTAMPTZ,
       deposit_paid_at TIMESTAMPTZ,
       deposit_proof_path TEXT,
-      late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0,
       proposed_price INTEGER,
       client_comment TEXT,
       cancelled_by TEXT,
@@ -3279,11 +3269,6 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS deposit_proof_path TEXT;
-  `)
-
-  await pool.query(`
-    ALTER TABLE service_bookings
-    ADD COLUMN IF NOT EXISTS late_cancel_fee_percent INTEGER NOT NULL DEFAULT 0;
   `)
 
   await pool.query(`
@@ -4212,7 +4197,6 @@ app.get('/api/masters/:userId', async (req, res) => {
           mp.deposit_fixed AS "depositFixed",
           mp.deposit_details AS "depositDetails",
           mp.deposit_qr_path AS "depositQrPath",
-          mp.late_cancel_fee_percent AS "lateCancelFeePercent",
           mp.works_at_client AS "worksAtClient",
           mp.works_at_master AS "worksAtMaster",
           mp.categories,
@@ -5272,7 +5256,6 @@ app.post('/api/masters', async (req, res) => {
     depositDetails,
     depositQrPath,
     depositQrUrl,
-    lateCancelFeePercent,
     worksAtClient,
     worksAtMaster,
     categories,
@@ -5300,7 +5283,6 @@ app.post('/api/masters', async (req, res) => {
   const parsedCancelWindowHours = parseOptionalInt(cancelWindowHours)
   const parsedDepositPercent = parseOptionalInt(depositPercent)
   const parsedDepositFixed = parseOptionalInt(depositFixed)
-  const parsedLateCancelFeePercent = parseOptionalInt(lateCancelFeePercent)
   const normalizedDepositType = normalizeText(depositType)
   const normalizedDepositDetails = normalizeText(depositDetails)
   const normalizedDepositQrPath = normalizeText(depositQrPath ?? depositQrUrl)
@@ -5314,11 +5296,6 @@ app.post('/api/masters', async (req, res) => {
   )
   const normalizedDepositPercent = clampValue(parsedDepositPercent ?? 0, 0, 100)
   const normalizedDepositFixed = clampValue(parsedDepositFixed ?? 0, 0, 1000000)
-  const normalizedLateCancelFeePercent = clampValue(
-    parsedLateCancelFeePercent ?? 0,
-    0,
-    100
-  )
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -5397,7 +5374,6 @@ app.post('/api/masters', async (req, res) => {
           deposit_fixed,
           deposit_details,
           deposit_qr_path,
-          late_cancel_fee_percent,
           works_at_client,
           works_at_master,
           categories,
@@ -5428,9 +5404,8 @@ app.post('/api/masters', async (req, res) => {
           $20,
           $21,
           $22,
-          $23,
-          COALESCE($24, '{}'::text[]),
-          $25::jsonb
+          COALESCE($23, '{}'::text[]),
+          $24::jsonb
         )
         ON CONFLICT (user_id) DO UPDATE
         SET display_name = EXCLUDED.display_name,
@@ -5450,15 +5425,14 @@ app.post('/api/masters', async (req, res) => {
             deposit_fixed = EXCLUDED.deposit_fixed,
             deposit_details = EXCLUDED.deposit_details,
             deposit_qr_path = EXCLUDED.deposit_qr_path,
-            late_cancel_fee_percent = EXCLUDED.late_cancel_fee_percent,
             works_at_client = EXCLUDED.works_at_client,
             works_at_master = EXCLUDED.works_at_master,
             categories = EXCLUDED.categories,
             services = EXCLUDED.services,
             portfolio_urls =
               CASE
-                WHEN $24 IS NULL THEN master_profiles.portfolio_urls
-                ELSE $24
+                WHEN $23 IS NULL THEN master_profiles.portfolio_urls
+                ELSE $23
               END,
             certificates = EXCLUDED.certificates,
             updated_at = NOW()
@@ -5482,7 +5456,6 @@ app.post('/api/masters', async (req, res) => {
         normalizedDepositFixed,
         normalizedDepositDetails || null,
         normalizedDepositQrPath || null,
-        normalizedLateCancelFeePercent,
         workAtClient,
         workAtMaster,
         categoryList,
@@ -5831,7 +5804,6 @@ app.get('/api/bookings', async (req, res) => {
           b.deposit_hold_expires_at AS "depositHoldExpiresAt",
           b.deposit_paid_at AS "depositPaidAt",
           b.deposit_proof_path AS "depositProofPath",
-          b.late_cancel_fee_percent AS "lateCancelFeePercent",
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
           b.outcome,
@@ -5930,7 +5902,6 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.deposit_hold_expires_at AS "depositHoldExpiresAt",
           b.deposit_paid_at AS "depositPaidAt",
           b.deposit_proof_path AS "depositProofPath",
-          b.late_cancel_fee_percent AS "lateCancelFeePercent",
           b.proposed_price AS "proposedPrice",
           b.client_comment AS "comment",
           b.outcome,
@@ -6523,11 +6494,6 @@ app.post('/api/bookings', async (req, res) => {
       0,
       100
     )
-    const normalizedLateCancelFeePercent = clampValue(
-      parseOptionalInt(profile.lateCancelFeePercent) ?? 0,
-      0,
-      100
-    )
     const depositAmount = calculateDepositAmount(
       profile,
       matchedService.price ?? null
@@ -6714,11 +6680,10 @@ app.post('/api/bookings', async (req, res) => {
           deposit_amount,
           deposit_status,
           deposit_hold_expires_at,
-          late_cancel_fee_percent,
           proposed_price,
           client_comment
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NULL, $20)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NULL, $19)
         RETURNING id, created_at AS "createdAt"
       `,
       [
@@ -6740,7 +6705,6 @@ app.post('/api/bookings', async (req, res) => {
         depositAmount,
         depositStatus,
         depositHoldExpiresAt,
-        normalizedLateCancelFeePercent,
         normalizedComment || null,
       ]
     )
@@ -6805,7 +6769,6 @@ app.patch('/api/bookings/:id', async (req, res) => {
           deposit_hold_expires_at AS "depositHoldExpiresAt",
           deposit_paid_at AS "depositPaidAt",
           deposit_proof_path AS "depositProofPath",
-          late_cancel_fee_percent AS "lateCancelFeePercent",
           outcome
         FROM service_bookings
         WHERE id = $1
@@ -7345,20 +7308,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
         72
       )
       const depositPercent = clampValue(parseOptionalInt(booking.depositPercent) ?? 0, 0, 100)
-      const lateCancelFeePercent = clampValue(
-        parseOptionalInt(booking.lateCancelFeePercent) ?? 0,
-        0,
-        100
-      )
-
       const cancelledDate = new Date()
       const cancelledAt = cancelledDate.toISOString()
-      const scheduledAt = new Date(booking.scheduledAt ?? '')
-      const isLateCancel =
-        !Number.isNaN(scheduledAt.getTime()) &&
-        scheduledAt.getTime() - cancelledDate.getTime() <
-          cancelWindowHours * 60 * 60 * 1000
-      const outcomeValue = isLateCancel ? 'late_cancel' : null
 
       await pool.query(
         `
@@ -7366,34 +7317,30 @@ app.patch('/api/bookings/:id', async (req, res) => {
           SET status = 'cancelled',
               cancelled_by = 'client',
               cancelled_at = $2,
-              outcome = $3,
+              outcome = NULL,
               updated_at = NOW()
           WHERE id = $1
         `,
-        [bookingId, cancelledAt, outcomeValue]
+        [bookingId, cancelledAt]
       )
 
       await logClientTrustEvent({
         userId: booking.clientId,
-        eventType: isLateCancel ? 'visit_late_cancel' : 'visit_rescheduled',
+        eventType: 'visit_rescheduled',
         meta: {
           ref: `booking:${bookingId}`,
           bookingId,
           scheduledAt: booking.scheduledAt,
           cancelWindowHours,
           depositPercent,
-          lateCancelFeePercent,
-          isLateCancel,
         },
       })
 
       res.json({
         ok: true,
         status: 'cancelled',
-        isLateCancel,
         cancelWindowHours,
         depositPercent,
-        lateCancelFeePercent,
       })
       return
     }
@@ -7404,7 +7351,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
-      if (!['on_time', 'late', 'no_show', 'late_cancel'].includes(normalizedOutcome)) {
+      if (!['on_time', 'late', 'no_show'].includes(normalizedOutcome)) {
         res.status(400).json({ error: 'outcome_invalid' })
         return
       }
@@ -7437,11 +7384,6 @@ app.patch('/api/bookings/:id', async (req, res) => {
       } else {
         updates.push('late_minutes = NULL')
         updates.push(normalizedOutcome === 'on_time' ? 'attendance_at = NOW()' : 'attendance_at = NULL')
-      }
-
-      if (normalizedOutcome === 'late_cancel') {
-        updates.push(`cancelled_by = COALESCE(cancelled_by, 'client')`)
-        updates.push(`cancelled_at = COALESCE(cancelled_at, NOW())`)
       }
 
       const outcomeLabel =
@@ -7526,18 +7468,13 @@ app.patch('/api/bookings/:id', async (req, res) => {
         ...(normalizedOutcome === 'late'
           ? { lateMinutes: parsedLateMinutes }
           : {}),
-        ...(normalizedOutcome === 'late_cancel'
-          ? { source: 'outcome' }
-          : {}),
       }
       const trustEventType =
         normalizedOutcome === 'on_time'
           ? 'visit_on_time'
           : normalizedOutcome === 'late'
             ? 'visit_late'
-            : normalizedOutcome === 'no_show'
-              ? 'visit_no_show'
-              : 'visit_rescheduled'
+            : 'visit_no_show'
 
       await logClientTrustEvent({
         userId: booking.clientId,
@@ -8539,11 +8476,6 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             0,
             100
           )
-          const normalizedLateCancelFeePercent = clampValue(
-            parseOptionalInt(profile.lateCancelFeePercent) ?? 0,
-            0,
-            100
-          )
 
           const serviceItems = parseServiceItems(profile.services ?? [])
           const normalizedRequestedService = normalizeServiceName(request.serviceName)
@@ -8695,11 +8627,10 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
                 deposit_amount,
                 deposit_status,
                 deposit_hold_expires_at,
-                late_cancel_fee_percent,
                 proposed_price,
                 client_comment
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed', $13, $14, $15, $16, $17, $18, NULL, $19)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed', $13, $14, $15, $16, $17, NULL, $18)
               RETURNING id, created_at AS "createdAt"
             `,
             [
@@ -8720,7 +8651,6 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
               depositAmount,
               depositStatus,
               depositHoldExpiresAt,
-              normalizedLateCancelFeePercent,
               requestComment,
             ]
           )
@@ -10246,32 +10176,6 @@ const backfillClientTrustScores = async () => {
         scheduledAt: row.scheduledAt,
       },
       occurredAt: row.cancelledAt,
-    })
-  }
-
-  const lateCancelBookings = await pool.query(
-    `
-      SELECT
-        id,
-        client_id AS "clientId",
-        scheduled_at AS "scheduledAt",
-        COALESCE(cancelled_at, updated_at) AS "eventAt"
-      FROM service_bookings
-      WHERE outcome = 'late_cancel'
-    `
-  )
-
-  for (const row of lateCancelBookings.rows) {
-    await trackEvent({
-      userId: row.clientId,
-      eventType: 'visit_rescheduled',
-      meta: {
-        ref: `booking:${row.id}`,
-        bookingId: row.id,
-        scheduledAt: row.scheduledAt,
-        source: 'outcome',
-      },
-      occurredAt: row.eventAt,
     })
   }
 

@@ -741,10 +741,6 @@ export const ClientMasterProfileScreen = ({
         : depositPercent && depositPercent > 0
           ? 'percent'
           : 'none'
-  const lateCancelFeePercent =
-    typeof profile?.lateCancelFeePercent === 'number'
-      ? Math.max(0, Math.round(profile.lateCancelFeePercent))
-      : null
   const cancelPolicyValue =
     cancelWindowHours === null
       ? 'Уточняется в переписке'
@@ -753,9 +749,7 @@ export const ClientMasterProfileScreen = ({
         : `Бесплатная отмена за ${formatHoursLabel(cancelWindowHours)} до визита`
   const cancelPolicyNote =
     cancelWindowHours && cancelWindowHours > 0
-      ? lateCancelFeePercent && lateCancelFeePercent > 0
-        ? 'После этого окна действует штраф.'
-        : 'После этого окна условия уточняются.'
+      ? 'После этого окна условия уточняются.'
       : 'Лучше предупредить заранее.'
   const depositPolicyValue =
     depositType === 'fixed'
@@ -774,18 +768,8 @@ export const ClientMasterProfileScreen = ({
       : depositType === 'fixed' || depositType === 'percent'
         ? 'Размер депозита уточняется.'
         : 'Оплата после подтверждения.'
-  const lateCancelPolicyValue =
-    lateCancelFeePercent === null
-      ? 'Уточняется'
-      : lateCancelFeePercent > 0
-        ? `Удержание ${lateCancelFeePercent}%`
-        : 'Без штрафа'
-  const lateCancelPolicyNote =
-    lateCancelFeePercent && lateCancelFeePercent > 0
-      ? 'Применяется при отмене после окна.'
-      : 'Гибкие условия для клиентов.'
   const policySummary =
-    cancelWindowHours === null && depositPercent === null && lateCancelFeePercent === null
+    cancelWindowHours === null && depositPercent === null
       ? 'Политики пока не заполнены — уточните детали в чате.'
       : 'Прозрачные условия помогают держать слот и время.'
   const policyItems = [
@@ -800,12 +784,6 @@ export const ClientMasterProfileScreen = ({
       label: 'Депозит',
       value: depositPolicyValue,
       note: depositPolicyNote,
-    },
-    {
-      id: 'late',
-      label: 'Поздняя отмена',
-      value: lateCancelPolicyValue,
-      note: lateCancelPolicyNote,
     },
   ]
   const profileStats = [
