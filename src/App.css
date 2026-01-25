@@ -20126,31 +20126,26 @@ h2 {
 }
 
 .screen--client-master-profile {
-  --pro-pad-x: 16px;
-  --pro-pad-top: calc(12px + var(--safe-top) + var(--tg-top-offset));
+  --pro-pad-x: 18px;
+  --pro-pad-top: calc(14px + var(--safe-top) + var(--tg-top-offset));
   --pro-ink: var(--ink);
   --pro-muted: var(--muted);
-  --pro-border: rgba(255, 255, 255, 0.36);
-  --pro-surface: rgba(var(--paper-rgb), 0.75);
-  --pro-surface-strong: rgba(var(--paper-rgb), 0.92);
+  --pro-border: rgba(var(--shadow-rgb), 0.14);
+  --pro-surface: rgba(var(--paper-rgb), 0.84);
+  --pro-surface-strong: rgba(var(--paper-rgb), 0.96);
   --pro-accent: var(--accent);
-  --pro-accent-2: #7cc8ff;
-  --pro-accent-3: #98e2ff;
+  --pro-accent-2: #5aa7ff;
+  --pro-accent-3: #4bd1ff;
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
-  --cm-glass: rgba(255, 255, 255, 0.45);
-  --cm-glass-soft: rgba(255, 255, 255, 0.28);
-  --cm-glass-strong: rgba(255, 255, 255, 0.62);
-  --cm-border: rgba(255, 255, 255, 0.32);
-  --cm-border-strong: rgba(255, 255, 255, 0.5);
-  --cm-shadow: 0 26px 48px rgba(var(--shadow-rgb), 0.18);
-  --cm-shadow-soft: 0 14px 28px rgba(var(--shadow-rgb), 0.12);
-  --cm-blur: 18px;
+  --cm-glass: rgba(var(--paper-rgb), 0.82);
+  --cm-glass-strong: rgba(var(--paper-rgb), 0.94);
+  --cm-border: rgba(var(--shadow-rgb), 0.12);
+  --cm-shadow: 0 18px 30px rgba(var(--shadow-rgb), 0.16);
   background:
-    radial-gradient(140% 120% at 6% -12%, rgba(79, 111, 255, 0.22), transparent 60%),
-    radial-gradient(120% 120% at 96% -4%, rgba(125, 210, 255, 0.18), transparent 62%),
-    radial-gradient(120% 120% at 50% 120%, rgba(111, 163, 255, 0.16), transparent 60%),
-    linear-gradient(160deg, #eef3ff 0%, #f8fbff 48%, #ffffff 100%);
+    radial-gradient(120% 120% at 8% -12%, rgba(var(--accent-rgb), 0.18), transparent 60%),
+    radial-gradient(140% 140% at 105% 0%, rgba(var(--raspberry-rgb), 0.12), transparent 62%),
+    linear-gradient(180deg, #f2f6ff 0%, #ffffff 48%, #ffffff 100%);
   color: var(--pro-ink);
   position: relative;
   overflow-x: hidden;
@@ -20163,152 +20158,60 @@ h2 {
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.8), transparent 58%),
-    radial-gradient(circle at 90% 6%, rgba(255, 255, 255, 0.55), transparent 62%),
-    radial-gradient(circle at 50% 110%, rgba(111, 163, 255, 0.2), transparent 60%);
-  opacity: 0.7;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.screen--client-master-profile::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(120% 90% at 0% 100%, rgba(79, 111, 255, 0.18), transparent 62%),
-    radial-gradient(120% 90% at 100% 100%, rgba(92, 209, 255, 0.16), transparent 62%);
-  opacity: 0.55;
+    radial-gradient(circle at 14% 10%, rgba(255, 255, 255, 0.75), transparent 55%),
+    radial-gradient(circle at 88% 6%, rgba(255, 255, 255, 0.5), transparent 60%);
+  opacity: 0.65;
   z-index: 0;
   pointer-events: none;
 }
 
 .screen--client-master-profile .pro-shell {
-  gap: 20px;
-  position: relative;
-  z-index: 1;
-}
-
-.screen--client-master-profile .pro-profile-ig {
-  position: relative;
-  gap: 14px;
-  padding: 12px;
-  border-radius: 28px;
-  background: var(--cm-glass-strong);
-  border: 1px solid var(--cm-border-strong);
-  box-shadow: var(--cm-shadow);
-  backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  overflow: hidden;
-}
-
-.screen--client-master-profile .pro-profile-ig::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    radial-gradient(120% 120% at 12% 0%, rgba(255, 255, 255, 0.7), transparent 58%),
-    radial-gradient(140% 120% at 90% 10%, rgba(125, 210, 255, 0.35), transparent 64%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 55%);
-  opacity: 0.6;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.screen--client-master-profile .pro-profile-ig > * {
-  position: relative;
-  z-index: 1;
+  gap: 18px;
+  z-index: auto;
 }
 
 .screen--client-master-profile .pro-profile-ig-cover {
-  height: clamp(170px, 50vw, 210px);
-  margin: -12px -12px 0;
-  border-radius: 24px;
-  clip-path: none;
-  -webkit-clip-path: none;
+  height: 170px;
   background: linear-gradient(
-    140deg,
-    rgba(95, 122, 255, 0.96) 0%,
-    rgba(110, 174, 255, 0.9) 45%,
-    rgba(219, 236, 255, 0.85) 100%
+    135deg,
+    #7f9dff 0%,
+    #6fa6ff 42%,
+    #dfe8ff 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  box-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.16);
+  box-shadow: 0 18px 26px rgba(var(--shadow-rgb), 0.14);
   filter: none;
 }
 
 .screen--client-master-profile .pro-profile-ig-cover::after {
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.55) 0%,
-    rgba(255, 255, 255, 0.2) 42%,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.08) 45%,
     rgba(255, 255, 255, 0) 100%
   );
 }
 
 .screen--client-master-profile .pro-profile-ig-cover-glow {
   background-image:
-    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.75), transparent 58%),
-    radial-gradient(circle at 78% 16%, rgba(140, 202, 255, 0.6), transparent 62%),
-    radial-gradient(circle at 82% 80%, rgba(176, 215, 255, 0.45), transparent 60%);
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.6), transparent 55%),
+    radial-gradient(circle at 78% 16%, rgba(138, 196, 255, 0.55), transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(173, 209, 255, 0.45), transparent 58%);
   opacity: 1;
 }
 
-.screen--client-master-profile .pro-profile-ig-header {
-  margin-top: -52px;
-  padding: 12px;
-  border-radius: 22px;
-  background: var(--cm-glass);
-  border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  position: relative;
-  z-index: 1;
-}
-
-.screen--client-master-profile .pro-profile-ig-header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.55),
-    rgba(255, 255, 255, 0)
-  );
-  opacity: 0.7;
-  pointer-events: none;
-}
-
-.screen--client-master-profile .pro-profile-ig-header > * {
-  position: relative;
-  z-index: 1;
-}
-
 .screen--client-master-profile .pro-profile-ig-avatar {
-  width: clamp(96px, 28vw, 120px);
-  height: clamp(96px, 28vw, 120px);
-  border-radius: 28px;
-  background: linear-gradient(145deg, rgba(102, 135, 255, 0.94), rgba(96, 208, 255, 0.88));
-  border-color: rgba(255, 255, 255, 0.86);
+  background: linear-gradient(145deg, #6f8eff 0%, #6fa6ff 45%, #5cc9ff 100%);
+  border-color: rgba(255, 255, 255, 0.98);
   box-shadow: 0 20px 30px rgba(var(--shadow-rgb), 0.22);
-  font-size: clamp(20px, 6vw, 26px);
 }
 
 .screen--client-master-profile .pro-profile-ig-avatar::before {
-  inset: -3px;
-  border-radius: 32px;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.65), transparent 55%),
-    radial-gradient(circle at 80% 80%, rgba(103, 190, 255, 0.6), transparent 60%);
-}
-
-.screen--client-master-profile .pro-profile-ig-name {
-  font-family: var(--font-title);
-  font-size: clamp(20px, 6.4vw, 28px);
-  letter-spacing: -0.01em;
+  background: radial-gradient(
+    circle at 20% 20%,
+    rgba(255, 255, 255, 0.7),
+    rgba(128, 166, 255, 0.55),
+    rgba(96, 150, 255, 0.35)
+  );
 }
 
 
@@ -20378,40 +20281,26 @@ h2 {
 
 .screen--client-master-profile .pro-profile-ig-name-row {
   position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
-  z-index: 1;
 }
 
 .screen--client-master-profile .master-profile-follow-inline {
-  position: static;
-  padding: 6px 12px;
+  position: absolute;
+  left: 0;
+  top: calc(100% - 2px);
+  padding: 4px 8px;
   font-size: 10px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   line-height: 1;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.14);
+  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.12);
   white-space: nowrap;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  z-index: 2;
 }
 
 .screen--client-master-profile .pro-profile-ig-actions {
   display: grid;
   gap: 10px;
-  padding: 8px;
-  border-radius: 18px;
-  background: var(--cm-glass-soft);
-  border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  position: relative;
-  z-index: 1;
+  padding: 0 6px;
 }
 
 .screen--client-master-profile .master-profile-booking-cta {
@@ -20419,166 +20308,48 @@ h2 {
   justify-content: center;
   padding: 14px 16px;
   font-size: 14px;
-  border-radius: 18px;
+  border-radius: 20px;
   letter-spacing: 0.02em;
-  background: linear-gradient(135deg, #3f6dff 0%, #6ad7ff 100%);
-  box-shadow: 0 16px 28px rgba(63, 109, 255, 0.32);
+  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.22);
 }
 
 .screen--client-master-profile .pro-profile-ig-stats {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  padding: 8px;
-  --ig-stats-radius: 18px;
-  background: var(--cm-glass-soft);
+  gap: 8px;
+  padding: 10px;
+  --ig-stats-radius: 20px;
+  background: var(--cm-glass);
   border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--cm-blur)) saturate(160%);
+  box-shadow: var(--cm-shadow);
+  backdrop-filter: blur(12px);
 }
 
 .screen--client-master-profile .pro-profile-ig-stats::before,
 .screen--client-master-profile .pro-profile-ig-stats::after {
-  opacity: 0.35;
+  opacity: 0.45;
 }
 
 .screen--client-master-profile .pro-profile-ig-stat-button {
   border-radius: 14px;
   padding: 10px 6px;
-  background: rgba(255, 255, 255, 0.52);
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    background 0.18s ease,
-    border-color 0.18s ease;
+  background: rgba(var(--paper-rgb), 0.72);
+  border: 1px solid rgba(var(--shadow-rgb), 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .screen--client-master-profile .pro-profile-ig-stat-button.is-active {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 12px 22px rgba(var(--shadow-rgb), 0.18);
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.18);
 }
 
 .screen--client-master-profile .pro-profile-ig-stat-value {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .screen--client-master-profile .pro-profile-ig-stat-label {
   font-size: 9px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-.screen--client-master-profile .pro-profile-ig-body {
-  --pro-ig-card-bg: var(--cm-glass);
-  --pro-ig-card-border: var(--cm-border);
-  --pro-ig-card-shadow: var(--cm-shadow-soft);
-  --pro-ig-card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  padding: 0;
-  gap: 14px;
-}
-
-.screen--client-master-profile .pro-profile-ig-tags {
-  background: var(--cm-glass-soft);
-  border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.screen--client-master-profile .pro-profile-ig-tags .pro-profile-tag {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(255, 255, 255, 0.6);
-  color: var(--pro-ink);
-}
-
-.screen--client-master-profile .pro-profile-ig-tags .pro-profile-tag.is-review {
-  background: linear-gradient(
-    135deg,
-    rgba(79, 111, 255, 0.2),
-    rgba(95, 210, 255, 0.22)
-  );
-  border-color: rgba(255, 255, 255, 0.6);
-  color: var(--pro-ink);
-}
-
-.screen--client-master-profile .pro-profile-status-card {
-  background: var(--cm-glass);
-  border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.screen--client-master-profile .pro-profile-status-card::after {
-  opacity: 0.5;
-}
-
-.screen--client-master-profile .pro-profile-facts-grid {
-  background: var(--cm-glass-soft);
-  border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.screen--client-master-profile .pro-profile-fact-card {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-profile-fact-card.is-muted {
-  background: rgba(255, 255, 255, 0.4);
-  border-color: rgba(255, 255, 255, 0.45);
-}
-
-.screen--client-master-profile .pro-profile-fact-icon {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: var(--pro-accent);
-  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.1);
-}
-
-.screen--client-master-profile .pro-profile-certificates {
-  background: var(--cm-glass-soft);
-  border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.screen--client-master-profile .pro-profile-certificates-action {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: var(--pro-ink);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.12);
-}
-
-.screen--client-master-profile .pro-profile-certificates-action.is-toggle {
-  background: linear-gradient(135deg, #3f6dff 0%, #6ad7ff 100%);
-  border-color: transparent;
-  color: #ffffff;
-}
-
-.screen--client-master-profile .pro-profile-certificate-card {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-profile-certificate-media {
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.7);
 }
 
 .screen--client-master-profile
@@ -20601,20 +20372,18 @@ h2 {
   display: flex;
   gap: 10px;
   overflow-x: auto;
-  padding: 10px 16px 12px;
+  padding: 8px 18px 12px;
   margin: 0 calc(50% - 50vw);
   scroll-snap-type: x mandatory;
-  scroll-padding: 16px;
+  scroll-padding: 18px;
   scrollbar-width: none;
   position: sticky;
   top: calc(var(--safe-top) + var(--tg-top-offset) + 6px);
   z-index: 6;
-  background: rgba(255, 255, 255, 0.62);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 0 0 18px 18px;
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  box-shadow: 0 12px 22px rgba(var(--shadow-rgb), 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  border-bottom: 1px solid rgba(var(--shadow-rgb), 0.08);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.06);
 }
 
 .screen--client-master-profile .master-profile-tabs::-webkit-scrollbar {
@@ -20634,18 +20403,18 @@ h2 {
 
 .screen--client-master-profile .master-profile-tabs::before {
   left: 0;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.88), transparent);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), transparent);
 }
 
 .screen--client-master-profile .master-profile-tabs::after {
   right: 0;
-  background: linear-gradient(270deg, rgba(255, 255, 255, 0.88), transparent);
+  background: linear-gradient(270deg, rgba(255, 255, 255, 0.9), transparent);
 }
 
 .screen--client-master-profile .master-profile-tab {
   flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  background: rgba(var(--paper-rgb), 0.86);
   border-radius: 999px;
   padding: 8px 14px;
   min-height: 40px;
@@ -20654,13 +20423,7 @@ h2 {
   color: var(--muted);
   cursor: pointer;
   scroll-snap-align: start;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -20668,9 +20431,9 @@ h2 {
 
 .screen--client-master-profile .master-profile-tab.is-active {
   color: #ffffff;
-  background: linear-gradient(125deg, #4f6bff, #5fd2ff);
+  background: linear-gradient(120deg, #4f6bff, #5fc5ff);
   border-color: transparent;
-  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.32);
+  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.28);
 }
 
 .screen--client-master-profile .master-profile-tab:focus-visible {
@@ -20678,16 +20441,11 @@ h2 {
   outline-offset: 2px;
 }
 
-.screen--client-master-profile .master-profile-tab:active {
-  transform: translateY(1px) scale(0.98);
-}
-
 .screen--client-master-profile .master-profile-tab-badge {
   min-width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.22);
   color: #ffffff;
   display: inline-flex;
   align-items: center;
@@ -20699,152 +20457,68 @@ h2 {
 .screen--client-master-profile
   .master-profile-tab:not(.is-active)
   .master-profile-tab-badge {
-  background: rgba(255, 255, 255, 0.6);
-  border-color: rgba(255, 255, 255, 0.65);
+  background: rgba(var(--accent-rgb), 0.12);
   color: #4165ff;
 }
 
 .screen--client-master-profile .master-profile-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
   position: relative;
 }
 
 .screen--client-master-profile .master-profile-section {
-  scroll-margin-top: calc(var(--safe-top) + var(--tg-top-offset) + 96px);
+  scroll-margin-top: calc(var(--safe-top) + var(--tg-top-offset) + 84px);
 }
 
 .screen--client-master-profile .master-profile-overview {
-  gap: 14px;
+  gap: 12px;
 }
 
 .screen--client-master-profile .pro-profile-portfolio-panel,
 .screen--client-master-profile .pro-profile-schedule-panel,
 .screen--client-master-profile .pro-profile-reviews {
-  border-radius: 24px;
+  border-radius: 22px;
   background: var(--cm-glass);
   border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  overflow: visible;
+  box-shadow: var(--cm-shadow);
 }
 
 .screen--client-master-profile .pro-profile-portfolio-panel {
-  padding: 16px;
-  width: auto;
-  margin-left: 0;
-  margin-right: 0;
+  padding: 14px;
 }
 
 .screen--client-master-profile .pro-profile-portfolio-panel-head {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .screen--client-master-profile .pro-profile-portfolio-panel-action {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .screen--client-master-profile .pro-profile-portfolio-item {
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
+  border-radius: 16px;
 }
 
 .screen--client-master-profile .pro-profile-portfolio-item img {
-  border-radius: 18px;
-}
-
-.screen--client-master-profile .pro-profile-portfolio-panel::before {
-  opacity: 0.35;
-  background:
-    radial-gradient(120% 120% at 0% 0%, rgba(255, 255, 255, 0.6), transparent 60%),
-    radial-gradient(120% 120% at 100% 0%, rgba(125, 210, 255, 0.35), transparent 62%);
+  border-radius: 16px;
 }
 
 .screen--client-master-profile .pro-profile-schedule-panel {
-  padding: 16px;
-  width: auto;
-  margin-left: 0;
-  margin-right: 0;
-  overflow: visible;
-}
-
-.screen--client-master-profile .pro-profile-schedule-panel::before {
-  opacity: 0.35;
-  background:
-    radial-gradient(120% 120% at 0% 0%, rgba(255, 255, 255, 0.6), transparent 60%),
-    radial-gradient(120% 120% at 100% 0%, rgba(125, 210, 255, 0.3), transparent 62%);
-}
-
-.screen--client-master-profile .pro-profile-schedule-info {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: var(--pro-accent);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-profile-schedule-popover {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--cm-shadow);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.screen--client-master-profile .pro-profile-schedule-popover::before {
-  background: rgba(255, 255, 255, 0.78);
-  border-left-color: rgba(255, 255, 255, 0.6);
-  border-top-color: rgba(255, 255, 255, 0.6);
-}
-
-.screen--client-master-profile .pro-profile-schedule-popover-day {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-}
-
-.screen--client-master-profile .pro-profile-schedule-popover-day.is-active {
-  background: linear-gradient(135deg, #3f6dff 0%, #6ad7ff 100%);
-  border-color: transparent;
-}
-
-.screen--client-master-profile .pro-profile-schedule-day {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.1);
-}
-
-.screen--client-master-profile .pro-profile-schedule-day.is-active {
-  background: linear-gradient(135deg, #3f6dff 0%, #6ad7ff 100%);
-  border-color: transparent;
-  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.25);
-}
-
-.screen--client-master-profile .pro-profile-schedule-timebar {
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 14px;
 }
 
 .screen--client-master-profile .pro-profile-reviews {
-  padding: 16px;
+  padding: 14px;
 }
 
 .screen--client-master-profile .master-profile-policies {
-  border-radius: 24px;
+  border-radius: 22px;
   background: var(--cm-glass);
   border: 1px solid var(--cm-border);
-  box-shadow: var(--cm-shadow-soft);
-  backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--cm-blur)) saturate(160%);
-  padding: 16px;
+  box-shadow: var(--cm-shadow);
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -20888,11 +20562,9 @@ h2 {
 .master-policy-card {
   padding: 12px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(var(--paper-rgb), 0.86);
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -20925,39 +20597,22 @@ h2 {
   color: var(--pro-muted);
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .screen--client-master-profile .pro-profile-reviews-summary,
 .screen--client-master-profile .pro-profile-review-card {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 12px 22px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-profile-reviews-count-pill {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(var(--paper-rgb), 0.86);
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.1);
 }
 
 .screen--client-master-profile .master-profile-follow-button.is-active {
-  background: linear-gradient(
-    135deg,
-    rgba(79, 111, 255, 0.24),
-    rgba(95, 210, 255, 0.22)
-  );
-  border-color: rgba(255, 255, 255, 0.65);
+  background: rgba(var(--accent-rgb), 0.16);
+  border-color: rgba(var(--accent-rgb), 0.35);
   color: var(--pro-ink);
-  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.18);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.18);
 }
 
 .master-profile-cover-fallback {
@@ -20982,19 +20637,14 @@ h2 {
 .master-profile-skeleton-cover {
   height: 150px;
   border-radius: 24px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.75),
-    rgba(233, 241, 255, 0.85)
-  );
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.12);
+  background: linear-gradient(135deg, rgba(var(--surface-rgb), 0.9), rgba(var(--surface-rgb), 0.9));
+  box-shadow: 0 18px 26px rgba(var(--shadow-rgb), 0.12);
 }
 
 .master-profile-skeleton-line {
   height: 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--pro-border);
 }
 
 .master-profile-skeleton-line.is-wide {
@@ -21007,11 +20657,6 @@ h2 {
 
 .screen--client-master-profile .pro-profile-ig-status {
   cursor: default;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .pro-profile-card.is-static {
@@ -21025,11 +20670,9 @@ h2 {
 }
 
 .screen--client-master-profile .bottom-nav {
-  border-top: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 -14px 24px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-top: 1px solid var(--pro-border);
+  background: rgba(var(--paper-rgb), 0.9);
+  box-shadow: 0 -12px 22px rgba(var(--shadow-rgb), 0.12);
 }
 
 .screen--client-master-profile .nav-item {
@@ -21038,87 +20681,6 @@ h2 {
 
 .screen--client-master-profile .nav-item.is-active {
   color: var(--pro-accent);
-}
-
-.screen--client-master-profile .pro-followers-sheet-overlay {
-  background: rgba(15, 20, 40, 0.36);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.screen--client-master-profile .pro-followers-sheet {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--cm-shadow);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-}
-
-.screen--client-master-profile .pro-followers-search-input {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-followers-card {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-followers-avatar {
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.screen--client-master-profile .pro-followers-sheet-close,
-.screen--client-master-profile .pro-followers-sheet-clear,
-.screen--client-master-profile .pro-followers-sheet-load {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: var(--pro-ink);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-portfolio-lightbox-overlay {
-  background: rgba(15, 20, 40, 0.4);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-.screen--client-master-profile .pro-portfolio-lightbox {
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--cm-shadow);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-}
-
-.screen--client-master-profile .pro-portfolio-lightbox-media {
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.screen--client-master-profile .pro-portfolio-lightbox-close,
-.screen--client-master-profile .pro-portfolio-lightbox-action {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: var(--pro-ink);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.screen--client-master-profile .pro-portfolio-lightbox-action.is-danger {
-  background: rgba(var(--danger-rgb), 0.5);
-  border-color: rgba(var(--danger-rgb), 0.45);
-  color: var(--danger);
 }
 
 .screen--client-master-profile .client-shell {
@@ -21132,11 +20694,8 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(var(--surface-rgb), 0.9);
+  border: 1px solid rgba(var(--surface-rgb), 0.7);
 }
 
 .client-master-profile-skeleton {
@@ -22846,8 +22405,8 @@ h2 {
   }
 
   .screen--client-master-profile .master-profile-tabs {
-    padding: 6px 12px 10px;
-    scroll-padding: 12px;
+    padding: 2px 14px 8px;
+    scroll-padding: 14px;
   }
 
   .client-profile-location {
