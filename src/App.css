@@ -26827,6 +26827,39 @@ h2 {
   backdrop-filter: none;
 }
 
+.screen--pro-profile .pro-profile-ig-cover::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 170%;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), 0.22), transparent 48%),
+    radial-gradient(circle at 88% 22%, rgba(var(--accent-rgb), 0.18), transparent 50%),
+    radial-gradient(circle at 40% 85%, rgba(255, 255, 255, 0.45), transparent 52%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.28) 0px,
+      rgba(255, 255, 255, 0.28) 6px,
+      rgba(255, 255, 255, 0) 6px,
+      rgba(255, 255, 255, 0) 22px
+    ),
+    conic-gradient(
+      from 210deg at 20% 20%,
+      rgba(255, 255, 255, 0.4),
+      rgba(var(--accent-rgb), 0.18),
+      rgba(255, 255, 255, 0.25),
+      rgba(var(--accent-rgb), 0.14),
+      rgba(255, 255, 255, 0.4)
+    );
+  opacity: 0.55;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.screen--pro-profile .pro-profile-ig-cover.has-image::before {
+  opacity: 0.12;
+}
+
 .screen--pro-profile .pro-profile-ig-cover::after {
   background: linear-gradient(
     180deg,
@@ -26842,6 +26875,21 @@ h2 {
     radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.4), transparent 55%),
     radial-gradient(circle at 82% 14%, rgba(206, 220, 255, 0.38), transparent 60%),
     radial-gradient(circle at 78% 80%, rgba(176, 198, 255, 0.28), transparent 60%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .screen--pro-profile .pro-profile-ig-cover::before {
+    animation: cover-pattern-float 18s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes cover-pattern-float {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-10px);
+  }
 }
 
 .screen--pro-profile .pro-profile-hero-cover {
