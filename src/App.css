@@ -22978,7 +22978,7 @@ h2 {
 }
 
 /* Primary actions: precise aquamarine accents */
-.request-submit,
+.request-submit:not(.request-submit--cancel),
 .booking-action.is-primary,
 .cabinet-next-button,
 .response-action.is-primary,
