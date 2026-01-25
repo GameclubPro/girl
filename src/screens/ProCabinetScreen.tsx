@@ -32,6 +32,11 @@ const formatShortDate = (value: Date) =>
     value
   )
 
+const formatShortTime = (value: Date) =>
+  new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(
+    value
+  )
+
 const formatWeekday = (value: Date) =>
   new Intl.DateTimeFormat('ru-RU', { weekday: 'short' })
     .format(value)
@@ -129,10 +134,14 @@ export const ProCabinetScreen = ({
   onOpenStories,
   onOpenSupport,
 }: ProCabinetScreenProps) => {
-  const { requestStats, bookingStats, bookings } = useProCabinetData(
-    apiBase,
-    userId
-  )
+  const {
+    requestStats,
+    bookingStats,
+    bookings,
+    lastUpdated,
+    isLoading,
+    combinedError,
+  } = useProCabinetData(apiBase, userId)
   const [showcasePreview, setShowcasePreview] = useState<PortfolioItem[]>([])
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null)
   const [profileDisplayName, setProfileDisplayName] = useState('')
@@ -244,6 +253,27 @@ export const ProCabinetScreen = ({
     [profileDisplayName]
   )
   const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
+  const heroTitle = profileDisplayName || 'Панель мастера'
+  const nextBookingDate = bookingStats.nextBookingTime
+    ? new Date(bookingStats.nextBookingTime)
+    : null
+  const nextBookingLabel = nextBookingDate
+    ? `Следующая запись · ${formatShortDate(nextBookingDate)} · ${formatShortTime(
+        nextBookingDate
+      )}`
+    : 'Ближайших записей нет'
+  const syncLabel = combinedError
+    ? combinedError
+    : isLoading
+      ? 'Синхронизация данных...'
+      : lastUpdated
+        ? `Обновлено ${formatShortDate(lastUpdated)} · ${formatShortTime(lastUpdated)}`
+        : ''
+  const summaryItems = [
+    { label: 'Открытые заявки', value: requestStats.open },
+    { label: 'Записи на неделе', value: bookingStats.upcomingWeek },
+    { label: 'Клиенты', value: bookingStats.uniqueClients },
+  ]
   const tapHint = (
     <span className="pro-cabinet-nav-hint" aria-hidden="true">
       <span className="pro-cabinet-nav-hint-arrow" />
@@ -252,303 +282,369 @@ export const ProCabinetScreen = ({
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
-      <div className="pro-cabinet-shell pro-cabinet-shell--icons">
-        <div className="pro-cabinet-nav-grid">
-          <button
-            className="pro-cabinet-nav-card is-analytics animate delay-1"
-            type="button"
-            onClick={onOpenAnalytics}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconDashboard />
+      <div className="pro-cabinet-shell">
+        <header className="pro-cabinet-hero animate delay-1">
+          <div className="pro-cabinet-hero-top">
+            <div className="pro-cabinet-hero-heading">
+              <p className="pro-cabinet-hero-kicker">Кабинет мастера</p>
+              <h1 className="pro-cabinet-title">{heroTitle}</h1>
+              <p className="pro-cabinet-hint">
+                Спокойный контроль расписания, клиентов и контента.
+              </p>
+            </div>
+            <button
+              className="pro-cabinet-hero-profile"
+              type="button"
+              onClick={() => onEditProfile()}
+            >
+              <span className="pro-cabinet-hero-avatar" aria-hidden="true">
+                {avatarDisplayUrl ? (
+                  <img src={avatarDisplayUrl} alt="" loading="lazy" />
+                ) : (
+                  <span>{profileInitials}</span>
+                )}
               </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Статистика</span>
-                <span className="pro-cabinet-nav-title">Аналитика</span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-spark" aria-hidden="true">
-                {analyticsSpark.map((value, index) => (
-                  <span
-                    className="pro-cabinet-nav-spark-bar"
-                    key={`analytics-spark-${index}`}
-                    style={{ '--spark': value } as CSSProperties}
-                  />
-                ))}
-              </div>
-              <div className="pro-cabinet-nav-stats">
-                <div className="pro-cabinet-nav-stat">
-                  <span className="pro-cabinet-nav-stat-value">
-                    {requestStats.open}
-                  </span>
-                  <span className="pro-cabinet-nav-stat-label">Открытые</span>
-                </div>
-                <div className="pro-cabinet-nav-stat">
-                  <span className="pro-cabinet-nav-stat-value">
-                    {bookingStats.confirmed}
-                  </span>
-                  <span className="pro-cabinet-nav-stat-label">Записи</span>
-                </div>
-              </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-calendar animate delay-2"
-            type="button"
-            onClick={onOpenCalendar}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconCalendar />
+              <span className="pro-cabinet-hero-profile-text">
+                <span className="pro-cabinet-hero-profile-label">Профиль</span>
+                <span className="pro-cabinet-hero-profile-name">
+                  {profileDisplayName || 'Мастер'}
+                </span>
               </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">График</span>
-                <span className="pro-cabinet-nav-title">Календарь</span>
+            </button>
+          </div>
+          <div className="pro-cabinet-hero-meta">
+            <span className="pro-cabinet-hero-pill">{nextBookingLabel}</span>
+            {syncLabel ? (
+              <span
+                className={`pro-cabinet-hero-sync${combinedError ? ' is-error' : ''}`}
+              >
+                {syncLabel}
+              </span>
+            ) : null}
+          </div>
+          <div className="pro-cabinet-summary">
+            {summaryItems.map((item) => (
+              <div className="pro-cabinet-summary-item" key={item.label}>
+                <span className="pro-cabinet-summary-value">{item.value}</span>
+                <span className="pro-cabinet-summary-label">{item.label}</span>
               </div>
+            ))}
+          </div>
+        </header>
+
+        <section className="pro-cabinet-section">
+          <div className="pro-cabinet-section-head">
+            <div>
+              <p className="pro-cabinet-section-kicker">Инструменты</p>
+              <h2 className="pro-cabinet-section-title">Разделы кабинета</h2>
             </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-week" aria-hidden="true">
-                {calendarPreview.map((day) => (
-                  <div
-                    className={`pro-cabinet-nav-day${day.isToday ? ' is-today' : ''}`}
-                    key={day.key}
-                  >
-                    <span className="pro-cabinet-nav-day-label">{day.label}</span>
+            <span className="pro-cabinet-section-meta">
+              {requestStats.open > 0
+                ? `Открытых заявок ${requestStats.open}`
+                : 'Все запросы обработаны'}
+            </span>
+          </div>
+
+          <div className="pro-cabinet-nav-grid">
+            <button
+              className="pro-cabinet-nav-card is-analytics animate delay-2"
+              type="button"
+              onClick={onOpenAnalytics}
+            >
+              {tapHint}
+              <div className="pro-cabinet-nav-head">
+                <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                  <IconDashboard />
+                </span>
+                <div className="pro-cabinet-nav-info">
+                  <span className="pro-cabinet-nav-kicker">Статистика</span>
+                  <span className="pro-cabinet-nav-title">Аналитика</span>
+                </div>
+              </div>
+              <div className="pro-cabinet-nav-preview">
+                <div className="pro-cabinet-nav-spark" aria-hidden="true">
+                  {analyticsSpark.map((value, index) => (
                     <span
-                      className={`pro-cabinet-nav-day-dot${
-                        day.count > 0 ? ' is-active' : ''
-                      }`}
+                      className="pro-cabinet-nav-spark-bar"
+                      key={`analytics-spark-${index}`}
+                      style={{ '--spark': value } as CSSProperties}
                     />
+                  ))}
+                </div>
+                <div className="pro-cabinet-nav-stats">
+                  <div className="pro-cabinet-nav-stat">
+                    <span className="pro-cabinet-nav-stat-value">
+                      {requestStats.open}
+                    </span>
+                    <span className="pro-cabinet-nav-stat-label">Открытые</span>
                   </div>
-                ))}
+                  <div className="pro-cabinet-nav-stat">
+                    <span className="pro-cabinet-nav-stat-value">
+                      {bookingStats.confirmed}
+                    </span>
+                    <span className="pro-cabinet-nav-stat-label">Записи</span>
+                  </div>
+                </div>
               </div>
-              <div className="pro-cabinet-nav-pills">
-                <span className="pro-cabinet-nav-pill">
-                  На неделе {bookingStats.upcomingWeek}
+            </button>
+            <button
+              className="pro-cabinet-nav-card is-calendar animate delay-3"
+              type="button"
+              onClick={onOpenCalendar}
+            >
+              {tapHint}
+              <div className="pro-cabinet-nav-head">
+                <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                  <IconCalendar />
                 </span>
-                <span className="pro-cabinet-nav-pill is-ghost">
-                  Активных {bookingStats.upcoming}
-                </span>
+                <div className="pro-cabinet-nav-info">
+                  <span className="pro-cabinet-nav-kicker">График</span>
+                  <span className="pro-cabinet-nav-title">Календарь</span>
+                </div>
               </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-clients animate delay-3"
-            type="button"
-            onClick={onOpenClients}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconUsers />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">База</span>
-                <span className="pro-cabinet-nav-title">Клиенты</span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview is-clients-preview">
-              <div className="pro-cabinet-nav-client-list">
-                {clientRows.map((client, index) => {
-                  const isGhost = !client
-                  const name = client?.name ?? 'Первые клиенты'
-                  const meta = client
-                    ? formatClientMeta(client)
-                    : 'Появятся после записи'
-                  const isRepeat = client ? client.count > 1 : false
-                  const badge = client ? (isRepeat ? 'повторный' : 'новый') : null
-                  return (
+              <div className="pro-cabinet-nav-preview">
+                <div className="pro-cabinet-nav-week" aria-hidden="true">
+                  {calendarPreview.map((day) => (
                     <div
-                      className={`pro-cabinet-nav-client-row${
-                        isGhost ? ' is-ghost' : ''
-                      }`}
-                      key={`client-row-${client?.id ?? index}`}
+                      className={`pro-cabinet-nav-day${day.isToday ? ' is-today' : ''}`}
+                      key={day.key}
                     >
-                      <span className="pro-cabinet-nav-client-avatar" aria-hidden="true">
-                        {client ? getInitials(client.name) : '•'}
-                      </span>
-                      <div className="pro-cabinet-nav-client-text">
-                        <span className="pro-cabinet-nav-client-name">{name}</span>
-                        <span className="pro-cabinet-nav-client-meta-text">
-                          {meta}
-                        </span>
-                      </div>
-                      {badge ? (
-                        <span
-                          className={`pro-cabinet-nav-client-badge${
-                            isRepeat ? ' is-repeat' : ' is-new'
-                          }`}
-                        >
-                          {badge}
-                        </span>
-                      ) : null}
+                      <span className="pro-cabinet-nav-day-label">{day.label}</span>
+                      <span
+                        className={`pro-cabinet-nav-day-dot${
+                          day.count > 0 ? ' is-active' : ''
+                        }`}
+                      />
                     </div>
-                  )
-                })}
-              </div>
-              <div className="pro-cabinet-nav-client-foot">
-                <div
-                  className={`pro-cabinet-nav-client-meter${
-                    totalClients > 0 ? '' : ' is-empty'
-                  }`}
-                  style={{ '--repeat-share': repeatShare } as CSSProperties}
-                  aria-hidden="true"
-                />
-                <div className="pro-cabinet-nav-client-meta">
-                  <span>Повторные {repeatClients}</span>
-                  <span className="is-muted">Новые {newClients}</span>
+                  ))}
+                </div>
+                <div className="pro-cabinet-nav-pills">
+                  <span className="pro-cabinet-nav-pill">
+                    На неделе {bookingStats.upcomingWeek}
+                  </span>
+                  <span className="pro-cabinet-nav-pill is-ghost">
+                    Активных {bookingStats.upcoming}
+                  </span>
                 </div>
               </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-campaigns animate delay-4"
-            type="button"
-            onClick={onOpenCampaigns}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconChat />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Продажи</span>
-                <span className="pro-cabinet-nav-title">Рассылка</span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-meter" aria-hidden="true">
-                <span
-                  className="pro-cabinet-nav-meter-fill"
-                  style={{ '--meter': campaignMeter } as CSSProperties}
-                />
-              </div>
-              <div className="pro-cabinet-nav-stats">
-                <div className="pro-cabinet-nav-stat">
-                  <span className="pro-cabinet-nav-stat-value">
-                    {bookingStats.uniqueClients}
-                  </span>
-                  <span className="pro-cabinet-nav-stat-label">Контакты</span>
-                </div>
-                <div className="pro-cabinet-nav-stat">
-                  <span className="pro-cabinet-nav-stat-value">
-                    {bookingStats.repeatClients}
-                  </span>
-                  <span className="pro-cabinet-nav-stat-label">Лояльные</span>
-                </div>
-              </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-stories animate delay-5"
-            type="button"
-            onClick={onOpenStories}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconStories />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Контент</span>
-                <span className="pro-cabinet-nav-title">Истории</span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-stories">
-                <span className="pro-cabinet-nav-stories-badge">NEW</span>
-                <span className="pro-cabinet-nav-story-ring" aria-hidden="true">
-                  <span className="pro-cabinet-nav-story-avatar">
-                    {avatarDisplayUrl ? (
-                      <img src={avatarDisplayUrl} alt="" loading="lazy" />
-                    ) : (
-                      <span>{profileInitials}</span>
-                    )}
-                  </span>
+            </button>
+            <button
+              className="pro-cabinet-nav-card is-clients animate delay-4"
+              type="button"
+              onClick={onOpenClients}
+            >
+              {tapHint}
+              <div className="pro-cabinet-nav-head">
+                <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                  <IconUsers />
                 </span>
+                <div className="pro-cabinet-nav-info">
+                  <span className="pro-cabinet-nav-kicker">База</span>
+                  <span className="pro-cabinet-nav-title">Клиенты</span>
+                </div>
               </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-showcase animate delay-6"
-            type="button"
-            onClick={onOpenShowcase}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconShowcase />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Портфолио</span>
-                <span className="pro-cabinet-nav-title">Витрина</span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-mosaic" aria-hidden="true">
-                {showcaseTiles.map((item, index) => {
-                  const slotClass =
-                    showcaseSlotClasses[index % showcaseSlotClasses.length]
-                  const isImage = item ? isImageUrl(item.url) : false
-                  const focus = item ? resolvePortfolioFocus(item) : null
-                  return (
-                    <span
-                      className={`pro-cabinet-nav-mosaic-tile ${slotClass}${
-                        item ? ' is-media' : ''
-                      }`}
-                      key={`showcase-preview-${item?.url ?? index}`}
-                    >
-                      {item ? (
-                        isImage ? (
-                          <img
-                            src={item.url}
-                            alt=""
-                            loading="lazy"
-                            style={{ objectPosition: focus?.position }}
-                          />
-                        ) : (
-                          <span className="pro-cabinet-nav-mosaic-fallback">
-                            LINK
+              <div className="pro-cabinet-nav-preview is-clients-preview">
+                <div className="pro-cabinet-nav-client-list">
+                  {clientRows.map((client, index) => {
+                    const isGhost = !client
+                    const name = client?.name ?? 'Первые клиенты'
+                    const meta = client
+                      ? formatClientMeta(client)
+                      : 'Появятся после записи'
+                    const isRepeat = client ? client.count > 1 : false
+                    const badge = client ? (isRepeat ? 'повторный' : 'новый') : null
+                    return (
+                      <div
+                        className={`pro-cabinet-nav-client-row${
+                          isGhost ? ' is-ghost' : ''
+                        }`}
+                        key={`client-row-${client?.id ?? index}`}
+                      >
+                        <span
+                          className="pro-cabinet-nav-client-avatar"
+                          aria-hidden="true"
+                        >
+                          {client ? getInitials(client.name) : '•'}
+                        </span>
+                        <div className="pro-cabinet-nav-client-text">
+                          <span className="pro-cabinet-nav-client-name">{name}</span>
+                          <span className="pro-cabinet-nav-client-meta-text">
+                            {meta}
                           </span>
-                        )
+                        </div>
+                        {badge ? (
+                          <span
+                            className={`pro-cabinet-nav-client-badge${
+                              isRepeat ? ' is-repeat' : ' is-new'
+                            }`}
+                          >
+                            {badge}
+                          </span>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="pro-cabinet-nav-client-foot">
+                  <div
+                    className={`pro-cabinet-nav-client-meter${
+                      totalClients > 0 ? '' : ' is-empty'
+                    }`}
+                    style={{ '--repeat-share': repeatShare } as CSSProperties}
+                    aria-hidden="true"
+                  />
+                  <div className="pro-cabinet-nav-client-meta">
+                    <span>Повторные {repeatClients}</span>
+                    <span className="is-muted">Новые {newClients}</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+            <button
+              className="pro-cabinet-nav-card is-campaigns animate delay-5"
+              type="button"
+              onClick={onOpenCampaigns}
+            >
+              {tapHint}
+              <div className="pro-cabinet-nav-head">
+                <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                  <IconChat />
+                </span>
+                <div className="pro-cabinet-nav-info">
+                  <span className="pro-cabinet-nav-kicker">Продажи</span>
+                  <span className="pro-cabinet-nav-title">Рассылка</span>
+                </div>
+              </div>
+              <div className="pro-cabinet-nav-preview">
+                <div className="pro-cabinet-nav-meter" aria-hidden="true">
+                  <span
+                    className="pro-cabinet-nav-meter-fill"
+                    style={{ '--meter': campaignMeter } as CSSProperties}
+                  />
+                </div>
+                <div className="pro-cabinet-nav-stats">
+                  <div className="pro-cabinet-nav-stat">
+                    <span className="pro-cabinet-nav-stat-value">
+                      {bookingStats.uniqueClients}
+                    </span>
+                    <span className="pro-cabinet-nav-stat-label">Контакты</span>
+                  </div>
+                  <div className="pro-cabinet-nav-stat">
+                    <span className="pro-cabinet-nav-stat-value">
+                      {bookingStats.repeatClients}
+                    </span>
+                    <span className="pro-cabinet-nav-stat-label">Лояльные</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+            <button
+              className="pro-cabinet-nav-card is-stories animate delay-6"
+              type="button"
+              onClick={onOpenStories}
+            >
+              {tapHint}
+              <div className="pro-cabinet-nav-head">
+                <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                  <IconStories />
+                </span>
+                <div className="pro-cabinet-nav-info">
+                  <span className="pro-cabinet-nav-kicker">Контент</span>
+                  <span className="pro-cabinet-nav-title">Истории</span>
+                </div>
+              </div>
+              <div className="pro-cabinet-nav-preview">
+                <div className="pro-cabinet-nav-stories">
+                  <span className="pro-cabinet-nav-stories-badge">NEW</span>
+                  <span className="pro-cabinet-nav-story-ring" aria-hidden="true">
+                    <span className="pro-cabinet-nav-story-avatar">
+                      {avatarDisplayUrl ? (
+                        <img src={avatarDisplayUrl} alt="" loading="lazy" />
                       ) : (
-                        <span className="pro-cabinet-nav-mosaic-fallback">+</span>
+                        <span>{profileInitials}</span>
                       )}
                     </span>
-                  )
-                })}
+                  </span>
+                </div>
               </div>
-            </div>
-          </button>
-          <button
-            className="pro-cabinet-nav-card is-support animate delay-7"
-            type="button"
-            onClick={onOpenSupport}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconSupport />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Сервис</span>
-                <span className="pro-cabinet-nav-title">Поддержка</span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-support">
-                <span className="pro-cabinet-nav-support-pill">24/7</span>
-                <span className="pro-cabinet-nav-support-text">
-                  Поможем с записью, оплатой и профилем.
+            </button>
+            <button
+              className="pro-cabinet-nav-card is-showcase animate delay-7"
+              type="button"
+              onClick={onOpenShowcase}
+            >
+              {tapHint}
+              <div className="pro-cabinet-nav-head">
+                <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                  <IconShowcase />
                 </span>
+                <div className="pro-cabinet-nav-info">
+                  <span className="pro-cabinet-nav-kicker">Портфолио</span>
+                  <span className="pro-cabinet-nav-title">Витрина</span>
+                </div>
               </div>
-            </div>
-          </button>
-        </div>
+              <div className="pro-cabinet-nav-preview">
+                <div className="pro-cabinet-nav-mosaic" aria-hidden="true">
+                  {showcaseTiles.map((item, index) => {
+                    const slotClass =
+                      showcaseSlotClasses[index % showcaseSlotClasses.length]
+                    const isImage = item ? isImageUrl(item.url) : false
+                    const focus = item ? resolvePortfolioFocus(item) : null
+                    return (
+                      <span
+                        className={`pro-cabinet-nav-mosaic-tile ${slotClass}${
+                          item ? ' is-media' : ''
+                        }`}
+                        key={`showcase-preview-${item?.url ?? index}`}
+                      >
+                        {item ? (
+                          isImage ? (
+                            <img
+                              src={item.url}
+                              alt=""
+                              loading="lazy"
+                              style={{ objectPosition: focus?.position }}
+                            />
+                          ) : (
+                            <span className="pro-cabinet-nav-mosaic-fallback">
+                              LINK
+                            </span>
+                          )
+                        ) : (
+                          <span className="pro-cabinet-nav-mosaic-fallback">+</span>
+                        )}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            </button>
+            <button
+              className="pro-cabinet-nav-card is-support animate delay-7"
+              type="button"
+              onClick={onOpenSupport}
+            >
+              {tapHint}
+              <div className="pro-cabinet-nav-head">
+                <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                  <IconSupport />
+                </span>
+                <div className="pro-cabinet-nav-info">
+                  <span className="pro-cabinet-nav-kicker">Сервис</span>
+                  <span className="pro-cabinet-nav-title">Поддержка</span>
+                </div>
+              </div>
+              <div className="pro-cabinet-nav-preview">
+                <div className="pro-cabinet-nav-support">
+                  <span className="pro-cabinet-nav-support-pill">24/7</span>
+                  <span className="pro-cabinet-nav-support-text">
+                    Поможем с записью, оплатой и профилем.
+                  </span>
+                </div>
+              </div>
+            </button>
+          </div>
+        </section>
       </div>
 
       <ProBottomNav
