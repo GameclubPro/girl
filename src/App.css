@@ -2821,6 +2821,14 @@
   --glass-blur: 10px;
   --glass-frost: blur(8px) saturate(1);
   --glass-frost-soft: blur(6px) saturate(1);
+  --portfolio-overlay: rgba(12, 20, 36, 0.36);
+  --portfolio-surface: var(--glass-bg-strong);
+  --portfolio-border: var(--glass-border);
+  --portfolio-shadow: var(--glass-shadow);
+  --portfolio-shadow-soft: var(--glass-shadow-soft);
+  --portfolio-frost: var(--glass-frost);
+  --portfolio-frost-soft: var(--glass-frost-soft);
+  --portfolio-muted-surface: rgba(var(--surface-muted-rgb), 0.72);
   background:
     radial-gradient(
       120% 120% at 10% -10%,
@@ -11086,9 +11094,9 @@
   position: fixed;
   inset: 0;
   z-index: 85;
-  background: rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  background: var(--portfolio-overlay, rgba(15, 23, 42, 0.32));
+  backdrop-filter: var(--portfolio-frost, blur(14px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost, blur(14px) saturate(1));
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -11097,17 +11105,13 @@
 
 .pro-portfolio-sheet {
   width: min(520px, 100%);
-  border-radius: 24px 24px 20px 20px;
+  border-radius: 22px;
   padding: 10px 14px 14px;
-  background: linear-gradient(
-    135deg,
-    rgba(50, 140, 220, 0.36),
-    rgba(20, 90, 160, 0.26)
-  );
-  border: 1px solid rgba(178, 205, 235, 0.55);
-  box-shadow: 0 26px 40px rgba(var(--shadow-rgb), 0.28);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  background: var(--portfolio-surface, rgba(var(--paper-rgb), 0.96));
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  box-shadow: var(--portfolio-shadow, 0 22px 34px rgba(var(--shadow-rgb), 0.18));
+  backdrop-filter: var(--portfolio-frost, blur(12px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost, blur(12px) saturate(1));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -11130,7 +11134,7 @@
   width: 34px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.2);
+  background: rgba(var(--shadow-rgb), 0.18);
 }
 
 .pro-portfolio-sheet-head {
@@ -11167,34 +11171,32 @@
 
 .pro-portfolio-sheet-action {
   border: none;
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 12px;
   font-size: 13px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(200, 225, 255, 0.22);
-  border: 1px solid rgba(178, 205, 235, 0.55);
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.75));
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 14px 22px rgba(var(--shadow-rgb), 0.22);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  box-shadow: var(--portfolio-shadow-soft, 0 12px 20px rgba(var(--shadow-rgb), 0.12));
+  backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
 }
 
 .pro-portfolio-sheet-action.is-story {
-  background: linear-gradient(
-    150deg,
-    rgba(63, 180, 255, 0.35),
-    rgba(200, 225, 255, 0.22)
-  );
-  color: var(--pro-ink);
-  box-shadow: 0 16px 24px rgba(63, 180, 255, 0.3);
+  background: rgba(var(--accent-rgb), 0.14);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  color: var(--accent-strong);
+  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.18);
 }
 
 .pro-portfolio-sheet-action.is-danger {
-  background: rgba(var(--danger-rgb), 0.6);
+  background: rgba(var(--danger-rgb), 0.12);
+  border-color: rgba(var(--danger-rgb), 0.4);
   color: var(--danger);
 }
 
@@ -11244,9 +11246,9 @@
   height: 60px;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(178, 205, 235, 0.55);
-  background: rgba(200, 225, 255, 0.22);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.22);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.7));
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
   padding: 0;
   cursor: pointer;
   appearance: none;
@@ -11271,8 +11273,8 @@
   aspect-ratio: 4 / 3;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(178, 205, 235, 0.55);
-  background: rgba(200, 225, 255, 0.22);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.7));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11292,14 +11294,14 @@
 }
 
 .pro-portfolio-sheet-cancel {
-  border: 1px solid rgba(178, 205, 235, 0.55);
-  background: rgba(200, 225, 255, 0.2);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  background: rgba(var(--paper-rgb), 0.88);
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-muted);
-  border-radius: 12px;
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.22);
+  border-radius: 14px;
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
   cursor: pointer;
 }
 
@@ -11346,16 +11348,17 @@
 }
 
 .pro-followers-sheet-close {
-  border: 1px solid rgba(178, 205, 235, 0.55);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
   border-radius: 14px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(200, 225, 255, 0.22);
+  background: rgba(var(--paper-rgb), 0.88);
   cursor: pointer;
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
+  backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
 }
 
 .pro-followers-sheet-search {
@@ -11369,16 +11372,17 @@
 }
 
 .pro-followers-sheet-clear {
-  border: 1px solid rgba(178, 205, 235, 0.45);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
   border-radius: 14px;
   padding: 8px 10px;
   font-size: 11px;
   font-weight: 700;
   color: var(--pro-muted);
-  background: rgba(200, 225, 255, 0.2);
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.7));
   cursor: pointer;
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
+  backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
 }
 
 .pro-followers-sheet-list {
@@ -11398,16 +11402,16 @@
 }
 
 .pro-followers-card {
-  border: 1px solid rgba(178, 205, 235, 0.5);
-  background: rgba(200, 225, 255, 0.22);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.7));
   border-radius: 18px;
   padding: 10px 12px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14);
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
+  backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
 }
 
 .pro-followers-avatar {
@@ -11415,7 +11419,7 @@
   height: 40px;
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(var(--accent-rgb), 0.18);
+  background: rgba(var(--accent-rgb), 0.14);
   color: var(--pro-ink);
   display: inline-flex;
   align-items: center;
@@ -11490,17 +11494,17 @@
 }
 
 .pro-followers-sheet-load {
-  border: 1px solid rgba(178, 205, 235, 0.55);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
   border-radius: 16px;
   padding: 12px;
   font-size: 13px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(200, 225, 255, 0.22);
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.75));
   cursor: pointer;
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.16);
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
+  backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
 }
 
 .pro-followers-sheet-close:focus-visible,
@@ -11673,9 +11677,9 @@
   position: fixed;
   inset: 0;
   z-index: 75;
-  background: rgba(6, 18, 38, 0.62);
-  backdrop-filter: blur(18px) saturate(1.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  background: var(--portfolio-overlay, rgba(15, 23, 42, 0.4));
+  backdrop-filter: var(--portfolio-frost, blur(14px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost, blur(14px) saturate(1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11686,17 +11690,17 @@
 .pro-portfolio-lightbox {
   width: min(560px, 100%);
   max-height: min(760px, 86dvh);
-  border-radius: 24px;
+  border-radius: 22px;
   padding: 14px;
-  background: rgba(200, 225, 255, 0.24);
-  border: 1px solid rgba(178, 205, 235, 0.55);
-  box-shadow: 0 22px 34px rgba(var(--shadow-rgb), 0.24);
+  background: var(--portfolio-surface, rgba(var(--paper-rgb), 0.96));
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  box-shadow: var(--portfolio-shadow, 0 22px 34px rgba(var(--shadow-rgb), 0.18));
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow: auto;
-  backdrop-filter: var(--glass-frost);
-  -webkit-backdrop-filter: var(--glass-frost);
+  backdrop-filter: var(--portfolio-frost, blur(10px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost, blur(10px) saturate(1));
 }
 
 .pro-portfolio-lightbox-head {
@@ -11731,17 +11735,17 @@
 }
 
 .pro-portfolio-lightbox-close {
-  border: 1px solid rgba(178, 205, 235, 0.5);
-  border-radius: 999px;
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  border-radius: 14px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(200, 225, 255, 0.22);
-  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.88);
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
   cursor: pointer;
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
 }
 
 .pro-portfolio-lightbox-close:focus-visible {
@@ -11755,8 +11759,8 @@
   aspect-ratio: 4 / 5;
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid rgba(178, 205, 235, 0.55);
-  background: rgba(200, 225, 255, 0.22);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.7));
 }
 
 .pro-portfolio-lightbox-media img {
@@ -11772,7 +11776,7 @@
 
 .pro-portfolio-lightbox-media.is-certificate {
   aspect-ratio: var(--certificate-ratio, 4 / 3);
-  background: rgba(200, 225, 255, 0.22);
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.7));
 }
 
 .pro-portfolio-lightbox-media.is-certificate img {
@@ -11805,16 +11809,17 @@
 
 .pro-portfolio-lightbox-action {
   border: none;
-  border-radius: 999px;
+  border-radius: 14px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;
-  background: rgba(200, 225, 255, 0.22);
+  background: var(--portfolio-muted-surface, rgba(var(--surface-muted-rgb), 0.75));
   color: var(--pro-ink);
   cursor: pointer;
-  border: 1px solid rgba(178, 205, 235, 0.45);
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  border: 1px solid var(--portfolio-border, rgba(var(--shadow-rgb), 0.12));
+  box-shadow: var(--portfolio-shadow-soft, 0 10px 16px rgba(var(--shadow-rgb), 0.12));
+  backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
+  -webkit-backdrop-filter: var(--portfolio-frost-soft, blur(8px) saturate(1));
 }
 
 .pro-portfolio-lightbox-action:disabled {
@@ -11823,7 +11828,8 @@
 }
 
 .pro-portfolio-lightbox-action.is-danger {
-  background: rgba(var(--danger-rgb), 0.6);
+  background: rgba(var(--danger-rgb), 0.12);
+  border-color: rgba(var(--danger-rgb), 0.4);
   color: var(--danger);
 }
 
@@ -20576,6 +20582,14 @@ h2 {
   --cm-glass-strong: rgba(var(--paper-rgb), 0.94);
   --cm-border: rgba(var(--shadow-rgb), 0.12);
   --cm-shadow: 0 18px 30px rgba(var(--shadow-rgb), 0.16);
+  --portfolio-overlay: rgba(var(--shadow-rgb), 0.32);
+  --portfolio-surface: var(--cm-glass-strong);
+  --portfolio-border: var(--cm-border);
+  --portfolio-shadow: var(--cm-shadow);
+  --portfolio-shadow-soft: 0 12px 20px rgba(var(--shadow-rgb), 0.12);
+  --portfolio-frost: blur(10px) saturate(1);
+  --portfolio-frost-soft: blur(8px) saturate(1);
+  --portfolio-muted-surface: rgba(var(--surface-muted-rgb), 0.7);
   background:
     radial-gradient(120% 120% at 8% -12%, rgba(var(--accent-rgb), 0.18), transparent 60%),
     radial-gradient(140% 140% at 105% 0%, rgba(var(--raspberry-rgb), 0.12), transparent 62%),
