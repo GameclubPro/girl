@@ -3171,7 +3171,9 @@ export const ProProfileScreen = ({
               </div>
               <div className="pro-profile-hero-main">
                 <div className="pro-profile-hero-name-row">
-                  <h1 className="pro-profile-hero-name">{displayNameValue}</h1>
+                  <div className="pro-profile-hero-name-wrap">
+                    <h1 className="pro-profile-hero-name">{displayNameValue}</h1>
+                  </div>
                   <button
                     className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
                     type="button"
