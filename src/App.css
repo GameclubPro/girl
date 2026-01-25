@@ -26817,7 +26817,7 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-ig-cover {
-  height: clamp(190px, 52vw, 230px);
+  height: clamp(152px, 42vw, 184px);
   border-radius: 0 0 26px 26px;
   background:
     radial-gradient(120% 120% at 18% 0%, rgba(255, 255, 255, 0.5), transparent 60%),
@@ -26833,31 +26833,31 @@ h2 {
   inset: -20% -10% auto;
   height: 170%;
   background-image:
-    radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), 0.22), transparent 48%),
-    radial-gradient(circle at 88% 22%, rgba(var(--accent-rgb), 0.18), transparent 50%),
-    radial-gradient(circle at 40% 85%, rgba(255, 255, 255, 0.45), transparent 52%),
+    radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), 0.32), transparent 44%),
+    radial-gradient(circle at 88% 22%, rgba(var(--accent-rgb), 0.28), transparent 46%),
+    radial-gradient(circle at 40% 85%, rgba(255, 255, 255, 0.6), transparent 48%),
     repeating-linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.28) 0px,
-      rgba(255, 255, 255, 0.28) 6px,
-      rgba(255, 255, 255, 0) 6px,
-      rgba(255, 255, 255, 0) 22px
+      rgba(255, 255, 255, 0.5) 0px,
+      rgba(255, 255, 255, 0.5) 5px,
+      rgba(255, 255, 255, 0) 5px,
+      rgba(255, 255, 255, 0) 16px
     ),
     conic-gradient(
       from 210deg at 20% 20%,
+      rgba(255, 255, 255, 0.6),
+      rgba(var(--accent-rgb), 0.28),
       rgba(255, 255, 255, 0.4),
-      rgba(var(--accent-rgb), 0.18),
-      rgba(255, 255, 255, 0.25),
-      rgba(var(--accent-rgb), 0.14),
-      rgba(255, 255, 255, 0.4)
+      rgba(var(--accent-rgb), 0.24),
+      rgba(255, 255, 255, 0.6)
     );
-  opacity: 0.55;
-  mix-blend-mode: soft-light;
+  opacity: 0.82;
+  mix-blend-mode: normal;
   pointer-events: none;
 }
 
 .screen--pro-profile .pro-profile-ig-cover.has-image::before {
-  opacity: 0.12;
+  opacity: 0.2;
 }
 
 .screen--pro-profile .pro-profile-ig-cover::after {
