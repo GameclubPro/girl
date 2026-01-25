@@ -652,11 +652,11 @@ export const BookingScreen = ({
     depositType === 'fixed'
       ? depositFixed && depositFixed > 0
         ? `Депозит ${formatPrice(depositFixed)} для фиксации слота`
-        : 'Без депозита'
+        : 'Депозит подтвержден, сумма уточняется'
       : depositType === 'percent'
         ? depositPercent !== null && depositPercent > 0
           ? `Депозит ${depositPercent}% для фиксации слота`
-          : 'Без депозита'
+          : 'Депозит подтвержден, процент уточняется'
         : 'Без депозита'
   const lateCancelPolicyValue =
     lateCancelFeePercent === null
@@ -673,16 +673,13 @@ export const BookingScreen = ({
     { label: 'Депозит', value: depositPolicyValue },
     { label: 'Поздняя отмена', value: lateCancelPolicyValue },
   ]
-  const showDepositPay =
-    depositType !== 'none' &&
-    ((depositFixed !== null && depositFixed > 0) ||
-      (depositPercent !== null && depositPercent > 0))
+  const showDepositPay = depositType !== 'none'
   const depositPayLabel =
     depositAmount > 0
       ? `К оплате сейчас: ${depositAmountLabel}`
       : 'Сумма депозита уточнится после согласования цены'
 
-  const showDepositStep = showDepositPay
+  const showDepositStep = depositType !== 'none'
   const bookingSteps = showDepositStep
     ? [...bookingBaseSteps, bookingDepositStep]
     : bookingBaseSteps
