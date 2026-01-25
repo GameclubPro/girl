@@ -137,6 +137,15 @@ const getInitials = (value: string) => {
   return normalized.slice(0, 2).toUpperCase()
 }
 
+const parseNumeric = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim().replace(',', '.')
+  if (!trimmed) return null
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 const formatReviewName = (review: MasterReview) => {
   const name = [review.reviewerFirstName, review.reviewerLastName]
     .filter(Boolean)
@@ -608,18 +617,14 @@ export const BookingScreen = ({
     typeof profile?.cancelWindowHours === 'number'
       ? Math.max(0, Math.round(profile.cancelWindowHours))
       : null
+  const depositPercentRaw = parseNumeric(profile?.depositPercent)
+  const depositFixedRaw = parseNumeric(profile?.depositFixed)
   const depositPercent =
-    typeof profile?.depositPercent === 'number'
-      ? Math.max(0, Math.round(profile.depositPercent))
-      : null
+    depositPercentRaw !== null ? Math.max(0, Math.round(depositPercentRaw)) : null
   const depositFixed =
-    typeof profile?.depositFixed === 'number'
-      ? Math.max(0, Math.round(profile.depositFixed))
-      : null
+    depositFixedRaw !== null ? Math.max(0, Math.round(depositFixedRaw)) : null
   const depositType =
-    profile?.depositType === 'fixed' ||
-    profile?.depositType === 'percent' ||
-    profile?.depositType === 'none'
+    profile?.depositType === 'fixed' || profile?.depositType === 'percent'
       ? profile.depositType
       : depositFixed && depositFixed > 0
         ? 'fixed'

@@ -73,6 +73,15 @@ const getCategoryLabel = (categoryId: string) =>
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const parseNumeric = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim().replace(',', '.')
+  if (!trimmed) return null
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 const formatPriceRange = (from: number | null, to: number | null) => {
   if (typeof from === 'number' && typeof to === 'number') {
     if (from === to) return formatPrice(from)
@@ -718,18 +727,14 @@ export const ClientMasterProfileScreen = ({
     typeof profile?.cancelWindowHours === 'number'
       ? Math.max(0, Math.round(profile.cancelWindowHours))
       : null
+  const depositPercentRaw = parseNumeric(profile?.depositPercent)
+  const depositFixedRaw = parseNumeric(profile?.depositFixed)
   const depositPercent =
-    typeof profile?.depositPercent === 'number'
-      ? Math.max(0, Math.round(profile.depositPercent))
-      : null
+    depositPercentRaw !== null ? Math.max(0, Math.round(depositPercentRaw)) : null
   const depositFixed =
-    typeof profile?.depositFixed === 'number'
-      ? Math.max(0, Math.round(profile.depositFixed))
-      : null
+    depositFixedRaw !== null ? Math.max(0, Math.round(depositFixedRaw)) : null
   const depositType =
-    profile?.depositType === 'fixed' ||
-    profile?.depositType === 'percent' ||
-    profile?.depositType === 'none'
+    profile?.depositType === 'fixed' || profile?.depositType === 'percent'
       ? profile.depositType
       : depositFixed && depositFixed > 0
         ? 'fixed'
@@ -756,17 +761,19 @@ export const ClientMasterProfileScreen = ({
     depositType === 'fixed'
       ? depositFixed && depositFixed > 0
         ? `${formatPrice(depositFixed)} для фиксации слота`
-        : 'Без депозита'
+        : 'Депозит подтвержден, сумма уточняется'
       : depositType === 'percent'
         ? depositPercent !== null && depositPercent > 0
           ? `${depositPercent}% для фиксации слота`
-          : 'Без депозита'
+          : 'Депозит подтвержден, процент уточняется'
         : 'Без депозита'
   const depositPolicyNote =
     (depositType === 'fixed' && depositFixed && depositFixed > 0) ||
     (depositType === 'percent' && depositPercent && depositPercent > 0)
       ? 'Депозит засчитывается в стоимость услуги.'
-      : 'Оплата после подтверждения.'
+      : depositType === 'fixed' || depositType === 'percent'
+        ? 'Размер депозита уточняется.'
+        : 'Оплата после подтверждения.'
   const lateCancelPolicyValue =
     lateCancelFeePercent === null
       ? 'Уточняется'
