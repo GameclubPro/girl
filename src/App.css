@@ -8565,6 +8565,7 @@
 }
 
 .screen--pro-profile .pro-profile-hero-identity {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -8621,8 +8622,8 @@
 
 .screen--pro-profile .pro-profile-hero-settings {
   position: absolute;
-  top: var(--hero-card-pad, 16px);
-  right: var(--hero-card-pad, 16px);
+  top: 0;
+  right: 0;
   z-index: 2;
 }
 

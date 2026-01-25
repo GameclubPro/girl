@@ -3129,17 +3129,17 @@ export const ProProfileScreen = ({
             />
           </div>
           <div className="pro-profile-hero-card">
-            <button
-              className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
-              type="button"
-              aria-label="Настройки профиля"
-              onClick={openSettings}
-            >
-              <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                <IconSettings />
-              </span>
-            </button>
             <div className="pro-profile-hero-identity">
+              <button
+                className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
+                type="button"
+                aria-label="Настройки профиля"
+                onClick={openSettings}
+              >
+                <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                  <IconSettings />
+                </span>
+              </button>
               <div
                 className={`pro-profile-ig-avatar pro-profile-hero-avatar is-editable${
                   isAvatarUploading ? ' is-loading' : ''
