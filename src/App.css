@@ -8621,8 +8621,8 @@
 
 .screen--pro-profile .pro-profile-hero-settings {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: var(--hero-card-pad, 16px);
+  right: var(--hero-card-pad, 16px);
   z-index: 2;
 }
 
@@ -26920,8 +26920,9 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-hero-card {
+  --hero-card-pad: 16px;
   margin: -64px 0 0;
-  padding: 16px;
+  padding: var(--hero-card-pad);
   border-radius: 24px;
   background: var(--glass-bg-strong);
   border: 1px solid var(--pro-border);
@@ -27677,8 +27678,9 @@ h2 {
 
 @media (max-width: 360px) {
   .screen--pro-profile .pro-profile-hero-card {
+    --hero-card-pad: 14px;
     margin: -58px 0 0;
-    padding: 14px;
+    padding: var(--hero-card-pad);
   }
 
   .screen--pro-profile .pro-profile-hero-avatar {
