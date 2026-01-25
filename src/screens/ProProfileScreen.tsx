@@ -3194,11 +3194,11 @@ export const ProProfileScreen = ({
                     onClick={() => setIsActive((current) => !current)}
                     aria-pressed={isActive}
                   >
-                    <span className="pro-profile-ig-status-label">
-                      {isActive ? 'Принимаю заявки' : 'Пауза'}
-                    </span>
                     <span className="pro-profile-ig-status-toggle" aria-hidden="true">
                       <span className="pro-profile-ig-status-knob" />
+                    </span>
+                    <span className="pro-profile-ig-status-label">
+                      {isActive ? 'Принимаю заявки' : 'Пауза'}
                     </span>
                     <span className="pro-profile-ig-status-chevron" aria-hidden="true" />
                   </button>
