@@ -633,19 +633,6 @@
   z-index: 7;
 }
 
-.screen--booking .request-submit-bar {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.2) 0%,
-    rgba(255, 255, 255, 0.72) 55%,
-    rgba(255, 255, 255, 0.92) 100%
-  );
-  border-top: 1px solid rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 -18px 28px rgba(var(--shadow-rgb), 0.18);
-}
-
 .request-submit-bar.is-hidden {
   display: none;
 }
@@ -778,12 +765,8 @@
   --booking-soft: rgba(var(--accent-rgb), 0.08);
   --request-pad-x: 16px;
   background:
-    radial-gradient(130% 120% at 5% -10%, rgba(var(--accent-rgb), 0.22), transparent 60%),
-    radial-gradient(120% 120% at 100% 0%, rgba(var(--raspberry-rgb), 0.16), transparent 55%),
-    radial-gradient(140% 140% at 50% -30%, rgba(var(--shadow-rgb), 0.08), transparent 60%),
-    linear-gradient(180deg, #eef3ff 0%, #ffffff 55%, #ffffff 100%);
-  position: relative;
-  overflow: hidden;
+    radial-gradient(120% 120% at 8% -10%, rgba(var(--accent-rgb), 0.12), transparent 55%),
+    linear-gradient(180deg, #f4f7ff 0%, #ffffff 45%, #ffffff 100%);
 }
 
 .booking-shell {
@@ -791,23 +774,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.screen--booking::before {
-  content: '';
-  position: fixed;
-  inset: -20% 0 40% 0;
-  background:
-    radial-gradient(60% 60% at 20% 0%, rgba(255, 255, 255, 0.65), transparent 70%),
-    radial-gradient(50% 50% at 80% 10%, rgba(255, 255, 255, 0.45), transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.screen--booking .request-shell,
-.screen--booking .request-submit-bar {
-  position: relative;
-  z-index: 1;
 }
 
 .booking-header {
@@ -844,11 +810,9 @@
 }
 
 .screen--booking .request-summary {
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.16);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(var(--accent-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.92);
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.1);
 }
 
 .screen--booking .request-summary-label {
@@ -856,23 +820,23 @@
 }
 
 .booking-card {
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 24px 34px rgba(31, 35, 64, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--paper-rgb), 0.98) 0%,
+    rgba(var(--paper-rgb), 0.94) 100%
+  );
+  border-color: rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.1);
   position: relative;
   overflow: hidden;
 }
 
 .booking-master-card {
-  border-color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(var(--accent-rgb), 0.18);
   background: linear-gradient(
     140deg,
-    rgba(255, 255, 255, 0.72) 0%,
-    rgba(var(--accent-rgb), 0.18) 100%
+    rgba(var(--paper-rgb), 0.98) 0%,
+    rgba(var(--accent-rgb), 0.12) 100%
   );
 }
 
@@ -1323,8 +1287,8 @@
 }
 
 .booking-day {
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(var(--shadow-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.96);
   border-radius: 18px;
   padding: 12px 14px;
   text-align: left;
@@ -1334,8 +1298,6 @@
   min-height: 64px;
   scroll-snap-align: start;
   cursor: pointer;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .booking-day-title {
@@ -1377,8 +1339,8 @@
 }
 
 .booking-slot {
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(var(--shadow-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.98);
   border-radius: 999px;
   padding: 10px 8px;
   font-size: 13px;
@@ -1387,36 +1349,6 @@
   cursor: pointer;
   text-align: center;
   min-height: 40px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.screen--booking .request-select,
-.screen--booking .request-select-input,
-.screen--booking .request-input,
-.screen--booking .request-textarea,
-.screen--booking .request-service-card,
-.screen--booking .request-upload,
-.screen--booking .booking-summary,
-.screen--booking .booking-review-card,
-.screen--booking .booking-policy-item,
-.screen--booking .booking-deposit-pay {
-  background: rgba(255, 255, 255, 0.62);
-  border-color: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.screen--booking .request-service-card.is-active {
-  background: rgba(var(--accent-rgb), 0.2);
-  border-color: rgba(var(--accent-rgb), 0.35);
-}
-
-.screen--booking .booking-policy-hint {
-  background: rgba(255, 255, 255, 0.55);
-  border-color: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .booking-slot.is-active {
