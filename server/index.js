@@ -4107,14 +4107,7 @@ app.get('/api/masters', async (req, res) => {
       `,
       values
     )
-    const seenPairs = new Set()
-    const rows = (result.rows ?? []).filter((row) => {
-      if (row.contextType === 'support') return true
-      const key = `${row.clientId}:${row.masterId}`
-      if (seenPairs.has(key)) return false
-      seenPairs.add(key)
-      return true
-    })
+    const rows = result.rows ?? []
 
     const payload = rows.map((row) => {
       const distanceKm =
