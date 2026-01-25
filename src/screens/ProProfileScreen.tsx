@@ -3127,19 +3127,6 @@ export const ProProfileScreen = ({
               aria-hidden="true"
               tabIndex={-1}
             />
-            <button
-              className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
-              type="button"
-              aria-label="Настройки профиля"
-              onClick={(event) => {
-                event.stopPropagation()
-                openSettings()
-              }}
-            >
-              <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                <IconSettings />
-              </span>
-            </button>
           </div>
           <div className="pro-profile-hero-card">
             <div className="pro-profile-hero-identity">
@@ -3185,6 +3172,18 @@ export const ProProfileScreen = ({
               <div className="pro-profile-hero-main">
                 <div className="pro-profile-hero-name-row">
                   <h1 className="pro-profile-hero-name">{displayNameValue}</h1>
+                  <button
+                    className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
+                    type="button"
+                    aria-label="Настройки профиля"
+                    onClick={openSettings}
+                  >
+                    <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                      <IconSettings />
+                    </span>
+                  </button>
+                </div>
+                <div className="pro-profile-hero-status-row">
                   <button
                     className={`pro-profile-ig-status pro-profile-hero-status${
                       isActive ? '' : ' is-paused'
