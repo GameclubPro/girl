@@ -8607,11 +8607,9 @@
 }
 
 .screen--pro-profile .pro-profile-hero-name-row {
-  position: relative;
   display: flex;
   align-items: center;
   min-height: calc(2 * 1.15em);
-  padding-right: 44px;
   min-width: 0;
 }
 
@@ -8623,8 +8621,9 @@
 
 .screen--pro-profile .pro-profile-hero-settings {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
 }
 
 .screen--pro-profile .pro-profile-hero-name {

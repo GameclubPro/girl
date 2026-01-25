@@ -3129,6 +3129,16 @@ export const ProProfileScreen = ({
             />
           </div>
           <div className="pro-profile-hero-card">
+            <button
+              className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
+              type="button"
+              aria-label="Настройки профиля"
+              onClick={openSettings}
+            >
+              <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                <IconSettings />
+              </span>
+            </button>
             <div className="pro-profile-hero-identity">
               <div
                 className={`pro-profile-ig-avatar pro-profile-hero-avatar is-editable${
@@ -3174,16 +3184,6 @@ export const ProProfileScreen = ({
                   <div className="pro-profile-hero-name-wrap">
                     <h1 className="pro-profile-hero-name">{displayNameValue}</h1>
                   </div>
-                  <button
-                    className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings"
-                    type="button"
-                    aria-label="Настройки профиля"
-                    onClick={openSettings}
-                  >
-                    <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                      <IconSettings />
-                    </span>
-                  </button>
                 </div>
                 <div className="pro-profile-hero-status-row">
                   <button
