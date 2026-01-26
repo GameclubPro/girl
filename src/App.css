@@ -15854,6 +15854,9 @@
 
 .request-item-actions {
   margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .response-toggle {
@@ -25128,8 +25131,8 @@ h2 {
   text-transform: uppercase;
   padding: 6px 8px;
   border-radius: 999px;
-  background: rgba(var(--success-rgb), 0.15);
-  color: var(--success);
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-strong);
 }
 
 .chat-request-meta {
@@ -25156,6 +25159,31 @@ h2 {
   margin: 0;
   font-size: 13px;
   color: var(--ink);
+}
+
+.chat-request-media {
+  margin-top: 2px;
+}
+
+.request-chat-link {
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.request-chat-link svg {
+  width: 16px;
+  height: 16px;
 }
 
 .chat-support-intro {

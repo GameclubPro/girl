@@ -352,6 +352,8 @@ export const ChatThreadScreen = ({
     ? `${baseRequestDateLabel} · ${requestWindowLabel}`
     : baseRequestDateLabel
   const requestBudgetLabel = request?.budget ? `Бюджет: ${request.budget}` : null
+  const requestStatusLabel =
+    request?.status ? requestStatusLabelMap[request.status] ?? 'Заявка' : 'Заявка'
   const activeTitle = booking?.serviceName ?? request?.serviceName ?? 'Диалог'
   const activeStatusLabel = isBookingChat
     ? booking?.outcome
@@ -1780,6 +1782,42 @@ export const ChatThreadScreen = ({
                 Подробнее
               </button>
             </section>
+            {!isBookingChat && request && (
+              <section className="chat-request-card">
+                <div className="chat-request-top">
+                  <span className="chat-request-title">
+                    {request.serviceName ?? 'Заявка'}
+                  </span>
+                  <span className="chat-request-pill">{requestStatusLabel}</span>
+                </div>
+                <div className="chat-request-meta">
+                  <span>
+                    <IconPin /> {locationLabelMap[request.locationType ?? 'any']}
+                  </span>
+                  <span>
+                    <IconClock /> {requestTimeLabel}
+                  </span>
+                  {requestBudgetLabel && <span>{requestBudgetLabel}</span>}
+                </div>
+                {request.details && (
+                  <p className="chat-request-details">{request.details}</p>
+                )}
+                {Array.isArray(request.photoUrls) &&
+                  request.photoUrls.length > 0 && (
+                    <div className="booking-photo-strip chat-request-media" role="list">
+                      {request.photoUrls.map((url, index) => (
+                        <span
+                          className="booking-photo-thumb"
+                          key={`request-${request.id}-photo-${index}`}
+                          role="listitem"
+                        >
+                          <img src={url} alt="" loading="lazy" />
+                        </span>
+                      ))}
+                    </div>
+                  )}
+              </section>
+            )}
           </>
         ) : (
           isDetailLoading && (

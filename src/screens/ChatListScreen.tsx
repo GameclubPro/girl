@@ -8,7 +8,7 @@ import {
 } from '../components/icons'
 import { TrustBadge } from '../components/TrustBadge'
 import { ProBottomNav } from '../components/ProBottomNav'
-import type { ChatMessage, ChatSummary } from '../types/app'
+import type { ChatMessage, ChatSummary, RequestTimeWindow } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
 import { getCachedChatList, setCachedChatList } from '../utils/chatCache'
@@ -42,6 +42,49 @@ const formatChatTimestamp = (value?: string | null) => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
+}
+
+const requestStatusLabelMap: Record<string, string> = {
+  open: 'Открыта',
+  closed: 'Согласована',
+}
+
+const bookingStatusLabelMap: Record<string, string> = {
+  pending: 'Ожидает подтверждения',
+  price_pending: 'Ожидает цену',
+  price_proposed: 'Цена предложена',
+  confirmed: 'Подтверждена',
+  declined: 'Отменена',
+  cancelled: 'Отменена',
+}
+
+const formatContextDateTime = (value?: string | null) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed)
+}
+
+const formatTimeWindowList = (windows?: RequestTimeWindow[] | null) => {
+  if (!Array.isArray(windows) || windows.length === 0) return ''
+  return windows
+    .map((window) => {
+      if (!window) return ''
+      if (window.label) return window.label
+      if (window.start && window.end) {
+        return window.start === window.end
+          ? window.start
+          : `${window.start}–${window.end}`
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join(', ')
 }
 
 
@@ -109,6 +152,46 @@ const getLatestContext = (chat: ChatSummary) => {
 const getContextTypeLabel = (context: ReturnType<typeof getLatestContext>) => {
   if (!context) return 'Диалог'
   return context.contextType === 'booking' ? 'Запись' : 'Заявка'
+}
+
+const getContextStatusLabel = (
+  context: ReturnType<typeof getLatestContext>
+) => {
+  if (!context) return ''
+  if (context.contextType === 'booking') {
+    if (context.status) {
+      return bookingStatusLabelMap[context.status] ?? context.status
+    }
+    return 'Запись'
+  }
+  if (context.status) {
+    return requestStatusLabelMap[context.status] ?? context.status
+  }
+  return 'Заявка'
+}
+
+const getContextTimeLabel = (context: ReturnType<typeof getLatestContext>) => {
+  if (!context) return ''
+  if (context.contextType === 'booking') {
+    return (
+      formatContextDateTime(context.scheduledAt ?? context.createdAt ?? null) ||
+      'Время уточняется'
+    )
+  }
+  const baseDateLabel =
+    context.dateOption === 'today'
+      ? 'Сегодня'
+      : context.dateOption === 'tomorrow'
+        ? 'Завтра'
+        : context.dateOption === 'choose'
+          ? formatContextDateTime(context.dateTime) || 'По договоренности'
+          : context.dateTime
+            ? formatContextDateTime(context.dateTime)
+            : 'По договоренности'
+  const timeWindowLabel = formatTimeWindowList(context.timeWindows)
+  return timeWindowLabel
+    ? `${baseDateLabel} · ${timeWindowLabel}`
+    : baseDateLabel
 }
 
 const getChatBucket = (chat: ChatSummary) => {
@@ -494,6 +577,11 @@ export const ChatListScreen = ({
     const serviceName = isSupportChat
       ? 'Поддержка'
       : latestContext?.serviceName || 'Диалог'
+    const contextStatusLabel = isSupportChat
+      ? ''
+      : getContextStatusLabel(latestContext)
+    const contextTimeLabel = isSupportChat ? '' : getContextTimeLabel(latestContext)
+    const showContextMeta = Boolean(contextStatusLabel || contextTimeLabel)
     const lastMessage = chat.lastMessage
     const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
     const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
@@ -548,6 +636,20 @@ export const ChatListScreen = ({
                 </span>
                 <span className="chat-card-context-title">{serviceName}</span>
               </span>
+              {showContextMeta && (
+                <span className="chat-card-context-meta">
+                  {contextStatusLabel && (
+                    <span className="chat-card-context-status">
+                      {contextStatusLabel}
+                    </span>
+                  )}
+                  {contextTimeLabel && (
+                    <span className="chat-card-context-time">
+                      {contextTimeLabel}
+                    </span>
+                  )}
+                </span>
+              )}
             </>
           )}
           <span className="chat-card-preview">{lastLabel}</span>

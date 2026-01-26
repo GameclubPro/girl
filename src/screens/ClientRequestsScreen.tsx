@@ -1384,6 +1384,16 @@ export const ClientRequestsScreen = ({
                             </span>
                           )}
                         </button>
+                        {item.chatId && (
+                          <button
+                            className="request-chat-link"
+                            type="button"
+                            onClick={() => onOpenChat(item.chatId!)}
+                          >
+                            <IconChat />
+                            Чат по заявке
+                          </button>
+                        )}
                       </div>
                       {isResponsesOpen && (
                         <div className="request-responses">
