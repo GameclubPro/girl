@@ -1,26 +1,40 @@
 # Project Guidance (Read First)
 
-This repository is a Telegram Mini App for smartphones only.
+## Product Snapshot
+- Telegram Mini App, mobile-only (target width 360-430px).
+- Two roles: client and master (pro).
+- Core flows: discovery, requests, bookings, deposits, chat, reschedule, reviews, stories, trust.
+- UI copy is primarily Russian; keep it calm, concise, and premium.
 
-- Mobile-first only: design for phone screens (roughly 360-430px width).
-- UI must feel like a modern mobile app, not a desktop website.
-- Optimize for touch: clear tap targets, safe-area insets, smooth scrolling.
-- Avoid desktop-specific layouts; responsive work only within phone sizes.
-- **Visual style is Calm Premium Minimalism (light theme + single blue accent).**
-- Visual direction should feel modern for 2026: clean, premium, subtle motion.
-- Editor screens should rely on Telegram UI for back navigation; do not add custom back buttons.
+## Architecture and Source of Truth
+- Frontend: React + TypeScript + Vite.
+  - Screens live in `src/screens`.
+  - Shared UI in `src/components`.
+  - Styling primarily in `src/App.css` and `src/index.css`.
+- Backend: Express + Postgres in a single file `server/index.js`.
+- Types and contracts: `src/types/app.ts` must stay in sync with API payloads.
+- API base: `VITE_API_URL` with fallback to `http://localhost:4000`.
+- User identity comes from Telegram WebApp init data.
 
-## Calm Premium Minimalism (Required Style)
-- Light, airy surfaces with restrained contrast; prioritize readability.
-- Single accent color: **blue** (use for primary actions, highlights, and focus).
+## UX and Visual System (Calm Premium Minimalism)
+- Light theme, airy surfaces, restrained contrast.
+- Single accent color: blue (primary actions, highlights, focus).
 - Minimal gradients; soft depth and shadows only where needed.
-- Calm, premium typography: strong hierarchy, no noisy decoration.
-- Motion should be subtle and purposeful; avoid flashy effects.
+- Modern 2026 feel: clean, premium typography, clear hierarchy, subtle motion.
+- Mobile-only UI: touch-first, safe-area padding, smooth scrolling, no desktop layouts.
+- Editor screens rely on Telegram back navigation; never add custom back buttons.
 
-## Agent Prompt (Use This)
-You are working in a Telegram Mini App codebase for smartphones only. Always start by scanning the project to understand current UX, screens, data flow, and API shape before changing anything. When a task is given:
-- Do not just implement the narrow request; proactively improve related UX, visual design, and logic to deliver the best holistic result.
-- Always create a multi-step plan (no single-step plans) and execute it.
-- Apply 2026-level design standards: mobile-first, premium, app-like UI, strong typography, refined layout, and purposeful motion.
-- Keep visual work aligned with **Calm Premium Minimalism** (light theme, single blue accent, minimal gradients).
-- Solve adjacent tasks without asking extra questions; make reasonable decisions and document them in the final response.
+## Best Strategy (Always Follow)
+1) Scan relevant screens, types, and API handlers before editing.
+2) Update backend first (schema, queries, actions, system messages, validations).
+3) Update frontend next (types, API calls, state, UI, optimistic updates).
+4) Polish UX and visuals to match Calm Premium Minimalism.
+5) Verify (at least TypeScript check) and document changes and follow-ups.
+
+## Implementation Rules
+- Do not just implement the narrow request; improve adjacent UX and logic.
+- Keep client and master flows symmetric unless product requirements differ.
+- Surface state changes in chat via system messages and update list cards/status.
+- Handle loading, empty, error, and edge states explicitly.
+- Avoid desktop breakpoints and oversized layouts; design for a phone screen only.
+- Document decisions in the final response; avoid extra questions unless blocked.
