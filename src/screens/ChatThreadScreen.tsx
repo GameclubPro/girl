@@ -36,6 +36,19 @@ type ChatThreadScreenProps = {
   onViewRequests?: (tab?: 'requests' | 'bookings') => void
 }
 
+type StickyActionButton = {
+  label: string
+  onClick: () => void
+}
+
+type StickyAction = {
+  tone?: 'neutral' | 'alert'
+  title: string
+  subtitle?: string
+  primary?: StickyActionButton
+  secondary?: StickyActionButton
+} | null
+
 const locationLabelMap = {
   master: 'У мастера',
   client: 'У клиента',
@@ -2305,7 +2318,7 @@ export const ChatThreadScreen = ({
     [closeContextSheet, contextAnchorMap, scrollToBottom, scrollToMessage]
   )
 
-  const stickyAction = useMemo(() => {
+  const stickyAction = useMemo<StickyAction>(() => {
     if (!isBookingChat || !booking?.id) return null
     const holdLabel = formatTimeLeft(depositHoldExpiresAt)
     const amountLabel =
@@ -2325,7 +2338,9 @@ export const ChatThreadScreen = ({
           subtitle: `Новая дата: ${rescheduleLabel}`,
           secondary: {
             label: 'Отменить',
-            onClick: () => void runRescheduleAction('reschedule-cancel'),
+            onClick: () => {
+              void runRescheduleAction('reschedule-cancel')
+            },
           },
         }
       }
@@ -2335,11 +2350,15 @@ export const ChatThreadScreen = ({
         subtitle: `Новая дата: ${rescheduleLabel}`,
         primary: {
           label: 'Принять',
-          onClick: () => void runRescheduleAction('reschedule-accept'),
+          onClick: () => {
+            void runRescheduleAction('reschedule-accept')
+          },
         },
         secondary: {
           label: 'Отклонить',
-          onClick: () => void runRescheduleAction('reschedule-decline'),
+          onClick: () => {
+            void runRescheduleAction('reschedule-decline')
+          },
         },
       }
     }
@@ -2372,11 +2391,15 @@ export const ChatThreadScreen = ({
           subtitle: priceLabel,
           primary: {
             label: 'Подтвердить',
-            onClick: () => void runBookingAction('client-accept-price'),
+            onClick: () => {
+              void runBookingAction('client-accept-price')
+            },
           },
           secondary: {
             label: 'Отклонить',
-            onClick: () => void runBookingAction('client-decline-price'),
+            onClick: () => {
+              void runBookingAction('client-decline-price')
+            },
           },
         }
       }
@@ -2390,11 +2413,15 @@ export const ChatThreadScreen = ({
         subtitle: amountLabel || 'Клиент отправил чек.',
         primary: {
           label: 'Подтвердить',
-          onClick: () => void runBookingAction('master-deposit-confirm'),
+          onClick: () => {
+            void runBookingAction('master-deposit-confirm')
+          },
         },
         secondary: {
           label: 'Отклонить',
-          onClick: () => void runBookingAction('master-deposit-reject'),
+          onClick: () => {
+            void runBookingAction('master-deposit-reject')
+          },
         },
       }
     }
@@ -2417,11 +2444,15 @@ export const ChatThreadScreen = ({
         subtitle: 'Клиент ждёт подтверждение.',
         primary: {
           label: 'Подтвердить',
-          onClick: () => void runBookingAction('master-accept'),
+          onClick: () => {
+            void runBookingAction('master-accept')
+          },
         },
         secondary: {
           label: 'Отказать',
-          onClick: () => void runBookingAction('master-decline'),
+          onClick: () => {
+            void runBookingAction('master-decline')
+          },
         },
       }
     }
@@ -3436,7 +3467,7 @@ export const ChatThreadScreen = ({
 
       <RescheduleSheet
         isOpen={isRescheduleSheetOpen}
-        booking={booking}
+        booking={booking ?? null}
         isProViewer={isProViewer}
         onClose={() => {
           setIsRescheduleSheetOpen(false)

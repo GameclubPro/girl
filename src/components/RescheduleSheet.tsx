@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Booking } from '../types/app'
+type RescheduleBooking = {
+  scheduledAt?: string | null
+  rescheduleProposedTime?: string | null
+  rescheduleNote?: string | null
+}
 
 const formatDateInputValue = (value?: string | null) => {
   if (!value) return ''
@@ -40,7 +44,7 @@ const formatDateTimeLabel = (value?: string | null) => {
 
 type RescheduleSheetProps = {
   isOpen: boolean
-  booking: Booking | null
+  booking: RescheduleBooking | null
   isProViewer?: boolean
   onClose: () => void
   onSubmit: (payload: { proposedAt: string; note?: string | null }) => void

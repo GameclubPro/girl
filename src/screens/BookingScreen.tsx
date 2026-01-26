@@ -515,7 +515,7 @@ export const BookingScreen = ({
             end: start + bookingDuration * 60 * 1000,
           }
         })
-        .filter(Boolean)
+        .filter((range): range is { start: number; end: number } => range !== null)
     })
 
     const result: {
