@@ -143,6 +143,7 @@ const getLatestContext = (chat: ChatSummary) => {
       locationType: chat.request.locationType ?? null,
       dateOption: chat.request.dateOption ?? null,
       dateTime: chat.request.dateTime ?? null,
+      timeWindows: chat.request.timeWindows ?? null,
       createdAt: chat.request.createdAt ?? null,
     }
   }
