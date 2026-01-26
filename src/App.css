@@ -28260,3 +28260,27 @@ h2 {
 .chat-active-reschedule {
   color: var(--accent-strong);
 }
+
+.booking-action.is-primary:not(.is-danger),
+.response-action.is-primary,
+.address-primary,
+.cta--primary,
+.pro-primary,
+.pro-profile-hero-action.is-primary,
+.pro-profile-ig-button--primary,
+.pro-profile-portfolio-panel-action.is-primary,
+.pro-cabinet-nav-action.is-primary,
+.pro-cabinet-share-action.is-primary,
+.pro-slots-footer-primary,
+.pro-slots-confirm-primary:not(.is-danger),
+.pro-slot-sheet-primary,
+.client-profile-primary-action,
+.client-profile-action.is-primary,
+.chat-sticky-button.is-primary,
+.reschedule-primary,
+.chat-reschedule-action.is-primary {
+  background: var(--metal-primary-bg);
+  color: var(--metal-primary-text);
+  border: 1px solid var(--metal-primary-border);
+  box-shadow: var(--metal-primary-shadow);
+}
