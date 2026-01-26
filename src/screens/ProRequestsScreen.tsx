@@ -3502,25 +3502,40 @@ export const ProRequestsScreen = ({
                       ['free', 'Свободные'],
                       ['booked', 'Занятые'],
                       ['closed', 'Закрытые'],
-                    ] as const).map(([value, label]) => (
-                      <button
-                        key={value}
-                        className={`pro-slots-filter${
-                          slotFilter === value ? ' is-active' : ''
-                        }`}
-                        type="button"
-                        role="tab"
-                        aria-selected={slotFilter === value}
-                        onClick={() => setSlotFilter(value)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="pro-slots-meta">
-                    <span>Свободные {slotStats.free}</span>
-                    <span>Занятые {slotStats.booked}</span>
-                    <span>Закрытые {slotStats.closed}</span>
+                    ] as const).map(([value, label]) => {
+                      const indexValue =
+                        value === 'free'
+                          ? slotStats.free
+                          : value === 'booked'
+                            ? slotStats.booked
+                            : value === 'closed'
+                              ? slotStats.closed
+                              : null
+                      return (
+                        <button
+                          key={value}
+                          className={`pro-slots-filter${
+                            slotFilter === value ? ' is-active' : ''
+                          }`}
+                          type="button"
+                          role="tab"
+                          aria-selected={slotFilter === value}
+                          onClick={() => setSlotFilter(value)}
+                        >
+                          {label}
+                          {value !== 'all' && (
+                            <span
+                              className={`pro-slots-filter-index${
+                                value === 'booked' ? ' is-danger' : ''
+                              }`}
+                              aria-hidden="true"
+                            >
+                              {indexValue ?? 0}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
 
                   {filteredSlotViews.length === 0 ? (
