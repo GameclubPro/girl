@@ -502,13 +502,34 @@ export const ChatListScreen = ({
               : null
           const event = typeof meta?.event === 'string' ? meta.event : ''
           if (
-            ['request_accepted', 'request_updated', 'booking_confirmed', 'booking_updated'].includes(
-              event
-            )
+            [
+              'request_accepted',
+              'request_updated',
+              'request_closed',
+              'booking_confirmed',
+              'booking_updated',
+              'booking_price_proposed',
+              'booking_cancelled',
+              'booking_declined',
+              'booking_reschedule_proposed',
+              'booking_reschedule_accepted',
+              'booking_reschedule_declined',
+              'booking_reschedule_cancelled',
+              'booking_outcome_marked',
+              'deposit_pending',
+              'deposit_submitted',
+              'deposit_confirmed',
+              'deposit_rejected',
+              'deposit_expired',
+            ].includes(event)
           ) {
             scheduleReload()
           }
         }
+        return
+      }
+      if (payload?.type === 'chat:created') {
+        scheduleReload()
         return
       }
       if (payload?.type === 'trust:update') {

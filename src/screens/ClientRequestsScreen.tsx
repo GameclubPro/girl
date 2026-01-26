@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   IconChat,
   IconCheck,
@@ -295,6 +295,7 @@ export const ClientRequestsScreen = ({
     Record<number, string>
   >({})
   const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const bookingsRequestIdRef = useRef(0)
   const bookingListRef = useRef<HTMLDivElement | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [bookingFilter, setBookingFilter] = useState<'all' | 'action'>('all')
@@ -365,13 +366,15 @@ export const ClientRequestsScreen = ({
     }
   }, [apiBase, userId])
 
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-
-    const loadBookings = async () => {
-      setIsBookingsLoading(true)
-      setBookingsError('')
+  const loadBookings = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!userId) return
+      const requestId = (bookingsRequestIdRef.current += 1)
+      const silent = options?.silent ?? false
+      if (!silent) {
+        setIsBookingsLoading(true)
+        setBookingsError('')
+      }
       try {
         const response = await fetch(
           `${apiBase}/api/bookings?userId=${encodeURIComponent(userId)}`
@@ -380,27 +383,26 @@ export const ClientRequestsScreen = ({
           throw new Error('Load bookings failed')
         }
         const data = (await response.json()) as Booking[]
-        if (!cancelled) {
+        if (bookingsRequestIdRef.current === requestId) {
           setBookings(Array.isArray(data) ? data : [])
         }
       } catch (error) {
-        if (!cancelled) {
+        if (bookingsRequestIdRef.current === requestId) {
           setBookings([])
           setBookingsError('Не удалось загрузить записи.')
         }
       } finally {
-        if (!cancelled) {
+        if (!silent && bookingsRequestIdRef.current === requestId) {
           setIsBookingsLoading(false)
         }
       }
-    }
+    },
+    [apiBase, userId]
+  )
 
-    loadBookings()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiBase, userId])
+  useEffect(() => {
+    void loadBookings()
+  }, [loadBookings])
 
   useEffect(() => {
     if (focusedBookingId === null) return
@@ -837,6 +839,7 @@ export const ClientRequestsScreen = ({
             depositStatus?: Booking['depositStatus']
             depositAmount?: number | null
             depositProofUrl?: string | null
+            chatId?: number | null
           }
         | null
 
@@ -870,6 +873,9 @@ export const ClientRequestsScreen = ({
           }
           if (typeof data?.depositProofUrl === 'string') {
             next.depositProofUrl = data.depositProofUrl
+          }
+          if (typeof data?.chatId === 'number') {
+            next.chatId = data.chatId
           }
           return next
         })
@@ -1189,6 +1195,9 @@ export const ClientRequestsScreen = ({
             request.id === requestId ? { ...request, status: 'closed' } : request
           )
         )
+        if (options?.bookNow) {
+          void loadBookings({ silent: true })
+        }
       }
     } catch (error) {
       setResponseActionError((current) => ({

@@ -1209,6 +1209,7 @@ export const ChatThreadScreen = ({
 
   useEffect(() => {
     if (!detail) return
+    const shouldAppendLocal = streamStatus !== 'connected'
     const hasDepositSnapshot =
       Boolean(bookingSnapshot && bookingSnapshot.id === booking?.id)
     const nextDepositStatus = hasDepositSnapshot ? depositStatus : undefined
@@ -1235,7 +1236,7 @@ export const ChatThreadScreen = ({
         const delta = Date.now() - new Date(message.createdAt).getTime()
         return delta >= 0 && delta < 5 * 60 * 1000
       })
-      if (!hasRecentSystemForBooking) {
+      if (shouldAppendLocal && !hasRecentSystemForBooking) {
         if (nextSnapshot.bookingStatus === 'price_proposed') {
           appendLocalSystemMessage('Мастер предложил цену. Подтвердите запись.', {
             event: 'booking_price_proposed',
@@ -1273,7 +1274,7 @@ export const ChatThreadScreen = ({
         const { requestId } = extractContextIds(message.meta)
         return requestId === request.id
       })
-      if (!hasSystemForRequest) {
+      if (shouldAppendLocal && !hasSystemForRequest) {
         appendLocalSystemMessage('Заявка согласована. Можно обсудить детали.', {
           event: 'request_closed',
           requestId: request.id,
@@ -1288,29 +1289,31 @@ export const ChatThreadScreen = ({
       previous.depositStatus !== nextSnapshot.depositStatus &&
       nextSnapshot.depositStatus
     ) {
-      if (nextSnapshot.depositStatus === 'pending') {
-        const holdLabel = formatTimeLeft(depositHoldExpiresAt)
-        const amountLabel =
-          typeof depositAmount === 'number' && depositAmount > 0
-            ? `Сумма: ${formatPrice(depositAmount)}`
-            : ''
-        const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
-        appendLocalSystemMessage(
-          `Нужен депозит. ${[amountLabel, holdText].filter(Boolean).join(' ')}`.trim(),
-          {
-            event: 'deposit_pending',
+      if (shouldAppendLocal) {
+        if (nextSnapshot.depositStatus === 'pending') {
+          const holdLabel = formatTimeLeft(depositHoldExpiresAt)
+          const amountLabel =
+            typeof depositAmount === 'number' && depositAmount > 0
+              ? `Сумма: ${formatPrice(depositAmount)}`
+              : ''
+          const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
+          appendLocalSystemMessage(
+            `Нужен депозит. ${[amountLabel, holdText].filter(Boolean).join(' ')}`.trim(),
+            {
+              event: 'deposit_pending',
+              bookingId: booking?.id ?? null,
+              depositAmount: depositAmount ?? null,
+              local: true,
+            }
+          )
+        }
+        if (nextSnapshot.depositStatus === 'submitted') {
+          appendLocalSystemMessage('Депозит отправлен. Ждём подтверждения мастера.', {
+            event: 'deposit_submitted',
             bookingId: booking?.id ?? null,
-            depositAmount: depositAmount ?? null,
             local: true,
-          }
-        )
-      }
-      if (nextSnapshot.depositStatus === 'submitted') {
-        appendLocalSystemMessage('Депозит отправлен. Ждём подтверждения мастера.', {
-          event: 'deposit_submitted',
-          bookingId: booking?.id ?? null,
-          local: true,
-        })
+          })
+        }
       }
     }
 
@@ -1327,6 +1330,7 @@ export const ChatThreadScreen = ({
     request?.id,
     request?.status,
     visibleMessages,
+    streamStatus,
   ])
 
   useLayoutEffect(() => {
@@ -1502,8 +1506,19 @@ export const ChatThreadScreen = ({
             [
               'request_accepted',
               'request_updated',
+              'request_closed',
               'booking_confirmed',
               'booking_updated',
+              'booking_price_proposed',
+              'booking_cancelled',
+              'booking_declined',
+              'booking_reschedule_proposed',
+              'booking_reschedule_accepted',
+              'booking_reschedule_declined',
+              'booking_reschedule_cancelled',
+              'booking_outcome_marked',
+              'deposit_pending',
+              'deposit_submitted',
               'deposit_confirmed',
               'deposit_rejected',
               'deposit_expired',

@@ -205,6 +205,8 @@ export type Booking = {
   id: number
   clientId: string
   masterId: string
+  requestId?: number | null
+  responseId?: number | null
   masterName?: string | null
   masterAvatarUrl?: string | null
   clientName?: string | null

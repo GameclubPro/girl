@@ -2598,6 +2598,7 @@ export const ProRequestsScreen = ({
             depositStatus?: Booking['depositStatus']
             depositAmount?: number | null
             scheduledAt?: string | null
+            chatId?: number | null
           }
         | null
 
@@ -2639,6 +2640,9 @@ export const ProRequestsScreen = ({
           }
           if (typeof data?.depositAmount === 'number') {
             next.depositAmount = data.depositAmount
+          }
+          if (typeof data?.chatId === 'number') {
+            next.chatId = data.chatId
           }
           return next
         })
