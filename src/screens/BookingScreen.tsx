@@ -54,6 +54,7 @@ type BookingScreenProps = {
 
 type MasterBookingSlot = {
   scheduledAt: string
+  rescheduleProposedTime?: string | null
   serviceDuration: number | null
   status: string
 }
@@ -500,16 +501,22 @@ export const BookingScreen = ({
     }
 
     const duration = selectedService?.duration ?? 60
-    const bookedRanges = bookings
-      .filter((booking) => booking.scheduledAt)
-      .map((booking) => {
-        const start = new Date(booking.scheduledAt).getTime()
-        const bookingDuration = booking.serviceDuration ?? 60
-        return {
-          start,
-          end: start + bookingDuration * 60 * 1000,
-        }
-      })
+    const bookedRanges = bookings.flatMap((booking) => {
+      const bookingDuration = booking.serviceDuration ?? 60
+      const times = [booking.scheduledAt, booking.rescheduleProposedTime].filter(
+        Boolean
+      ) as string[]
+      return times
+        .map((time) => {
+          const start = new Date(time).getTime()
+          if (Number.isNaN(start)) return null
+          return {
+            start,
+            end: start + bookingDuration * 60 * 1000,
+          }
+        })
+        .filter(Boolean)
+    })
 
     const result: {
       key: string

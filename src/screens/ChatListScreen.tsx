@@ -44,6 +44,18 @@ const formatChatTimestamp = (value?: string | null) => {
   }).format(date)
 }
 
+const formatChatDateTime = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
 const requestStatusLabelMap: Record<string, string> = {
   open: 'Открыта',
   closed: 'Согласована',
@@ -582,7 +594,22 @@ export const ChatListScreen = ({
       ? ''
       : getContextStatusLabel(latestContext)
     const contextTimeLabel = isSupportChat ? '' : getContextTimeLabel(latestContext)
-    const showContextMeta = Boolean(contextStatusLabel || contextTimeLabel)
+    const reschedulePending =
+      Boolean(chat.booking?.rescheduleProposedTime) &&
+      Boolean(chat.booking?.rescheduleProposedBy)
+    const isRescheduleProposer =
+      chat.booking?.rescheduleProposedBy === (role === 'pro' ? 'master' : 'client')
+    const rescheduleStatusLabel = reschedulePending
+      ? isRescheduleProposer
+        ? 'Перенос предложен'
+        : 'Нужно подтвердить перенос'
+      : ''
+    const rescheduleTimeLabel = reschedulePending
+      ? formatChatDateTime(chat.booking?.rescheduleProposedTime ?? null)
+      : ''
+    const resolvedStatusLabel = rescheduleStatusLabel || contextStatusLabel
+    const resolvedTimeLabel = reschedulePending ? rescheduleTimeLabel : contextTimeLabel
+    const showContextMeta = Boolean(resolvedStatusLabel || resolvedTimeLabel)
     const lastMessage = chat.lastMessage
     const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
     const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
@@ -639,14 +666,14 @@ export const ChatListScreen = ({
               </span>
               {showContextMeta && (
                 <span className="chat-card-context-meta">
-                  {contextStatusLabel && (
+                  {resolvedStatusLabel && (
                     <span className="chat-card-context-status">
-                      {contextStatusLabel}
+                      {resolvedStatusLabel}
                     </span>
                   )}
-                  {contextTimeLabel && (
+                  {resolvedTimeLabel && (
                     <span className="chat-card-context-time">
-                      {contextTimeLabel}
+                      {resolvedTimeLabel}
                     </span>
                   )}
                 </span>

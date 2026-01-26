@@ -221,6 +221,10 @@ export type Booking = {
   districtName?: string | null
   address?: string | null
   scheduledAt: string
+  rescheduleProposedAt?: string | null
+  rescheduleProposedBy?: 'client' | 'master' | null
+  rescheduleProposedTime?: string | null
+  rescheduleNote?: string | null
   cancelWindowHours?: number | null
   depositPercent?: number | null
   depositAmount?: number | null
@@ -296,6 +300,10 @@ export type ChatContextSummary = {
   timeWindows?: RequestTimeWindow[] | null
   locationType?: ServiceRequest['locationType']
   scheduledAt?: string | null
+  rescheduleProposedAt?: string | null
+  rescheduleProposedBy?: 'client' | 'master' | null
+  rescheduleProposedTime?: string | null
+  rescheduleNote?: string | null
   serviceDuration?: number | null
   servicePrice?: number | null
   outcome?: string | null
@@ -343,6 +351,10 @@ export type ChatSummary = {
     categoryId?: string | null
     status?: string | null
     scheduledAt?: string | null
+    rescheduleProposedAt?: string | null
+    rescheduleProposedBy?: 'client' | 'master' | null
+    rescheduleProposedTime?: string | null
+    rescheduleNote?: string | null
     serviceDuration?: number | null
     servicePrice?: number | null
     outcome?: string | null
@@ -394,6 +406,10 @@ export type ChatDetail = {
     categoryId?: string | null
     locationType?: ServiceRequest['locationType']
     scheduledAt?: string | null
+    rescheduleProposedAt?: string | null
+    rescheduleProposedBy?: 'client' | 'master' | null
+    rescheduleProposedTime?: string | null
+    rescheduleNote?: string | null
     serviceDuration?: number | null
     servicePrice?: number | null
     status?: string | null

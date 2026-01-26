@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { TrustBadge } from '../components/TrustBadge'
+import { RescheduleSheet } from '../components/RescheduleSheet'
 import type { Booking, ChatDetail, ChatMessage, RequestTimeWindow } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
@@ -115,6 +116,28 @@ const parseOutcomeMarkedMeta = (meta: ChatMessage['meta']) => {
     bookingId,
     outcome,
     lateMinutes,
+  }
+}
+
+const parseRescheduleMeta = (meta: ChatMessage['meta']) => {
+  if (!meta || typeof meta !== 'object') return null
+  const payload = meta as Record<string, unknown>
+  const event = typeof payload.event === 'string' ? payload.event : ''
+  if (!event.startsWith('booking_reschedule_')) return null
+  const rawId = payload.bookingId
+  const bookingId = typeof rawId === 'number' ? rawId : Number(rawId)
+  if (!Number.isInteger(bookingId)) return null
+  return {
+    event,
+    bookingId,
+    serviceName: typeof payload.serviceName === 'string' ? payload.serviceName : null,
+    scheduledAt: typeof payload.scheduledAt === 'string' ? payload.scheduledAt : null,
+    proposedAt: typeof payload.proposedAt === 'string' ? payload.proposedAt : null,
+    proposedBy: typeof payload.proposedBy === 'string' ? payload.proposedBy : null,
+    note: typeof payload.note === 'string' ? payload.note : null,
+    acceptedBy: typeof payload.acceptedBy === 'string' ? payload.acceptedBy : null,
+    declinedBy: typeof payload.declinedBy === 'string' ? payload.declinedBy : null,
+    cancelledBy: typeof payload.cancelledBy === 'string' ? payload.cancelledBy : null,
   }
 }
 
@@ -346,6 +369,9 @@ export const ChatThreadScreen = ({
   const [bookingSnapshot, setBookingSnapshot] = useState<Booking | null>(null)
   const [bookingActionId, setBookingActionId] = useState<number | null>(null)
   const [bookingActionError, setBookingActionError] = useState('')
+  const [isRescheduleSheetOpen, setIsRescheduleSheetOpen] = useState(false)
+  const [rescheduleError, setRescheduleError] = useState('')
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const screenRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -398,6 +424,12 @@ export const ChatThreadScreen = ({
       : typeof booking?.servicePrice === 'number'
         ? booking.servicePrice
         : null
+  const rescheduleProposedBy =
+    bookingSnapshot?.rescheduleProposedBy ?? booking?.rescheduleProposedBy ?? null
+  const rescheduleProposedTime =
+    bookingSnapshot?.rescheduleProposedTime ?? booking?.rescheduleProposedTime ?? null
+  const rescheduleNote =
+    bookingSnapshot?.rescheduleNote ?? booking?.rescheduleNote ?? null
   const isBookingActionLoading = bookingActionId === booking?.id
   const isProViewer = detail?.chat?.memberRole === 'master'
   const showTrustBadge = Boolean(isProViewer && counterpart?.role === 'client')
@@ -409,6 +441,19 @@ export const ChatThreadScreen = ({
     : isBookingChat
       ? booking?.serviceName ?? 'Запись подтверждена'
       : request?.serviceName ?? 'Переговоры по заявке'
+  const hasReschedulePending = Boolean(
+    rescheduleProposedTime && rescheduleProposedBy
+  )
+  const isRescheduleProposer =
+    rescheduleProposedBy === (isProViewer ? 'master' : 'client')
+  const rescheduleStatusLabel = hasReschedulePending
+    ? isRescheduleProposer
+      ? 'Перенос предложен'
+      : 'Нужно подтвердить перенос'
+    : ''
+  const rescheduleTimeLabel = rescheduleProposedTime
+    ? formatDateTime(rescheduleProposedTime)
+    : ''
   const bookingStatusLabel =
     bookingStatus === 'confirmed' ? 'Подтверждено' : 'Запись'
   const bookingTimeLabel = booking?.scheduledAt
@@ -444,15 +489,18 @@ export const ChatThreadScreen = ({
   const activeStatusLabel = isBookingChat
     ? booking?.outcome
       ? `Итог: ${bookingOutcomeLabelMap[booking.outcome] ?? booking.outcome}`
-      : bookingStatus
-        ? bookingStatusLabelMap[bookingStatus] ?? bookingStatusLabel
-        : bookingStatusLabel
+      : rescheduleStatusLabel
+        ? rescheduleStatusLabel
+        : bookingStatus
+          ? bookingStatusLabelMap[bookingStatus] ?? bookingStatusLabel
+          : bookingStatusLabel
     : request?.status
       ? requestStatusLabelMap[request.status] ?? 'Заявка'
       : 'Заявка'
   const summaryMeta = [
     activeStatusLabel,
     isBookingChat ? bookingTimeLabel : requestTimeLabel,
+    isBookingChat && rescheduleTimeLabel ? `→ ${rescheduleTimeLabel}` : '',
   ]
     .filter(Boolean)
     .join(' · ')
@@ -1836,6 +1884,144 @@ export const ChatThreadScreen = ({
     [apiBase, booking?.id, bookingActionId, bookingSnapshot?.proposedPrice, bookingStatus, userId]
   )
 
+  const resolveRescheduleError = (code?: string) => {
+    if (code === 'reschedule_window_closed') {
+      return 'Перенос возможен только заранее.'
+    }
+    if (code === 'schedule_unavailable') return 'График мастера недоступен.'
+    if (code === 'day_unavailable') return 'В этот день мастер не работает.'
+    if (code === 'time_unavailable') return 'Это время уже занято.'
+    if (code === 'same_time') return 'Выберите другое время.'
+    if (code === 'status_invalid') return 'Перенос доступен только для подтвержденных записей.'
+    if (code === 'outcome_locked') return 'Запись уже завершена.'
+    return 'Не удалось предложить перенос.'
+  }
+
+  const submitRescheduleProposal = useCallback(
+    async (payload: { proposedAt: string; note?: string | null }) => {
+      if (!booking?.id || rescheduleSubmitting) return
+      setRescheduleSubmitting(true)
+      setRescheduleError('')
+      try {
+        const response = await fetch(`${apiBase}/api/bookings/${booking.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            action: 'reschedule-propose',
+            proposedAt: payload.proposedAt,
+            rescheduleNote: payload.note ?? null,
+          }),
+        })
+        const data = (await response.json().catch(() => null)) as
+          | {
+              error?: string
+              rescheduleProposedAt?: string | null
+              rescheduleProposedBy?: Booking['rescheduleProposedBy']
+              rescheduleProposedTime?: string | null
+              rescheduleNote?: string | null
+            }
+          | null
+        if (!response.ok) {
+          setRescheduleError(resolveRescheduleError(data?.error))
+          return
+        }
+        setDetail((current) => {
+          if (!current?.booking || current.booking.id !== booking.id) return current
+          return {
+            ...current,
+            booking: {
+              ...current.booking,
+              rescheduleProposedAt:
+                data?.rescheduleProposedAt ?? new Date().toISOString(),
+              rescheduleProposedBy: data?.rescheduleProposedBy ?? null,
+              rescheduleProposedTime: data?.rescheduleProposedTime ?? payload.proposedAt,
+              rescheduleNote: data?.rescheduleNote ?? payload.note ?? null,
+            },
+          }
+        })
+        setBookingSnapshot((current) => {
+          if (!current || current.id !== booking.id) return current
+          return {
+            ...current,
+            rescheduleProposedAt:
+              data?.rescheduleProposedAt ?? new Date().toISOString(),
+            rescheduleProposedBy: data?.rescheduleProposedBy ?? null,
+            rescheduleProposedTime: data?.rescheduleProposedTime ?? payload.proposedAt,
+            rescheduleNote: data?.rescheduleNote ?? payload.note ?? null,
+          }
+        })
+        setIsRescheduleSheetOpen(false)
+      } catch (error) {
+        setRescheduleError('Не удалось предложить перенос.')
+      } finally {
+        setRescheduleSubmitting(false)
+      }
+    },
+    [apiBase, booking?.id, rescheduleSubmitting, userId]
+  )
+
+  const runRescheduleAction = useCallback(
+    async (action: 'reschedule-accept' | 'reschedule-decline' | 'reschedule-cancel') => {
+      if (!booking?.id || bookingActionId !== null) return
+      setBookingActionId(booking.id)
+      setBookingActionError('')
+      try {
+        const response = await fetch(`${apiBase}/api/bookings/${booking.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action }),
+        })
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string; scheduledAt?: string | null }
+          | null
+        if (!response.ok) {
+          const message =
+            data?.error === 'reschedule_not_found'
+              ? 'Перенос уже не актуален.'
+              : 'Не удалось обновить перенос.'
+          setBookingActionError(message)
+          return
+        }
+
+        setDetail((current) => {
+          if (!current?.booking || current.booking.id !== booking.id) return current
+          const nextBooking = {
+            ...current.booking,
+            rescheduleProposedAt: null,
+            rescheduleProposedBy: null,
+            rescheduleProposedTime: null,
+            rescheduleNote: null,
+          }
+          if (action === 'reschedule-accept' && data?.scheduledAt) {
+            nextBooking.scheduledAt = data.scheduledAt
+          }
+          return { ...current, booking: nextBooking }
+        })
+
+        setBookingSnapshot((current) => {
+          if (!current || current.id !== booking.id) return current
+          const next = {
+            ...current,
+            rescheduleProposedAt: null,
+            rescheduleProposedBy: null,
+            rescheduleProposedTime: null,
+            rescheduleNote: null,
+          }
+          if (action === 'reschedule-accept' && data?.scheduledAt) {
+            next.scheduledAt = data.scheduledAt
+          }
+          return next
+        })
+      } catch (error) {
+        setBookingActionError('Не удалось обновить перенос.')
+      } finally {
+        setBookingActionId((current) => (current === booking?.id ? null : current))
+      }
+    },
+    [apiBase, booking?.id, bookingActionId, userId]
+  )
+
   const submitBookingOutcome = useCallback(
     async (bookingId: number, outcome: string, lateMinutes?: number | null) => {
       setOutcomeError('')
@@ -2127,6 +2313,36 @@ export const ChatThreadScreen = ({
         ? `Сумма: ${formatPrice(depositAmount)}`
         : ''
     const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
+    const rescheduleLabel = rescheduleProposedTime
+      ? formatDateTime(rescheduleProposedTime)
+      : ''
+
+    if (hasReschedulePending && rescheduleLabel) {
+      if (isRescheduleProposer) {
+        return {
+          tone: 'neutral' as const,
+          title: 'Перенос ожидает подтверждения',
+          subtitle: `Новая дата: ${rescheduleLabel}`,
+          secondary: {
+            label: 'Отменить',
+            onClick: () => void runRescheduleAction('reschedule-cancel'),
+          },
+        }
+      }
+      return {
+        tone: 'alert' as const,
+        title: 'Подтвердить перенос',
+        subtitle: `Новая дата: ${rescheduleLabel}`,
+        primary: {
+          label: 'Принять',
+          onClick: () => void runRescheduleAction('reschedule-accept'),
+        },
+        secondary: {
+          label: 'Отклонить',
+          onClick: () => void runRescheduleAction('reschedule-decline'),
+        },
+      }
+    }
 
     if (!isProViewer) {
       if (depositStatus === 'pending' || depositStatus === 'rejected') {
@@ -2230,12 +2446,16 @@ export const ChatThreadScreen = ({
     depositAmount,
     depositHoldExpiresAt,
     depositStatus,
+    hasReschedulePending,
     isBookingChat,
     isProViewer,
+    isRescheduleProposer,
     onViewRequests,
     openQuickMode,
     proposedPrice,
+    rescheduleProposedTime,
     runBookingAction,
+    runRescheduleAction,
   ])
 
   const onLoadMore = () => {
@@ -2493,6 +2713,7 @@ export const ChatThreadScreen = ({
             const outcomeStatus = outcomePrompt
               ? outcomeByBookingId.get(outcomePrompt.bookingId) ?? null
               : null
+            const rescheduleMeta = isSystem ? parseRescheduleMeta(message.meta) : null
             const offerMeta = (message.meta ?? {}) as Record<string, unknown>
             const offerTitle =
               message.type === 'offer_price'
@@ -2651,6 +2872,123 @@ export const ChatThreadScreen = ({
                       {showError && (
                         <p className="chat-outcome-error" role="alert">
                           {outcomeError}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            if (rescheduleMeta) {
+              const scheduledLabel = formatDateTime(
+                rescheduleMeta.scheduledAt ?? booking?.scheduledAt ?? null
+              )
+              const proposedLabel = formatDateTime(
+                rescheduleMeta.proposedAt ?? rescheduleProposedTime ?? null
+              )
+              const proposerLabel =
+                rescheduleMeta.proposedBy === 'master'
+                  ? 'Мастер'
+                  : rescheduleMeta.proposedBy === 'client'
+                    ? 'Клиент'
+                    : 'Сторона'
+              const statusMap: Record<string, string> = {
+                booking_reschedule_proposed: 'Ожидает подтверждения',
+                booking_reschedule_accepted: 'Подтверждено',
+                booking_reschedule_declined: 'Отклонено',
+                booking_reschedule_cancelled: 'Отменено',
+              }
+              const statusLabel = statusMap[rescheduleMeta.event] ?? 'Перенос'
+              const isCurrentProposal =
+                rescheduleMeta.event === 'booking_reschedule_proposed' &&
+                hasReschedulePending &&
+                rescheduleProposedTime === rescheduleMeta.proposedAt &&
+                rescheduleProposedBy === rescheduleMeta.proposedBy
+              const canRespond =
+                isCurrentProposal && !isRescheduleProposer && !isBookingActionLoading
+              const canCancel =
+                isCurrentProposal && isRescheduleProposer && !isBookingActionLoading
+              const toneClass =
+                rescheduleMeta.event === 'booking_reschedule_accepted'
+                  ? 'is-accepted'
+                  : rescheduleMeta.event === 'booking_reschedule_declined'
+                    ? 'is-declined'
+                    : rescheduleMeta.event === 'booking_reschedule_cancelled'
+                      ? 'is-cancelled'
+                      : 'is-pending'
+
+              return (
+                <div
+                  key={message.id}
+                  id={`chat-message-${message.id}`}
+                  className="chat-message-group"
+                >
+                  {showDate && (
+                    <div className="chat-date">
+                      {formatDayLabel(message.createdAt)}
+                    </div>
+                  )}
+                  <div className="chat-message is-system">
+                    <div className="chat-reschedule-card">
+                      <div className="chat-reschedule-top">
+                        <div>
+                          <p className="chat-reschedule-kicker">Перенос записи</p>
+                          <h3 className="chat-reschedule-title">
+                            {rescheduleMeta.serviceName ?? booking?.serviceName ?? 'Запись'}
+                          </h3>
+                        </div>
+                        <span className={`chat-reschedule-status ${toneClass}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className="chat-reschedule-meta">
+                        {scheduledLabel && <span>Текущее: {scheduledLabel}</span>}
+                        {proposedLabel && <span>Предлагаемое: {proposedLabel}</span>}
+                        <span>Инициатор: {proposerLabel}</span>
+                      </div>
+                      {(rescheduleMeta.note || rescheduleNote) && (
+                        <p className="chat-reschedule-note">
+                          {rescheduleMeta.note || rescheduleNote}
+                        </p>
+                      )}
+                      {(canRespond || canCancel) && (
+                        <div className="chat-reschedule-actions">
+                          {canRespond && (
+                            <>
+                              <button
+                                className="chat-reschedule-action is-primary"
+                                type="button"
+                                onClick={() => void runRescheduleAction('reschedule-accept')}
+                                disabled={isBookingActionLoading}
+                              >
+                                Принять
+                              </button>
+                              <button
+                                className="chat-reschedule-action"
+                                type="button"
+                                onClick={() => void runRescheduleAction('reschedule-decline')}
+                                disabled={isBookingActionLoading}
+                              >
+                                Отклонить
+                              </button>
+                            </>
+                          )}
+                          {canCancel && (
+                            <button
+                              className="chat-reschedule-action"
+                              type="button"
+                              onClick={() => void runRescheduleAction('reschedule-cancel')}
+                              disabled={isBookingActionLoading}
+                            >
+                              Отменить перенос
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {bookingActionError && (
+                        <p className="chat-reschedule-error" role="alert">
+                          {bookingActionError}
                         </p>
                       )}
                     </div>
@@ -2926,6 +3264,11 @@ export const ChatThreadScreen = ({
                     <span>
                       <IconClock /> {bookingTimeLabel}
                     </span>
+                    {rescheduleTimeLabel && (
+                      <span className="chat-active-reschedule">
+                        Перенос: {rescheduleTimeLabel}
+                      </span>
+                    )}
                     {bookingDurationLabel && (
                       <span>Длительность: {bookingDurationLabel}</span>
                     )}
@@ -2951,7 +3294,8 @@ export const ChatThreadScreen = ({
                   className="chat-active-action"
                   type="button"
                   onClick={() => {
-                    applyComposerTemplate(buildQuickTemplate('reschedule'))
+                    setRescheduleError('')
+                    setIsRescheduleSheetOpen(true)
                     closeContextSheet()
                   }}
                 >
@@ -3089,6 +3433,21 @@ export const ChatThreadScreen = ({
           </div>
         </div>
       )}
+
+      <RescheduleSheet
+        isOpen={isRescheduleSheetOpen}
+        booking={booking}
+        isProViewer={isProViewer}
+        onClose={() => {
+          setIsRescheduleSheetOpen(false)
+          setRescheduleError('')
+        }}
+        onSubmit={({ proposedAt, note }) => {
+          void submitRescheduleProposal({ proposedAt, note })
+        }}
+        isSubmitting={rescheduleSubmitting}
+        error={rescheduleError}
+      />
 
       {showTrustBadge && isTrustSheetOpen && (
         <div

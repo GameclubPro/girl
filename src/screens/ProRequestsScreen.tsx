@@ -423,7 +423,7 @@ type Slot = {
   createdAt: number
 }
 
-type SlotViewStatus = 'free' | 'closed' | 'booked'
+type SlotViewStatus = 'free' | 'closed' | 'booked' | 'pending'
 
 type SlotView = {
   id: string
@@ -433,6 +433,7 @@ type SlotView = {
   status: SlotViewStatus
   reason?: string | null
   booking?: Booking
+  isReschedule?: boolean
 }
 
 type SlotSuggestion = {
@@ -446,7 +447,7 @@ type SlotSuggestion = {
   confidenceLabel?: string
 }
 
-type SlotFilter = 'all' | 'free' | 'booked' | 'closed'
+type SlotFilter = 'all' | 'free' | 'booked' | 'closed' | 'pending'
 
 type ParsedSlotGroup = {
   date: Date
@@ -1022,22 +1023,49 @@ export const ProRequestsScreen = ({
   const bookingRangesByDate = useMemo(() => {
     const map = new Map<
       string,
-      { startMinutes: number; durationMinutes: number; booking: Booking }[]
+      {
+        startMinutes: number
+        durationMinutes: number
+        booking: Booking
+        isReschedule?: boolean
+      }[]
     >()
-    bookingCalendarItems.forEach((item) => {
-      const startMinutes = getMinutesFromDateTime(item.booking.scheduledAt)
-      if (startMinutes === null) return
-      const durationMinutes = item.booking.serviceDuration ?? BOOKING_DURATION_MIN
-      const list = map.get(item.dateKey)
-      const range = { startMinutes, durationMinutes, booking: item.booking }
-      if (list) {
-        list.push(range)
-      } else {
-        map.set(item.dateKey, [range])
+    confirmedBookingItems.forEach((booking) => {
+      const durationMinutes = booking.serviceDuration ?? BOOKING_DURATION_MIN
+      const scheduledDate = parseDateOnly(booking.scheduledAt)
+      const scheduledMinutes = getMinutesFromDateTime(booking.scheduledAt)
+      if (scheduledDate && scheduledMinutes !== null) {
+        const dateKey = toDateKey(scheduledDate)
+        const list = map.get(dateKey)
+        const range = { startMinutes: scheduledMinutes, durationMinutes, booking }
+        if (list) {
+          list.push(range)
+        } else {
+          map.set(dateKey, [range])
+        }
+      }
+      if (booking.rescheduleProposedTime) {
+        const proposedDate = parseDateOnly(booking.rescheduleProposedTime)
+        const proposedMinutes = getMinutesFromDateTime(booking.rescheduleProposedTime)
+        if (proposedDate && proposedMinutes !== null) {
+          const dateKey = toDateKey(proposedDate)
+          const list = map.get(dateKey)
+          const range = {
+            startMinutes: proposedMinutes,
+            durationMinutes,
+            booking,
+            isReschedule: true,
+          }
+          if (list) {
+            list.push(range)
+          } else {
+            map.set(dateKey, [range])
+          }
+        }
       }
     })
     return map
-  }, [bookingCalendarItems])
+  }, [confirmedBookingItems])
 
   const applySlotTimes = (
     dateKey: string,
@@ -1185,12 +1213,13 @@ export const ProRequestsScreen = ({
     }))
     const bookedViews: SlotView[] = (bookingRangesByDate.get(selectedDateKey) ?? [])
       .map((range) => ({
-        id: `booking-${range.booking.id}`,
+        id: `booking-${range.booking.id}${range.isReschedule ? '-reschedule' : ''}`,
         dateKey: selectedDateKey,
         startMinutes: range.startMinutes,
         durationMinutes: range.durationMinutes,
-        status: 'booked' as const,
+        status: range.isReschedule ? 'pending' : ('booked' as const),
         booking: range.booking,
+        isReschedule: range.isReschedule,
       }))
     return [...manualViews, ...bookedViews].sort(
       (a, b) => a.startMinutes - b.startMinutes
@@ -1198,6 +1227,11 @@ export const ProRequestsScreen = ({
   }, [bookingRangesByDate, selectedDateKey, selectedSlots])
   const filteredSlotViews = useMemo(() => {
     if (slotFilter === 'all') return selectedSlotViews
+    if (slotFilter === 'booked') {
+      return selectedSlotViews.filter(
+        (slot) => slot.status === 'booked' || slot.status === 'pending'
+      )
+    }
     return selectedSlotViews.filter((slot) => slot.status === slotFilter)
   }, [selectedSlotViews, slotFilter])
   const slotStats = useMemo(() => {
@@ -1206,7 +1240,7 @@ export const ProRequestsScreen = ({
     let closed = 0
     selectedSlotViews.forEach((slot) => {
       if (slot.status === 'free') free += 1
-      if (slot.status === 'booked') booked += 1
+      if (slot.status === 'booked' || slot.status === 'pending') booked += 1
       if (slot.status === 'closed') closed += 1
     })
     return { free, booked, closed }
@@ -1750,65 +1784,67 @@ export const ProRequestsScreen = ({
     setSelectedTimes([])
   }
 
-  const handleRescheduleBooking = (newTime: number) => {
+  const handleRescheduleBooking = async (newTime: number) => {
     if (!rescheduleBooking) return
-    const oldMinutes = getMinutesFromDateTime(rescheduleBooking.scheduledAt)
-    const oldDate = parseDateOnly(rescheduleBooking.scheduledAt)
+    setAddSlotsError('')
     const updatedDate = new Date(selectedDate)
     updatedDate.setHours(Math.floor(newTime / 60), newTime % 60, 0, 0)
-    const updatedScheduledAt = updatedDate.toISOString()
-    setBookings((current) =>
-      current.map((booking) =>
-        booking.id === rescheduleBooking.id
-          ? { ...booking, scheduledAt: updatedScheduledAt }
-          : booking
-      )
-    )
-    setSlots((current) => {
-      let next = current.filter(
-        (slot) =>
-          !(
-            slot.dateKey === selectedDateKey &&
-            slot.status === 'free' &&
-            rangesOverlap(
-              newTime,
-              SLOT_DURATION_MIN,
-              slot.startMinutes,
-              slot.durationMinutes
-            )
-          )
-      )
-      if (oldDate && oldMinutes !== null) {
-        const oldKey = toDateKey(oldDate)
-        const hasOverlap = next.some(
-          (slot) =>
-            slot.dateKey === oldKey &&
-            rangesOverlap(
-              oldMinutes,
-              SLOT_DURATION_MIN,
-              slot.startMinutes,
-              slot.durationMinutes
-            )
-        )
-        if (!hasOverlap) {
-          next = [
-            ...next,
-            {
-              id: buildSlotId(),
-              dateKey: oldKey,
-              startMinutes: oldMinutes,
-              durationMinutes: SLOT_DURATION_MIN,
-              status: 'free',
-              reason: null,
-              createdAt: Date.now(),
-            },
-          ]
+    const proposedAt = updatedDate.toISOString()
+
+    try {
+      const response = await fetch(
+        `${apiBase}/api/bookings/${rescheduleBooking.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            action: 'reschedule-propose',
+            proposedAt,
+          }),
         }
+      )
+      const data = (await response.json().catch(() => null)) as
+        | {
+            error?: string
+            rescheduleProposedAt?: string | null
+            rescheduleProposedBy?: Booking['rescheduleProposedBy']
+            rescheduleProposedTime?: string | null
+          }
+        | null
+
+      if (!response.ok) {
+        const message =
+          data?.error === 'day_unavailable'
+            ? 'Этот день недоступен.'
+            : data?.error === 'schedule_unavailable'
+              ? 'График мастера пока недоступен.'
+              : data?.error === 'time_unavailable'
+                ? 'Время уже занято.'
+                : data?.error === 'same_time'
+                  ? 'Выберите другое время.'
+                  : 'Не удалось предложить перенос.'
+        setAddSlotsError(message)
+        return
       }
-      return next
-    })
-    setSlotMessage('Запись перенесена.')
-    handleCloseAddSlots()
+
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === rescheduleBooking.id
+            ? {
+                ...booking,
+                rescheduleProposedAt: data?.rescheduleProposedAt ?? new Date().toISOString(),
+                rescheduleProposedBy: data?.rescheduleProposedBy ?? 'master',
+                rescheduleProposedTime: data?.rescheduleProposedTime ?? proposedAt,
+              }
+            : booking
+        )
+      )
+      setSlotMessage('Предложение переноса отправлено.')
+      handleCloseAddSlots()
+    } catch (error) {
+      setAddSlotsError('Не удалось предложить перенос.')
+    }
   }
 
   const handleSaveSlots = () => {
@@ -1841,7 +1877,7 @@ export const ProRequestsScreen = ({
         setAddSlotsError('Время пересекается с закрытым периодом.')
         return
       }
-      handleRescheduleBooking(availableTimes[0])
+      void handleRescheduleBooking(availableTimes[0])
       return
     }
 
@@ -2139,6 +2175,9 @@ export const ProRequestsScreen = ({
       locationLabelMap[booking.locationType] ?? 'Не важно'
     const distanceLabel = formatDistance(booking.distanceKm)
     const scheduledLabel = formatDateTime(booking.scheduledAt)
+    const rescheduleLabel = booking.rescheduleProposedTime
+      ? formatDateTime(booking.rescheduleProposedTime)
+      : ''
     const updatedAtMs = booking.updatedAt
       ? new Date(booking.updatedAt).getTime()
       : null
@@ -2216,6 +2255,24 @@ export const ProRequestsScreen = ({
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
+    const reschedulePending =
+      Boolean(booking.rescheduleProposedTime) &&
+      Boolean(booking.rescheduleProposedBy)
+    const rescheduleByMaster = booking.rescheduleProposedBy === 'master'
+    const canRespondReschedule = reschedulePending && !rescheduleByMaster
+    const canCancelReschedule = reschedulePending && rescheduleByMaster
+    const rescheduleMetaLabel = reschedulePending
+      ? rescheduleByMaster
+        ? rescheduleLabel
+          ? `Ожидает подтверждения · ${rescheduleLabel}`
+          : 'Ожидает подтверждения переноса'
+        : rescheduleLabel
+          ? `Клиент просит перенос · ${rescheduleLabel}`
+          : 'Клиент просит перенос'
+      : ''
+    const rescheduleMetaTone = canRespondReschedule
+      ? 'booking-item-meta--warning'
+      : 'booking-item-meta--highlight'
 
     return (
       <div
@@ -2247,6 +2304,11 @@ export const ProRequestsScreen = ({
           {categoryLabel}
           {scheduledLabel ? ` • ${scheduledLabel}` : ''}
         </div>
+        {rescheduleMetaLabel && (
+          <div className={`booking-item-meta ${rescheduleMetaTone}`}>
+            {rescheduleMetaLabel}
+          </div>
+        )}
         <div className="booking-item-meta">
           {locationLabel}
           {booking.cityName ? ` • ${booking.cityName}` : ''}
@@ -2282,6 +2344,46 @@ export const ProRequestsScreen = ({
         {depositAmount > 0 && depositStatusLabel && (
           <div className="booking-item-meta booking-item-meta--highlight">
             {depositStatusLabel}
+          </div>
+        )}
+        {reschedulePending && (
+          <div className="booking-actions">
+            {canRespondReschedule && (
+              <>
+                <button
+                  className="booking-action is-primary"
+                  type="button"
+                  onClick={() =>
+                    handleBookingAction(booking.id, 'reschedule-accept')
+                  }
+                  disabled={isActionLoading}
+                >
+                  Подтвердить перенос
+                </button>
+                <button
+                  className="booking-action"
+                  type="button"
+                  onClick={() =>
+                    handleBookingAction(booking.id, 'reschedule-decline')
+                  }
+                  disabled={isActionLoading}
+                >
+                  Отклонить
+                </button>
+              </>
+            )}
+            {canCancelReschedule && (
+              <button
+                className="booking-action is-ghost"
+                type="button"
+                onClick={() =>
+                  handleBookingAction(booking.id, 'reschedule-cancel')
+                }
+                disabled={isActionLoading}
+              >
+                Отменить перенос
+              </button>
+            )}
           </div>
         )}
         {booking.depositProofUrl && (
@@ -2448,7 +2550,10 @@ export const ProRequestsScreen = ({
       | 'master-decline'
       | 'master-propose-price'
       | 'master-deposit-confirm'
-      | 'master-deposit-reject',
+      | 'master-deposit-reject'
+      | 'reschedule-accept'
+      | 'reschedule-decline'
+      | 'reschedule-cancel',
     price?: string
   ) => {
     if (bookingActionId !== null) return
@@ -2492,6 +2597,7 @@ export const ProRequestsScreen = ({
             proposedPrice?: number | null
             depositStatus?: Booking['depositStatus']
             depositAmount?: number | null
+            scheduledAt?: string | null
           }
         | null
 
@@ -2514,6 +2620,19 @@ export const ProRequestsScreen = ({
                 ? data.proposedPrice
                 : Number(price)
             next.proposedPrice = updatedPrice
+          }
+          if (action === 'reschedule-accept' && data?.scheduledAt) {
+            next.scheduledAt = data.scheduledAt
+          }
+          if (
+            action === 'reschedule-accept' ||
+            action === 'reschedule-decline' ||
+            action === 'reschedule-cancel'
+          ) {
+            next.rescheduleProposedAt = null
+            next.rescheduleProposedBy = null
+            next.rescheduleProposedTime = null
+            next.rescheduleNote = null
           }
           if (data?.depositStatus) {
             next.depositStatus = data.depositStatus
@@ -3416,9 +3535,11 @@ export const ProRequestsScreen = ({
                         const statusLabel =
                           slot.status === 'free'
                             ? 'Свободно'
-                            : slot.status === 'booked'
-                              ? 'Занято'
-                              : 'Закрыто'
+                            : slot.status === 'pending'
+                              ? 'Ожидает подтверждения'
+                              : slot.status === 'booked'
+                                ? 'Занято'
+                                : 'Закрыто'
                         const booking = slot.booking
                         const hasDetails = booking && slotDetailId === booking.id
                         const isConfirmTarget = slotConfirm
@@ -3470,7 +3591,9 @@ export const ProRequestsScreen = ({
                                         </button>
                                       </>
                                     )}
-                                    {slot.status === 'booked' && booking && (
+                                    {(slot.status === 'booked' ||
+                                      slot.status === 'pending') &&
+                                      booking && (
                                       <>
                                         <button
                                           className={`pro-slot-action pro-slot-action--icon${

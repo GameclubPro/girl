@@ -2550,6 +2550,12 @@
   color: var(--success);
 }
 
+.booking-action-icon.is-accept {
+  background: rgba(var(--success-rgb), 0.16);
+  border-color: rgba(var(--success-rgb), 0.34);
+  color: var(--success);
+}
+
 .booking-action-icon.is-cancel,
 .booking-action-icon.is-delete {
   background: rgba(var(--danger-rgb), 0.16);
@@ -15292,6 +15298,12 @@
   border-color: rgba(var(--shadow-rgb), 0.22);
 }
 
+.pro-slot-status.is-pending {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
+  border-color: rgba(var(--accent-rgb), 0.32);
+}
+
 .pro-slot-status.is-closed {
   background: rgba(var(--danger-rgb), 0.14);
   color: var(--danger);
@@ -27891,4 +27903,299 @@ h2 {
   .screen--pro-profile .pro-profile-hero-actions {
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   }
+}
+
+.reschedule-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 14px calc(12px + var(--safe-bottom));
+  background: rgba(16, 24, 40, 0.32);
+  backdrop-filter: blur(6px);
+}
+
+.reschedule-sheet {
+  width: min(430px, 100%);
+  background: var(--surface);
+  border-radius: 26px 26px 20px 20px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 26px 60px rgba(var(--shadow-rgb), 0.2);
+  padding: 10px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: reschedule-sheet-rise 0.25s ease-out;
+}
+
+@keyframes reschedule-sheet-rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.reschedule-sheet-handle {
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--shadow-rgb), 0.2);
+  margin: 0 auto;
+}
+
+.reschedule-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reschedule-sheet-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.reschedule-sheet-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.reschedule-sheet-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.reschedule-sheet-subtitle.is-accent {
+  color: var(--accent);
+}
+
+.reschedule-sheet-close {
+  border: none;
+  background: rgba(var(--shadow-rgb), 0.08);
+  color: var(--ink);
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.reschedule-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reschedule-input-row {
+  display: grid;
+  gap: 6px;
+}
+
+.reschedule-input-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.reschedule-input,
+.reschedule-note {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  padding: 12px 14px;
+  background: rgba(var(--paper-rgb), 0.9);
+  color: var(--ink);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.reschedule-note {
+  resize: none;
+}
+
+.reschedule-input:focus-visible,
+.reschedule-note:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.3);
+  outline-offset: 2px;
+}
+
+.reschedule-quick {
+  display: flex;
+  gap: 8px;
+}
+
+.reschedule-quick-action {
+  flex: 1;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reschedule-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.reschedule-sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.reschedule-primary,
+.reschedule-secondary {
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.reschedule-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(var(--accent-rgb), 0.24);
+}
+
+.reschedule-secondary {
+  background: rgba(var(--shadow-rgb), 0.06);
+  color: var(--ink);
+  border-color: rgba(var(--shadow-rgb), 0.12);
+}
+
+.reschedule-primary:disabled,
+.reschedule-secondary:disabled,
+.reschedule-quick-action:disabled {
+  opacity: 0.6;
+}
+
+.chat-reschedule-card {
+  position: relative;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--paper-rgb), 0.96);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 14px 26px rgba(var(--shadow-rgb), 0.12);
+}
+
+.chat-reschedule-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-reschedule-kicker {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chat-reschedule-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.chat-reschedule-status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(var(--shadow-rgb), 0.1);
+  color: var(--muted);
+  border: 1px solid rgba(var(--shadow-rgb), 0.2);
+}
+
+.chat-reschedule-status.is-pending {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
+  border-color: rgba(var(--accent-rgb), 0.3);
+}
+
+.chat-reschedule-status.is-accepted {
+  background: rgba(var(--success-rgb), 0.16);
+  color: var(--success);
+  border-color: rgba(var(--success-rgb), 0.32);
+}
+
+.chat-reschedule-status.is-declined,
+.chat-reschedule-status.is-cancelled {
+  background: rgba(var(--danger-rgb), 0.14);
+  color: var(--danger);
+  border-color: rgba(var(--danger-rgb), 0.3);
+}
+
+.chat-reschedule-meta {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chat-reschedule-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.chat-reschedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-reschedule-action {
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(var(--shadow-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.9);
+  color: var(--ink);
+}
+
+.chat-reschedule-action.is-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 10px 22px rgba(var(--accent-rgb), 0.22);
+}
+
+.chat-reschedule-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.chat-active-reschedule {
+  color: var(--accent-strong);
 }

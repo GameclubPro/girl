@@ -313,9 +313,6 @@ function App() {
   const [chatReturnView, setChatReturnView] = useState<ChatReturnView | null>(
     null
   )
-  const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(
-    null
-  )
   const [requestsInitialTab, setRequestsInitialTab] = useState<
     'requests' | 'bookings'
   >('requests')
@@ -379,7 +376,6 @@ function App() {
     setBookingPhotoUrls([])
     setBookingPreferredCategoryId(null)
     setBookingReturnView('client-master-profile')
-    setRescheduleBookingId(null)
     navigate('booking', { reset: true })
   }, [navigate])
 
@@ -927,7 +923,6 @@ function App() {
         initialLocationType?: 'master' | 'client' | null
         initialDetails?: string | null
         returnView?: BookingReturnView
-        rescheduleBookingId?: number | null
       }
     ) => {
       setBookingMasterId(masterId)
@@ -937,7 +932,6 @@ function App() {
       setBookingInitialLocationType(options?.initialLocationType ?? null)
       setBookingInitialDetails(options?.initialDetails ?? null)
       setBookingReturnView(options?.returnView ?? 'client-showcase')
-      setRescheduleBookingId(options?.rescheduleBookingId ?? null)
       navigate('booking')
     },
     [navigate]
@@ -1101,27 +1095,6 @@ function App() {
       })
     },
     []
-  )
-
-  const handleBookingCreated = useCallback(
-    async (_payload: { id: number | null; status?: string }) => {
-      if (!rescheduleBookingId) return
-      try {
-        const response = await fetch(`${apiBase}/api/bookings/${rescheduleBookingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, action: 'client-cancel' }),
-        })
-        if (!response.ok) {
-          throw new Error('Cancel rescheduled booking failed')
-        }
-      } catch (error) {
-        console.error('Failed to cancel booking after reschedule:', error)
-      } finally {
-        setRescheduleBookingId(null)
-      }
-    },
-    [apiBase, rescheduleBookingId, userId]
   )
 
   const renderScreen = (screen: ReactElement) => (
@@ -1410,10 +1383,8 @@ function App() {
           setBookingPreferredCategoryId(null)
           goBack(bookingReturnView ?? 'client-showcase')
           setBookingReturnView(null)
-          setRescheduleBookingId(null)
         }}
         onBackHandlerChange={registerScreenBackHandler}
-        onBookingCreated={handleBookingCreated}
       />
     )
   }
@@ -1435,17 +1406,6 @@ function App() {
           navigate('client-master-profile')
         }}
         onOpenChat={(chatId) => openChatThread(chatId, 'requests')}
-        onRescheduleBooking={(booking) => {
-          openBooking(booking.masterId, {
-            photoUrls: booking.photoUrls,
-            preferredCategoryId: booking.categoryId,
-            initialServiceName: booking.serviceName,
-            initialLocationType: booking.locationType,
-            initialDetails: booking.comment ?? null,
-            returnView: 'requests',
-            rescheduleBookingId: booking.id,
-          })
-        }}
       />
     )
   }

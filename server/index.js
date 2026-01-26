@@ -1958,6 +1958,98 @@ const loadMasterProfile = async (userId) => {
   return result.rows[0] ?? null
 }
 
+const validateBookingSlotAvailability = async ({
+  masterId,
+  scheduledDate,
+  serviceDuration,
+  excludeBookingId,
+}) => {
+  const profile = await loadMasterProfile(masterId)
+  if (!profile) return { ok: false, error: 'master_not_found' }
+
+  const scheduleDays = normalizeDayKeys(profile.scheduleDays)
+  const scheduleStartMinutes = parseTimeToMinutes(profile.scheduleStart)
+  const scheduleEndMinutes = parseTimeToMinutes(profile.scheduleEnd)
+
+  if (
+    scheduleDays.length === 0 ||
+    scheduleStartMinutes === null ||
+    scheduleEndMinutes === null ||
+    scheduleStartMinutes >= scheduleEndMinutes
+  ) {
+    return { ok: false, error: 'schedule_unavailable' }
+  }
+
+  const dayKey = getDayKeyFromDate(scheduledDate)
+  if (!scheduleDays.includes(dayKey)) {
+    return { ok: false, error: 'day_unavailable' }
+  }
+
+  const durationMinutes = resolveBookingDurationMinutes(serviceDuration)
+  const scheduledMinutes =
+    scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
+  if (
+    scheduledMinutes < scheduleStartMinutes ||
+    scheduledMinutes + durationMinutes > scheduleEndMinutes
+  ) {
+    return { ok: false, error: 'time_unavailable' }
+  }
+
+  if (scheduledDate.getTime() <= Date.now()) {
+    return { ok: false, error: 'time_unavailable' }
+  }
+
+  const { start: dayStart, end: dayEnd } = buildDayBounds(scheduledDate)
+  const existing = await pool.query(
+    `
+      SELECT
+        id,
+        scheduled_at AS "scheduledAt",
+        service_duration AS "serviceDuration",
+        reschedule_proposed_time AS "rescheduleProposedTime"
+      FROM service_bookings
+      WHERE master_id = $1
+        AND status NOT IN ('declined', 'cancelled')
+        AND (
+          (scheduled_at >= $2 AND scheduled_at < $3)
+          OR (reschedule_proposed_time >= $2 AND reschedule_proposed_time < $3)
+        )
+        AND ($4::int IS NULL OR id <> $4)
+    `,
+    [
+      masterId,
+      dayStart.toISOString(),
+      dayEnd.toISOString(),
+      excludeBookingId ?? null,
+    ]
+  )
+
+  const targetStart = scheduledDate.getTime()
+  const targetEnd = targetStart + durationMinutes * 60 * 1000
+  const hasConflict = existing.rows.some((row) => {
+    const rowDuration = resolveBookingDurationMinutes(row.serviceDuration)
+    const starts = []
+    if (row.scheduledAt) {
+      const startMs = new Date(row.scheduledAt).getTime()
+      if (!Number.isNaN(startMs)) starts.push(startMs)
+    }
+    if (row.rescheduleProposedTime) {
+      const proposedMs = new Date(row.rescheduleProposedTime).getTime()
+      if (!Number.isNaN(proposedMs)) starts.push(proposedMs)
+    }
+    return starts.some((startMs) => {
+      const endMs = startMs + rowDuration * 60 * 1000
+      return targetStart < endMs && targetEnd > startMs
+    })
+  })
+
+  if (hasConflict) {
+    return { ok: false, error: 'time_unavailable' }
+  }
+
+  return { ok: true, profile }
+}
+
 const loadUserLocation = async (userId) => {
   const result = await pool.query(
     `
@@ -3209,6 +3301,10 @@ const ensureSchema = async () => {
       service_duration INTEGER,
       location_type TEXT NOT NULL,
       scheduled_at TIMESTAMPTZ NOT NULL,
+      reschedule_proposed_at TIMESTAMPTZ,
+      reschedule_proposed_by TEXT,
+      reschedule_proposed_time TIMESTAMPTZ,
+      reschedule_note TEXT,
       photo_urls TEXT[] NOT NULL DEFAULT '{}',
       status TEXT NOT NULL DEFAULT 'pending',
       cancel_window_hours INTEGER NOT NULL DEFAULT 12,
@@ -3244,6 +3340,26 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS cancel_window_hours INTEGER NOT NULL DEFAULT 12;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS reschedule_proposed_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS reschedule_proposed_by TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS reschedule_proposed_time TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS reschedule_note TEXT;
   `)
 
   await pool.query(`
@@ -4389,6 +4505,7 @@ app.get('/api/masters/:userId/bookings', async (req, res) => {
         SELECT
           id,
           scheduled_at AS "scheduledAt",
+          reschedule_proposed_time AS "rescheduleProposedTime",
           service_duration AS "serviceDuration",
           status
         FROM service_bookings
@@ -5807,6 +5924,10 @@ app.get('/api/bookings', async (req, res) => {
           b.service_duration AS "serviceDuration",
           b.location_type AS "locationType",
           b.scheduled_at AS "scheduledAt",
+          b.reschedule_proposed_at AS "rescheduleProposedAt",
+          b.reschedule_proposed_by AS "rescheduleProposedBy",
+          b.reschedule_proposed_time AS "rescheduleProposedTime",
+          b.reschedule_note AS "rescheduleNote",
           b.photo_urls AS "photoUrls",
           b.status,
           b.cancel_window_hours AS "cancelWindowHours",
@@ -5906,6 +6027,10 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.service_duration AS "serviceDuration",
           b.location_type AS "locationType",
           b.scheduled_at AS "scheduledAt",
+          b.reschedule_proposed_at AS "rescheduleProposedAt",
+          b.reschedule_proposed_by AS "rescheduleProposedBy",
+          b.reschedule_proposed_time AS "rescheduleProposedTime",
+          b.reschedule_note AS "rescheduleNote",
           b.photo_urls AS "photoUrls",
           b.status,
           b.cancel_window_hours AS "cancelWindowHours",
@@ -6646,12 +6771,15 @@ app.post('/api/bookings', async (req, res) => {
       `
         SELECT
           scheduled_at AS "scheduledAt",
-          service_duration AS "serviceDuration"
+          service_duration AS "serviceDuration",
+          reschedule_proposed_time AS "rescheduleProposedTime"
         FROM service_bookings
         WHERE master_id = $1
           AND status NOT IN ('declined', 'cancelled')
-          AND scheduled_at >= $2
-          AND scheduled_at < $3
+          AND (
+            (scheduled_at >= $2 AND scheduled_at < $3)
+            OR (reschedule_proposed_time >= $2 AND reschedule_proposed_time < $3)
+          )
       `,
       [normalizedMasterId, dayStart.toISOString(), dayEnd.toISOString()]
     )
@@ -6659,10 +6787,24 @@ app.post('/api/bookings', async (req, res) => {
     const startMs = scheduledDate.getTime()
     const endMs = startMs + serviceDuration * 60 * 1000
     const hasConflict = existing.rows.some((row) => {
-      const existingStart = new Date(row.scheduledAt).getTime()
       const existingDuration = Number(row.serviceDuration) || 60
-      const existingEnd = existingStart + existingDuration * 60 * 1000
-      return startMs < existingEnd && endMs > existingStart
+      const times = []
+      if (row.scheduledAt) {
+        const existingStart = new Date(row.scheduledAt).getTime()
+        if (!Number.isNaN(existingStart)) {
+          times.push(existingStart)
+        }
+      }
+      if (row.rescheduleProposedTime) {
+        const proposedStart = new Date(row.rescheduleProposedTime).getTime()
+        if (!Number.isNaN(proposedStart)) {
+          times.push(proposedStart)
+        }
+      }
+      return times.some((existingStart) => {
+        const existingEnd = existingStart + existingDuration * 60 * 1000
+        return startMs < existingEnd && endMs > existingStart
+      })
     })
     if (hasConflict) {
       res.status(409).json({ error: 'time_unavailable' })
@@ -6742,13 +6884,25 @@ app.patch('/api/bookings/:id', async (req, res) => {
     return
   }
 
-  const { userId, action, price, outcome, lateMinutes, depositProofPath, depositProofUrl } =
-    req.body ?? {}
+  const {
+    userId,
+    action,
+    price,
+    outcome,
+    lateMinutes,
+    depositProofPath,
+    depositProofUrl,
+    proposedAt,
+    rescheduleNote,
+  } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
   const normalizedAction = normalizeText(action)
   const parsedPrice = parseOptionalInt(price)
   const normalizedOutcome = normalizeText(outcome)
   const parsedLateMinutes = parseOptionalInt(lateMinutes)
+  const proposedAtRaw = proposedAt ?? req.body?.scheduledAt ?? req.body?.rescheduleAt
+  const normalizedProposedAt = normalizeDateTime(proposedAtRaw)
+  const normalizedRescheduleNote = normalizeText(rescheduleNote)
   const normalizedDepositProofPath = normalizeUploadPath(
     depositProofPath ?? depositProofUrl
   )
@@ -6774,6 +6928,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
           service_name AS "serviceName",
           service_price AS "servicePrice",
           proposed_price AS "proposedPrice",
+          service_duration AS "serviceDuration",
           scheduled_at AS "scheduledAt",
           cancelled_at AS "cancelledAt",
           cancel_window_hours AS "cancelWindowHours",
@@ -6783,6 +6938,10 @@ app.patch('/api/bookings/:id', async (req, res) => {
           deposit_hold_expires_at AS "depositHoldExpiresAt",
           deposit_paid_at AS "depositPaidAt",
           deposit_proof_path AS "depositProofPath",
+          reschedule_proposed_at AS "rescheduleProposedAt",
+          reschedule_proposed_by AS "rescheduleProposedBy",
+          reschedule_proposed_time AS "rescheduleProposedTime",
+          reschedule_note AS "rescheduleNote",
           outcome
         FROM service_bookings
         WHERE id = $1
@@ -7303,6 +7462,491 @@ app.patch('/api/bookings/:id', async (req, res) => {
         console.error('Failed to notify deposit rejection:', chatError)
       }
       res.json({ ok: true, depositStatus: 'rejected' })
+      return
+    }
+
+    if (normalizedAction === 'reschedule-propose') {
+      const proposerRole = isClient ? 'client' : isMaster ? 'master' : ''
+      if (!proposerRole) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.status !== 'confirmed') {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+      if (booking.outcome) {
+        res.status(409).json({ error: 'outcome_locked' })
+        return
+      }
+      if (!normalizedProposedAt) {
+        res.status(400).json({ error: 'proposedAt_required' })
+        return
+      }
+
+      const proposedDate = new Date(normalizedProposedAt)
+      if (Number.isNaN(proposedDate.getTime())) {
+        res.status(400).json({ error: 'proposedAt_invalid' })
+        return
+      }
+
+      const currentScheduledMs = booking.scheduledAt
+        ? new Date(booking.scheduledAt).getTime()
+        : null
+      if (
+        currentScheduledMs &&
+        Math.abs(proposedDate.getTime() - currentScheduledMs) < 60 * 1000
+      ) {
+        res.status(409).json({ error: 'same_time' })
+        return
+      }
+
+      if (isClient) {
+        const cancelWindowHours = clampValue(
+          parseOptionalInt(booking.cancelWindowHours) ?? BOOKING_FREE_CANCEL_HOURS,
+          0,
+          72
+        )
+        const timeUntilMs =
+          typeof currentScheduledMs === 'number'
+            ? currentScheduledMs - Date.now()
+            : null
+        if (
+          typeof timeUntilMs !== 'number' ||
+          timeUntilMs < cancelWindowHours * 60 * 60 * 1000
+        ) {
+          res.status(409).json({
+            error: 'reschedule_window_closed',
+            cancelWindowHours,
+          })
+          return
+        }
+      }
+
+      const availability = await validateBookingSlotAvailability({
+        masterId: booking.masterId,
+        scheduledDate: proposedDate,
+        serviceDuration: booking.serviceDuration,
+        excludeBookingId: bookingId,
+      })
+      if (!availability.ok) {
+        res.status(409).json({ error: availability.error })
+        return
+      }
+
+      const rescheduleProposedAt = new Date().toISOString()
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET reschedule_proposed_at = $2,
+              reschedule_proposed_by = $3,
+              reschedule_proposed_time = $4,
+              reschedule_note = $5,
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [
+          bookingId,
+          rescheduleProposedAt,
+          proposerRole,
+          normalizedProposedAt,
+          normalizedRescheduleNote || null,
+        ]
+      )
+
+      try {
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
+          },
+          { suppressSystemMessage: true }
+        )
+        if (chatPayload?.chatId) {
+          if (chatPayload.isNew) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'chat:created',
+              chatId: chatPayload.chatId,
+              bookingId,
+            })
+          }
+          const body = 'Предложение переноса записи.'
+          const meta = {
+            event: 'booking_reschedule_proposed',
+            bookingId,
+            serviceName: booking.serviceName ?? null,
+            scheduledAt: booking.scheduledAt ?? null,
+            proposedAt: normalizedProposedAt,
+            proposedBy: proposerRole,
+            note: normalizedRescheduleNote || null,
+          }
+          const messageResult = await insertSystemMessage({
+            chatId: chatPayload.chatId,
+            body,
+            meta,
+            actorId: normalizedUserId,
+          })
+          const messagePayload = {
+            id: messageResult.id,
+            chatId: chatPayload.chatId,
+            senderId: null,
+            type: 'system',
+            body,
+            meta,
+            attachmentUrl: null,
+            createdAt: messageResult.createdAt,
+          }
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'message:new',
+            chatId: chatPayload.chatId,
+            message: messagePayload,
+          })
+          void sendChatNotification({
+            chatId: chatPayload.chatId,
+            senderId: normalizedUserId,
+            preview: 'Предложение переноса',
+          })
+        }
+      } catch (chatError) {
+        console.error('Failed to notify reschedule proposal:', chatError)
+      }
+
+      res.json({
+        ok: true,
+        rescheduleProposedAt,
+        rescheduleProposedBy: proposerRole,
+        rescheduleProposedTime: normalizedProposedAt,
+        rescheduleNote: normalizedRescheduleNote || null,
+      })
+      return
+    }
+
+    if (normalizedAction === 'reschedule-accept') {
+      if (booking.status !== 'confirmed') {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+      if (!booking.rescheduleProposedTime) {
+        res.status(409).json({ error: 'reschedule_not_found' })
+        return
+      }
+      const proposerRole = normalizeText(booking.rescheduleProposedBy)
+      if (
+        (isClient && proposerRole === 'client') ||
+        (isMaster && proposerRole === 'master')
+      ) {
+        res.status(403).json({ error: 'reschedule_not_allowed' })
+        return
+      }
+      const proposedDate = new Date(booking.rescheduleProposedTime)
+      if (Number.isNaN(proposedDate.getTime())) {
+        res.status(409).json({ error: 'time_unavailable' })
+        return
+      }
+
+      const availability = await validateBookingSlotAvailability({
+        masterId: booking.masterId,
+        scheduledDate: proposedDate,
+        serviceDuration: booking.serviceDuration,
+        excludeBookingId: bookingId,
+      })
+      if (!availability.ok) {
+        res.status(409).json({ error: availability.error })
+        return
+      }
+
+      const previousScheduledAt = booking.scheduledAt ?? null
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET scheduled_at = $2,
+              reschedule_proposed_at = NULL,
+              reschedule_proposed_by = NULL,
+              reschedule_proposed_time = NULL,
+              reschedule_note = NULL,
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId, proposedDate.toISOString()]
+      )
+
+      if (proposerRole === 'client') {
+        await logClientTrustEvent({
+          userId: booking.clientId,
+          eventType: 'visit_rescheduled',
+          meta: {
+            ref: `booking:${bookingId}`,
+            bookingId,
+            scheduledAt: previousScheduledAt,
+            proposedAt: proposedDate.toISOString(),
+            proposedBy: proposerRole,
+          },
+        })
+      }
+
+      try {
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
+          },
+          { suppressSystemMessage: true }
+        )
+        if (chatPayload?.chatId) {
+          if (chatPayload.isNew) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'chat:created',
+              chatId: chatPayload.chatId,
+              bookingId,
+            })
+          }
+          const body = 'Перенос подтверждён.'
+          const meta = {
+            event: 'booking_reschedule_accepted',
+            bookingId,
+            serviceName: booking.serviceName ?? null,
+            scheduledAt: previousScheduledAt,
+            proposedAt: proposedDate.toISOString(),
+            proposedBy: proposerRole || null,
+            acceptedBy: isClient ? 'client' : 'master',
+          }
+          const messageResult = await insertSystemMessage({
+            chatId: chatPayload.chatId,
+            body,
+            meta,
+            actorId: normalizedUserId,
+          })
+          const messagePayload = {
+            id: messageResult.id,
+            chatId: chatPayload.chatId,
+            senderId: null,
+            type: 'system',
+            body,
+            meta,
+            attachmentUrl: null,
+            createdAt: messageResult.createdAt,
+          }
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'message:new',
+            chatId: chatPayload.chatId,
+            message: messagePayload,
+          })
+          void sendChatNotification({
+            chatId: chatPayload.chatId,
+            senderId: normalizedUserId,
+            preview: 'Перенос подтверждён',
+          })
+        }
+      } catch (chatError) {
+        console.error('Failed to notify reschedule acceptance:', chatError)
+      }
+
+      res.json({
+        ok: true,
+        scheduledAt: proposedDate.toISOString(),
+        rescheduleProposedAt: null,
+        rescheduleProposedBy: null,
+        rescheduleProposedTime: null,
+        rescheduleNote: null,
+      })
+      return
+    }
+
+    if (normalizedAction === 'reschedule-decline') {
+      if (!booking.rescheduleProposedTime) {
+        res.status(409).json({ error: 'reschedule_not_found' })
+        return
+      }
+      const proposerRole = normalizeText(booking.rescheduleProposedBy)
+      if (
+        (isClient && proposerRole === 'client') ||
+        (isMaster && proposerRole === 'master')
+      ) {
+        res.status(403).json({ error: 'reschedule_not_allowed' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET reschedule_proposed_at = NULL,
+              reschedule_proposed_by = NULL,
+              reschedule_proposed_time = NULL,
+              reschedule_note = NULL,
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+
+      try {
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
+          },
+          { suppressSystemMessage: true }
+        )
+        if (chatPayload?.chatId) {
+          if (chatPayload.isNew) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'chat:created',
+              chatId: chatPayload.chatId,
+              bookingId,
+            })
+          }
+          const body = 'Перенос отклонён.'
+          const meta = {
+            event: 'booking_reschedule_declined',
+            bookingId,
+            serviceName: booking.serviceName ?? null,
+            proposedAt: booking.rescheduleProposedTime ?? null,
+            proposedBy: proposerRole || null,
+            declinedBy: isClient ? 'client' : 'master',
+          }
+          const messageResult = await insertSystemMessage({
+            chatId: chatPayload.chatId,
+            body,
+            meta,
+            actorId: normalizedUserId,
+          })
+          const messagePayload = {
+            id: messageResult.id,
+            chatId: chatPayload.chatId,
+            senderId: null,
+            type: 'system',
+            body,
+            meta,
+            attachmentUrl: null,
+            createdAt: messageResult.createdAt,
+          }
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'message:new',
+            chatId: chatPayload.chatId,
+            message: messagePayload,
+          })
+          void sendChatNotification({
+            chatId: chatPayload.chatId,
+            senderId: normalizedUserId,
+            preview: 'Перенос отклонён',
+          })
+        }
+      } catch (chatError) {
+        console.error('Failed to notify reschedule decline:', chatError)
+      }
+
+      res.json({
+        ok: true,
+        rescheduleProposedAt: null,
+        rescheduleProposedBy: null,
+        rescheduleProposedTime: null,
+        rescheduleNote: null,
+      })
+      return
+    }
+
+    if (normalizedAction === 'reschedule-cancel') {
+      if (!booking.rescheduleProposedTime) {
+        res.status(409).json({ error: 'reschedule_not_found' })
+        return
+      }
+      const proposerRole = normalizeText(booking.rescheduleProposedBy)
+      if (
+        (isClient && proposerRole !== 'client') ||
+        (isMaster && proposerRole !== 'master')
+      ) {
+        res.status(403).json({ error: 'reschedule_not_allowed' })
+        return
+      }
+
+      await pool.query(
+        `
+          UPDATE service_bookings
+          SET reschedule_proposed_at = NULL,
+              reschedule_proposed_by = NULL,
+              reschedule_proposed_time = NULL,
+              reschedule_note = NULL,
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+
+      try {
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
+          },
+          { suppressSystemMessage: true }
+        )
+        if (chatPayload?.chatId) {
+          if (chatPayload.isNew) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'chat:created',
+              chatId: chatPayload.chatId,
+              bookingId,
+            })
+          }
+          const body = 'Предложение переноса отменено.'
+          const meta = {
+            event: 'booking_reschedule_cancelled',
+            bookingId,
+            serviceName: booking.serviceName ?? null,
+            proposedAt: booking.rescheduleProposedTime ?? null,
+            proposedBy: proposerRole || null,
+            cancelledBy: isClient ? 'client' : 'master',
+          }
+          const messageResult = await insertSystemMessage({
+            chatId: chatPayload.chatId,
+            body,
+            meta,
+            actorId: normalizedUserId,
+          })
+          const messagePayload = {
+            id: messageResult.id,
+            chatId: chatPayload.chatId,
+            senderId: null,
+            type: 'system',
+            body,
+            meta,
+            attachmentUrl: null,
+            createdAt: messageResult.createdAt,
+          }
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'message:new',
+            chatId: chatPayload.chatId,
+            message: messagePayload,
+          })
+          void sendChatNotification({
+            chatId: chatPayload.chatId,
+            senderId: normalizedUserId,
+            preview: 'Предложение переноса отменено',
+          })
+        }
+      } catch (chatError) {
+        console.error('Failed to notify reschedule cancel:', chatError)
+      }
+
+      res.json({
+        ok: true,
+        rescheduleProposedAt: null,
+        rescheduleProposedBy: null,
+        rescheduleProposedTime: null,
+        rescheduleNote: null,
+      })
       return
     }
 
@@ -8275,12 +8919,15 @@ app.post('/api/requests/:id/responses', async (req, res) => {
         `
           SELECT
             scheduled_at AS "scheduledAt",
-            service_duration AS "serviceDuration"
+            service_duration AS "serviceDuration",
+            reschedule_proposed_time AS "rescheduleProposedTime"
           FROM service_bookings
           WHERE master_id = $1
             AND status NOT IN ('declined', 'cancelled')
-            AND scheduled_at >= $2
-            AND scheduled_at < $3
+            AND (
+              (scheduled_at >= $2 AND scheduled_at < $3)
+              OR (reschedule_proposed_time >= $2 AND reschedule_proposed_time < $3)
+            )
         `,
         [normalizedUserId, dayStart.toISOString(), dayEnd.toISOString()]
       )
@@ -8311,10 +8958,20 @@ app.post('/api/requests/:id/responses', async (req, res) => {
       const startMs = proposedDate.getTime()
       const endMs = startMs + serviceDuration * 60 * 1000
       const hasBookingConflict = existingBookings.rows.some((row) => {
-        const existingStart = new Date(row.scheduledAt).getTime()
         const existingDuration = Number(row.serviceDuration) || 60
-        const existingEnd = existingStart + existingDuration * 60 * 1000
-        return startMs < existingEnd && endMs > existingStart
+        const times = []
+        if (row.scheduledAt) {
+          const existingStart = new Date(row.scheduledAt).getTime()
+          if (!Number.isNaN(existingStart)) times.push(existingStart)
+        }
+        if (row.rescheduleProposedTime) {
+          const proposedStart = new Date(row.rescheduleProposedTime).getTime()
+          if (!Number.isNaN(proposedStart)) times.push(proposedStart)
+        }
+        return times.some((existingStart) => {
+          const existingEnd = existingStart + existingDuration * 60 * 1000
+          return startMs < existingEnd && endMs > existingStart
+        })
       })
       if (hasBookingConflict) {
         res.status(409).json({ error: 'time_unavailable' })
@@ -8623,12 +9280,15 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             `
               SELECT
                 scheduled_at AS "scheduledAt",
-                service_duration AS "serviceDuration"
+                service_duration AS "serviceDuration",
+                reschedule_proposed_time AS "rescheduleProposedTime"
               FROM service_bookings
               WHERE master_id = $1
                 AND status NOT IN ('declined', 'cancelled')
-                AND scheduled_at >= $2
-                AND scheduled_at < $3
+                AND (
+                  (scheduled_at >= $2 AND scheduled_at < $3)
+                  OR (reschedule_proposed_time >= $2 AND reschedule_proposed_time < $3)
+                )
             `,
             [response.masterId, dayStart.toISOString(), dayEnd.toISOString()]
           )
@@ -8636,10 +9296,20 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
           const startMs = scheduledDate.getTime()
           const endMs = startMs + serviceDuration * 60 * 1000
           const hasConflict = existing.rows.some((row) => {
-            const existingStart = new Date(row.scheduledAt).getTime()
             const existingDuration = Number(row.serviceDuration) || 60
-            const existingEnd = existingStart + existingDuration * 60 * 1000
-            return startMs < existingEnd && endMs > existingStart
+            const times = []
+            if (row.scheduledAt) {
+              const existingStart = new Date(row.scheduledAt).getTime()
+              if (!Number.isNaN(existingStart)) times.push(existingStart)
+            }
+            if (row.rescheduleProposedTime) {
+              const proposedStart = new Date(row.rescheduleProposedTime).getTime()
+              if (!Number.isNaN(proposedStart)) times.push(proposedStart)
+            }
+            return times.some((existingStart) => {
+              const existingEnd = existingStart + existingDuration * 60 * 1000
+              return startMs < existingEnd && endMs > existingStart
+            })
           })
           if (hasConflict) {
             await client.query('ROLLBACK')
@@ -9006,6 +9676,10 @@ app.get('/api/chats', async (req, res) => {
           sb.scheduled_at AS "bookingScheduledAt",
           sb.service_duration AS "bookingServiceDuration",
           sb.service_price AS "bookingServicePrice",
+          sb.reschedule_proposed_at AS "bookingRescheduleProposedAt",
+          sb.reschedule_proposed_by AS "bookingRescheduleProposedBy",
+          sb.reschedule_proposed_time AS "bookingRescheduleProposedTime",
+          sb.reschedule_note AS "bookingRescheduleNote",
           sb.outcome AS "bookingOutcome",
           sb.late_minutes AS "bookingLateMinutes",
           sb.created_at AS "bookingCreatedAt",
@@ -9112,6 +9786,10 @@ app.get('/api/chats', async (req, res) => {
               scheduledAt: row.bookingScheduledAt,
               serviceDuration: row.bookingServiceDuration,
               servicePrice: row.bookingServicePrice,
+              rescheduleProposedAt: row.bookingRescheduleProposedAt,
+              rescheduleProposedBy: row.bookingRescheduleProposedBy,
+              rescheduleProposedTime: row.bookingRescheduleProposedTime,
+              rescheduleNote: row.bookingRescheduleNote,
               outcome: row.bookingOutcome,
               lateMinutes: row.bookingLateMinutes,
               createdAt: row.bookingCreatedAt,
@@ -9336,6 +10014,10 @@ app.get('/api/chats/:id', async (req, res) => {
           sb.service_duration AS "bookingServiceDuration",
           sb.service_price AS "bookingServicePrice",
           sb.status AS "bookingStatus",
+          sb.reschedule_proposed_at AS "bookingRescheduleProposedAt",
+          sb.reschedule_proposed_by AS "bookingRescheduleProposedBy",
+          sb.reschedule_proposed_time AS "bookingRescheduleProposedTime",
+          sb.reschedule_note AS "bookingRescheduleNote",
           sb.outcome AS "bookingOutcome",
           sb.late_minutes AS "bookingLateMinutes",
           sb.attendance_at AS "bookingAttendanceAt",
@@ -9547,6 +10229,10 @@ app.get('/api/chats/:id', async (req, res) => {
               serviceDuration: row.bookingServiceDuration,
               servicePrice: row.bookingServicePrice,
               status: row.bookingStatus,
+              rescheduleProposedAt: row.bookingRescheduleProposedAt,
+              rescheduleProposedBy: row.bookingRescheduleProposedBy,
+              rescheduleProposedTime: row.bookingRescheduleProposedTime,
+              rescheduleNote: row.bookingRescheduleNote,
               outcome: row.bookingOutcome,
               lateMinutes: row.bookingLateMinutes,
               attendanceAt: row.bookingAttendanceAt,

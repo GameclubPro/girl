@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   IconChat,
+  IconCheck,
   IconClose,
   IconHome,
   IconList,
@@ -8,6 +9,7 @@ import {
   IconSwap,
   IconUser,
 } from '../components/icons'
+import { RescheduleSheet } from '../components/RescheduleSheet'
 import { categoryItems } from '../data/clientData'
 import type { Booking, RequestResponse, ServiceRequest } from '../types/app'
 
@@ -234,7 +236,6 @@ type ClientRequestsScreenProps = {
   onViewHome: () => void
   onViewChats: () => void
   onViewProfile: (masterId: string) => void
-  onRescheduleBooking: (booking: Booking) => void
   onOpenChat: (chatId: number) => void
 }
 
@@ -253,7 +254,6 @@ export const ClientRequestsScreen = ({
   onViewHome,
   onViewChats,
   onViewProfile,
-  onRescheduleBooking,
   onOpenChat,
 }: ClientRequestsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>(
@@ -282,6 +282,9 @@ export const ClientRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
+  const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null)
+  const [rescheduleError, setRescheduleError] = useState('')
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
   const [depositUploadingId, setDepositUploadingId] = useState<number | null>(
     null
   )
@@ -555,7 +558,15 @@ export const ClientRequestsScreen = ({
       const needsPriceDecision = booking.status === 'price_proposed'
       const needsConfirmation =
         booking.status === 'pending' || booking.status === 'price_pending'
-      return needsDeposit || needsPriceDecision || needsConfirmation
+      const needsRescheduleDecision =
+        Boolean(booking.rescheduleProposedTime) &&
+        booking.rescheduleProposedBy === 'master'
+      return (
+        needsDeposit ||
+        needsPriceDecision ||
+        needsConfirmation ||
+        needsRescheduleDecision
+      )
     })
     const resolveHoldMsLeft = (booking: Booking) => {
       if (!booking.depositHoldExpiresAt) return Number.POSITIVE_INFINITY
@@ -872,6 +883,135 @@ export const ClientRequestsScreen = ({
             : action === 'client-deposit-submit'
               ? 'Не удалось отметить депозит.'
             : 'Не удалось обновить запись.',
+      }))
+    } finally {
+      setBookingActionId((current) => (current === bookingId ? null : current))
+    }
+  }
+
+  const resolveRescheduleError = (code?: string) => {
+    if (code === 'reschedule_window_closed') {
+      return 'Перенос доступен только заранее. Проверьте окно отмены.'
+    }
+    if (code === 'schedule_unavailable') return 'График мастера пока недоступен.'
+    if (code === 'day_unavailable') return 'В этот день мастер не работает.'
+    if (code === 'time_unavailable') return 'Это время уже занято.'
+    if (code === 'same_time') return 'Выберите другое время.'
+    if (code === 'status_invalid') return 'Перенос доступен только для подтвержденных записей.'
+    if (code === 'outcome_locked') return 'Запись уже завершена.'
+    return 'Не удалось предложить перенос.'
+  }
+
+  const handleRescheduleSubmit = async (payload: {
+    booking: Booking
+    proposedAt: string
+    note?: string | null
+  }) => {
+    if (rescheduleSubmitting) return
+    setRescheduleSubmitting(true)
+    setRescheduleError('')
+    try {
+      const response = await fetch(
+        `${apiBase}/api/bookings/${payload.booking.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            action: 'reschedule-propose',
+            proposedAt: payload.proposedAt,
+            rescheduleNote: payload.note ?? null,
+          }),
+        }
+      )
+      const data = (await response.json().catch(() => null)) as
+        | {
+            error?: string
+            rescheduleProposedAt?: string | null
+            rescheduleProposedBy?: Booking['rescheduleProposedBy']
+            rescheduleProposedTime?: string | null
+            rescheduleNote?: string | null
+          }
+        | null
+
+      if (!response.ok) {
+        setRescheduleError(resolveRescheduleError(data?.error))
+        return
+      }
+
+      setBookings((current) =>
+        current.map((booking) =>
+          booking.id === payload.booking.id
+            ? {
+                ...booking,
+                rescheduleProposedAt: data?.rescheduleProposedAt ?? new Date().toISOString(),
+                rescheduleProposedBy: data?.rescheduleProposedBy ?? 'client',
+                rescheduleProposedTime: data?.rescheduleProposedTime ?? payload.proposedAt,
+                rescheduleNote: data?.rescheduleNote ?? payload.note ?? null,
+              }
+            : booking
+        )
+      )
+      setRescheduleBooking(null)
+    } catch (error) {
+      setRescheduleError('Не удалось предложить перенос.')
+    } finally {
+      setRescheduleSubmitting(false)
+    }
+  }
+
+  const handleRescheduleDecision = async (
+    bookingId: number,
+    action: 'reschedule-accept' | 'reschedule-decline' | 'reschedule-cancel'
+  ) => {
+    if (bookingActionId !== null) return
+    setBookingActionId(bookingId)
+    setBookingActionError((current) => ({ ...current, [bookingId]: '' }))
+    try {
+      const response = await fetch(`${apiBase}/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, action }),
+      })
+      const data = (await response.json().catch(() => null)) as
+        | {
+            error?: string
+            scheduledAt?: string | null
+          }
+        | null
+
+      if (!response.ok) {
+        const message =
+          data?.error === 'reschedule_not_found'
+            ? 'Перенос уже не актуален.'
+            : 'Не удалось обновить перенос.'
+        setBookingActionError((current) => ({
+          ...current,
+          [bookingId]: message,
+        }))
+        return
+      }
+
+      setBookings((current) =>
+        current.map((booking) => {
+          if (booking.id !== bookingId) return booking
+          const next = {
+            ...booking,
+            rescheduleProposedAt: null,
+            rescheduleProposedBy: null,
+            rescheduleProposedTime: null,
+            rescheduleNote: null,
+          }
+          if (action === 'reschedule-accept' && data?.scheduledAt) {
+            next.scheduledAt = data.scheduledAt
+          }
+          return next
+        })
+      )
+    } catch (error) {
+      setBookingActionError((current) => ({
+        ...current,
+        [bookingId]: 'Не удалось обновить перенос.',
       }))
     } finally {
       setBookingActionId((current) => (current === bookingId ? null : current))
@@ -1719,6 +1859,9 @@ export const ClientRequestsScreen = ({
                       (category) => category.id === booking.categoryId
                     )?.label ?? booking.categoryId
                   const scheduledLabel = formatDateTime(booking.scheduledAt)
+                  const rescheduleLabel = booking.rescheduleProposedTime
+                    ? formatDateTime(booking.rescheduleProposedTime)
+                    : ''
                   const updatedAtMs = booking.updatedAt
                     ? new Date(booking.updatedAt).getTime()
                     : null
@@ -1759,6 +1902,12 @@ export const ClientRequestsScreen = ({
                     booking.status === 'confirmed' &&
                     typeof timeUntilMs === 'number' &&
                     timeUntilMs >= cancelWindowMs
+                  const reschedulePending =
+                    Boolean(booking.rescheduleProposedTime) &&
+                    Boolean(booking.rescheduleProposedBy)
+                  const rescheduleByClient = booking.rescheduleProposedBy === 'client'
+                  const canRespondReschedule = reschedulePending && !rescheduleByClient
+                  const canCancelReschedule = reschedulePending && rescheduleByClient
                   const canCancelConfirmed =
                     booking.status === 'confirmed' &&
                     typeof timeUntilMs === 'number' &&
@@ -1839,13 +1988,14 @@ export const ClientRequestsScreen = ({
                   const canDelete =
                     booking.status === 'cancelled' || booking.status === 'declined'
                   const isConfirmed = booking.status === 'confirmed'
+                  const canRescheduleAction = canReschedule && !reschedulePending
                   const actionVariant = canDelete
                     ? 'delete'
                     : canLeaveReview
                       ? 'review'
                       : hasReview
                         ? 'reviewed'
-                        : canReschedule
+                        : canRescheduleAction
                           ? 'reschedule'
                           : canCancelConfirmed
                             ? 'cancel'
@@ -1861,6 +2011,18 @@ export const ClientRequestsScreen = ({
                     rating: 0,
                     comment: '',
                   }
+                  const rescheduleMetaLabel = reschedulePending
+                    ? rescheduleByClient
+                      ? rescheduleLabel
+                        ? `Ожидает подтверждения · ${rescheduleLabel}`
+                        : 'Ожидает подтверждения переноса'
+                      : rescheduleLabel
+                        ? `Предложен перенос · ${rescheduleLabel}`
+                        : 'Предложен перенос'
+                    : ''
+                  const rescheduleMetaTone = canRespondReschedule
+                    ? 'booking-item-meta--warning'
+                    : 'booking-item-meta--highlight'
 
                   return (
                     <div
@@ -1911,13 +2073,80 @@ export const ClientRequestsScreen = ({
                               Чат
                             </button>
                           )}
+                          {reschedulePending && (
+                            <div className="booking-action-row booking-action-row--top">
+                              {canRespondReschedule && (
+                                <>
+                                  <button
+                                    className="booking-action-icon is-accept"
+                                    type="button"
+                                    onClick={() =>
+                                      handleRescheduleDecision(
+                                        booking.id,
+                                        'reschedule-accept'
+                                      )
+                                    }
+                                    disabled={isActionLoading}
+                                  >
+                                    <span
+                                      className="booking-action-icon-symbol"
+                                      aria-hidden="true"
+                                    >
+                                      <IconCheck />
+                                    </span>
+                                    Принять
+                                  </button>
+                                  <button
+                                    className="booking-action-icon is-cancel"
+                                    type="button"
+                                    onClick={() =>
+                                      handleRescheduleDecision(
+                                        booking.id,
+                                        'reschedule-decline'
+                                      )
+                                    }
+                                    disabled={isActionLoading}
+                                  >
+                                    <span
+                                      className="booking-action-icon-symbol"
+                                      aria-hidden="true"
+                                    >
+                                      <IconClose />
+                                    </span>
+                                    Отклонить
+                                  </button>
+                                </>
+                              )}
+                              {canCancelReschedule && (
+                                <button
+                                  className="booking-action-icon is-cancel"
+                                  type="button"
+                                  onClick={() =>
+                                    handleRescheduleDecision(
+                                      booking.id,
+                                      'reschedule-cancel'
+                                    )
+                                  }
+                                  disabled={isActionLoading}
+                                >
+                                  <span
+                                    className="booking-action-icon-symbol"
+                                    aria-hidden="true"
+                                  >
+                                    <IconClose />
+                                  </span>
+                                  Отменить перенос
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {actionVariant && actionVariant !== 'reviewed' && (
                             <div className="booking-action-row booking-action-row--top">
                               {actionVariant === 'reschedule' && (
                                 <button
                                   className="booking-action-icon is-reschedule"
                                   type="button"
-                                  onClick={() => onRescheduleBooking(booking)}
+                                  onClick={() => setRescheduleBooking(booking)}
                                   disabled={isActionLoading}
                                 >
                                   <span
@@ -1999,6 +2228,11 @@ export const ClientRequestsScreen = ({
                         {categoryLabel}
                         {scheduledLabel ? ` • ${scheduledLabel}` : ''}
                       </div>
+                      {rescheduleMetaLabel && (
+                        <div className={`booking-item-meta ${rescheduleMetaTone}`}>
+                          {rescheduleMetaLabel}
+                        </div>
+                      )}
                       <div className="booking-item-meta">
                         {locationLabel}
                         {booking.cityName ? ` • ${booking.cityName}` : ''}
@@ -2291,6 +2525,25 @@ export const ClientRequestsScreen = ({
             </>
           )}
       </div>
+
+      <RescheduleSheet
+        isOpen={Boolean(rescheduleBooking)}
+        booking={rescheduleBooking}
+        onClose={() => {
+          setRescheduleBooking(null)
+          setRescheduleError('')
+        }}
+        onSubmit={({ proposedAt, note }) => {
+          if (!rescheduleBooking) return
+          void handleRescheduleSubmit({
+            booking: rescheduleBooking,
+            proposedAt,
+            note,
+          })
+        }}
+        isSubmitting={rescheduleSubmitting}
+        error={rescheduleError}
+      />
 
       <nav className="bottom-nav" aria-label="Навигация">
         <button className="nav-item" type="button" onClick={onViewHome}>
