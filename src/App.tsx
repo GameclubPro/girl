@@ -1424,6 +1424,7 @@ function App() {
         userId={userId}
         displayNameFallback={clientName}
         telegramAvatarUrl={telegramAvatarUrl}
+        returnView={proProfileReturnView}
         onBack={() => {
           setProProfileSection(null)
           setProProfilePortfolioView(null)

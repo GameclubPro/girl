@@ -51,6 +51,7 @@ type ProProfileScreenProps = {
   userId: string
   displayNameFallback: string
   telegramAvatarUrl?: string | null
+  returnView?: 'pro-cabinet' | 'pro-requests'
   onBack: () => void
   onViewRequests: () => void
   onViewChats: () => void
@@ -342,6 +343,7 @@ export const ProProfileScreen = ({
   userId,
   displayNameFallback,
   telegramAvatarUrl,
+  returnView = 'pro-cabinet',
   onBack,
   onViewRequests,
   onViewChats,
@@ -465,6 +467,7 @@ export const ProProfileScreen = ({
   const showcaseDragIndexRef = useRef<number | null>(null)
   const portfolioFocusPointerRef = useRef(false)
   const showcaseFocusPointerRef = useRef(false)
+  const returnAfterEditorRef = useRef(false)
   const portfolioLightboxIndexRef = useRef<number | null>(null)
   const certificateLightboxIndexRef = useRef<number | null>(null)
   const portfolioFocusIndexRef = useRef<number | null>(null)
@@ -1132,10 +1135,19 @@ export const ProProfileScreen = ({
     setEditingSection(section)
   }
   const closeEditor = () => {
+    const shouldReturnAfterEdit =
+      returnView === 'pro-requests' &&
+      returnAfterEditorRef.current &&
+      !settingsReturnRef.current
     setEditingSection(null)
     if (settingsReturnRef.current) {
       settingsReturnRef.current = false
       setIsSettingsOpen(true)
+      return
+    }
+    if (shouldReturnAfterEdit) {
+      returnAfterEditorRef.current = false
+      onBack()
     }
   }
   const persistSaveMessage = (message: string) => {
@@ -1519,6 +1531,16 @@ export const ProProfileScreen = ({
     onBackHandlerChange,
     portfolioQuickActionIndex,
   ])
+
+  useEffect(() => {
+    if (returnView !== 'pro-requests') {
+      returnAfterEditorRef.current = false
+      return
+    }
+    if (focusSection && focusSection !== 'portfolio') {
+      returnAfterEditorRef.current = true
+    }
+  }, [focusSection, returnView])
 
   useEffect(() => {
     if (!focusSection) return
