@@ -15098,6 +15098,43 @@
   line-height: 1.15;
 }
 
+.pro-slots-head-action {
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--pro-ink);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
+}
+
+.pro-slots-head-action:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.3);
+  outline-offset: 2px;
+}
+
+.pro-slots-head-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pro-slots-head-icon img,
+.pro-slots-head-icon svg {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .pro-slots-close {
   border: none;
   width: 32px;

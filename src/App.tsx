@@ -266,6 +266,9 @@ function App() {
   const [proProfilePortfolioView, setProProfilePortfolioView] = useState<
     'portfolio' | 'showcase' | null
   >(null)
+  const [proProfileReturnView, setProProfileReturnView] = useState<
+    'pro-cabinet' | 'pro-requests'
+  >('pro-cabinet')
   const [proStoriesReturnView, setProStoriesReturnView] = useState<
     'pro-cabinet' | 'pro-profile'
   >('pro-cabinet')
@@ -826,7 +829,8 @@ function App() {
           }
           setProProfileSection(null)
           setProProfilePortfolioView(null)
-          goBack('pro-cabinet')
+          goBack(proProfileReturnView)
+          setProProfileReturnView('pro-cabinet')
           break
         case 'pro-requests':
           goBack('pro-cabinet')
@@ -861,6 +865,7 @@ function App() {
     chatReturnView,
     goBack,
     navStack.length,
+    proProfileReturnView,
     role,
     view,
   ])
@@ -954,9 +959,11 @@ function App() {
     (options?: {
       section?: ProProfileSection | null
       portfolioView?: 'portfolio' | 'showcase' | null
+      returnView?: 'pro-cabinet' | 'pro-requests' | null
     }) => {
       setProProfileSection(options?.section ?? null)
       setProProfilePortfolioView(options?.portfolioView ?? null)
+      setProProfileReturnView(options?.returnView ?? 'pro-cabinet')
       navigate('pro-profile')
     },
     [navigate]
@@ -1420,7 +1427,8 @@ function App() {
         onBack={() => {
           setProProfileSection(null)
           setProProfilePortfolioView(null)
-          goBack('pro-cabinet')
+          goBack(proProfileReturnView)
+          setProProfileReturnView('pro-cabinet')
         }}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
@@ -1441,7 +1449,7 @@ function App() {
         onBack={() => goBack('pro-cabinet')}
         onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onEditProfile={(section) => {
-          openProProfile({ section: section ?? null })
+          openProProfile({ section: section ?? null, returnView: 'pro-requests' })
         }}
         onViewChats={openChatList}
         onOpenChat={(chatId) => openChatThread(chatId, 'pro-requests')}

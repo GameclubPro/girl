@@ -5,6 +5,7 @@ import {
   IconChevron,
   IconClose,
   IconLock,
+  IconSettings,
   IconSwap,
   IconTrash,
   IconUnlock,
@@ -3495,6 +3496,16 @@ export const ProRequestsScreen = ({
                       <p className="pro-slots-kicker">Окна дня</p>
                       <h3 className="pro-slots-title">{selectedDayTitle}</h3>
                     </div>
+                    <button
+                      className="pro-slots-head-action"
+                      type="button"
+                      aria-label="Открыть график"
+                      onClick={() => onEditProfile('availability')}
+                    >
+                      <span className="pro-slots-head-icon" aria-hidden="true">
+                        <IconSettings />
+                      </span>
+                    </button>
                   </header>
                   <div className="pro-slots-filters" role="tablist">
                     {([
