@@ -56,6 +56,19 @@ const bookingStatusLabelMap: Record<string, string> = {
   cancelled: 'Отменено',
 }
 
+const bookingStatusValues: Booking['status'][] = [
+  'pending',
+  'price_pending',
+  'price_proposed',
+  'confirmed',
+  'declined',
+  'cancelled',
+]
+
+const isBookingStatus = (value: unknown): value is Booking['status'] =>
+  typeof value === 'string' &&
+  bookingStatusValues.includes(value as Booking['status'])
+
 const requestStatusLabelMap: Record<string, string> = {
   open: 'Ожидает отклика',
   closed: 'Согласовано',
@@ -372,7 +385,9 @@ export const ChatThreadScreen = ({
   const counterpart = detail?.counterpart
   const request = detail?.request
   const booking = detail?.booking
-  const bookingStatus = bookingSnapshot?.status ?? booking?.status ?? null
+  const bookingStatus =
+    bookingSnapshot?.status ??
+    (isBookingStatus(booking?.status) ? booking?.status : null)
   const depositStatus = bookingSnapshot?.depositStatus ?? null
   const depositAmount = bookingSnapshot?.depositAmount ?? null
   const depositHoldExpiresAt = bookingSnapshot?.depositHoldExpiresAt ?? null
@@ -1112,7 +1127,7 @@ export const ChatThreadScreen = ({
     setBookingSnapshot((current) => {
       if (!current || current.id !== booking.id) return current
       const next = { ...current }
-      if (booking.status) {
+      if (isBookingStatus(booking.status)) {
         next.status = booking.status
       }
       if (typeof booking.servicePrice === 'number') {
@@ -1755,8 +1770,9 @@ export const ChatThreadScreen = ({
           throw new Error('booking_update_failed')
         }
 
+        const apiStatus = isBookingStatus(data?.status) ? data?.status : null
         const nextStatus =
-          data?.status ??
+          apiStatus ??
           (action === 'client-accept-price' || action === 'master-accept'
             ? 'confirmed'
             : action === 'client-decline-price'
