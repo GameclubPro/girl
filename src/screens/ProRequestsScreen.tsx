@@ -596,6 +596,7 @@ type ProRequestsScreenProps = {
   initialTab?: 'requests' | 'bookings'
   onBack: () => void
   onViewCabinet?: () => void
+  onTabChange?: (tab: 'requests' | 'bookings') => void
   onEditProfile: (section?: ProProfileSection) => void
   onViewChats: () => void
   onOpenChat: (chatId: number) => void
@@ -607,6 +608,7 @@ export const ProRequestsScreen = ({
   initialTab,
   onBack,
   onViewCabinet,
+  onTabChange,
   onEditProfile,
   onViewChats,
   onOpenChat,
@@ -699,6 +701,9 @@ export const ProRequestsScreen = ({
     if (!initialTab) return
     setActiveTab(initialTab)
   }, [initialTab])
+  useEffect(() => {
+    onTabChange?.(activeTab)
+  }, [activeTab, onTabChange])
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
     const seedKey = buildSlotSeedKey(userId)

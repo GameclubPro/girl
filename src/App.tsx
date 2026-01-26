@@ -1449,6 +1449,7 @@ function App() {
         initialTab={proRequestsInitialTab}
         onBack={() => goBack('pro-cabinet')}
         onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
+        onTabChange={(tab) => setProRequestsInitialTab(tab)}
         onEditProfile={(section) => {
           openProProfile({ section: section ?? null, returnView: 'pro-requests' })
         }}
