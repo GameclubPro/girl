@@ -15099,10 +15099,10 @@
 }
 
 .pro-slots-head-action {
-  border: 1px solid var(--glass-border);
+  border: 2px solid var(--glass-border);
   background: var(--glass-bg-strong);
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
   padding: 0;
   display: inline-flex;
@@ -15121,8 +15121,8 @@
 }
 
 .pro-slots-head-icon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15130,8 +15130,8 @@
 
 .pro-slots-head-icon img,
 .pro-slots-head-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
 }
 
