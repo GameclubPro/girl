@@ -28284,3 +28284,78 @@ h2 {
   border: 1px solid var(--metal-primary-border);
   box-shadow: var(--metal-primary-shadow);
 }
+
+.booking-action:not(.is-primary):not(.is-danger),
+.response-action:not(.is-primary):not(.is-danger),
+.pro-slots-footer-secondary,
+.pro-slots-confirm-secondary,
+.pro-slot-sheet-secondary,
+.pro-slot-sheet-alt,
+.pro-profile-hero-action:not(.is-primary),
+.pro-profile-ig-button:not(.pro-profile-ig-button--primary),
+.pro-profile-portfolio-panel-action:not(.is-primary),
+.pro-cabinet-nav-action:not(.is-primary),
+.pro-cabinet-share-action:not(.is-primary),
+.client-profile-action:not(.is-primary),
+.chat-reschedule-action:not(.is-primary),
+.pro-slots-filter,
+.request-chip,
+.booking-filter-chip,
+.requests-tab,
+.analytics-range-chip,
+.pro-cabinet-calendar-filter,
+.pro-nav-pill,
+.pro-editor-tab,
+.pro-action-chip,
+.pro-cabinet-quick-chip,
+.pro-cabinet-pill,
+.pro-template-chip,
+.pro-detail-chip,
+.pro-detail-pill,
+.pro-slot-time-chip,
+.booking-step-pill,
+.booking-calendar-summary-pill,
+.pro-cabinet-calendar-summary-pill,
+.response-toggle-pill,
+.client-category-pill,
+.client-category-chip,
+.client-profile-tab,
+.client-master-filter,
+.client-master-toggle,
+.client-master-chip,
+.client-profile-chip,
+.client-profile-toggle,
+.master-profile-tab,
+.outcome-minute-chip {
+  background: var(--metal-bg);
+  border: 1px solid var(--metal-border);
+  color: var(--metal-text);
+  box-shadow: var(--metal-shadow), var(--metal-inset);
+}
+
+.request-chip.is-active,
+.booking-filter-chip.is-active,
+.requests-tab.is-active,
+.analytics-range-chip.is-active,
+.pro-cabinet-calendar-filter.is-active,
+.pro-slots-filter.is-active,
+.pro-nav-pill.is-active,
+.pro-editor-tab.is-active,
+.pro-cabinet-share-toggle-btn.is-active,
+.pro-profile-portfolio-panel-tab.is-active,
+.pro-profile-editor-tab.is-active,
+.pro-profile-editor-toggle-card.is-active,
+.client-category-pill.is-active,
+.client-category-chip.is-active,
+.client-profile-tab.is-active,
+.client-master-filter.is-active,
+.client-master-toggle.is-active,
+.master-profile-tab.is-active,
+.response-toggle.has-responses .response-toggle-pill,
+.pro-slot-time-chip.is-selected,
+.outcome-minute-chip.is-active {
+  background: var(--metal-active-bg);
+  border-color: var(--metal-active-border);
+  color: var(--metal-active-text);
+  box-shadow: var(--metal-active-shadow);
+}

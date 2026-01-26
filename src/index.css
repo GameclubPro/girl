@@ -35,10 +35,28 @@
   --warning-rgb: 184, 106, 0;
   --danger: #b44b4b;
   --danger-rgb: 180, 75, 75;
-  --metal-bg: linear-gradient(135deg, #f7f9fc 0%, #d6dce7 48%, #fefeff 100%);
-  --metal-border: rgba(var(--ink-rgb), 0.18);
-  --metal-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.14);
-  --metal-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --metal-bg: linear-gradient(
+    135deg,
+    #fefefe 0%,
+    #d6dde7 45%,
+    #f7f9fc 70%,
+    #cfd6e2 100%
+  );
+  --metal-border: rgba(var(--ink-rgb), 0.22);
+  --metal-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.16);
+  --metal-inset: inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  --metal-text: var(--ink);
+  --metal-active-bg: linear-gradient(
+    135deg,
+    #f4f9ff 0%,
+    #d7e4f4 50%,
+    #f0f6ff 100%
+  );
+  --metal-active-border: rgba(var(--accent-rgb), 0.45);
+  --metal-active-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --metal-active-text: var(--accent-strong);
   --metal-primary-bg: linear-gradient(135deg, #0b66b5 0%, #5aa9ef 50%, #0b66b5 100%);
   --metal-primary-border: rgba(var(--accent-rgb), 0.6);
   --metal-primary-shadow: 0 14px 24px rgba(var(--accent-rgb), 0.25),
