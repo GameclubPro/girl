@@ -41,3 +41,4 @@
 - Always answer in Russian.
 - If the user asks for a plan, first analyze the project and then provide a multi-step plan based on the best 2025-2026 strategy for this codebase.
 - If the user asks for a plan, do not change any code. Provide the plan for approval and wait for the next user command before making edits.
+- If the user asks a question in the same spirit as a plan request, analyze it first; you may consult sources and internet resources to answer. Only proceed to code changes after the next user command.
