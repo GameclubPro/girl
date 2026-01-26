@@ -1,119 +1,588 @@
-import {
-  AlbumOpen,
-  BadgeCheck,
-  Bell,
-  Calendar,
-  ChatBubble,
-  Check,
-  City,
-  Clock,
-  Coins,
-  CoinsSwap,
-  Community,
-  Dashboard,
-  EditPencil,
-  Filter,
-  HeadsetHelp,
-  Home,
-  HomeSimple,
-  HomeUser,
-  InfoCircle,
-  List,
-  Lock,
-  LockSlash,
-  MailIn,
-  Map,
-  MapPin,
-  Medal,
-  MediaImage,
-  NavArrowDown,
-  Refresh,
-  Settings,
-  Star,
-  TaskList,
-  ThreeStars,
-  Trash,
-  User,
-  Xmark,
-} from 'iconoir-react'
+import locationPin from '../assets/location-pin.webp'
+import priceTag from '../assets/price-tag.webp'
+import experienceIcon from '../assets/experience-icon.webp'
+import workFormatIcon from '../assets/work-format.webp'
+import homeMasterIcon from '../assets/home-master.webp'
+import clientVisitIcon from '../assets/client-visit.webp'
+import settingsGear from '../assets/settings-gear.webp'
+import profileAboutIcon from '../assets/profile-about.webp'
+import scheduleIcon from '../assets/schedule-icon.webp'
+import servicesIcon from '../assets/services-icon.webp'
+import certificatesIcon from '../assets/certificates-icon.webp'
 
-const baseProps = { strokeWidth: 1.6, 'aria-hidden': true } as const
-const softProps = { strokeWidth: 1.4, 'aria-hidden': true } as const
+export const IconBell = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6.4 16.2V10a5.6 5.6 0 1 1 11.2 0v6.2l1.6 2H4.8l1.6-2Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.8 18.2a2.2 2.2 0 0 0 4.4 0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconBell = () => <Bell {...baseProps} />
+export const IconHome = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M4 11.4 12 5l8 6.4V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8.6Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconHome = () => <Home {...baseProps} />
+export const IconDashboard = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="4"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="13"
+      y="4"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="4"
+      y="13"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="13"
+      y="13"
+      width="7"
+      height="7"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+  </svg>
+)
 
-export const IconDashboard = () => <Dashboard {...baseProps} />
+export const IconUsers = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="9"
+      r="3.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M4 20c1.7-3.4 4.7-5.2 8-5.2s6.3 1.8 8 5.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconUsers = () => <Community {...baseProps} />
+export const IconList = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="5"
+      y="4"
+      width="14"
+      height="16"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M8 9h8M8 13h8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconList = () => <List {...baseProps} />
+export const IconCertificate = () => (
+  <img src={certificatesIcon} alt="" aria-hidden="true" />
+)
 
-export const IconCertificate = () => <BadgeCheck {...baseProps} />
+export const IconInbox = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5 6.5h14l-1.6 9.6a2 2 0 0 1-2 1.7H8.6a2 2 0 0 1-2-1.7L5 6.5Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.2 12h5.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconInbox = () => <MailIn {...baseProps} />
+export const IconChat = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5.4 6.4h13.2a1.6 1.6 0 0 1 1.6 1.6v7.2a1.6 1.6 0 0 1-1.6 1.6H9.2l-3.8 2.8v-2.8H5.4a1.6 1.6 0 0 1-1.6-1.6V8a1.6 1.6 0 0 1 1.6-1.6Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8 10h8M8 13h5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconChat = () => <ChatBubble {...baseProps} />
+export const IconSupport = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M4 12a8 8 0 0 1 16 0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+    <rect
+      x="3"
+      y="11.6"
+      width="4"
+      height="7"
+      rx="1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <rect
+      x="17"
+      y="11.6"
+      width="4"
+      height="7"
+      rx="1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M12 18.6h3.6a2.4 2.4 0 0 0 2.4-2.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconSupport = () => <HeadsetHelp {...baseProps} />
+export const IconEdit = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5 16.6V19h2.4l9.2-9.2-2.4-2.4L5 16.6Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M13.8 7.2 16.2 4.8a1.7 1.7 0 0 1 2.4 2.4l-2.4 2.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconEdit = () => <EditPencil {...baseProps} />
+export const IconFilter = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M4 7h16M4 12h16M4 17h16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+    <circle cx="9" cy="7" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="15" cy="12" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="12" cy="17" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+  </svg>
+)
 
-export const IconFilter = () => <Filter {...baseProps} />
+export const IconUser = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="8.8"
+      r="3.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M6 20c1.6-3 4-4.6 6-4.6s4.4 1.6 6 4.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconUser = () => <User {...baseProps} />
+export const IconPin = () => (
+  <img src={locationPin} alt="" aria-hidden="true" />
+)
 
-export const IconPin = () => <MapPin {...baseProps} />
+export const IconPrice = () => (
+  <img src={priceTag} alt="" aria-hidden="true" />
+)
 
-export const IconPrice = () => <Coins {...baseProps} />
+export const IconExperience = () => (
+  <img src={experienceIcon} alt="" aria-hidden="true" />
+)
 
-export const IconExperience = () => <Medal {...baseProps} />
+export const IconFormat = () => (
+  <img src={workFormatIcon} alt="" aria-hidden="true" />
+)
 
-export const IconFormat = () => <HomeUser {...baseProps} />
+export const IconHomeMaster = () => (
+  <img src={homeMasterIcon} alt="" aria-hidden="true" />
+)
 
-export const IconHomeMaster = () => <HomeSimple {...baseProps} />
+export const IconClientVisit = () => (
+  <img src={clientVisitIcon} alt="" aria-hidden="true" />
+)
 
-export const IconClientVisit = () => <MapPin {...baseProps} />
+export const IconClock = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="12"
+      r="8.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M12 7.8v4.6l3.4 1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconClock = () => <Clock {...baseProps} />
+export const IconCalendar = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="6"
+      width="16"
+      height="14"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M8 4v4M16 4v4M4 10h16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconCalendar = () => <Calendar {...baseProps} />
+export const IconRefresh = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M19.6 12a7.6 7.6 0 1 1-2.6-5.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M19.6 6.2v4.4h-4.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconRefresh = () => <Refresh {...baseProps} />
+export const IconPhoto = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="5.2"
+      width="16"
+      height="13.6"
+      rx="2.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    />
+    <circle
+      cx="9"
+      cy="10"
+      r="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    />
+    <path
+      d="m6.8 17 4.2-4 2.6 2.4 3.6-3.4 1.8 1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconPhoto = () => <MediaImage {...softProps} />
+export const IconShowcase = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4"
+      y="6"
+      width="16"
+      height="12"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="m7.2 15.4 3.2-3 2.2 2.2 3.4-3 2 1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="m16.2 4.6.6 1.2 1.4.2-1 1 .2 1.4-1.2-.6-1.2.6.2-1.4-1-1 1.4-.2.6-1.2Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconShowcase = () => <AlbumOpen {...baseProps} />
+export const IconStories = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="12"
+      r="7.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <circle
+      cx="12"
+      cy="12"
+      r="3.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+  </svg>
+)
 
-export const IconStories = () => <ThreeStars {...baseProps} />
+export const IconCity = () => (
+  <img src={locationPin} alt="" aria-hidden="true" />
+)
 
-export const IconCity = () => <City {...baseProps} />
+export const IconDistrict = () => (
+  <img src={locationPin} alt="" aria-hidden="true" />
+)
 
-export const IconDistrict = () => <Map {...baseProps} />
+export const IconSettings = () => (
+  <img src={settingsGear} alt="" aria-hidden="true" />
+)
 
-export const IconSettings = () => <Settings {...baseProps} />
+export const IconProfileAbout = () => (
+  <img src={profileAboutIcon} alt="" aria-hidden="true" />
+)
 
-export const IconProfileAbout = () => <InfoCircle {...baseProps} />
+export const IconSchedule = () => (
+  <img src={scheduleIcon} alt="" aria-hidden="true" />
+)
 
-export const IconSchedule = () => <Calendar {...baseProps} />
+export const IconServices = () => (
+  <img src={servicesIcon} alt="" aria-hidden="true" />
+)
 
-export const IconServices = () => <TaskList {...baseProps} />
+export const IconAddress = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M4 11.4 12 5l8 6.4V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8.6Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconAddress = () => <HomeSimple {...baseProps} />
+export const IconStar = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="m12 4.4 2.4 4.8 5.3.8-3.9 3.8.9 5.3-4.7-2.5-4.7 2.5.9-5.3-3.9-3.8 5.3-.8L12 4.4Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconStar = () => <Star {...baseProps} />
+export const IconCheck = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5.5 12.6 10 17l8.5-9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconCheck = () => <Check {...baseProps} />
+export const IconSwap = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M7 7h10l-2.6-2.6M17 17H7l2.6 2.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconSwap = () => <CoinsSwap {...baseProps} />
+export const IconClose = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6 6l12 12M18 6l-12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconClose = () => <Xmark {...baseProps} />
+export const IconChevron = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6 9l6 6 6-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconChevron = () => <NavArrowDown {...baseProps} />
+export const IconTrash = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6 7h12M9 7V5h6v2M8 7l.6 12h6.8L16 7"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
 
-export const IconTrash = () => <Trash {...baseProps} />
+export const IconLock = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="6"
+      y="11"
+      width="12"
+      height="8"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M8.5 11V8a3.5 3.5 0 1 1 7 0v3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
-export const IconLock = () => <Lock {...baseProps} />
-
-export const IconUnlock = () => <LockSlash {...baseProps} />
+export const IconUnlock = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="6"
+      y="11"
+      width="12"
+      height="8"
+      rx="2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M9 11V8a3.5 3.5 0 0 1 6.6-1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
