@@ -1356,6 +1356,9 @@ function App() {
           goBack(chatReturnView ?? 'chats')
           setChatReturnView(null)
         }}
+        onViewRequests={(tab) =>
+          role === 'pro' ? openProRequests(tab) : openRequests(tab)
+        }
       />
     )
   }

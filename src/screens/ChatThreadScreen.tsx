@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { TrustBadge } from '../components/TrustBadge'
-import type { ChatDetail, ChatMessage, RequestTimeWindow } from '../types/app'
+import type { Booking, ChatDetail, ChatMessage, RequestTimeWindow } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
 import {
@@ -32,6 +32,7 @@ type ChatThreadScreenProps = {
   userId: string
   chatId: number
   onBack: () => void
+  onViewRequests?: (tab?: 'requests' | 'bookings') => void
 }
 
 const locationLabelMap = {
@@ -164,6 +165,49 @@ const formatDayLabel = (value?: string | null) => {
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const formatTimeLeftFromMs = (ms: number) => {
+  if (!Number.isFinite(ms) || ms <= 0) return ''
+  const totalMinutes = Math.floor(ms / 60000)
+  if (totalMinutes <= 0) return ''
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours <= 0) return `${minutes} мин`
+  if (minutes <= 0) return `${hours} ч`
+  return `${hours} ч ${minutes} мин`
+}
+
+const formatTimeLeft = (value?: string | null) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return formatTimeLeftFromMs(parsed.getTime() - Date.now())
+}
+
+const extractContextIds = (meta: ChatMessage['meta']) => {
+  if (!meta || typeof meta !== 'object') {
+    return { bookingId: null, requestId: null }
+  }
+  const payload = meta as Record<string, unknown>
+  const rawBookingId = payload.bookingId
+  const rawRequestId = payload.requestId
+  const bookingId =
+    typeof rawBookingId === 'number'
+      ? rawBookingId
+      : typeof rawBookingId === 'string'
+        ? Number(rawBookingId)
+        : null
+  const requestId =
+    typeof rawRequestId === 'number'
+      ? rawRequestId
+      : typeof rawRequestId === 'string'
+        ? Number(rawRequestId)
+        : null
+  return {
+    bookingId: Number.isInteger(bookingId) ? bookingId : null,
+    requestId: Number.isInteger(requestId) ? requestId : null,
+  }
+}
+
 type MessageStatus = 'sending' | 'sent' | 'failed'
 
 type LocalChatMessage = ChatMessage & {
@@ -249,6 +293,7 @@ export const ChatThreadScreen = ({
   userId,
   chatId,
   onBack,
+  onViewRequests,
 }: ChatThreadScreenProps) => {
   const [detail, setDetail] = useState<ChatDetail | null>(null)
   const [messages, setMessages] = useState<LocalChatMessage[]>([])
@@ -285,6 +330,9 @@ export const ChatThreadScreen = ({
   const [outcomeErrorBookingId, setOutcomeErrorBookingId] = useState<number | null>(
     null
   )
+  const [bookingSnapshot, setBookingSnapshot] = useState<Booking | null>(null)
+  const [bookingActionId, setBookingActionId] = useState<number | null>(null)
+  const [bookingActionError, setBookingActionError] = useState('')
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const screenRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -310,6 +358,13 @@ export const ChatThreadScreen = ({
   }>({ initial: null, more: null })
   const detailRequestIdRef = useRef(0)
   const messagesRequestIdRef = useRef({ initial: 0, more: 0 })
+  const bookingSnapshotAbortRef = useRef<AbortController | null>(null)
+  const bookingSnapshotRequestIdRef = useRef(0)
+  const statusSnapshotRef = useRef<{
+    bookingStatus?: Booking['status'] | null
+    requestStatus?: string | null
+    depositStatus?: Booking['depositStatus'] | null
+  } | null>(null)
 
   const limit = 30
   const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
@@ -317,6 +372,18 @@ export const ChatThreadScreen = ({
   const counterpart = detail?.counterpart
   const request = detail?.request
   const booking = detail?.booking
+  const bookingStatus = bookingSnapshot?.status ?? booking?.status ?? null
+  const depositStatus = bookingSnapshot?.depositStatus ?? null
+  const depositAmount = bookingSnapshot?.depositAmount ?? null
+  const depositHoldExpiresAt = bookingSnapshot?.depositHoldExpiresAt ?? null
+  const proposedPrice = bookingSnapshot?.proposedPrice ?? null
+  const bookingPrice =
+    typeof bookingSnapshot?.servicePrice === 'number'
+      ? bookingSnapshot.servicePrice
+      : typeof booking?.servicePrice === 'number'
+        ? booking.servicePrice
+        : null
+  const isBookingActionLoading = bookingActionId === booking?.id
   const isProViewer = detail?.chat?.memberRole === 'master'
   const showTrustBadge = Boolean(isProViewer && counterpart?.role === 'client')
   const contextType = detail?.chat?.contextType ?? null
@@ -328,14 +395,18 @@ export const ChatThreadScreen = ({
       ? booking?.serviceName ?? 'Запись подтверждена'
       : request?.serviceName ?? 'Переговоры по заявке'
   const bookingStatusLabel =
-    booking?.status === 'confirmed' ? 'Подтверждено' : 'Запись'
+    bookingStatus === 'confirmed' ? 'Подтверждено' : 'Запись'
   const bookingTimeLabel = booking?.scheduledAt
     ? formatDateTime(booking.scheduledAt)
     : 'Время уточняется'
   const bookingPriceLabel =
-    typeof booking?.servicePrice === 'number'
-      ? `Стоимость: ${formatPrice(booking.servicePrice)}`
-      : null
+    typeof bookingSnapshot?.servicePrice === 'number'
+      ? `Стоимость: ${formatPrice(bookingSnapshot.servicePrice)}`
+      : typeof booking?.servicePrice === 'number'
+        ? `Стоимость: ${formatPrice(booking.servicePrice)}`
+        : typeof proposedPrice === 'number'
+          ? `Предложена цена: ${formatPrice(proposedPrice)}`
+          : null
   const bookingDurationLabel = formatDurationLabel(booking?.serviceDuration)
   const baseRequestDateLabel =
     request?.dateOption === 'choose'
@@ -358,8 +429,8 @@ export const ChatThreadScreen = ({
   const activeStatusLabel = isBookingChat
     ? booking?.outcome
       ? `Итог: ${bookingOutcomeLabelMap[booking.outcome] ?? booking.outcome}`
-      : booking?.status
-        ? bookingStatusLabelMap[booking.status] ?? bookingStatusLabel
+      : bookingStatus
+        ? bookingStatusLabelMap[bookingStatus] ?? bookingStatusLabel
         : bookingStatusLabel
     : request?.status
       ? requestStatusLabelMap[request.status] ?? 'Заявка'
@@ -583,6 +654,29 @@ export const ChatThreadScreen = ({
         item.id === tempId ? { ...item, status } : item
       )
     )
+  }, [])
+
+  const appendLocalSystemMessage = useCallback(
+    (body: string, meta?: Record<string, unknown>) => {
+      const message: ChatMessage = {
+        id: -Date.now(),
+        chatId,
+        senderId: null,
+        type: 'system',
+        body,
+        meta: meta ?? null,
+        attachmentUrl: null,
+        createdAt: new Date().toISOString(),
+      }
+      mergeMessages([message])
+    },
+    [chatId, mergeMessages]
+  )
+
+  const scrollToMessage = useCallback((messageId: number) => {
+    const element = document.getElementById(`chat-message-${messageId}`)
+    if (!element) return
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
   const sendMessageRequest = useCallback(
@@ -932,6 +1026,43 @@ export const ChatThreadScreen = ({
     [apiBase, chatId, userId]
   )
 
+  const loadBookingSnapshot = useCallback(async () => {
+    if (!userId || !booking?.id) return
+    const requestId = (bookingSnapshotRequestIdRef.current += 1)
+    if (bookingSnapshotAbortRef.current) {
+      bookingSnapshotAbortRef.current.abort()
+    }
+    const controller = new AbortController()
+    bookingSnapshotAbortRef.current = controller
+    try {
+      const endpoint = isProViewer ? '/api/pro/bookings' : '/api/bookings'
+      const response = await fetch(
+        `${apiBase}${endpoint}?userId=${encodeURIComponent(userId)}`,
+        { signal: controller.signal }
+      )
+      if (!response.ok) {
+        throw new Error('Load bookings failed')
+      }
+      const data = (await response.json()) as Booking[]
+      if (controller.signal.aborted || bookingSnapshotRequestIdRef.current !== requestId) {
+        return
+      }
+      const match = Array.isArray(data)
+        ? data.find((item) => item.id === booking.id) ?? null
+        : null
+      setBookingSnapshot(match)
+    } catch (error) {
+      if (controller.signal.aborted) return
+      console.error('Failed to load booking snapshot:', error)
+    } finally {
+      if (bookingSnapshotRequestIdRef.current === requestId) {
+        if (bookingSnapshotAbortRef.current === controller) {
+          bookingSnapshotAbortRef.current = null
+        }
+      }
+    }
+  }, [apiBase, booking?.id, isProViewer, userId])
+
   useEffect(() => {
     const cachedDetail = getCachedChatDetail(apiBase, userId, chatId)
     if (cachedDetail) {
@@ -959,11 +1090,168 @@ export const ChatThreadScreen = ({
   }, [apiBase, chatId, hydrateOutboxMessages, loadDetail, loadMessages, userId])
 
   useEffect(() => {
+    statusSnapshotRef.current = null
+  }, [chatId, booking?.id, request?.id])
+
+  useEffect(() => {
+    if (!booking?.id) {
+      setBookingSnapshot(null)
+      return
+    }
+    void loadBookingSnapshot()
+    return () => {
+      if (bookingSnapshotAbortRef.current) {
+        bookingSnapshotAbortRef.current.abort()
+        bookingSnapshotAbortRef.current = null
+      }
+    }
+  }, [booking?.id, loadBookingSnapshot])
+
+  useEffect(() => {
+    if (!booking?.id) return
+    setBookingSnapshot((current) => {
+      if (!current || current.id !== booking.id) return current
+      const next = { ...current }
+      if (booking.status) {
+        next.status = booking.status
+      }
+      if (typeof booking.servicePrice === 'number') {
+        next.servicePrice = booking.servicePrice
+      }
+      return next
+    })
+  }, [booking?.id, booking?.servicePrice, booking?.status])
+
+  useEffect(() => {
     setIsHistoryOpen(false)
     setQuickMode(null)
     setQuickValue('')
     setIsContextSheetOpen(false)
+    setBookingActionError('')
+    setBookingActionId(null)
   }, [chatId])
+
+  useEffect(() => {
+    if (!detail) return
+    const hasDepositSnapshot =
+      Boolean(bookingSnapshot && bookingSnapshot.id === booking?.id)
+    const nextDepositStatus = hasDepositSnapshot ? depositStatus : undefined
+    const nextSnapshot = {
+      bookingStatus: bookingStatus ?? null,
+      requestStatus: request?.status ?? null,
+      depositStatus: nextDepositStatus,
+    }
+    const previous = statusSnapshotRef.current
+    if (!previous) {
+      statusSnapshotRef.current = nextSnapshot
+      return
+    }
+
+    if (
+      previous.bookingStatus !== nextSnapshot.bookingStatus &&
+      nextSnapshot.bookingStatus
+    ) {
+      const hasRecentSystemForBooking = visibleMessages.some((message) => {
+        if (message.type !== 'system') return false
+        const { bookingId } = extractContextIds(message.meta)
+        if (!bookingId || bookingId !== booking?.id) return false
+        if (!message.createdAt) return false
+        const delta = Date.now() - new Date(message.createdAt).getTime()
+        return delta >= 0 && delta < 5 * 60 * 1000
+      })
+      if (!hasRecentSystemForBooking) {
+        if (nextSnapshot.bookingStatus === 'price_proposed') {
+          appendLocalSystemMessage('Мастер предложил цену. Подтвердите запись.', {
+            event: 'booking_price_proposed',
+            bookingId: booking?.id ?? null,
+            status: nextSnapshot.bookingStatus,
+            local: true,
+          })
+        }
+        if (nextSnapshot.bookingStatus === 'cancelled') {
+          appendLocalSystemMessage('Запись отменена.', {
+            event: 'booking_cancelled',
+            bookingId: booking?.id ?? null,
+            status: nextSnapshot.bookingStatus,
+            local: true,
+          })
+        }
+        if (nextSnapshot.bookingStatus === 'declined') {
+          appendLocalSystemMessage('Запись отклонена мастером.', {
+            event: 'booking_declined',
+            bookingId: booking?.id ?? null,
+            status: nextSnapshot.bookingStatus,
+            local: true,
+          })
+        }
+      }
+    }
+
+    if (
+      previous.requestStatus !== nextSnapshot.requestStatus &&
+      nextSnapshot.requestStatus === 'closed' &&
+      request?.id
+    ) {
+      const hasSystemForRequest = visibleMessages.some((message) => {
+        if (message.type !== 'system') return false
+        const { requestId } = extractContextIds(message.meta)
+        return requestId === request.id
+      })
+      if (!hasSystemForRequest) {
+        appendLocalSystemMessage('Заявка согласована. Можно обсудить детали.', {
+          event: 'request_closed',
+          requestId: request.id,
+          status: nextSnapshot.requestStatus,
+          local: true,
+        })
+      }
+    }
+
+    if (
+      previous.depositStatus !== undefined &&
+      previous.depositStatus !== nextSnapshot.depositStatus &&
+      nextSnapshot.depositStatus
+    ) {
+      if (nextSnapshot.depositStatus === 'pending') {
+        const holdLabel = formatTimeLeft(depositHoldExpiresAt)
+        const amountLabel =
+          typeof depositAmount === 'number' && depositAmount > 0
+            ? `Сумма: ${formatPrice(depositAmount)}`
+            : ''
+        const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
+        appendLocalSystemMessage(
+          `Нужен депозит. ${[amountLabel, holdText].filter(Boolean).join(' ')}`.trim(),
+          {
+            event: 'deposit_pending',
+            bookingId: booking?.id ?? null,
+            depositAmount: depositAmount ?? null,
+            local: true,
+          }
+        )
+      }
+      if (nextSnapshot.depositStatus === 'submitted') {
+        appendLocalSystemMessage('Депозит отправлен. Ждём подтверждения мастера.', {
+          event: 'deposit_submitted',
+          bookingId: booking?.id ?? null,
+          local: true,
+        })
+      }
+    }
+
+    statusSnapshotRef.current = nextSnapshot
+  }, [
+    appendLocalSystemMessage,
+    booking?.id,
+    bookingSnapshot,
+    bookingStatus,
+    depositAmount,
+    depositHoldExpiresAt,
+    depositStatus,
+    detail,
+    request?.id,
+    request?.status,
+    visibleMessages,
+  ])
 
   useLayoutEffect(() => {
     if (hasInitialScrollRef.current) return
@@ -1128,6 +1416,27 @@ export const ChatThreadScreen = ({
         const exists = messagesRef.current.some((item) => item.id === incoming.id)
         if (exists) return
         mergeMessages([incoming])
+        if (incoming.type === 'system') {
+          const meta =
+            incoming.meta && typeof incoming.meta === 'object'
+              ? (incoming.meta as Record<string, unknown>)
+              : null
+          const event = typeof meta?.event === 'string' ? meta.event : ''
+          if (
+            [
+              'request_accepted',
+              'request_updated',
+              'booking_confirmed',
+              'booking_updated',
+              'deposit_confirmed',
+              'deposit_rejected',
+              'deposit_expired',
+            ].includes(event)
+          ) {
+            void loadDetail({ silent: true })
+            void loadBookingSnapshot()
+          }
+        }
         const outcomeMeta = parseOutcomeMarkedMeta(incoming.meta)
         if (outcomeMeta?.bookingId) {
           updateBookingOutcome(
@@ -1209,6 +1518,8 @@ export const ChatThreadScreen = ({
   }, [
     chatId,
     counterpart?.id,
+    loadBookingSnapshot,
+    loadDetail,
     markRead,
     mergeMessages,
     scrollToBottom,
@@ -1411,6 +1722,103 @@ export const ChatThreadScreen = ({
       })
     }
   }
+
+  const runBookingAction = useCallback(
+    async (
+      action:
+        | 'client-accept-price'
+        | 'client-decline-price'
+        | 'master-accept'
+        | 'master-decline'
+        | 'master-deposit-confirm'
+        | 'master-deposit-reject',
+      payload?: Record<string, unknown>
+    ) => {
+      if (!booking?.id || bookingActionId !== null) return
+      setBookingActionId(booking.id)
+      setBookingActionError('')
+      try {
+        const response = await fetch(`${apiBase}/api/bookings/${booking.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action, ...(payload ?? {}) }),
+        })
+        const data = (await response.json().catch(() => null)) as
+          | {
+              status?: Booking['status']
+              servicePrice?: number | null
+              depositStatus?: Booking['depositStatus']
+              depositAmount?: number | null
+            }
+          | null
+        if (!response.ok) {
+          throw new Error('booking_update_failed')
+        }
+
+        const nextStatus =
+          data?.status ??
+          (action === 'client-accept-price' || action === 'master-accept'
+            ? 'confirmed'
+            : action === 'client-decline-price'
+              ? 'cancelled'
+              : action === 'master-decline'
+                ? 'declined'
+                : bookingStatus ?? null)
+
+        setDetail((current) => {
+          if (!current?.booking || current.booking.id !== booking.id) return current
+          const nextBooking = { ...current.booking }
+          if (nextStatus) {
+            nextBooking.status = nextStatus
+          }
+          if (action === 'client-accept-price') {
+            const acceptedPrice =
+              typeof data?.servicePrice === 'number'
+                ? data.servicePrice
+                : bookingSnapshot?.proposedPrice ?? nextBooking.servicePrice ?? null
+            nextBooking.servicePrice = acceptedPrice
+          }
+          return { ...current, booking: nextBooking }
+        })
+
+        setBookingSnapshot((current) => {
+          if (!current || current.id !== booking.id) return current
+          const next = { ...current }
+          if (nextStatus) {
+            next.status = nextStatus
+          }
+          if (action === 'client-accept-price') {
+            const acceptedPrice =
+              typeof data?.servicePrice === 'number'
+                ? data.servicePrice
+                : bookingSnapshot?.proposedPrice ?? next.servicePrice ?? null
+            next.servicePrice = acceptedPrice
+            next.proposedPrice = null
+          }
+          if (data?.depositStatus) {
+            next.depositStatus = data.depositStatus
+          } else if (action === 'master-deposit-confirm') {
+            next.depositStatus = 'confirmed'
+          } else if (action === 'master-deposit-reject') {
+            next.depositStatus = 'rejected'
+          }
+          if (typeof data?.depositAmount === 'number') {
+            next.depositAmount = data.depositAmount
+          }
+          return next
+        })
+      } catch (error) {
+        setBookingActionError(
+          action === 'master-deposit-confirm' || action === 'master-deposit-reject'
+            ? 'Не удалось обновить депозит.'
+            : 'Не удалось обновить запись.'
+        )
+      } finally {
+        setBookingActionId((current) => (current === booking?.id ? null : current))
+      }
+    },
+    [apiBase, booking?.id, bookingActionId, bookingSnapshot?.proposedPrice, bookingStatus, userId]
+  )
 
   const submitBookingOutcome = useCallback(
     async (bookingId: number, outcome: string, lateMinutes?: number | null) => {
@@ -1666,6 +2074,154 @@ export const ChatThreadScreen = ({
     setQuickValue('')
   }, [])
 
+  const contextAnchorMap = useMemo(() => {
+    const map = new Map<string, number>()
+    visibleMessages.forEach((message) => {
+      if (message.type !== 'system') return
+      const { bookingId, requestId } = extractContextIds(message.meta)
+      if (bookingId && !map.has(`booking-${bookingId}`)) {
+        map.set(`booking-${bookingId}`, message.id)
+      }
+      if (requestId && !map.has(`request-${requestId}`)) {
+        map.set(`request-${requestId}`, message.id)
+      }
+    })
+    return map
+  }, [visibleMessages])
+
+  const handleContextJump = useCallback(
+    (context: NonNullable<ChatDetail['contexts']>[number]) => {
+      const key = `${context.contextType}-${context.contextId}`
+      const messageId = contextAnchorMap.get(key)
+      closeContextSheet()
+      if (messageId) {
+        requestAnimationFrame(() => scrollToMessage(messageId))
+        return
+      }
+      requestAnimationFrame(() => scrollToBottom('smooth'))
+    },
+    [closeContextSheet, contextAnchorMap, scrollToBottom, scrollToMessage]
+  )
+
+  const stickyAction = useMemo(() => {
+    if (!isBookingChat || !booking?.id) return null
+    const holdLabel = formatTimeLeft(depositHoldExpiresAt)
+    const amountLabel =
+      typeof depositAmount === 'number' && depositAmount > 0
+        ? `Сумма: ${formatPrice(depositAmount)}`
+        : ''
+    const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
+
+    if (!isProViewer) {
+      if (depositStatus === 'pending' || depositStatus === 'rejected') {
+        if (!onViewRequests) return null
+        const depositIntro =
+          depositStatus === 'rejected'
+            ? 'Депозит отклонён. Отправьте снова.'
+            : 'Нужен депозит.'
+        return {
+          tone: 'alert' as const,
+          title: 'Нужен депозит',
+          subtitle: [depositIntro, amountLabel, holdText].filter(Boolean).join(' '),
+          primary: {
+            label: 'Оплатить депозит',
+            onClick: () => onViewRequests('bookings'),
+          },
+        }
+      }
+      if (bookingStatus === 'price_proposed') {
+        const priceLabel =
+          typeof proposedPrice === 'number'
+            ? `Предложение: ${formatPrice(proposedPrice)}`
+            : 'Мастер предложил цену.'
+        return {
+          tone: 'alert' as const,
+          title: 'Подтвердите цену',
+          subtitle: priceLabel,
+          primary: {
+            label: 'Подтвердить',
+            onClick: () => void runBookingAction('client-accept-price'),
+          },
+          secondary: {
+            label: 'Отклонить',
+            onClick: () => void runBookingAction('client-decline-price'),
+          },
+        }
+      }
+      return null
+    }
+
+    if (depositStatus === 'submitted') {
+      return {
+        tone: 'alert' as const,
+        title: 'Проверить депозит',
+        subtitle: amountLabel || 'Клиент отправил чек.',
+        primary: {
+          label: 'Подтвердить',
+          onClick: () => void runBookingAction('master-deposit-confirm'),
+        },
+        secondary: {
+          label: 'Отклонить',
+          onClick: () => void runBookingAction('master-deposit-reject'),
+        },
+      }
+    }
+
+    if (bookingStatus === 'pending') {
+      if (bookingPrice === null) {
+        return {
+          tone: 'alert' as const,
+          title: 'Нужно уточнить цену',
+          subtitle: 'Клиент ждёт стоимость.',
+          primary: {
+            label: 'Предложить цену',
+            onClick: () => openQuickMode('price'),
+          },
+        }
+      }
+      return {
+        tone: 'alert' as const,
+        title: 'Нужно подтвердить запись',
+        subtitle: 'Клиент ждёт подтверждение.',
+        primary: {
+          label: 'Подтвердить',
+          onClick: () => void runBookingAction('master-accept'),
+        },
+        secondary: {
+          label: 'Отказать',
+          onClick: () => void runBookingAction('master-decline'),
+        },
+      }
+    }
+
+    if (bookingStatus === 'price_pending') {
+      return {
+        tone: 'alert' as const,
+        title: 'Нужно предложить цену',
+        subtitle: 'Запись ожидает стоимость.',
+        primary: {
+          label: 'Предложить цену',
+          onClick: () => openQuickMode('price'),
+        },
+      }
+    }
+
+    return null
+  }, [
+    booking?.id,
+    bookingPrice,
+    bookingStatus,
+    depositAmount,
+    depositHoldExpiresAt,
+    depositStatus,
+    isBookingChat,
+    isProViewer,
+    onViewRequests,
+    openQuickMode,
+    proposedPrice,
+    runBookingAction,
+  ])
+
   const onLoadMore = () => {
     const oldestId = messages[0]?.id
     if (oldestId && oldestId > 0) {
@@ -1782,6 +2338,49 @@ export const ChatThreadScreen = ({
                 Подробнее
               </button>
             </section>
+            {stickyAction && (
+              <section
+                className={`chat-sticky-action${
+                  stickyAction.tone ? ` is-${stickyAction.tone}` : ''
+                }`}
+              >
+                <div className="chat-sticky-main">
+                  <span className="chat-sticky-title">{stickyAction.title}</span>
+                  {stickyAction.subtitle && (
+                    <span className="chat-sticky-subtitle">
+                      {stickyAction.subtitle}
+                    </span>
+                  )}
+                </div>
+                <div className="chat-sticky-actions">
+                  {stickyAction.secondary && (
+                    <button
+                      className="chat-sticky-button is-secondary"
+                      type="button"
+                      onClick={stickyAction.secondary.onClick}
+                      disabled={isBookingActionLoading}
+                    >
+                      {stickyAction.secondary.label}
+                    </button>
+                  )}
+                  {stickyAction.primary && (
+                    <button
+                      className="chat-sticky-button is-primary"
+                      type="button"
+                      onClick={stickyAction.primary.onClick}
+                      disabled={isBookingActionLoading}
+                    >
+                      {stickyAction.primary.label}
+                    </button>
+                  )}
+                </div>
+                {bookingActionError && (
+                  <p className="chat-sticky-error" role="alert">
+                    {bookingActionError}
+                  </p>
+                )}
+              </section>
+            )}
             {!isBookingChat && request && (
               <section className="chat-request-card">
                 <div className="chat-request-top">
@@ -1931,7 +2530,11 @@ export const ChatThreadScreen = ({
                 outcomeErrorBookingId === outcomePrompt.bookingId
 
               return (
-                <div key={message.id} className="chat-message-group">
+                <div
+                  key={message.id}
+                  id={`chat-message-${message.id}`}
+                  className="chat-message-group"
+                >
                   {showDate && (
                     <div className="chat-date">
                       {formatDayLabel(message.createdAt)}
@@ -2041,7 +2644,11 @@ export const ChatThreadScreen = ({
             }
 
             return (
-              <div key={message.id} className="chat-message-group">
+              <div
+                key={message.id}
+                id={`chat-message-${message.id}`}
+                className="chat-message-group"
+              >
                 {showDate && (
                   <div className="chat-date">{formatDayLabel(message.createdAt)}</div>
                 )}
@@ -2426,35 +3033,40 @@ export const ChatThreadScreen = ({
                   </span>
                 </button>
                 <div className="chat-history-panel">
-                  <div className="chat-history-list">
+                  <div className="chat-history-timeline" role="list">
                     {contextHistory.map((context) => {
                       const timeLabel = getHistoryTimeLabel(context)
                       const statusLabel = getHistoryStatusLabel(context)
                       const label =
                         context.contextType === 'booking' ? 'Запись' : 'Заявка'
                       return (
-                        <div
+                        <button
                           key={`${context.contextType}-${context.contextId}`}
-                          className="chat-history-item"
+                          className="chat-history-node"
+                          type="button"
+                          role="listitem"
+                          onClick={() => handleContextJump(context)}
                         >
                           <span
                             className={`chat-history-badge is-${context.contextType}`}
                           >
                             {label}
                           </span>
-                          <div className="chat-history-main">
-                            <span className="chat-history-service">
-                              {context.serviceName ?? label}
-                            </span>
-                            <span className="chat-history-meta">
-                              {statusLabel && <span>{statusLabel}</span>}
-                              {timeLabel && <span>{timeLabel}</span>}
-                            </span>
-                          </div>
-                        </div>
+                          <span className="chat-history-service">
+                            {context.serviceName ?? label}
+                          </span>
+                          <span className="chat-history-meta">
+                            {statusLabel && <span>{statusLabel}</span>}
+                            {timeLabel && <span>{timeLabel}</span>}
+                          </span>
+                          <span className="chat-history-jump">Перейти →</span>
+                        </button>
                       )
                     })}
                   </div>
+                  <p className="chat-history-hint">
+                    Нажмите на этап, чтобы перейти в переписке.
+                  </p>
                 </div>
               </section>
             )}
