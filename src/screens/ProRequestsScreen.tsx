@@ -3522,7 +3522,7 @@ export const ProRequestsScreen = ({
                           aria-selected={slotFilter === value}
                           onClick={() => setSlotFilter(value)}
                         >
-                          {label}
+                          <span className="pro-slots-filter-label">{label}</span>
                           {value !== 'all' && (
                             <span
                               className={`pro-slots-filter-index${

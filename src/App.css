@@ -15131,12 +15131,12 @@
   border: none;
   background: transparent;
   border-radius: 10px;
-  padding: 8px 22px 8px 6px;
-  font-size: clamp(10px, 2.6vw, 11px);
+  padding: 6px 18px 6px 6px;
+  font-size: clamp(9px, 2.1vw, 10px);
   font-weight: 700;
   color: var(--pro-muted);
   cursor: pointer;
-  min-height: 38px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15144,12 +15144,15 @@
   position: relative;
   overflow: visible;
   text-align: center;
-  line-height: 1.2;
-  white-space: normal;
-  word-break: break-word;
-  hyphens: auto;
+  line-height: 1.1;
   transition: transform 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
     background 0.2s ease;
+}
+
+.pro-slots-filter-label {
+  display: block;
+  width: 100%;
+  white-space: nowrap;
 }
 
 .pro-slots-filter.is-active {
