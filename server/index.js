@@ -1588,6 +1588,30 @@ const createChatForBooking = async (
     const previousContextType = existingChat?.contextType ?? null
     const previousContextId = existingChat?.contextId ?? null
 
+    let resolvedRequestId = requestId ?? null
+    let resolvedResponseId = responseId ?? null
+    if (!resolvedRequestId && !resolvedResponseId) {
+      const contextResult = await client.query(
+        `
+          SELECT
+            request_id AS "requestId",
+            response_id AS "responseId"
+          FROM service_bookings
+          WHERE id = $1
+        `,
+        [bookingId]
+      )
+      const contextRow = contextResult.rows[0] ?? {}
+      const loadedRequestId = parseOptionalInt(contextRow.requestId)
+      const loadedResponseId = parseOptionalInt(contextRow.responseId)
+      if (loadedRequestId) {
+        resolvedRequestId = loadedRequestId
+      }
+      if (loadedResponseId) {
+        resolvedResponseId = loadedResponseId
+      }
+    }
+
     let chatId = existingChat?.id ?? null
     let isNew = false
     if (chatId) {
@@ -1597,12 +1621,12 @@ const createChatForBooking = async (
           SET context_type = 'booking',
               context_id = $1,
               booking_id = $1,
-              request_id = NULL,
-              response_id = NULL,
+              request_id = $3,
+              response_id = $4,
               updated_at = NOW()
           WHERE id = $2
         `,
-        [bookingId, chatId]
+        [bookingId, chatId, resolvedRequestId, resolvedResponseId]
       )
     } else {
       const insertResult = await client.query(
@@ -1611,14 +1635,16 @@ const createChatForBooking = async (
             context_type,
             context_id,
             booking_id,
+            request_id,
+            response_id,
             client_id,
             master_id,
             status
           )
-          VALUES ('booking', $1, $1, $2, $3, 'active')
+          VALUES ('booking', $1, $1, $2, $3, $4, $5, 'active')
           RETURNING id
         `,
-        [bookingId, clientId, masterId]
+        [bookingId, resolvedRequestId, resolvedResponseId, clientId, masterId]
       )
       chatId = insertResult.rows[0]?.id ?? null
       if (!chatId) {
@@ -1661,14 +1687,14 @@ const createChatForBooking = async (
       )
     }
 
-    if (requestId) {
+    if (resolvedRequestId) {
       await upsertChatContext(
         {
           chatId,
           contextType: 'request',
-          contextId: requestId,
-          requestId,
-          responseId: responseId ?? null,
+          contextId: resolvedRequestId,
+          requestId: resolvedRequestId,
+          responseId: resolvedResponseId ?? null,
         },
         { client }
       )
@@ -1680,8 +1706,8 @@ const createChatForBooking = async (
         contextType: 'booking',
         contextId: bookingId,
         bookingId,
-        requestId: requestId ?? null,
-        responseId: responseId ?? null,
+        requestId: resolvedRequestId ?? null,
+        responseId: resolvedResponseId ?? null,
       },
       { client }
     )
@@ -2945,52 +2971,71 @@ const runDepositHoldCycle = async () => {
 
         await client.query('COMMIT')
 
-        const chatResult = await pool.query(
-          `
-            SELECT id
-            FROM chats
-            WHERE booking_id = $1
-            ORDER BY last_message_at DESC NULLS LAST, updated_at DESC
-            LIMIT 1
-          `,
-          [booking.id]
-        )
-        const chatId = chatResult.rows[0]?.id ?? null
+        let chatId = null
+        try {
+          const chatPayload = await createChatForBooking(
+            {
+              bookingId: booking.id,
+              clientId: booking.clientId,
+              masterId: booking.masterId,
+              serviceName: booking.serviceName,
+              actorId: null,
+            },
+            { suppressSystemMessage: true }
+          )
+          if (chatPayload?.chatId && chatPayload.isNew) {
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'chat:created',
+              chatId: chatPayload.chatId,
+              bookingId: booking.id,
+            })
+          }
+          chatId = chatPayload?.chatId ?? null
+        } catch (chatError) {
+          console.error('Failed to prepare chat for deposit expiry:', chatError)
+        }
         if (!chatId) continue
 
-        const body = `Слот снят: депозит не поступил за ${DEPOSIT_HOLD_MINUTES} минут.`
-        const meta = {
+        const isDuplicate = await isDuplicateSystemEvent({
+          chatId,
           event: 'deposit_expired',
           bookingId: booking.id,
-          serviceName: booking.serviceName ?? null,
+        })
+        if (!isDuplicate) {
+          const body = `Слот снят: депозит не поступил за ${DEPOSIT_HOLD_MINUTES} минут.`
+          const meta = {
+            event: 'deposit_expired',
+            bookingId: booking.id,
+            serviceName: booking.serviceName ?? null,
+          }
+          const messageResult = await insertSystemMessage({
+            chatId,
+            body,
+            meta,
+            actorId: null,
+          })
+          const messagePayload = {
+            id: messageResult.id,
+            chatId,
+            senderId: null,
+            type: 'system',
+            body,
+            meta,
+            attachmentUrl: null,
+            createdAt: messageResult.createdAt,
+          }
+          void notifyChatMembers(chatId, {
+            type: 'message:new',
+            chatId,
+            message: messagePayload,
+          })
+          void sendChatNotification({
+            chatId,
+            audience: 'client',
+            title: 'Депозит не поступил',
+            text: body,
+          })
         }
-        const messageResult = await insertSystemMessage({
-          chatId,
-          body,
-          meta,
-          actorId: null,
-        })
-        const messagePayload = {
-          id: messageResult.id,
-          chatId,
-          senderId: null,
-          type: 'system',
-          body,
-          meta,
-          attachmentUrl: null,
-          createdAt: messageResult.createdAt,
-        }
-        void notifyChatMembers(chatId, {
-          type: 'message:new',
-          chatId,
-          message: messagePayload,
-        })
-        void sendChatNotification({
-          chatId,
-          audience: 'client',
-          title: 'Депозит не поступил',
-          text: body,
-        })
       } catch (error) {
         await client.query('ROLLBACK')
         console.error('Deposit hold cycle failed:', error)
@@ -7095,6 +7140,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
           masterId: booking.masterId,
           serviceName: booking.serviceName,
           actorId: normalizedUserId,
+          requestId: booking.requestId ?? null,
+          responseId: booking.responseId ?? null,
         })
         if (chatPayload?.chatId) {
           void notifyChatMembers(chatPayload.chatId, {
@@ -7218,7 +7265,31 @@ app.patch('/api/bookings/:id', async (req, res) => {
         [bookingId]
       )
 
-      const declinedChatId = await loadBookingChatId(bookingId)
+      let declinedChatId = await loadBookingChatId(bookingId)
+      try {
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
+          },
+          { suppressSystemMessage: true }
+        )
+        if (chatPayload?.chatId && chatPayload.isNew) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
+            bookingId,
+          })
+        }
+        declinedChatId = chatPayload?.chatId ?? declinedChatId
+      } catch (chatError) {
+        console.error('Failed to prepare chat for booking decline:', chatError)
+      }
       if (declinedChatId) {
         const isDuplicate = await isDuplicateSystemEvent({
           chatId: declinedChatId,
@@ -7472,6 +7543,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
           masterId: booking.masterId,
           serviceName: booking.serviceName,
           actorId: normalizedUserId,
+          requestId: booking.requestId ?? null,
+          responseId: booking.responseId ?? null,
         })
         if (chatPayload?.chatId) {
           void notifyChatMembers(chatPayload.chatId, {
@@ -7589,7 +7662,31 @@ app.patch('/api/bookings/:id', async (req, res) => {
         [bookingId, cancelledAt]
       )
 
-      const cancelledChatId = await loadBookingChatId(bookingId)
+      let cancelledChatId = await loadBookingChatId(bookingId)
+      try {
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
+          },
+          { suppressSystemMessage: true }
+        )
+        if (chatPayload?.chatId && chatPayload.isNew) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
+            bookingId,
+          })
+        }
+        cancelledChatId = chatPayload?.chatId ?? cancelledChatId
+      } catch (chatError) {
+        console.error('Failed to prepare chat for price decline:', chatError)
+      }
       if (cancelledChatId) {
         const isDuplicate = await isDuplicateSystemEvent({
           chatId: cancelledChatId,
@@ -7701,6 +7798,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { suppressSystemMessage: true }
         )
@@ -7800,6 +7899,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { suppressSystemMessage: true }
         )
@@ -7889,6 +7990,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { suppressSystemMessage: true }
         )
@@ -8048,6 +8151,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { suppressSystemMessage: true }
         )
@@ -8181,6 +8286,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { suppressSystemMessage: true }
         )
@@ -8279,6 +8386,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { suppressSystemMessage: true }
         )
@@ -8375,6 +8484,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { suppressSystemMessage: true }
         )
@@ -8480,7 +8591,31 @@ app.patch('/api/bookings/:id', async (req, res) => {
         },
       })
 
-      const cancelledChatId = await loadBookingChatId(bookingId)
+      let cancelledChatId = await loadBookingChatId(bookingId)
+      try {
+        const chatPayload = await createChatForBooking(
+          {
+            bookingId,
+            clientId: booking.clientId,
+            masterId: booking.masterId,
+            serviceName: booking.serviceName,
+            actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
+          },
+          { suppressSystemMessage: true }
+        )
+        if (chatPayload?.chatId && chatPayload.isNew) {
+          void notifyChatMembers(chatPayload.chatId, {
+            type: 'chat:created',
+            chatId: chatPayload.chatId,
+            bookingId,
+          })
+        }
+        cancelledChatId = chatPayload?.chatId ?? cancelledChatId
+      } catch (chatError) {
+        console.error('Failed to prepare chat for booking cancel:', chatError)
+      }
       if (cancelledChatId) {
         const isDuplicate = await isDuplicateSystemEvent({
           chatId: cancelledChatId,
@@ -8659,6 +8794,8 @@ app.patch('/api/bookings/:id', async (req, res) => {
             masterId: booking.masterId,
             serviceName: booking.serviceName,
             actorId: normalizedUserId,
+            requestId: booking.requestId ?? null,
+            responseId: booking.responseId ?? null,
           },
           { client }
         )
