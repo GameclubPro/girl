@@ -38,3 +38,6 @@
 - Handle loading, empty, error, and edge states explicitly.
 - Avoid desktop breakpoints and oversized layouts; design for a phone screen only.
 - Document decisions in the final response; avoid extra questions unless blocked.
+- Always answer in Russian.
+- If the user asks for a plan, first analyze the project and then provide a multi-step plan based on the best 2025-2026 strategy for this codebase.
+- If the user asks for a plan, do not change any code. Provide the plan for approval and wait for the next user command before making edits.
