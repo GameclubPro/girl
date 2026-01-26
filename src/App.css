@@ -27468,9 +27468,10 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-fact-icon {
-  background: rgba(var(--accent-rgb), 0.12);
-  border-radius: 12px;
-  color: var(--accent-strong);
+  background: transparent;
+  border: none;
+  color: var(--pro-accent);
+  box-shadow: none;
 }
 
 .screen--pro-profile .pro-profile-certificates {
