@@ -555,6 +555,7 @@
 .request-upload-remove img {
   width: 12px;
   height: 12px;
+  object-fit: contain;
   display: block;
 }
 
@@ -2522,6 +2523,7 @@
 .booking-action-icon-symbol img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
   display: block;
 }
 
@@ -7354,6 +7356,7 @@
 .pro-service-remove img {
   width: 14px;
   height: 14px;
+  object-fit: contain;
   display: block;
 }
 
@@ -12876,6 +12879,7 @@
 .pro-deposit-qr-remove img {
   width: 12px;
   height: 12px;
+  object-fit: contain;
   display: block;
 }
 
@@ -15486,6 +15490,7 @@
 .pro-slot-action--icon img {
   width: 16px;
   height: 16px;
+  object-fit: contain;
   display: block;
   transition: transform 0.2s ease, filter 0.2s ease;
 }
@@ -26521,6 +26526,7 @@ h2 {
 .pro-stories-delete img {
   width: 12px;
   height: 12px;
+  object-fit: contain;
   display: block;
 }
 
