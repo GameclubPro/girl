@@ -15409,7 +15409,9 @@
 }
 
 .pro-slot-status.is-free {
-  background: rgba(var(--success-rgb), 0.88);
+  background: #ffffff;
+  color: var(--pro-ink);
+  border-color: rgba(var(--shadow-rgb), 0.18);
 }
 
 .pro-slot-status.is-booked {
