@@ -20,6 +20,7 @@ import {
   IconServices,
   IconSchedule,
   IconSettings,
+  IconTrash,
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
@@ -5519,6 +5520,7 @@ export const ProProfileScreen = ({
                               onClick={handleDepositQrRemove}
                               disabled={depositQrUploading}
                             >
+                              <IconTrash />
                               Удалить
                             </button>
                           </div>
@@ -5812,7 +5814,7 @@ export const ProProfileScreen = ({
                                   onClick={() => removeService(index)}
                                   aria-label={`Удалить ${service.name || 'услугу'}`}
                                 >
-                                  ×
+                                  <IconTrash />
                                 </button>
                               </div>
                               {isMetaOpen && (

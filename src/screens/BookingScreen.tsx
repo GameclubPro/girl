@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
 } from 'react'
-import { IconClock, IconPin, IconPhoto } from '../components/icons'
+import { IconClock, IconPin, IconPhoto, IconTrash } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
 import { useTelegramMainButton } from '../hooks/useTelegramMainButton'
@@ -1554,7 +1554,7 @@ export const BookingScreen = ({
                               onClick={() => handleRemovePhoto(photo)}
                               aria-label="Удалить фото"
                             >
-                              x
+                              <IconTrash />
                             </button>
                           </div>
                         ))}

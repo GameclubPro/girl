@@ -7,6 +7,7 @@ import {
   IconList,
   IconStar,
   IconSwap,
+  IconTrash,
   IconUser,
 } from '../components/icons'
 import { RescheduleSheet } from '../components/RescheduleSheet'
@@ -2221,7 +2222,7 @@ export const ClientRequestsScreen = ({
                                     className="booking-action-icon-symbol"
                                     aria-hidden="true"
                                   >
-                                    <IconClose />
+                                    <IconTrash />
                                   </span>
                                   Удалить
                                 </button>

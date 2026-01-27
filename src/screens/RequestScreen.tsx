@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
 } from 'react'
-import { IconClock, IconPhoto, IconPin } from '../components/icons'
+import { IconClock, IconPhoto, IconPin, IconTrash } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import {
   requestBudgetOptions,
@@ -944,7 +944,7 @@ export const RequestScreen = ({
                         onClick={() => handleRemovePhoto(photo)}
                         aria-label="Удалить фото"
                       >
-                        x
+                        <IconTrash />
                       </button>
                     </div>
                   ))}

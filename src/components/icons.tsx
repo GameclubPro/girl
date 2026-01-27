@@ -9,6 +9,7 @@ import profileAboutIcon from '../assets/profile-about.webp'
 import scheduleIcon from '../assets/schedule-icon.webp'
 import servicesIcon from '../assets/services-icon.webp'
 import certificatesIcon from '../assets/certificates-icon.webp'
+import trashIcon from '../assets/trash-icon.webp'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -530,18 +531,7 @@ export const IconChevron = () => (
   </svg>
 )
 
-export const IconTrash = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M6 7h12M9 7V5h6v2M8 7l.6 12h6.8L16 7"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
+export const IconTrash = () => <img src={trashIcon} alt="" aria-hidden="true" />
 
 export const IconLock = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">

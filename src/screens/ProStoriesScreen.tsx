@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
+import { IconTrash } from '../components/icons'
 import { StoryViewer } from '../components/StoryViewer'
 import type { StoryGroup, StoryItem } from '../types/app'
 
@@ -394,6 +395,7 @@ export const ProStoriesScreen = ({
                       type="button"
                       onClick={() => handleDelete(story.id)}
                     >
+                      <IconTrash />
                       Удалить
                     </button>
                   </div>
