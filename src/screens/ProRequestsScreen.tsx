@@ -3589,9 +3589,9 @@ export const ProRequestsScreen = ({
                             key={`${slot.id}-${timeLabel}`}
                           >
                             <div className="pro-slot-row">
-                              <div className="pro-slot-time">{timeLabel}</div>
                               <div className="pro-slot-body">
                                 <div className="pro-slot-top">
+                                  <span className="pro-slot-time">{timeLabel}</span>
                                   <span className={`pro-slot-status is-${slot.status}`}>
                                     {slot.status === 'closed' && (
                                       <span
