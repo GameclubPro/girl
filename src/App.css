@@ -15301,10 +15301,10 @@
 }
 
 .pro-slots-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-right: 2px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  padding-right: 0;
 }
 
 .pro-slots-inline .pro-slots-list {
@@ -15334,23 +15334,28 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 14px 20px rgba(var(--shadow-rgb), 0.1);
-  min-height: 62px;
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
+  min-height: 74px;
+}
+
+.pro-slot-card.is-expanded {
+  grid-column: 1 / -1;
 }
 
 .pro-slot-row {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   align-items: flex-start;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
 .pro-slot-time {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--pro-ink);
-  min-width: 52px;
+  min-width: 0;
   line-height: 1.1;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
@@ -15370,8 +15375,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
-  flex-wrap: nowrap;
+  gap: 6px;
+  flex-wrap: wrap;
   min-width: 0;
   width: 100%;
 }
@@ -15390,6 +15395,14 @@
   white-space: nowrap;
   flex: 0 0 auto;
   line-height: 1;
+}
+
+.pro-slots-list .pro-slot-status {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  padding: 4px 6px;
+  white-space: normal;
+  text-align: center;
 }
 
 .pro-slot-status.is-free {
@@ -15425,15 +15438,15 @@
   display: flex;
   flex-wrap: nowrap;
   gap: 6px;
-  overflow-x: auto;
+  overflow: visible;
   scrollbar-width: none;
-  flex: 0 1 auto;
+  flex: 1 1 100%;
   min-width: 0;
-  max-width: 55%;
+  max-width: none;
   justify-content: flex-end;
   align-items: center;
-  margin-left: auto;
-  padding: 2px 2px 2px 6px;
+  margin-left: 0;
+  padding: 0;
   border-radius: 999px;
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;

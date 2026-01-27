@@ -3582,8 +3582,12 @@ export const ProRequestsScreen = ({
                             ? booking?.id === slotConfirm.bookingId
                             : slotConfirm.slotId === slot.id
                           : false
+                        const isExpanded = Boolean(hasDetails || isConfirmTarget)
                         return (
-                          <div className="pro-slot-card" key={`${slot.id}-${timeLabel}`}>
+                          <div
+                            className={`pro-slot-card${isExpanded ? ' is-expanded' : ''}`}
+                            key={`${slot.id}-${timeLabel}`}
+                          >
                             <div className="pro-slot-row">
                               <div className="pro-slot-time">{timeLabel}</div>
                               <div className="pro-slot-body">
