@@ -10,6 +10,7 @@ import scheduleIcon from '../assets/schedule-icon.webp'
 import servicesIcon from '../assets/services-icon.webp'
 import certificatesIcon from '../assets/certificates-icon.webp'
 import trashIcon from '../assets/trash-icon.webp'
+import lockClosedIcon from '../assets/lock-closed.webp'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -534,25 +535,7 @@ export const IconChevron = () => (
 export const IconTrash = () => <img src={trashIcon} alt="" aria-hidden="true" />
 
 export const IconLock = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="6"
-      y="11"
-      width="12"
-      height="8"
-      rx="2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M8.5 11V8a3.5 3.5 0 1 1 7 0v3"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+  <img src={lockClosedIcon} alt="" aria-hidden="true" />
 )
 
 export const IconUnlock = () => (
