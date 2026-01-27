@@ -480,6 +480,18 @@ const LEAD_CONVERSION_WEEKDAY_MIN_SAMPLE = 4
 
 const buildSlotStorageKey = (userId: string) => `pro-slots:${userId}`
 const buildSlotSeedKey = (userId: string) => `pro-slots-seeded:${userId}`
+const buildSlotScheduleKey = (userId: string) => `pro-slots-schedule:${userId}`
+
+const buildScheduleSignature = (
+  days: string[],
+  start: number | null,
+  end: number | null
+) => {
+  const normalizedDays = [...days].sort().join(',')
+  const startValue = start === null ? 'null' : String(start)
+  const endValue = end === null ? 'null' : String(end)
+  return `${normalizedDays}|${startValue}|${endValue}`
+}
 
 const loadSlotsFromStorage = (userId: string) => {
   if (typeof window === 'undefined' || !userId) return []
@@ -659,7 +671,19 @@ export const ProRequestsScreen = ({
   )
   const [profileScheduleEnd, setProfileScheduleEnd] = useState<number | null>(null)
   const [scheduleLoaded, setScheduleLoaded] = useState(false)
-  const [hasSeededSlots, setHasSeededSlots] = useState(false)
+  const [scheduleLoadError, setScheduleLoadError] = useState(false)
+  const [scheduleSignatureSeeded, setScheduleSignatureSeeded] = useState<
+    string | null
+  >(null)
+  const scheduleSignature = useMemo(
+    () =>
+      buildScheduleSignature(
+        profileScheduleDays,
+        profileScheduleStart,
+        profileScheduleEnd
+      ),
+    [profileScheduleDays, profileScheduleStart, profileScheduleEnd]
+  )
   const [slots, setSlots] = useState<Slot[]>(() => loadSlotsFromStorage(userId))
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [slotNotice, setSlotNotice] = useState('')
@@ -706,11 +730,11 @@ export const ProRequestsScreen = ({
   }, [activeTab, onTabChange])
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
-    const seedKey = buildSlotSeedKey(userId)
+    const scheduleKey = buildSlotScheduleKey(userId)
     try {
-      setHasSeededSlots(window.localStorage.getItem(seedKey) === '1')
+      setScheduleSignatureSeeded(window.localStorage.getItem(scheduleKey))
     } catch (error) {
-      setHasSeededSlots(false)
+      setScheduleSignatureSeeded(null)
     }
   }, [userId])
   const shareText =
@@ -731,6 +755,7 @@ export const ProRequestsScreen = ({
         }
         const data = (await response.json()) as MasterProfile
         if (cancelled) return
+        setScheduleLoadError(false)
         const days = normalizeScheduleDays(
           Array.isArray(data.scheduleDays) ? data.scheduleDays : []
         )
@@ -750,6 +775,7 @@ export const ProRequestsScreen = ({
         setProfileScheduleEnd(endMinutes)
       } catch (error) {
         if (!cancelled) {
+          setScheduleLoadError(true)
           setProfileScheduleDays([])
           setProfileScheduleStart(null)
           setProfileScheduleEnd(null)
@@ -1122,75 +1148,90 @@ export const ProRequestsScreen = ({
     })
   }
   const seedSlotsFromSchedule = useCallback(() => {
-      if (!userId || typeof window === 'undefined') return 0
-      if (!scheduleLoaded) return 0
-      if (hasSeededSlots && slots.length > 0) return 0
-      if (profileScheduleDays.length === 0) return 0
-      if (profileScheduleStart === null || profileScheduleEnd === null) return 0
-      if (profileScheduleEnd <= profileScheduleStart) return 0
-      if (isBookingsLoading) return 0
+    if (!userId || typeof window === 'undefined') return 0
+    if (!scheduleLoaded || scheduleLoadError || isBookingsLoading) return 0
+    if (scheduleSignatureSeeded === scheduleSignature) return 0
 
-      const daySet = new Set(profileScheduleDays)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const availableCount = Math.floor(
-        (profileScheduleEnd - profileScheduleStart) / SLOT_TIME_STEP
-      )
-      if (availableCount <= 0) return 0
+    const daySet = new Set(profileScheduleDays)
+    const hasValidSchedule =
+      daySet.size > 0 &&
+      profileScheduleStart !== null &&
+      profileScheduleEnd !== null &&
+      profileScheduleEnd > profileScheduleStart
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
-      try {
-        window.localStorage.setItem(buildSlotSeedKey(userId), '1')
-      } catch (error) {
-        // ignore storage errors
-      }
-      setHasSeededSlots(true)
+    setSlots((current) => {
+      const next = current.filter((slot) => slot.status === 'closed')
+      if (!hasValidSchedule) return next
+      const scheduleStart = profileScheduleStart ?? 0
+      const scheduleEnd = profileScheduleEnd ?? 0
 
-      let added = 0
       for (let offset = 0; offset < DEFAULT_SLOT_RANGE_DAYS; offset += 1) {
         const date = addDays(today, offset)
         const dayKey = getDayKey(date)
         if (!daySet.has(dayKey)) continue
         const dateKey = toDateKey(date)
         const bookedRanges = bookingRangesByDate.get(dateKey) ?? []
-        const times: number[] = []
         for (
-          let time = profileScheduleStart;
-          time + SLOT_TIME_STEP <= profileScheduleEnd;
+          let time = scheduleStart;
+          time + SLOT_TIME_STEP <= scheduleEnd;
           time += SLOT_TIME_STEP
         ) {
-          times.push(time)
-        }
-        const filtered = times.filter(
-          (time) =>
-            !bookedRanges.some((range) =>
+          const bookedOverlap = bookedRanges.some((range) =>
+            rangesOverlap(
+              time,
+              SLOT_DURATION_MIN,
+              range.startMinutes,
+              range.durationMinutes
+            )
+          )
+          if (bookedOverlap) continue
+          const slotOverlap = next.some(
+            (slot) =>
+              slot.dateKey === dateKey &&
               rangesOverlap(
                 time,
                 SLOT_DURATION_MIN,
-                range.startMinutes,
-                range.durationMinutes
+                slot.startMinutes,
+                slot.durationMinutes
               )
-            )
-        )
-        if (filtered.length > 0) {
-          applySlotTimes(dateKey, filtered)
-          added += filtered.length
+          )
+          if (slotOverlap) continue
+          next.push({
+            id: buildSlotId(),
+            dateKey,
+            startMinutes: time,
+            durationMinutes: SLOT_DURATION_MIN,
+            status: 'free',
+            reason: null,
+            createdAt: Date.now(),
+          })
         }
       }
-      return added
-    },
-    [
-      applySlotTimes,
-      bookingRangesByDate,
-      hasSeededSlots,
-      isBookingsLoading,
-      profileScheduleDays,
-      profileScheduleEnd,
-      profileScheduleStart,
-      scheduleLoaded,
-      slots.length,
-      userId,
-    ]
-  )
+      return next
+    })
+
+    try {
+      window.localStorage.setItem(buildSlotScheduleKey(userId), scheduleSignature)
+      window.localStorage.setItem(buildSlotSeedKey(userId), '1')
+    } catch (error) {
+      // ignore storage errors
+    }
+    setScheduleSignatureSeeded(scheduleSignature)
+    return 1
+  }, [
+    bookingRangesByDate,
+    isBookingsLoading,
+    profileScheduleDays,
+    profileScheduleEnd,
+    profileScheduleStart,
+    scheduleLoaded,
+    scheduleLoadError,
+    scheduleSignature,
+    scheduleSignatureSeeded,
+    userId,
+  ])
 
   useEffect(() => {
     seedSlotsFromSchedule()
