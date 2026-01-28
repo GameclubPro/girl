@@ -74,6 +74,15 @@ const bookingStatusLabelMap: Record<string, string> = {
   cancelled: 'Отменено',
 }
 
+const depositStatusLabelMap: Record<string, string> = {
+  pending: 'Нужна оплата',
+  submitted: 'Чек отправлен',
+  confirmed: 'Подтверждён',
+  rejected: 'Чек отклонён',
+  expired: 'Слот снят',
+  not_required: 'Не требуется',
+}
+
 const bookingStatusValues: Booking['status'][] = [
   'pending',
   'price_pending',
@@ -468,6 +477,13 @@ export const ChatThreadScreen = ({
   )
   const isRescheduleProposer =
     rescheduleProposedBy === (isProViewer ? 'master' : 'client')
+  const resolvedDepositStatus =
+    depositStatus ??
+    (typeof depositAmount === 'number' && depositAmount > 0
+      ? 'pending'
+      : 'not_required')
+  const isDepositRelevant =
+    resolvedDepositStatus && resolvedDepositStatus !== 'not_required'
   const rescheduleStatusLabel = hasReschedulePending
     ? isRescheduleProposer
       ? 'Перенос предложен'
@@ -526,6 +542,73 @@ export const ChatThreadScreen = ({
   ]
     .filter(Boolean)
     .join(' · ')
+
+  const contextChips = useMemo(() => {
+    if (isSupportChat) return []
+    const chips: { id: string; label: string; tone: string }[] = []
+    if (request) {
+      const requestTone = request.status === 'closed' ? 'success' : 'warning'
+      chips.push({
+        id: `request-${request.id}`,
+        label: `Заявка · ${requestStatusLabel}`,
+        tone: requestTone,
+      })
+    }
+    if (booking) {
+      const bookingLabel =
+        bookingStatus && bookingStatusLabelMap[bookingStatus]
+          ? bookingStatusLabelMap[bookingStatus]
+          : bookingStatusLabel
+      const bookingTone =
+        bookingStatus === 'confirmed'
+          ? 'success'
+          : bookingStatus === 'declined' || bookingStatus === 'cancelled'
+            ? 'muted'
+            : 'warning'
+      chips.push({
+        id: `booking-${booking.id}`,
+        label: `Запись · ${bookingLabel}`,
+        tone: bookingTone,
+      })
+    }
+    if (hasReschedulePending) {
+      chips.push({
+        id: 'reschedule',
+        label: isRescheduleProposer
+          ? 'Перенос · ждём ответа'
+          : 'Перенос · подтвердите',
+        tone: 'alert',
+      })
+    }
+    if (booking && isDepositRelevant) {
+      const depositLabel =
+        depositStatusLabelMap[resolvedDepositStatus] ?? 'Нужен депозит'
+      const depositTone =
+        resolvedDepositStatus === 'confirmed'
+          ? 'success'
+          : resolvedDepositStatus === 'rejected' ||
+              resolvedDepositStatus === 'expired'
+            ? 'alert'
+            : 'warning'
+      chips.push({
+        id: `deposit-${booking.id}`,
+        label: `Депозит · ${depositLabel}`,
+        tone: depositTone,
+      })
+    }
+    return chips
+  }, [
+    booking,
+    bookingStatus,
+    bookingStatusLabel,
+    hasReschedulePending,
+    isDepositRelevant,
+    isRescheduleProposer,
+    isSupportChat,
+    request,
+    requestStatusLabel,
+    resolvedDepositStatus,
+  ])
 
   const visibleMessages = useMemo(() => {
     if (isProViewer) return messages
@@ -2633,6 +2716,18 @@ export const ChatThreadScreen = ({
                 Подробнее
               </button>
             </section>
+            {contextChips.length > 0 && (
+              <section className="chat-context-pills">
+                {contextChips.map((chip) => (
+                  <span
+                    key={chip.id}
+                    className={`chat-context-pill is-${chip.tone}`}
+                  >
+                    {chip.label}
+                  </span>
+                ))}
+              </section>
+            )}
             {stickyAction && (
               <section
                 className={`chat-sticky-action${

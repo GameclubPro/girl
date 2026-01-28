@@ -1967,14 +1967,22 @@
 }
 
 .request-item {
-  border: 1px solid rgba(var(--shadow-rgb), 0.16);
-  background: #ffffff;
-  border-radius: 18px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.96);
+  border-radius: 20px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  box-shadow: 0 6px 12px rgba(var(--shadow-rgb), 0.08);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.request-item:active {
+  transform: scale(0.992);
 }
 
 .request-item-top {
@@ -2052,14 +2060,22 @@
 }
 
 .booking-item {
-  border: 1px solid rgba(var(--shadow-rgb), 0.16);
-  background: #ffffff;
-  border-radius: 18px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.96);
+  border-radius: 20px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  box-shadow: 0 6px 12px rgba(var(--shadow-rgb), 0.08);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.booking-item:active {
+  transform: scale(0.992);
 }
 
 .booking-item-head {
@@ -16333,9 +16349,17 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  box-shadow: 0 16px 26px rgba(var(--shadow-rgb), 0.12);
+  box-shadow: 0 10px 20px rgba(var(--shadow-rgb), 0.12);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.pro-request-item:active {
+  transform: scale(0.992);
 }
 
 .pro-request-item.is-focus {
@@ -24177,9 +24201,9 @@ h2 {
 }
 
 .chat-card {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  background: rgba(var(--paper-rgb), 0.92);
-  border-radius: 20px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.96);
+  border-radius: 18px;
   padding: 12px;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -24187,7 +24211,7 @@ h2 {
   align-items: center;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 12px 20px rgba(var(--shadow-rgb), 0.1);
+  box-shadow: 0 8px 16px rgba(var(--shadow-rgb), 0.08);
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease;
@@ -24263,18 +24287,18 @@ h2 {
 }
 
 .chat-card.is-unread {
-  border-color: rgba(var(--accent-rgb), 0.5);
-  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.2);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 12px 20px rgba(var(--accent-rgb), 0.18);
 }
 
 .chat-card.is-support {
-  border-color: rgba(var(--accent-rgb), 0.3);
-  box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.28);
+  box-shadow: 0 12px 20px rgba(var(--accent-rgb), 0.16);
 }
 
 .chat-card.is-attention {
-  border-color: rgba(var(--accent-rgb), 0.4);
-  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.22);
+  border-color: rgba(var(--accent-rgb), 0.38);
+  box-shadow: 0 12px 20px rgba(var(--accent-rgb), 0.2);
 }
 
 .chat-avatar {
@@ -24850,6 +24874,41 @@ h2 {
 .chat-context-summary-action:focus-visible {
   outline: 3px solid rgba(var(--accent-rgb), 0.28);
   outline-offset: 2px;
+}
+
+.chat-context-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-context-pill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(var(--shadow-rgb), 0.08);
+  color: var(--ink);
+}
+
+.chat-context-pill.is-success {
+  background: rgba(var(--success-rgb), 0.16);
+  color: var(--success);
+}
+
+.chat-context-pill.is-warning {
+  background: rgba(var(--warning-rgb), 0.16);
+  color: var(--warning);
+}
+
+.chat-context-pill.is-alert {
+  background: rgba(var(--danger-rgb), 0.16);
+  color: var(--danger);
+}
+
+.chat-context-pill.is-muted {
+  background: rgba(var(--shadow-rgb), 0.08);
+  color: var(--muted);
 }
 
 .chat-sticky-action {
