@@ -33,7 +33,11 @@ type ChatThreadScreenProps = {
   userId: string
   chatId: number
   onBack: () => void
-  onViewRequests?: (tab?: 'requests' | 'bookings') => void
+  onViewRequests?: (options?: {
+    tab?: 'requests' | 'bookings'
+    focusRequestId?: number | null
+    focusBookingId?: number | null
+  }) => void
 }
 
 type StickyActionButton = {
@@ -449,6 +453,11 @@ export const ChatThreadScreen = ({
   const contextType = detail?.chat?.contextType ?? null
   const isSupportChat = contextType === 'support'
   const isBookingChat = contextType === 'booking'
+  const relatedRequestId = detail?.chat?.requestId ?? request?.id ?? null
+  const relatedBookingId = detail?.chat?.bookingId ?? booking?.id ?? null
+  const hasRelatedActions = Boolean(
+    onViewRequests && (relatedRequestId || relatedBookingId)
+  )
   const headerSubtitle = isSupportChat
     ? 'Команда поддержки KIVEN'
     : isBookingChat
@@ -2391,7 +2400,11 @@ export const ChatThreadScreen = ({
           subtitle: [depositIntro, amountLabel, holdText].filter(Boolean).join(' '),
           primary: {
             label: 'Оплатить депозит',
-            onClick: () => onViewRequests('bookings'),
+            onClick: () =>
+              onViewRequests({
+                tab: 'bookings',
+                focusBookingId: booking?.id ?? null,
+              }),
           },
         }
       }
@@ -2661,6 +2674,41 @@ export const ChatThreadScreen = ({
                     {bookingActionError}
                   </p>
                 )}
+              </section>
+            )}
+            {hasRelatedActions && onViewRequests && (
+              <section className="chat-related">
+                <span className="chat-related-title">Связано</span>
+                <div className="chat-related-actions">
+                  {relatedRequestId && (
+                    <button
+                      className="chat-related-button"
+                      type="button"
+                      onClick={() =>
+                        onViewRequests({
+                          tab: 'requests',
+                          focusRequestId: relatedRequestId,
+                        })
+                      }
+                    >
+                      Перейти к заявке
+                    </button>
+                  )}
+                  {relatedBookingId && (
+                    <button
+                      className="chat-related-button is-primary"
+                      type="button"
+                      onClick={() =>
+                        onViewRequests({
+                          tab: 'bookings',
+                          focusBookingId: relatedBookingId,
+                        })
+                      }
+                    >
+                      Перейти к записи
+                    </button>
+                  )}
+                </div>
               </section>
             )}
             {!isBookingChat && request && (

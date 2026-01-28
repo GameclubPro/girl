@@ -9104,6 +9104,7 @@ app.get('/api/requests', async (req, res) => {
           r.photo_urls AS "photoUrls",
           r.status,
           r.created_at AS "createdAt",
+          COALESCE(ch.id, legacy_ch.id) AS "chatId",
           (
             SELECT COUNT(*)
             FROM request_responses rr
@@ -9130,6 +9131,25 @@ app.get('/api/requests', async (req, res) => {
         FROM service_requests r
         LEFT JOIN cities c ON c.id = r.city_id
         LEFT JOIN districts d ON d.id = r.district_id
+        LEFT JOIN LATERAL (
+          SELECT ch.id
+          FROM chat_contexts cc
+          JOIN chats ch ON ch.id = cc.chat_id
+          WHERE cc.context_type = 'request'
+            AND cc.context_id = r.id
+            AND ch.client_id = r.user_id
+          ORDER BY ch.updated_at DESC NULLS LAST
+          LIMIT 1
+        ) ch ON true
+        LEFT JOIN LATERAL (
+          SELECT id
+          FROM chats
+          WHERE request_id = r.id
+            AND client_id = r.user_id
+            AND context_type = 'request'
+          ORDER BY updated_at DESC NULLS LAST
+          LIMIT 1
+        ) legacy_ch ON true
         LEFT JOIN LATERAL (
           SELECT json_agg(
             json_build_object(
@@ -9177,6 +9197,7 @@ app.get('/api/requests', async (req, res) => {
       }))
       return {
         ...row,
+        chatId: row.chatId ?? null,
         responsePreview,
         timeWindows: normalizeTimeWindows(row.timeWindows),
       }

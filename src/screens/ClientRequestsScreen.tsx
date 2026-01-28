@@ -12,7 +12,8 @@ import {
 } from '../components/icons'
 import { RescheduleSheet } from '../components/RescheduleSheet'
 import { categoryItems } from '../data/clientData'
-import type { Booking, RequestResponse, ServiceRequest } from '../types/app'
+import type { Booking, ChatMessage, RequestResponse, ServiceRequest } from '../types/app'
+import { getChatStream } from '../utils/chatStream'
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -233,6 +234,9 @@ type ClientRequestsScreenProps = {
   apiBase: string
   userId: string
   initialTab?: 'requests' | 'bookings'
+  focusRequestId?: number | null
+  focusBookingId?: number | null
+  onFocusHandled?: () => void
   onCreateRequest: () => void
   onViewHome: () => void
   onViewChats: () => void
@@ -251,6 +255,9 @@ export const ClientRequestsScreen = ({
   apiBase,
   userId,
   initialTab,
+  focusRequestId,
+  focusBookingId,
+  onFocusHandled,
   onCreateRequest,
   onViewHome,
   onViewChats,
@@ -296,8 +303,11 @@ export const ClientRequestsScreen = ({
     Record<number, string>
   >({})
   const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const requestsRequestIdRef = useRef(0)
   const bookingsRequestIdRef = useRef(0)
   const bookingListRef = useRef<HTMLDivElement | null>(null)
+  const reloadTimerRef = useRef<number | null>(null)
+  const reloadFlagsRef = useRef({ requests: false, bookings: false })
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [bookingFilter, setBookingFilter] = useState<'all' | 'action'>('all')
   const [reviewOpenId, setReviewOpenId] = useState<number | null>(null)
@@ -307,6 +317,9 @@ export const ClientRequestsScreen = ({
     Record<number, { rating: number; comment: string }>
   >({})
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
+  const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
+  const pendingRequestFocusIdRef = useRef<number | null>(null)
+  const pendingBookingFocusIdRef = useRef<number | null>(null)
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
   )
@@ -330,13 +343,15 @@ export const ClientRequestsScreen = ({
     return () => clearInterval(intervalId)
   }, [])
 
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-
-    const loadRequests = async () => {
-      setIsLoading(true)
-      setLoadError('')
+  const loadRequests = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!userId) return
+      const requestId = (requestsRequestIdRef.current += 1)
+      const silent = options?.silent ?? false
+      if (!silent) {
+        setIsLoading(true)
+        setLoadError('')
+      }
 
       try {
         const response = await fetch(
@@ -346,26 +361,25 @@ export const ClientRequestsScreen = ({
           throw new Error('Load requests failed')
         }
         const data = (await response.json()) as ServiceRequest[]
-        if (!cancelled) {
-          setRequests(data)
+        if (requestsRequestIdRef.current === requestId) {
+          setRequests(Array.isArray(data) ? data : [])
         }
       } catch (error) {
-        if (!cancelled) {
+        if (requestsRequestIdRef.current === requestId && !silent) {
           setLoadError('Не удалось загрузить заявки.')
         }
       } finally {
-        if (!cancelled) {
+        if (requestsRequestIdRef.current === requestId && !silent) {
           setIsLoading(false)
         }
       }
-    }
+    },
+    [apiBase, userId]
+  )
 
-    loadRequests()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiBase, userId])
+  useEffect(() => {
+    void loadRequests()
+  }, [loadRequests])
 
   const loadBookings = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -405,6 +419,95 @@ export const ClientRequestsScreen = ({
     void loadBookings()
   }, [loadBookings])
 
+  const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
+  const requestEvents = useMemo(
+    () =>
+      new Set([
+        'request_accepted',
+        'request_updated',
+        'request_closed',
+      ]),
+    []
+  )
+  const bookingEvents = useMemo(
+    () =>
+      new Set([
+        'booking_confirmed',
+        'booking_updated',
+        'booking_price_proposed',
+        'booking_cancelled',
+        'booking_declined',
+        'booking_reschedule_proposed',
+        'booking_reschedule_accepted',
+        'booking_reschedule_declined',
+        'booking_reschedule_cancelled',
+        'booking_outcome_marked',
+        'deposit_pending',
+        'deposit_submitted',
+        'deposit_confirmed',
+        'deposit_rejected',
+        'deposit_expired',
+      ]),
+    []
+  )
+
+  const scheduleReload = useCallback(
+    (targets: { requests?: boolean; bookings?: boolean }) => {
+      if (targets.requests) {
+        reloadFlagsRef.current.requests = true
+      }
+      if (targets.bookings) {
+        reloadFlagsRef.current.bookings = true
+      }
+      if (reloadTimerRef.current !== null) return
+      reloadTimerRef.current = window.setTimeout(() => {
+        const { requests, bookings } = reloadFlagsRef.current
+        reloadFlagsRef.current = { requests: false, bookings: false }
+        reloadTimerRef.current = null
+        if (requests) {
+          void loadRequests({ silent: true })
+        }
+        if (bookings) {
+          void loadBookings({ silent: true })
+        }
+      }, 240)
+    },
+    [loadBookings, loadRequests]
+  )
+
+  useEffect(() => {
+    if (!userId) return
+    const unsubscribe = stream.subscribe((payload) => {
+      if (payload?.type === 'chat:created') {
+        scheduleReload({ requests: true, bookings: true })
+        return
+      }
+      if (payload?.type === 'message:new') {
+        const incoming = payload.message as ChatMessage | undefined
+        const meta =
+          incoming?.meta && typeof incoming.meta === 'object'
+            ? (incoming.meta as Record<string, unknown>)
+            : null
+        const event = typeof meta?.event === 'string' ? meta.event : ''
+        if (requestEvents.has(event)) {
+          scheduleReload({ requests: true })
+        }
+        if (bookingEvents.has(event)) {
+          scheduleReload({ bookings: true })
+        }
+      }
+    })
+
+    return () => {
+      unsubscribe()
+      if (reloadTimerRef.current !== null) {
+        window.clearTimeout(reloadTimerRef.current)
+        reloadTimerRef.current = null
+      }
+      reloadFlagsRef.current = { requests: false, bookings: false }
+    }
+  }, [bookingEvents, requestEvents, scheduleReload, stream, userId])
+
   useEffect(() => {
     if (focusedBookingId === null) return
     const timeout = setTimeout(() => {
@@ -412,6 +515,14 @@ export const ClientRequestsScreen = ({
     }, 4000)
     return () => clearTimeout(timeout)
   }, [focusedBookingId])
+
+  useEffect(() => {
+    if (focusedRequestId === null) return
+    const timeout = setTimeout(() => {
+      setFocusedRequestId(null)
+    }, 4000)
+    return () => clearTimeout(timeout)
+  }, [focusedRequestId])
 
   const items = useMemo(() => requests, [requests])
   const bookingItems = useMemo(() => bookings, [bookings])
@@ -644,7 +755,7 @@ export const ClientRequestsScreen = ({
     setCalendarInitialized(true)
   }
 
-  const focusBooking = (booking: Booking) => {
+  const focusBooking = useCallback((booking: Booking) => {
     const date = parseDateOnly(booking.scheduledAt)
     if (!date) return
     setSelectedDate(date)
@@ -654,42 +765,95 @@ export const ClientRequestsScreen = ({
     requestAnimationFrame(() => {
       bookingListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
-  }
+  }, [])
 
-  const toggleResponses = async (requestId: number) => {
-    if (expandedRequestId === requestId) {
-      setExpandedRequestId(null)
-      return
-    }
-
-    setExpandedRequestId(requestId)
-
-    if (responsesByRequestId[requestId]) {
-      return
-    }
-
-    setResponsesLoadingId(requestId)
-    setResponsesError('')
-    setResponsesErrorId(null)
-
-    try {
-      const response = await fetch(
-        `${apiBase}/api/requests/${requestId}/responses?userId=${encodeURIComponent(
-          userId
-        )}`
-      )
-      if (!response.ok) {
-        throw new Error('Load responses failed')
+  const loadResponses = useCallback(
+    async (requestId: number) => {
+      try {
+        const response = await fetch(
+          `${apiBase}/api/requests/${requestId}/responses?userId=${encodeURIComponent(
+            userId
+          )}`
+        )
+        if (!response.ok) {
+          throw new Error('Load responses failed')
+        }
+        const data = (await response.json()) as RequestResponse[]
+        setResponsesByRequestId((current) => ({ ...current, [requestId]: data }))
+      } catch (error) {
+        setResponsesError('Не удалось загрузить отклики.')
+        setResponsesErrorId(requestId)
+      } finally {
+        setResponsesLoadingId((current) => (current === requestId ? null : current))
       }
-      const data = (await response.json()) as RequestResponse[]
-      setResponsesByRequestId((current) => ({ ...current, [requestId]: data }))
-    } catch (error) {
-      setResponsesError('Не удалось загрузить отклики.')
-      setResponsesErrorId(requestId)
-    } finally {
-      setResponsesLoadingId((current) => (current === requestId ? null : current))
+    },
+    [apiBase, userId]
+  )
+
+  const openResponses = useCallback(
+    (requestId: number) => {
+      setExpandedRequestId(requestId)
+      if (responsesByRequestId[requestId]) {
+        return
+      }
+      setResponsesLoadingId(requestId)
+      setResponsesError('')
+      setResponsesErrorId(null)
+      void loadResponses(requestId)
+    },
+    [loadResponses, responsesByRequestId]
+  )
+
+  const toggleResponses = useCallback(
+    (requestId: number) => {
+      if (expandedRequestId === requestId) {
+        setExpandedRequestId(null)
+        return
+      }
+      openResponses(requestId)
+    },
+    [expandedRequestId, openResponses]
+  )
+
+  useEffect(() => {
+    if (typeof focusRequestId !== 'number') return
+    pendingRequestFocusIdRef.current = focusRequestId
+    setActiveTab('requests')
+  }, [focusRequestId])
+
+  useEffect(() => {
+    if (typeof focusBookingId !== 'number') return
+    pendingBookingFocusIdRef.current = focusBookingId
+    setActiveTab('bookings')
+  }, [focusBookingId])
+
+  useEffect(() => {
+    const requestId = pendingRequestFocusIdRef.current
+    if (!requestId || activeTab !== 'requests') return
+    const item = requests.find((request) => request.id === requestId)
+    if (!item) return
+    pendingRequestFocusIdRef.current = null
+    setFocusedRequestId(requestId)
+    if (expandedRequestId !== requestId) {
+      openResponses(requestId)
     }
-  }
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`request-${requestId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    onFocusHandled?.()
+  }, [activeTab, expandedRequestId, onFocusHandled, openResponses, requests])
+
+  useEffect(() => {
+    const bookingId = pendingBookingFocusIdRef.current
+    if (!bookingId || activeTab !== 'bookings') return
+    const booking = bookingItems.find((item) => item.id === bookingId)
+    if (!booking) return
+    pendingBookingFocusIdRef.current = null
+    focusBooking(booking)
+    onFocusHandled?.()
+  }, [activeTab, bookingItems, focusBooking, onFocusHandled])
 
   const readFileAsDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -1191,9 +1355,17 @@ export const ClientRequestsScreen = ({
       })
 
       if (action === 'accept') {
+        const nextChatId =
+          typeof data?.chatId === 'number' ? data.chatId : null
         setRequests((current) =>
           current.map((request) =>
-            request.id === requestId ? { ...request, status: 'closed' } : request
+            request.id === requestId
+              ? {
+                  ...request,
+                  status: 'closed',
+                  chatId: nextChatId ?? request.chatId ?? null,
+                }
+              : request
           )
         )
         if (options?.bookNow) {
@@ -1445,7 +1617,13 @@ export const ClientRequestsScreen = ({
                   const isResponsesOpen = expandedRequestId === item.id
 
                   return (
-                    <div className="request-item" key={item.id}>
+                    <div
+                      className={`request-item${
+                        focusedRequestId === item.id ? ' is-focus' : ''
+                      }`}
+                      key={item.id}
+                      id={`request-${item.id}`}
+                    >
                       <div className="request-item-top">
                         <div className="request-item-title">{item.serviceName}</div>
                         <span
@@ -1534,7 +1712,7 @@ export const ClientRequestsScreen = ({
                             </span>
                           )}
                         </button>
-                        {item.chatId && (
+                        {item.chatId ? (
                           <button
                             className="request-chat-link"
                             type="button"
@@ -1543,6 +1721,12 @@ export const ClientRequestsScreen = ({
                             <IconChat />
                             Чат по заявке
                           </button>
+                        ) : (
+                          item.status === 'closed' && (
+                            <span className="request-chat-pending">
+                              Чат создаётся...
+                            </span>
+                          )
                         )}
                       </div>
                       {isResponsesOpen && (

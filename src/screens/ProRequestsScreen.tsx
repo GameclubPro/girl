@@ -606,6 +606,9 @@ type ProRequestsScreenProps = {
   apiBase: string
   userId: string
   initialTab?: 'requests' | 'bookings'
+  focusRequestId?: number | null
+  focusBookingId?: number | null
+  onFocusHandled?: () => void
   onBack: () => void
   onViewCabinet?: () => void
   onTabChange?: (tab: 'requests' | 'bookings') => void
@@ -618,6 +621,9 @@ export const ProRequestsScreen = ({
   apiBase,
   userId,
   initialTab,
+  focusRequestId,
+  focusBookingId,
+  onFocusHandled,
   onBack,
   onViewCabinet,
   onTabChange,
@@ -645,6 +651,10 @@ export const ProRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
+  const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
+  const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
+  const pendingRequestFocusIdRef = useRef<number | null>(null)
+  const pendingBookingFocusIdRef = useRef<number | null>(null)
   const [leadConversionStats, setLeadConversionStats] =
     useState<LeadConversionStats | null>(null)
   const [bookingDrafts, setBookingDrafts] = useState<Record<number, string>>({})
@@ -725,6 +735,29 @@ export const ProRequestsScreen = ({
     if (!initialTab) return
     setActiveTab(initialTab)
   }, [initialTab])
+  useEffect(() => {
+    if (typeof focusRequestId !== 'number') return
+    pendingRequestFocusIdRef.current = focusRequestId
+    setActiveTab('requests')
+  }, [focusRequestId])
+  useEffect(() => {
+    if (typeof focusBookingId !== 'number') return
+    pendingBookingFocusIdRef.current = focusBookingId
+  }, [focusBookingId])
+  useEffect(() => {
+    if (focusedRequestId === null) return
+    const timeout = window.setTimeout(() => {
+      setFocusedRequestId(null)
+    }, 4000)
+    return () => window.clearTimeout(timeout)
+  }, [focusedRequestId])
+  useEffect(() => {
+    if (focusedBookingId === null) return
+    const timeout = window.setTimeout(() => {
+      setFocusedBookingId(null)
+    }, 4000)
+    return () => window.clearTimeout(timeout)
+  }, [focusedBookingId])
   useEffect(() => {
     onTabChange?.(activeTab)
   }, [activeTab, onTabChange])
@@ -1693,6 +1726,75 @@ export const ProRequestsScreen = ({
     setCalendarInitialized(true)
   }
 
+  const focusRequest = useCallback((requestId: number) => {
+    setFocusedRequestId(requestId)
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`pro-request-${requestId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
+
+  const focusPendingBooking = useCallback((bookingId: number) => {
+    setFocusedBookingId(bookingId)
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`pro-booking-${bookingId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
+
+  const focusBookingInCalendar = useCallback((booking: Booking) => {
+    const date = parseDateOnly(booking.scheduledAt)
+    if (!date) return
+    setSlotFilter('all')
+    setSelectedDate(date)
+    setWeekStartDate(startOfWeek(date))
+    setCalendarInitialized(true)
+    setSlotDetailId(booking.id)
+    setFocusedBookingId(booking.id)
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`pro-booking-${booking.id}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
+
+  useEffect(() => {
+    const requestId = pendingRequestFocusIdRef.current
+    if (!requestId || activeTab !== 'requests') return
+    const item = requests.find((request) => request.id === requestId)
+    if (!item) return
+    pendingRequestFocusIdRef.current = null
+    focusRequest(requestId)
+    onFocusHandled?.()
+  }, [activeTab, focusRequest, onFocusHandled, requests])
+
+  useEffect(() => {
+    const bookingId = pendingBookingFocusIdRef.current
+    if (!bookingId) return
+    const booking = bookings.find((item) => item.id === bookingId)
+    if (!booking) return
+    const targetTab = booking.status === 'confirmed' ? 'bookings' : 'requests'
+    if (activeTab !== targetTab) {
+      setActiveTab(targetTab)
+      return
+    }
+    pendingBookingFocusIdRef.current = null
+    if (targetTab === 'bookings') {
+      focusBookingInCalendar(booking)
+    } else {
+      focusPendingBooking(bookingId)
+    }
+    onFocusHandled?.()
+  }, [
+    activeTab,
+    bookings,
+    focusBookingInCalendar,
+    focusPendingBooking,
+    onFocusHandled,
+  ])
+
   const setShareMessage = (message: string) => {
     setShareStatus(message)
     if (shareTimerRef.current) {
@@ -2323,8 +2425,11 @@ export const ProRequestsScreen = ({
 
     return (
       <div
-        className={`booking-item${options?.archived ? ' is-archived' : ''}`}
+        className={`booking-item${options?.archived ? ' is-archived' : ''}${
+          focusedBookingId === booking.id ? ' is-focus' : ''
+        }`}
         key={booking.id}
+        id={`pro-booking-${booking.id}`}
       >
         <div className="booking-item-head">
           <span className="booking-item-avatar" aria-hidden="true">
@@ -3083,7 +3188,13 @@ export const ProRequestsScreen = ({
                     const showSlotEmpty = slotSuggestions.length === 0 && canRespond
 
                     return (
-                      <div className="pro-request-item" key={item.id}>
+                      <div
+                        className={`pro-request-item${
+                          focusedRequestId === item.id ? ' is-focus' : ''
+                        }`}
+                        key={item.id}
+                        id={`pro-request-${item.id}`}
+                      >
                         <div className="booking-item-head">
                           <span className="booking-item-avatar" aria-hidden="true">
                             <span>{clientInitials}</span>
@@ -3180,6 +3291,11 @@ export const ProRequestsScreen = ({
                             >
                               Перейти в чат
                             </button>
+                          )}
+                          {item.responseStatus === 'accepted' && !item.chatId && (
+                            <span className="request-chat-pending">
+                              Чат создаётся...
+                            </span>
                           )}
                           {item.details && (
                             <div className="request-item-details">{item.details}</div>

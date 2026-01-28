@@ -181,6 +181,12 @@ type ChatReturnView =
   | 'pro-requests'
   | 'pro-cabinet'
 
+type RequestsNavOptions = {
+  tab?: 'requests' | 'bookings'
+  focusRequestId?: number | null
+  focusBookingId?: number | null
+}
+
 type NavState = {
   view: View
   stack: View[]
@@ -319,9 +325,21 @@ function App() {
   const [requestsInitialTab, setRequestsInitialTab] = useState<
     'requests' | 'bookings'
   >('requests')
+  const [requestsFocusRequestId, setRequestsFocusRequestId] = useState<
+    number | null
+  >(null)
+  const [requestsFocusBookingId, setRequestsFocusBookingId] = useState<
+    number | null
+  >(null)
   const [proRequestsInitialTab, setProRequestsInitialTab] = useState<
     'requests' | 'bookings'
   >('requests')
+  const [proRequestsFocusRequestId, setProRequestsFocusRequestId] = useState<
+    number | null
+  >(null)
+  const [proRequestsFocusBookingId, setProRequestsFocusBookingId] = useState<
+    number | null
+  >(null)
   const [favorites, setFavorites] = useState<FavoriteMaster[]>(() =>
     loadFavorites()
   )
@@ -942,14 +960,25 @@ function App() {
     [navigate]
   )
 
-  const openRequests = useCallback((tab?: 'requests' | 'bookings') => {
-    setRequestsInitialTab(tab ?? 'requests')
-    navigate('requests')
-  }, [navigate])
+  const openRequests = useCallback(
+    (input?: 'requests' | 'bookings' | RequestsNavOptions) => {
+      const options =
+        typeof input === 'string' ? { tab: input } : input ?? {}
+      setRequestsInitialTab(options.tab ?? 'requests')
+      setRequestsFocusRequestId(options.focusRequestId ?? null)
+      setRequestsFocusBookingId(options.focusBookingId ?? null)
+      navigate('requests')
+    },
+    [navigate]
+  )
 
   const openProRequests = useCallback(
-    (tab?: 'requests' | 'bookings') => {
-      setProRequestsInitialTab(tab ?? 'requests')
+    (input?: 'requests' | 'bookings' | RequestsNavOptions) => {
+      const options =
+        typeof input === 'string' ? { tab: input } : input ?? {}
+      setProRequestsInitialTab(options.tab ?? 'requests')
+      setProRequestsFocusRequestId(options.focusRequestId ?? null)
+      setProRequestsFocusBookingId(options.focusBookingId ?? null)
       navigate('pro-requests')
     },
     [navigate]
@@ -1336,8 +1365,8 @@ function App() {
           goBack(chatReturnView ?? 'chats')
           setChatReturnView(null)
         }}
-        onViewRequests={(tab) =>
-          role === 'pro' ? openProRequests(tab) : openRequests(tab)
+        onViewRequests={(options) =>
+          role === 'pro' ? openProRequests(options) : openRequests(options)
         }
       />
     )
@@ -1402,6 +1431,12 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         initialTab={requestsInitialTab}
+        focusRequestId={requestsFocusRequestId}
+        focusBookingId={requestsFocusBookingId}
+        onFocusHandled={() => {
+          setRequestsFocusRequestId(null)
+          setRequestsFocusBookingId(null)
+        }}
         onCreateRequest={() => {
           setRequestCategoryId(clientCategoryId ?? categoryItems[0]?.id ?? '')
           navigate('request')
@@ -1447,6 +1482,12 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         initialTab={proRequestsInitialTab}
+        focusRequestId={proRequestsFocusRequestId}
+        focusBookingId={proRequestsFocusBookingId}
+        onFocusHandled={() => {
+          setProRequestsFocusRequestId(null)
+          setProRequestsFocusBookingId(null)
+        }}
         onBack={() => goBack('pro-cabinet')}
         onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onTabChange={(tab) => setProRequestsInitialTab(tab)}

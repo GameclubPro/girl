@@ -351,6 +351,10 @@ export const ChatListScreen = ({
     })
     return { attention, active, waiting, archived }
   }, [filteredItems, role])
+  const attentionIds = useMemo(
+    () => new Set(chatSections.attention.map((item) => item.id)),
+    [chatSections.attention]
+  )
 
   const hasRegularChats = regularItems.length > 0
   const filteredCount =
@@ -602,6 +606,7 @@ export const ChatListScreen = ({
     const counterpart = chat.counterpart
     const latestContext = getLatestContext(chat)
     const isSupportChat = chat.contextType === 'support'
+    const isAttention = attentionIds.has(chat.id)
     const contextLabel = isSupportChat
       ? 'Поддержка'
       : getContextTypeLabel(latestContext)
@@ -642,7 +647,9 @@ export const ChatListScreen = ({
       <button
         className={`chat-card${
           unreadCount > 0 ? ' is-unread' : ''
-        }${chat.contextType === 'support' ? ' is-support' : ''}`}
+        }${chat.contextType === 'support' ? ' is-support' : ''}${
+          isAttention ? ' is-attention' : ''
+        }`}
         key={chat.id}
         type="button"
         role="listitem"
@@ -704,6 +711,9 @@ export const ChatListScreen = ({
           <span className="chat-card-preview">{lastLabel}</span>
         </span>
         <span className="chat-card-meta">
+          {isAttention && (
+            <span className="chat-card-flag">Нужно действие</span>
+          )}
           {unreadCount > 0 && (
             <span className="chat-unread">{unreadCount}</span>
           )}
