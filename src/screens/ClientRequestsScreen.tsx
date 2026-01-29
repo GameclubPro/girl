@@ -98,6 +98,14 @@ const formatTimeWindowList = (windows?: ServiceRequest['timeWindows']) => {
 const formatPrice = (value: number) =>
   `${Math.round(value).toLocaleString('ru-RU')} ₽`
 
+const formatDistance = (value?: number | null) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
+  if (value < 1) {
+    return `${Math.round(value * 1000)} м`
+  }
+  return `${value.toFixed(1).replace('.', ',')} км`
+}
+
 const formatRating = (average?: number | null, count?: number | null) => {
   const safeCount = typeof count === 'number' ? count : 0
   const safeAverage = typeof average === 'number' ? average : 0
@@ -2106,6 +2114,7 @@ export const ClientRequestsScreen = ({
                     bookingStatusToneMap[booking.status] ?? 'is-waiting'
                   const locationLabel =
                     locationLabelMap[booking.locationType] ?? 'Не важно'
+                  const distanceLabel = formatDistance(booking.distanceKm)
                   const scheduledLabel = formatDateTime(booking.scheduledAt)
                   const rescheduleLabel = booking.rescheduleProposedTime
                     ? formatDateTime(booking.rescheduleProposedTime)
