@@ -8,19 +8,16 @@ import {
   type RefObject,
 } from 'react'
 import {
-  IconChat,
   IconClientVisit,
   IconExperience,
   IconFormat,
   IconHomeMaster,
-  IconHome,
-  IconList,
   IconPin,
   IconPrice,
   IconStar,
   IconCheck,
-  IconUser,
 } from '../components/icons'
+import { ClientBottomNav } from '../components/ClientBottomNav'
 import { categoryItems } from '../data/clientData'
 import type {
   MasterCertificate,
@@ -1951,32 +1948,14 @@ export const ClientMasterProfileScreen = ({
         </div>
       )}
 
-      <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item is-active" type="button" onClick={onViewHome}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconHome />
-          </span>
-          Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconChat />
-          </span>
-          Чаты
-        </button>
-        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconList />
-          </span>
-          Мои заявки
-        </button>
-        <button className="nav-item" type="button" onClick={onViewProfile}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUser />
-          </span>
-          Профиль
-        </button>
-      </nav>
+      <ClientBottomNav
+        active="home"
+        onHome={onViewHome}
+        onChats={onViewChats}
+        onRequests={() => onViewRequests()}
+        onProfile={onViewProfile}
+        allowActiveClick
+      />
     </div>
   )
 }

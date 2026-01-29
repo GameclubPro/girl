@@ -7,12 +7,9 @@ import {
   type MouseEvent,
 } from 'react'
 import {
-  IconChat,
-  IconHome,
-  IconList,
-  IconUser,
   IconUsers,
 } from '../components/icons'
+import { ClientBottomNav } from '../components/ClientBottomNav'
 import { StoryViewer } from '../components/StoryViewer'
 import { CollectionCarousel } from '../components/CollectionCarousel'
 import { categoryItems, type CollectionItem } from '../data/clientData'
@@ -912,32 +909,13 @@ export const ClientScreen = ({
         </div>
       )}
 
-      <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item is-active" type="button">
-          <span className="nav-icon" aria-hidden="true">
-            <IconHome />
-          </span>
-          Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconChat />
-          </span>
-          Чаты
-        </button>
-        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconList />
-          </span>
-          Мои заявки
-        </button>
-        <button className="nav-item" type="button" onClick={onViewProfile}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUser />
-          </span>
-          Профиль
-        </button>
-      </nav>
+      <ClientBottomNav
+        active="home"
+        onHome={() => {}}
+        onChats={onViewChats}
+        onRequests={() => onViewRequests()}
+        onProfile={onViewProfile}
+      />
       {activeStoryGroupIndex !== null && storyGroups[activeStoryGroupIndex] && (
         <StoryViewer
           groups={storyGroups}

@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
-  IconChat,
   IconCalendar,
   IconFilter,
-  IconHome,
-  IconList,
   IconUser,
 } from '../components/icons'
+import { ClientBottomNav } from '../components/ClientBottomNav'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, UserLocation } from '../types/app'
 import {
@@ -504,32 +502,14 @@ export const ClientShowcaseGalleryScreen = ({
         </section>
       </div>
 
-      <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item is-active" type="button" onClick={onBack}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconHome />
-          </span>
-          Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconChat />
-          </span>
-          Чаты
-        </button>
-        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconList />
-          </span>
-          Мои заявки
-        </button>
-        <button className="nav-item" type="button" onClick={onViewClientProfile}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUser />
-          </span>
-          Профиль
-        </button>
-      </nav>
+      <ClientBottomNav
+        active="home"
+        onHome={onBack}
+        onChats={onViewChats}
+        onRequests={() => onViewRequests()}
+        onProfile={onViewClientProfile}
+        allowActiveClick
+      />
     </div>
   )
 }
@@ -702,32 +682,14 @@ export const ClientShowcaseDetailScreen = ({
         </div>
       </div>
 
-      <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item is-active" type="button" onClick={onViewHome}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconHome />
-          </span>
-          Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconChat />
-          </span>
-          Чаты
-        </button>
-        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconList />
-          </span>
-          Мои заявки
-        </button>
-        <button className="nav-item" type="button" onClick={onViewClientProfile}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUser />
-          </span>
-          Профиль
-        </button>
-      </nav>
+      <ClientBottomNav
+        active="home"
+        onHome={onViewHome}
+        onChats={onViewChats}
+        onRequests={() => onViewRequests()}
+        onProfile={onViewClientProfile}
+        allowActiveClick
+      />
     </div>
   )
 }
@@ -1360,32 +1322,14 @@ export const ClientShowcaseScreen = ({
         </section>
       </div>
 
-      <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item is-active" type="button" onClick={onBack}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconHome />
-          </span>
-          Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconChat />
-          </span>
-          Чаты
-        </button>
-        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconList />
-          </span>
-          Мои заявки
-        </button>
-        <button className="nav-item" type="button" onClick={onViewClientProfile}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconUser />
-          </span>
-          Профиль
-        </button>
-      </nav>
+      <ClientBottomNav
+        active="home"
+        onHome={onBack}
+        onChats={onViewChats}
+        onRequests={() => onViewRequests()}
+        onProfile={onViewClientProfile}
+        allowActiveClick
+      />
     </div>
   )
 }

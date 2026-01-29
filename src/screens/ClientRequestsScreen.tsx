@@ -3,13 +3,11 @@ import {
   IconChat,
   IconCheck,
   IconClose,
-  IconHome,
-  IconList,
   IconStar,
   IconSwap,
   IconTrash,
-  IconUser,
 } from '../components/icons'
+import { ClientBottomNav } from '../components/ClientBottomNav'
 import { RescheduleSheet } from '../components/RescheduleSheet'
 import { categoryItems } from '../data/clientData'
 import type { Booking, ChatMessage, RequestResponse, ServiceRequest } from '../types/app'
@@ -240,6 +238,7 @@ type ClientRequestsScreenProps = {
   onCreateRequest: () => void
   onViewHome: () => void
   onViewChats: () => void
+  onViewClientProfile: () => void
   onViewProfile: (masterId: string) => void
   onOpenChat: (chatId: number) => void
 }
@@ -261,6 +260,7 @@ export const ClientRequestsScreen = ({
   onCreateRequest,
   onViewHome,
   onViewChats,
+  onViewClientProfile,
   onViewProfile,
   onOpenChat,
 }: ClientRequestsScreenProps) => {
@@ -2759,32 +2759,13 @@ export const ClientRequestsScreen = ({
         error={rescheduleError}
       />
 
-      <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item" type="button" onClick={onViewHome}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconHome />
-          </span>
-          Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconChat />
-          </span>
-          Чаты
-        </button>
-        <button className="nav-item is-active" type="button">
-          <span className="nav-icon" aria-hidden="true">
-            <IconList />
-          </span>
-          Заявки и записи
-        </button>
-        <button className="nav-item" type="button">
-          <span className="nav-icon" aria-hidden="true">
-            <IconUser />
-          </span>
-          Профиль
-        </button>
-      </nav>
+      <ClientBottomNav
+        active="requests"
+        onHome={onViewHome}
+        onChats={onViewChats}
+        onRequests={() => {}}
+        onProfile={onViewClientProfile}
+      />
     </div>
   )
 }

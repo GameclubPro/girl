@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  IconChat,
-  IconHome,
-  IconList,
-  IconSupport,
-  IconUser,
-} from '../components/icons'
+import { IconChat, IconSupport } from '../components/icons'
+import { ClientBottomNav } from '../components/ClientBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import { ProBottomNav } from '../components/ProBottomNav'
 import type { ChatMessage, ChatSummary, RequestTimeWindow } from '../types/app'
@@ -902,32 +897,13 @@ export const ChatListScreen = ({
       </div>
 
       {role === 'client' && (
-        <nav className="bottom-nav" aria-label="Навигация">
-          <button className="nav-item" type="button" onClick={onViewHome}>
-            <span className="nav-icon" aria-hidden="true">
-              <IconHome />
-            </span>
-            Главная
-          </button>
-          <button className="nav-item is-active" type="button">
-            <span className="nav-icon" aria-hidden="true">
-              <IconChat />
-            </span>
-            Чаты
-          </button>
-          <button className="nav-item" type="button" onClick={onViewRequests}>
-            <span className="nav-icon" aria-hidden="true">
-              <IconList />
-            </span>
-            Мои заявки
-          </button>
-          <button className="nav-item" type="button" onClick={onViewProfile}>
-            <span className="nav-icon" aria-hidden="true">
-              <IconUser />
-            </span>
-            Профиль
-          </button>
-        </nav>
+        <ClientBottomNav
+          active="chats"
+          onHome={onViewHome ?? (() => {})}
+          onChats={() => {}}
+          onRequests={onViewRequests ?? (() => {})}
+          onProfile={onViewProfile ?? (() => {})}
+        />
       )}
 
       {role === 'pro' && (

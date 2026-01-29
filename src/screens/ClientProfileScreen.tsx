@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  IconChat,
   IconClock,
-  IconHome,
   IconList,
   IconPin,
   IconRefresh,
   IconStar,
-  IconUser,
 } from '../components/icons'
+import { ClientBottomNav } from '../components/ClientBottomNav'
 import { TrustMeter } from '../components/TrustMeter'
 import { categoryItems } from '../data/clientData'
 import type {
@@ -1868,32 +1866,13 @@ export const ClientProfileScreen = ({
         )}
       </div>
 
-      <nav className="bottom-nav" aria-label="Навигация">
-        <button className="nav-item" type="button" onClick={onViewHome}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconHome />
-          </span>
-          Главная
-        </button>
-        <button className="nav-item" type="button" onClick={onViewChats}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconChat />
-          </span>
-          Чаты
-        </button>
-        <button className="nav-item" type="button" onClick={() => onViewRequests()}>
-          <span className="nav-icon" aria-hidden="true">
-            <IconList />
-          </span>
-          Мои заявки
-        </button>
-        <button className="nav-item is-active" type="button">
-          <span className="nav-icon" aria-hidden="true">
-            <IconUser />
-          </span>
-          Профиль
-        </button>
-      </nav>
+      <ClientBottomNav
+        active="profile"
+        onHome={onViewHome}
+        onChats={onViewChats}
+        onRequests={() => onViewRequests()}
+        onProfile={() => {}}
+      />
     </div>
   )
 }

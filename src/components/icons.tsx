@@ -172,6 +172,120 @@ export const IconChat = () => (
   </svg>
 )
 
+export const IconNavHome = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M4.6 11.3 12 5l7.4 6.3v7.1a1.7 1.7 0 0 1-1.7 1.7H13.2v-5.4h-2.6v5.4H6.3a1.7 1.7 0 0 1-1.7-1.7v-7.1Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconNavChat = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M6.2 6.6h11.6a2 2 0 0 1 2 2v5.8a2 2 0 0 1-2 2H9.5l-3.7 2.6v-2.6H6.2a2 2 0 0 1-2-2V8.6a2 2 0 0 1 2-2Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+    <circle cx="9.6" cy="11.2" r="0.8" fill="currentColor" />
+    <circle cx="12" cy="11.2" r="0.8" fill="currentColor" />
+    <circle cx="14.4" cy="11.2" r="0.8" fill="currentColor" />
+  </svg>
+)
+
+export const IconNavRequests = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="5"
+      y="4.4"
+      width="14"
+      height="15.2"
+      rx="2.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+    <path
+      d="M8 9.2h8M8 13h6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconNavProfile = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="8.8"
+      r="3.1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+    <path
+      d="M6.2 19.4c1.6-3 3.9-4.5 5.8-4.5s4.2 1.5 5.8 4.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconNavCabinet = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4.6"
+      y="4.6"
+      width="6.6"
+      height="6.6"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+    <rect
+      x="12.8"
+      y="4.6"
+      width="6.6"
+      height="6.6"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+    <rect
+      x="4.6"
+      y="12.8"
+      width="6.6"
+      height="6.6"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+    <rect
+      x="12.8"
+      y="12.8"
+      width="6.6"
+      height="6.6"
+      rx="1.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+  </svg>
+)
+
 export const IconSupport = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
