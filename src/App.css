@@ -2135,27 +2135,17 @@
   min-width: 0;
 }
 
-.booking-item-trust-row {
+.booking-item-aside {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
-  margin-top: 2px;
   min-width: 0;
 }
 
-.booking-item-trust-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.booking-item-trust-note {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
+.screen--requests .booking-item-aside,
+.screen--pro-requests .booking-item-aside {
+  justify-self: end;
 }
 
 .trust-badge {
@@ -2191,6 +2181,10 @@
 .trust-badge--sm {
   font-size: 10px;
   padding: 3px 8px;
+}
+
+.trust-badge--label {
+  letter-spacing: 0.01em;
 }
 
 .trust-badge-dot {
@@ -14997,11 +14991,6 @@
 
 .screen--pro-requests .booking-item-service,
 .screen--pro-requests .booking-item-meta {
-  color: var(--pro-muted);
-}
-
-.screen--pro-requests .booking-item-trust-label,
-.screen--pro-requests .booking-item-trust-note {
   color: var(--pro-muted);
 }
 

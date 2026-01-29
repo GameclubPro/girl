@@ -2302,9 +2302,11 @@ export const ClientRequestsScreen = ({
                             {booking.serviceName}
                           </div>
                         </div>
-                        <span className={`booking-status ${statusTone}`}>
-                          {statusLabel}
-                        </span>
+                        <div className="booking-item-aside">
+                          <span className={`booking-status ${statusTone}`}>
+                            {statusLabel}
+                          </span>
+                        </div>
                       </div>
                       <div className="booking-item-meta">
                         {scheduledLabel ? `${scheduledLabel} · ` : ''}

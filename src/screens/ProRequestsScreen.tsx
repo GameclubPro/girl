@@ -2516,19 +2516,18 @@ export const ProRequestsScreen = ({
             <div className="booking-item-service">
               {booking.serviceName}
             </div>
-            <div className="booking-item-trust-row">
-              <span className="booking-item-trust-label">Доверие</span>
-              <TrustBadge
-                trust={booking.clientTrust ?? null}
-                size="sm"
-                className="booking-item-trust"
-              />
-              <span className="booking-item-trust-note">по визитам</span>
-            </div>
           </div>
-          <span className={`booking-status ${statusTone}`}>
-            {statusLabel}
-          </span>
+          <div className="booking-item-aside">
+            <span className={`booking-status ${statusTone}`}>
+              {statusLabel}
+            </span>
+            <TrustBadge
+              trust={booking.clientTrust ?? null}
+              size="sm"
+              variant="label"
+              className="booking-item-trust"
+            />
+          </div>
         </div>
         <div className="booking-item-meta">
           {scheduledLabel ? `${scheduledLabel} · ` : ''}

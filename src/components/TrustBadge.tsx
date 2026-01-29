@@ -10,6 +10,7 @@ import {
 type TrustBadgeProps = {
   trust?: ClientTrust | null
   size?: 'sm' | 'md'
+  variant?: 'compact' | 'label'
   className?: string
   ariaLabel?: string
 }
@@ -17,12 +18,18 @@ type TrustBadgeProps = {
 export const TrustBadge = ({
   trust,
   size = 'sm',
+  variant = 'compact',
   className,
   ariaLabel,
 }: TrustBadgeProps) => {
   const tone = getTrustTone(trust)
-  const text = formatTrustBadgeText(trust)
   const score = getTrustScoreValue(trust)
+  const text =
+    variant === 'label'
+      ? isTrustNew(trust)
+        ? 'Доверие: новый'
+        : `Доверие ${score}/100`
+      : formatTrustBadgeText(trust)
   const levelLabel = getTrustLevelLabel(trust?.confidence ?? 0)
   const defaultLabel = isTrustNew(trust)
     ? 'Новый клиент'
@@ -32,6 +39,7 @@ export const TrustBadge = ({
     'trust-badge',
     tone,
     `trust-badge--${size}`,
+    variant === 'label' ? 'trust-badge--label' : '',
     className,
   ]
     .filter(Boolean)
