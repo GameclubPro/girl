@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import {
+  IconChevron,
   IconClose,
   IconLock,
   IconSettings,
@@ -3839,6 +3840,12 @@ export const ProRequestsScreen = ({
                                       className={`pro-slot-status is-${slot.status}`}
                                     >
                                       {statusLabel}
+                                    </span>
+                                    <span
+                                      className="pro-slot-toggle-icon"
+                                      aria-hidden="true"
+                                    >
+                                      <IconChevron />
                                     </span>
                                   </button>
                                   {isExpanded && !isConfirmTarget && (

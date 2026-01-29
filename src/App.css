@@ -15436,6 +15436,31 @@
   border-radius: 10px;
 }
 
+.pro-slot-toggle-icon {
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pro-muted);
+  flex: 0 0 auto;
+}
+
+.pro-slot-toggle-icon svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.pro-slot-card.is-open .pro-slot-toggle-icon {
+  color: var(--accent-strong);
+}
+
+.pro-slot-card.is-open .pro-slot-toggle-icon svg {
+  transform: rotate(180deg);
+}
+
 .pro-slot-status {
   display: inline-flex;
   align-items: center;
