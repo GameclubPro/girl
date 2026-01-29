@@ -7,6 +7,7 @@ import {
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, UserLocation } from '../types/app'
+import { fetchJsonCached, readCache } from '../utils/dataCache'
 import {
   isImageUrl,
   parsePortfolioItems,
@@ -15,6 +16,8 @@ import {
 import type { ServiceItem } from '../utils/profileContent'
 import type { FavoriteMaster } from '../utils/favorites'
 import { normalizeScheduleDay } from '../utils/schedule'
+
+const SHOWCASE_CACHE_TTL_MS = 2 * 60 * 1000
 
 type ClientShowcaseScreenProps = {
   apiBase: string
@@ -337,6 +340,39 @@ const buildShowcaseLocation = (item: ShowcaseMedia) => {
   return city || 'Локация не указана'
 }
 
+const buildGalleryPool = (data: MasterProfile[]) =>
+  (Array.isArray(data) ? data : []).flatMap((profile) => {
+    const categories = Array.isArray(profile.categories) ? profile.categories : []
+    const services = parseServiceItems(profile.services ?? [])
+    const masterName = profile.displayName?.trim() || 'Мастер'
+    const reviewsCount =
+      typeof profile.reviewsCount === 'number' ? profile.reviewsCount : 0
+    const reviewsAverage =
+      reviewsCount > 0 && typeof profile.reviewsAverage === 'number'
+        ? profile.reviewsAverage
+        : null
+    return parsePortfolioItems(profile.portfolioUrls ?? [])
+      .filter((item) => isImageUrl(item.url))
+      .map((item, index) => ({
+        id: `${profile.userId}-${index}`,
+        url: item.url,
+        focusX: item.focusX ?? 0.5,
+        focusY: item.focusY ?? 0.5,
+        title: item.title ?? null,
+        categories,
+        masterId: profile.userId,
+        masterName,
+        masterAvatarUrl: profile.avatarUrl ?? null,
+        reviewsAverage,
+        reviewsCount,
+        priceFrom: profile.priceFrom ?? null,
+        priceTo: profile.priceTo ?? null,
+        cityName: profile.cityName ?? null,
+        districtName: profile.districtName ?? null,
+        services,
+      }))
+  })
+
 export const ClientShowcaseGalleryScreen = ({
   apiBase,
   activeCategoryId,
@@ -355,55 +391,31 @@ export const ClientShowcaseGalleryScreen = ({
     let cancelled = false
 
     const loadShowcase = async () => {
-      setIsLoading(true)
-      setLoadError('')
+      const cacheKey = `${apiBase}/api/masters?limit=0`
+      const cached = readCache<MasterProfile[]>(cacheKey, {
+        ttlMs: SHOWCASE_CACHE_TTL_MS,
+      })
+      const silent = Boolean(cached?.value)
+      if (cached?.value) {
+        setShowcasePool(buildGalleryPool(cached.value))
+      }
+      if (!silent) {
+        setIsLoading(true)
+        setLoadError('')
+      }
       try {
-        const response = await fetch(`${apiBase}/api/masters?limit=0`)
-        if (!response.ok) {
-          throw new Error('Load showcase failed')
-        }
-        const data = (await response.json()) as MasterProfile[]
-        if (cancelled) return
-
-        const nextPool = (Array.isArray(data) ? data : []).flatMap((profile) => {
-          const categories = Array.isArray(profile.categories) ? profile.categories : []
-          const services = parseServiceItems(profile.services ?? [])
-          const masterName = profile.displayName?.trim() || 'Мастер'
-          const reviewsCount =
-            typeof profile.reviewsCount === 'number' ? profile.reviewsCount : 0
-          const reviewsAverage =
-            reviewsCount > 0 && typeof profile.reviewsAverage === 'number'
-              ? profile.reviewsAverage
-              : null
-          return parsePortfolioItems(profile.portfolioUrls ?? [])
-            .filter((item) => isImageUrl(item.url))
-            .map((item, index) => ({
-              id: `${profile.userId}-${index}`,
-              url: item.url,
-              focusX: item.focusX ?? 0.5,
-              focusY: item.focusY ?? 0.5,
-              title: item.title ?? null,
-              categories,
-              masterId: profile.userId,
-              masterName,
-              masterAvatarUrl: profile.avatarUrl ?? null,
-              reviewsAverage,
-              reviewsCount,
-              priceFrom: profile.priceFrom ?? null,
-              priceTo: profile.priceTo ?? null,
-              cityName: profile.cityName ?? null,
-              districtName: profile.districtName ?? null,
-              services,
-            }))
+        const { data } = await fetchJsonCached<MasterProfile[]>(cacheKey, {
+          ttlMs: SHOWCASE_CACHE_TTL_MS,
         })
-        setShowcasePool(nextPool)
+        if (cancelled) return
+        setShowcasePool(buildGalleryPool(data))
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setShowcasePool([])
           setLoadError('Не удалось загрузить витрину работ.')
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setIsLoading(false)
         }
       }
@@ -734,8 +746,7 @@ export const ClientShowcaseScreen = ({
     let cancelled = false
 
     const loadMasters = async () => {
-      setIsLoading(true)
-      setLoadError('')
+      let silent = false
       try {
         const params = new URLSearchParams()
         if (typeof locationLat === 'number' && typeof locationLng === 'number') {
@@ -749,21 +760,30 @@ export const ClientShowcaseScreen = ({
         const url = queryString
           ? `${apiBase}/api/masters?${queryString}`
           : `${apiBase}/api/masters`
-        const response = await fetch(url)
-        if (!response.ok) {
-          throw new Error('Load masters failed')
+        const cached = readCache<MasterProfile[]>(url, {
+          ttlMs: SHOWCASE_CACHE_TTL_MS,
+        })
+        silent = Boolean(cached?.value)
+        if (cached?.value) {
+          setProfiles(Array.isArray(cached.value) ? cached.value : [])
         }
-        const data = (await response.json()) as MasterProfile[]
+        if (!silent) {
+          setIsLoading(true)
+          setLoadError('')
+        }
+        const { data } = await fetchJsonCached<MasterProfile[]>(url, {
+          ttlMs: SHOWCASE_CACHE_TTL_MS,
+        })
         if (!cancelled) {
           setProfiles(Array.isArray(data) ? data : [])
         }
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setProfiles([])
           setLoadError('Не удалось загрузить список мастеров.')
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setIsLoading(false)
         }
       }

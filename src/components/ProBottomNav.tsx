@@ -4,6 +4,7 @@ import {
   IconNavProfile,
   IconNavRequests,
 } from './icons'
+import { useNavPreload } from '../contexts/NavPreloadContext'
 
 type ProNavKey = 'cabinet' | 'requests' | 'chats' | 'profile'
 
@@ -24,9 +25,22 @@ export const ProBottomNav = ({
   onProfile,
   allowActiveClick = false,
 }: ProBottomNavProps) => {
+  const preload = useNavPreload()
   const handleClick = (key: ProNavKey, action: () => void) => () => {
     if (active === key && !allowActiveClick) return
     action()
+  }
+  const handlePreload = (key: ProNavKey) => {
+    if (!preload) return
+    const target =
+      key === 'cabinet'
+        ? 'pro-cabinet'
+        : key === 'requests'
+          ? 'pro-requests'
+          : key === 'chats'
+            ? 'chats'
+            : 'pro-profile'
+    preload(target)
   }
 
   return (
@@ -35,6 +49,7 @@ export const ProBottomNav = ({
         className={`pro-nav-item${active === 'cabinet' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('cabinet', onCabinet)}
+        onPointerDown={() => handlePreload('cabinet')}
         aria-current={active === 'cabinet' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">
@@ -46,6 +61,7 @@ export const ProBottomNav = ({
         className={`pro-nav-item${active === 'requests' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('requests', onRequests)}
+        onPointerDown={() => handlePreload('requests')}
         aria-current={active === 'requests' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">
@@ -57,6 +73,7 @@ export const ProBottomNav = ({
         className={`pro-nav-item${active === 'chats' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('chats', onChats)}
+        onPointerDown={() => handlePreload('chats')}
         aria-current={active === 'chats' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">
@@ -68,6 +85,7 @@ export const ProBottomNav = ({
         className={`pro-nav-item${active === 'profile' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('profile', onProfile)}
+        onPointerDown={() => handlePreload('profile')}
         aria-current={active === 'profile' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">

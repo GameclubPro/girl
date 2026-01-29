@@ -1,4 +1,5 @@
 import { IconNavChat, IconNavHome, IconNavProfile, IconNavRequests } from './icons'
+import { useNavPreload } from '../contexts/NavPreloadContext'
 
 type ClientNavKey = 'home' | 'chats' | 'requests' | 'profile'
 
@@ -19,9 +20,22 @@ export const ClientBottomNav = ({
   onProfile,
   allowActiveClick = false,
 }: ClientBottomNavProps) => {
+  const preload = useNavPreload()
   const handleClick = (key: ClientNavKey, action: () => void) => () => {
     if (active === key && !allowActiveClick) return
     action()
+  }
+  const handlePreload = (key: ClientNavKey) => {
+    if (!preload) return
+    const target =
+      key === 'home'
+        ? 'client'
+        : key === 'chats'
+          ? 'chats'
+          : key === 'requests'
+            ? 'requests'
+            : 'client-profile'
+    preload(target)
   }
 
   return (
@@ -30,6 +44,7 @@ export const ClientBottomNav = ({
         className={`nav-item${active === 'home' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('home', onHome)}
+        onPointerDown={() => handlePreload('home')}
         aria-current={active === 'home' ? 'page' : undefined}
       >
         <span className="nav-icon" aria-hidden="true">
@@ -41,6 +56,7 @@ export const ClientBottomNav = ({
         className={`nav-item${active === 'chats' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('chats', onChats)}
+        onPointerDown={() => handlePreload('chats')}
         aria-current={active === 'chats' ? 'page' : undefined}
       >
         <span className="nav-icon" aria-hidden="true">
@@ -52,6 +68,7 @@ export const ClientBottomNav = ({
         className={`nav-item${active === 'requests' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('requests', onRequests)}
+        onPointerDown={() => handlePreload('requests')}
         aria-current={active === 'requests' ? 'page' : undefined}
       >
         <span className="nav-icon" aria-hidden="true">
@@ -63,6 +80,7 @@ export const ClientBottomNav = ({
         className={`nav-item${active === 'profile' ? ' is-active' : ''}`}
         type="button"
         onClick={handleClick('profile', onProfile)}
+        onPointerDown={() => handlePreload('profile')}
         aria-current={active === 'profile' ? 'page' : undefined}
       >
         <span className="nav-icon" aria-hidden="true">

@@ -12,6 +12,10 @@ import { RescheduleSheet } from '../components/RescheduleSheet'
 import { categoryItems } from '../data/clientData'
 import type { Booking, ChatMessage, RequestResponse, ServiceRequest } from '../types/app'
 import { getChatStream } from '../utils/chatStream'
+import { fetchJsonCached, readCache } from '../utils/dataCache'
+
+const REQUESTS_CACHE_TTL_MS = 60 * 1000
+const BOOKINGS_CACHE_TTL_MS = 60 * 1000
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -357,13 +361,13 @@ export const ClientRequestsScreen = ({
       }
 
       try {
-        const response = await fetch(
-          `${apiBase}/api/requests?userId=${encodeURIComponent(userId)}`
-        )
-        if (!response.ok) {
-          throw new Error('Load requests failed')
-        }
-        const data = (await response.json()) as ServiceRequest[]
+        const cacheKey = `${apiBase}/api/requests?userId=${encodeURIComponent(
+          userId
+        )}`
+        const { data } = await fetchJsonCached<ServiceRequest[]>(cacheKey, {
+          ttlMs: REQUESTS_CACHE_TTL_MS,
+          persist: true,
+        })
         if (requestsRequestIdRef.current === requestId) {
           setRequests(Array.isArray(data) ? data : [])
         }
@@ -381,8 +385,19 @@ export const ClientRequestsScreen = ({
   )
 
   useEffect(() => {
-    void loadRequests()
-  }, [loadRequests])
+    if (!userId) return
+    const cacheKey = `${apiBase}/api/requests?userId=${encodeURIComponent(
+      userId
+    )}`
+    const cached = readCache<ServiceRequest[]>(cacheKey, {
+      ttlMs: REQUESTS_CACHE_TTL_MS,
+      persist: true,
+    })
+    if (cached?.value) {
+      setRequests(Array.isArray(cached.value) ? cached.value : [])
+    }
+    void loadRequests({ silent: Boolean(cached?.value) })
+  }, [apiBase, loadRequests, userId])
 
   const loadBookings = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -394,13 +409,13 @@ export const ClientRequestsScreen = ({
         setBookingsError('')
       }
       try {
-        const response = await fetch(
-          `${apiBase}/api/bookings?userId=${encodeURIComponent(userId)}`
-        )
-        if (!response.ok) {
-          throw new Error('Load bookings failed')
-        }
-        const data = (await response.json()) as Booking[]
+        const cacheKey = `${apiBase}/api/bookings?userId=${encodeURIComponent(
+          userId
+        )}`
+        const { data } = await fetchJsonCached<Booking[]>(cacheKey, {
+          ttlMs: BOOKINGS_CACHE_TTL_MS,
+          persist: true,
+        })
         if (bookingsRequestIdRef.current === requestId) {
           setBookings(Array.isArray(data) ? data : [])
         }
@@ -419,8 +434,19 @@ export const ClientRequestsScreen = ({
   )
 
   useEffect(() => {
-    void loadBookings()
-  }, [loadBookings])
+    if (!userId) return
+    const cacheKey = `${apiBase}/api/bookings?userId=${encodeURIComponent(
+      userId
+    )}`
+    const cached = readCache<Booking[]>(cacheKey, {
+      ttlMs: BOOKINGS_CACHE_TTL_MS,
+      persist: true,
+    })
+    if (cached?.value) {
+      setBookings(Array.isArray(cached.value) ? cached.value : [])
+    }
+    void loadBookings({ silent: Boolean(cached?.value) })
+  }, [apiBase, loadBookings, userId])
 
   const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
   const requestEvents = useMemo(

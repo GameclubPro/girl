@@ -1,6 +1,7 @@
 import {
   Suspense,
   lazy,
+  startTransition,
   useCallback,
   useEffect,
   useReducer,
@@ -9,6 +10,7 @@ import {
   type ReactElement,
 } from 'react'
 import { ScreenLoader } from './components/ScreenLoader'
+import { NavPreloadContext } from './contexts/NavPreloadContext'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
 import type {
@@ -26,6 +28,8 @@ import {
   toggleFavorite,
   type FavoriteMaster,
 } from './utils/favorites'
+import { prefetchJson } from './utils/dataCache'
+import { markNavEnd, markNavStart, markScreenMount, markScreenPaint } from './utils/perf'
 import type { ShowcaseMedia } from './screens/ClientShowcaseScreen'
 import { StartScreen } from './screens/StartScreen'
 import './App.css'
@@ -260,6 +264,14 @@ const proWarmViews: View[] = [
   'chat-thread',
 ]
 
+const NAV_PREFETCH_TTL_MS = {
+  masters: 2 * 60 * 1000,
+  showcase: 2 * 60 * 1000,
+  stories: 60 * 1000,
+  requests: 60 * 1000,
+  bookings: 60 * 1000,
+}
+
 const navReducer = (state: NavState, action: NavAction): NavState => {
   switch (action.type) {
     case 'GO': {
@@ -319,10 +331,13 @@ function App() {
   const view = nav.view
   const navStack = nav.stack
   const navIntentRef = useRef(0)
+  const pendingNavPerfRef = useRef<{ view: View; id: number } | null>(null)
   const preloadedViewsRef = useRef<Set<View>>(new Set())
   const preloadPromisesRef = useRef<Map<View, Promise<void>>>(new Map())
+  const prefetchViewDataRef = useRef<(target: View) => void>(() => {})
 
   const preloadView = useCallback((target: View) => {
+    prefetchViewDataRef.current(target)
     const loader = viewLoaders[target]
     if (!loader || preloadedViewsRef.current.has(target)) {
       return null
@@ -348,9 +363,13 @@ function App() {
   const navigate = useCallback(
     (next: View, options?: { replace?: boolean; reset?: boolean }) => {
       const intentId = ++navIntentRef.current
+      pendingNavPerfRef.current = { view: next, id: intentId }
+      markNavStart(next, intentId)
       const commit = () => {
         if (navIntentRef.current !== intentId) return
-        dispatchNav({ type: 'GO', view: next, ...options })
+        startTransition(() => {
+          dispatchNav({ type: 'GO', view: next, ...options })
+        })
       }
       const promise = preloadView(next)
       if (!promise) {
@@ -456,6 +475,65 @@ function App() {
       .trim() || telegramUser?.username?.trim() || ''
   const telegramAvatarUrl = telegramUser?.photo_url ?? null
 
+  const prefetchViewData = useCallback(
+    (target: View) => {
+      if (!apiBase) return
+      switch (target) {
+        case 'client': {
+          void prefetchJson(`${apiBase}/api/masters`, {
+            ttlMs: NAV_PREFETCH_TTL_MS.masters,
+          })
+          if (userId) {
+            void prefetchJson(
+              `${apiBase}/api/stories?userId=${encodeURIComponent(userId)}`,
+              { ttlMs: NAV_PREFETCH_TTL_MS.stories, persist: true }
+            )
+          }
+          break
+        }
+        case 'client-showcase':
+        case 'client-gallery':
+        case 'client-gallery-detail': {
+          void prefetchJson(`${apiBase}/api/masters?limit=0`, {
+            ttlMs: NAV_PREFETCH_TTL_MS.showcase,
+          })
+          break
+        }
+        case 'requests': {
+          if (!userId) return
+          void prefetchJson(
+            `${apiBase}/api/requests?userId=${encodeURIComponent(userId)}`,
+            { ttlMs: NAV_PREFETCH_TTL_MS.requests, persist: true }
+          )
+          void prefetchJson(
+            `${apiBase}/api/bookings?userId=${encodeURIComponent(userId)}`,
+            { ttlMs: NAV_PREFETCH_TTL_MS.bookings, persist: true }
+          )
+          break
+        }
+        case 'pro-requests': {
+          if (!userId) return
+          void prefetchJson(
+            `${apiBase}/api/pro/requests?userId=${encodeURIComponent(userId)}`,
+            { ttlMs: NAV_PREFETCH_TTL_MS.requests, persist: true }
+          )
+          void prefetchJson(
+            `${apiBase}/api/pro/bookings?userId=${encodeURIComponent(userId)}`,
+            { ttlMs: NAV_PREFETCH_TTL_MS.bookings, persist: true }
+          )
+          break
+        }
+        default:
+          break
+      }
+    },
+    [apiBase, userId]
+  )
+
+  useEffect(() => {
+    prefetchViewDataRef.current = prefetchViewData
+  }, [prefetchViewData])
+
   useEffect(() => {
     preloadedViewsRef.current.add(view)
   }, [view])
@@ -466,12 +544,30 @@ function App() {
     const queue = (role === 'pro' ? proWarmViews : clientWarmViews).filter(
       (target) => target !== view
     )
-    const timers = queue.map((target, index) =>
-      window.setTimeout(() => {
+    const idleApi = window as Window & {
+      requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    const idleIds: number[] = []
+    const timers: number[] = []
+    const schedule = (target: View, index: number) => {
+      const run = () => {
         void preloadView(target)
-      }, 180 + index * 140)
-    )
+      }
+      if (typeof idleApi.requestIdleCallback === 'function') {
+        const id = idleApi.requestIdleCallback(
+          () => run(),
+          { timeout: 900 + index * 180 }
+        )
+        idleIds.push(id)
+        return
+      }
+      const timer = window.setTimeout(run, 200 + index * 160)
+      timers.push(timer)
+    }
+    queue.forEach(schedule)
     return () => {
+      idleIds.forEach((id) => idleApi.cancelIdleCallback?.(id))
       timers.forEach((timer) => window.clearTimeout(timer))
     }
   }, [preloadView, role, view])
@@ -1255,12 +1351,54 @@ function App() {
     []
   )
 
-  const renderScreen = (screen: ReactElement) => (
-    <Suspense fallback={<ScreenLoader />}>{screen}</Suspense>
+  const navPreloadHandler = useCallback(
+    (target: string) => {
+      if (!Object.prototype.hasOwnProperty.call(viewLoaders, target)) return
+      void preloadView(target as View)
+    },
+    [preloadView]
+  )
+
+  const ScreenPerfMarker = ({
+    screenView,
+    children,
+  }: {
+    screenView: View
+    children: ReactElement
+  }) => {
+    useEffect(() => {
+      markScreenMount(screenView)
+      const rafId = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          const pending = pendingNavPerfRef.current
+          if (pending?.view === screenView) {
+            markNavEnd(screenView, pending.id, { view: screenView })
+            if (pendingNavPerfRef.current?.id === pending.id) {
+              pendingNavPerfRef.current = null
+            }
+          }
+          markScreenPaint(screenView)
+        })
+      })
+      return () => {
+        window.cancelAnimationFrame(rafId)
+      }
+    }, [screenView])
+
+    return children
+  }
+
+  const renderScreen = (screenView: View, screen: ReactElement) => (
+    <NavPreloadContext.Provider value={navPreloadHandler}>
+      <Suspense fallback={<ScreenLoader />}>
+        <ScreenPerfMarker screenView={screenView}>{screen}</ScreenPerfMarker>
+      </Suspense>
+    </NavPreloadContext.Provider>
   )
 
   if (view === 'client') {
     return renderScreen(
+      'client',
       <ClientScreen
         apiBase={apiBase}
         userId={userId}
@@ -1288,6 +1426,7 @@ function App() {
 
   if (view === 'client-profile') {
     return renderScreen(
+      'client-profile',
       <ClientProfileScreen
         apiBase={apiBase}
         userId={userId}
@@ -1325,6 +1464,7 @@ function App() {
 
   if (view === 'client-showcase') {
     return renderScreen(
+      'client-showcase',
       <ClientShowcaseScreen
         apiBase={apiBase}
         activeCategoryId={clientCategoryId}
@@ -1359,6 +1499,7 @@ function App() {
 
   if (view === 'client-master-profile' && selectedMasterId) {
     return renderScreen(
+      'client-master-profile',
       <ClientMasterProfileScreen
         apiBase={apiBase}
         masterId={selectedMasterId}
@@ -1394,6 +1535,7 @@ function App() {
 
   if (view === 'client-gallery-detail' && selectedShowcaseItem) {
     return renderScreen(
+      'client-gallery-detail',
       <ClientShowcaseDetailScreen
         item={selectedShowcaseItem}
         activeCategoryId={clientCategoryId}
@@ -1439,6 +1581,7 @@ function App() {
 
   if (view === 'client-gallery') {
     return renderScreen(
+      'client-gallery',
       <ClientShowcaseGalleryScreen
         apiBase={apiBase}
         activeCategoryId={clientCategoryId}
@@ -1457,6 +1600,7 @@ function App() {
 
   if (view === 'chats') {
     return renderScreen(
+      'chats',
       <ChatListScreen
         apiBase={apiBase}
         userId={userId}
@@ -1477,6 +1621,7 @@ function App() {
 
   if (view === 'chat-thread' && selectedChatId) {
     return renderScreen(
+      'chat-thread',
       <ChatThreadScreen
         key={selectedChatId}
         apiBase={apiBase}
@@ -1500,6 +1645,7 @@ function App() {
       districts.find((item) => item.id === districtId)?.name ?? ''
 
     return renderScreen(
+      'request',
       <RequestScreen
         apiBase={apiBase}
         userId={userId}
@@ -1521,6 +1667,7 @@ function App() {
       districts.find((item) => item.id === districtId)?.name ?? ''
 
     return renderScreen(
+      'booking',
       <BookingScreen
         apiBase={apiBase}
         userId={userId}
@@ -1549,6 +1696,7 @@ function App() {
 
   if (view === 'requests') {
     return renderScreen(
+      'requests',
       <ClientRequestsScreen
         apiBase={apiBase}
         userId={userId}
@@ -1577,6 +1725,7 @@ function App() {
 
   if (view === 'pro-profile') {
     return renderScreen(
+      'pro-profile',
       <ProProfileScreen
         apiBase={apiBase}
         userId={userId}
@@ -1601,6 +1750,7 @@ function App() {
 
   if (view === 'pro-requests') {
     return renderScreen(
+      'pro-requests',
       <ProRequestsScreen
         apiBase={apiBase}
         userId={userId}
@@ -1625,6 +1775,7 @@ function App() {
 
   if (view === 'pro-analytics') {
     return renderScreen(
+      'pro-analytics',
       <ProAnalyticsScreen
         apiBase={apiBase}
         userId={userId}
@@ -1640,6 +1791,7 @@ function App() {
 
   if (view === 'pro-clients') {
     return renderScreen(
+      'pro-clients',
       <ProClientsScreen
         apiBase={apiBase}
         userId={userId}
@@ -1655,6 +1807,7 @@ function App() {
 
   if (view === 'pro-campaigns') {
     return renderScreen(
+      'pro-campaigns',
       <ProCampaignsScreen
         apiBase={apiBase}
         userId={userId}
@@ -1671,6 +1824,7 @@ function App() {
 
   if (view === 'pro-reminders') {
     return renderScreen(
+      'pro-reminders',
       <ProRemindersScreen
         apiBase={apiBase}
         userId={userId}
@@ -1687,6 +1841,7 @@ function App() {
 
   if (view === 'pro-stories') {
     return renderScreen(
+      'pro-stories',
       <ProStoriesScreen
         apiBase={apiBase}
         userId={userId}
@@ -1702,6 +1857,7 @@ function App() {
 
   if (view === 'pro-cabinet') {
     return renderScreen(
+      'pro-cabinet',
       <ProCabinetScreen
         apiBase={apiBase}
         userId={userId}
@@ -1724,6 +1880,7 @@ function App() {
 
   if (view === 'address') {
     return renderScreen(
+      'address',
       <AddressScreen
         role={role}
         cities={cities}
@@ -1755,6 +1912,7 @@ function App() {
   }
 
   return renderScreen(
+    'start',
     <StartScreen
       onRoleSelect={(nextRole) => {
         setRole(nextRole)

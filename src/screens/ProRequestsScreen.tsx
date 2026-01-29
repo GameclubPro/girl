@@ -22,12 +22,16 @@ import type {
 import type { LeadConversionStats } from '../types/analytics'
 import { buildBookingStartParam } from '../utils/deeplink'
 import { getChatStream } from '../utils/chatStream'
+import { fetchJsonCached, readCache } from '../utils/dataCache'
 import { hapticSelection } from '../utils/haptics'
 import {
   normalizeScheduleDays,
   parseScheduleRange,
   parseScheduleTimeToMinutes,
 } from '../utils/schedule'
+
+const REQUESTS_CACHE_TTL_MS = 60 * 1000
+const BOOKINGS_CACHE_TTL_MS = 60 * 1000
 
 const locationLabelMap = {
   master: 'У мастера',
@@ -838,17 +842,12 @@ export const ProRequestsScreen = ({
     let cancelled = false
 
     const loadRequests = async () => {
-      setIsLoading(true)
-      setLoadError('')
-
+      let silent = false
       try {
-        const response = await fetch(
-          `${apiBase}/api/pro/requests?userId=${encodeURIComponent(userId)}`
-        )
-        if (!response.ok) {
-          throw new Error('Load pro requests failed')
-        }
-        const data = (await response.json()) as
+        const cacheKey = `${apiBase}/api/pro/requests?userId=${encodeURIComponent(
+          userId
+        )}`
+        const cached = readCache<
           | ProRequest[]
           | {
               profileStatus?: ProfileStatus
@@ -858,42 +857,83 @@ export const ProRequestsScreen = ({
               leadConversionStats?: LeadConversionStats | null
               requests?: ProRequest[]
             }
-        if (cancelled) return
-
-        const requestItems = Array.isArray(data) ? data : data.requests ?? []
-        const nextMissing = Array.isArray(data) ? [] : data.missingFields ?? []
-        const nextActive = Array.isArray(data) ? true : data.isActive ?? true
-        const nextLeadConversionStats = Array.isArray(data)
-          ? null
-          : data.leadConversionStats ?? null
-
-        setRequests(requestItems)
-        setMissingFields(nextMissing)
-        setIsActive(nextActive)
-        setLeadConversionStats(nextLeadConversionStats)
-        setDrafts((current) => {
-          const nextDrafts = { ...current }
-          requestItems.forEach((item) => {
-            if (!nextDrafts[item.id]) {
-              nextDrafts[item.id] = {
-                price:
-                  item.responsePrice !== null && item.responsePrice !== undefined
-                    ? String(item.responsePrice)
-                    : '',
-                comment: item.responseComment ?? '',
-                proposedTime: item.responseProposedTime ?? '',
-                proposedSlotAt: normalizeSlotInputValue(item.responseProposedSlotAt),
-              }
-            }
-          })
-          return nextDrafts
+        >(cacheKey, {
+          ttlMs: REQUESTS_CACHE_TTL_MS,
+          persist: true,
         })
+        silent = Boolean(cached?.value)
+        const applyPayload = (
+          data:
+            | ProRequest[]
+            | {
+                profileStatus?: ProfileStatus
+                missingFields?: string[]
+                isActive?: boolean
+                leadScoreVariant?: string | null
+                leadConversionStats?: LeadConversionStats | null
+                requests?: ProRequest[]
+              }
+        ) => {
+          const requestItems = Array.isArray(data) ? data : data.requests ?? []
+          const nextMissing = Array.isArray(data) ? [] : data.missingFields ?? []
+          const nextActive = Array.isArray(data) ? true : data.isActive ?? true
+          const nextLeadConversionStats = Array.isArray(data)
+            ? null
+            : data.leadConversionStats ?? null
+
+          setRequests(requestItems)
+          setMissingFields(nextMissing)
+          setIsActive(nextActive)
+          setLeadConversionStats(nextLeadConversionStats)
+          setDrafts((current) => {
+            const nextDrafts = { ...current }
+            requestItems.forEach((item) => {
+              if (!nextDrafts[item.id]) {
+                nextDrafts[item.id] = {
+                  price:
+                    item.responsePrice !== null && item.responsePrice !== undefined
+                      ? String(item.responsePrice)
+                      : '',
+                  comment: item.responseComment ?? '',
+                  proposedTime: item.responseProposedTime ?? '',
+                  proposedSlotAt: normalizeSlotInputValue(item.responseProposedSlotAt),
+                }
+              }
+            })
+            return nextDrafts
+          })
+        }
+
+        if (cached?.value) {
+          applyPayload(cached.value)
+        }
+        if (!silent) {
+          setIsLoading(true)
+          setLoadError('')
+        }
+
+        const { data } = await fetchJsonCached<
+          | ProRequest[]
+          | {
+              profileStatus?: ProfileStatus
+              missingFields?: string[]
+              isActive?: boolean
+              leadScoreVariant?: string | null
+              leadConversionStats?: LeadConversionStats | null
+              requests?: ProRequest[]
+            }
+        >(cacheKey, {
+          ttlMs: REQUESTS_CACHE_TTL_MS,
+          persist: true,
+        })
+        if (cancelled) return
+        applyPayload(data)
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setLoadError('Не удалось загрузить заявки.')
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setIsLoading(false)
         }
       }
@@ -920,17 +960,27 @@ export const ProRequestsScreen = ({
     let cancelled = false
 
     const loadBookings = async () => {
-      setIsBookingsLoading(true)
-      setBookingsError('')
-
+      let silent = false
       try {
-        const response = await fetch(
-          `${apiBase}/api/pro/bookings?userId=${encodeURIComponent(userId)}`
-        )
-        if (!response.ok) {
-          throw new Error('Load bookings failed')
+        const cacheKey = `${apiBase}/api/pro/bookings?userId=${encodeURIComponent(
+          userId
+        )}`
+        const cached = readCache<Booking[]>(cacheKey, {
+          ttlMs: BOOKINGS_CACHE_TTL_MS,
+          persist: true,
+        })
+        silent = Boolean(cached?.value)
+        if (cached?.value) {
+          setBookings(Array.isArray(cached.value) ? cached.value : [])
         }
-        const data = (await response.json()) as Booking[]
+        if (!silent) {
+          setIsBookingsLoading(true)
+          setBookingsError('')
+        }
+        const { data } = await fetchJsonCached<Booking[]>(cacheKey, {
+          ttlMs: BOOKINGS_CACHE_TTL_MS,
+          persist: true,
+        })
         if (cancelled) return
         const bookingItems = Array.isArray(data) ? data : []
         setBookings(bookingItems)
@@ -947,12 +997,12 @@ export const ProRequestsScreen = ({
           return next
         })
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setBookings([])
           setBookingsError('Не удалось загрузить записи.')
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setIsBookingsLoading(false)
         }
       }

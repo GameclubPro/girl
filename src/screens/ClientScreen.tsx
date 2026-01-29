@@ -14,12 +14,16 @@ import { StoryViewer } from '../components/StoryViewer'
 import { CollectionCarousel } from '../components/CollectionCarousel'
 import { categoryItems, type CollectionItem } from '../data/clientData'
 import type { MasterProfile, StoryGroup } from '../types/app'
+import { fetchJsonCached, readCache } from '../utils/dataCache'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
 const categoryLabelOverrides: Record<string, string> = {
   'beauty-nails': 'Ногти',
   'cosmetology-care': 'Уход за лицом',
 }
+
+const MASTERS_CACHE_TTL_MS = 2 * 60 * 1000
+const STORIES_CACHE_TTL_MS = 60 * 1000
 
 const getDayGreeting = (date: Date) => {
   const hour = date.getHours()
@@ -81,6 +85,21 @@ const buildShowcaseSrcSet = (url: string, widths: number[] | null) => {
   }
   return widths.map((width) => `${buildShowcaseUrl(url, width)} ${width}w`).join(', ')
 }
+
+const buildShowcasePool = (data: MasterProfile[]) =>
+  data.flatMap((profile) => {
+    const categories = Array.isArray(profile.categories) ? profile.categories : []
+    return parsePortfolioItems(profile.portfolioUrls ?? [])
+      .filter((item) => isImageUrl(item.url))
+      .map((item, index) => ({
+        id: `${profile.userId}-${index}`,
+        url: item.url,
+        focusX: item.focusX ?? 0.5,
+        focusY: item.focusY ?? 0.5,
+        categories,
+        shape: collageShapes[index % collageShapes.length],
+      }))
+  })
 
 export const ClientScreen = ({
   apiBase,
@@ -197,27 +216,18 @@ export const ClientScreen = ({
 
     const loadShowcase = async () => {
       try {
-        const response = await fetch(`${apiBase}/api/masters`)
-        if (!response.ok) {
-          throw new Error('Load showcase failed')
-        }
-        const data = (await response.json()) as MasterProfile[]
-        if (cancelled) return
-
-        const nextPool = data.flatMap((profile) => {
-          const categories = Array.isArray(profile.categories) ? profile.categories : []
-          return parsePortfolioItems(profile.portfolioUrls ?? [])
-            .filter((item) => isImageUrl(item.url))
-            .map((item, index) => ({
-              id: `${profile.userId}-${index}`,
-              url: item.url,
-              focusX: item.focusX ?? 0.5,
-              focusY: item.focusY ?? 0.5,
-              categories,
-              shape: collageShapes[index % collageShapes.length],
-            }))
+        const cacheKey = `${apiBase}/api/masters`
+        const cached = readCache<MasterProfile[]>(cacheKey, {
+          ttlMs: MASTERS_CACHE_TTL_MS,
         })
-        setShowcasePool(nextPool)
+        if (cached?.value) {
+          setShowcasePool(buildShowcasePool(cached.value))
+        }
+        const { data } = await fetchJsonCached<MasterProfile[]>(cacheKey, {
+          ttlMs: MASTERS_CACHE_TTL_MS,
+        })
+        if (cancelled) return
+        setShowcasePool(buildShowcasePool(Array.isArray(data) ? data : []))
       } catch (error) {
         if (!cancelled) {
           setShowcasePool([])
@@ -237,26 +247,36 @@ export const ClientScreen = ({
     if (!userId) return
 
     const loadStories = async () => {
-      setIsStoriesLoading(true)
-      setStoriesError('')
+      const cacheKey = `${apiBase}/api/stories?userId=${encodeURIComponent(
+        userId
+      )}`
+      const cached = readCache<StoryGroup[]>(cacheKey, {
+        ttlMs: STORIES_CACHE_TTL_MS,
+        persist: true,
+      })
+      const silent = Boolean(cached?.value)
+      if (cached?.value) {
+        setStoryGroups(Array.isArray(cached.value) ? cached.value : [])
+      }
+      if (!silent) {
+        setIsStoriesLoading(true)
+        setStoriesError('')
+      }
       try {
-        const response = await fetch(
-          `${apiBase}/api/stories?userId=${encodeURIComponent(userId)}`
-        )
-        if (!response.ok) {
-          throw new Error('Load stories failed')
-        }
-        const data = (await response.json()) as StoryGroup[]
+        const { data } = await fetchJsonCached<StoryGroup[]>(cacheKey, {
+          ttlMs: STORIES_CACHE_TTL_MS,
+          persist: true,
+        })
         if (!cancelled) {
           setStoryGroups(Array.isArray(data) ? data : [])
         }
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setStoriesError('Не удалось загрузить истории.')
           setStoryGroups([])
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !silent) {
           setIsStoriesLoading(false)
         }
       }
