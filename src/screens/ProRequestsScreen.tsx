@@ -3,9 +3,11 @@ import { ProBottomNav } from '../components/ProBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStack'
 import {
+  IconCalendar,
   IconChevron,
   IconClose,
   IconLock,
+  IconRadius,
   IconSettings,
   IconSwap,
   IconTrash,
@@ -2529,10 +2531,26 @@ export const ProRequestsScreen = ({
             />
           </div>
         </div>
-        <div className="booking-item-meta">
-          {scheduledLabel ? `${scheduledLabel} · ` : ''}
-          {locationLabel}
-          {distanceLabel ? ` • ${distanceLabel}` : ''}
+        <div className="booking-item-meta booking-item-meta--row">
+          {scheduledLabel && (
+            <span className="booking-item-meta-segment">
+              <span className="booking-item-meta-icon" aria-hidden="true">
+                <IconCalendar />
+              </span>
+              {scheduledLabel}
+            </span>
+          )}
+          {locationLabel && (
+            <span className="booking-item-meta-segment">{locationLabel}</span>
+          )}
+          {distanceLabel && (
+            <span className="booking-item-meta-segment">
+              <span className="booking-item-meta-icon" aria-hidden="true">
+                <IconRadius />
+              </span>
+              {distanceLabel}
+            </span>
+          )}
         </div>
         {rescheduleMetaLabel && (
           <div className={`booking-item-meta ${rescheduleMetaTone}`}>

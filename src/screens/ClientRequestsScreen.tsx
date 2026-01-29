@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
+  IconCalendar,
   IconChat,
   IconCheck,
   IconClose,
+  IconRadius,
   IconStar,
   IconSwap,
   IconTrash,
@@ -2308,9 +2310,28 @@ export const ClientRequestsScreen = ({
                           </span>
                         </div>
                       </div>
-                      <div className="booking-item-meta">
-                        {scheduledLabel ? `${scheduledLabel} · ` : ''}
-                        {locationLabel}
+                      <div className="booking-item-meta booking-item-meta--row">
+                        {scheduledLabel && (
+                          <span className="booking-item-meta-segment">
+                            <span className="booking-item-meta-icon" aria-hidden="true">
+                              <IconCalendar />
+                            </span>
+                            {scheduledLabel}
+                          </span>
+                        )}
+                        {locationLabel && (
+                          <span className="booking-item-meta-segment">
+                            {locationLabel}
+                          </span>
+                        )}
+                        {distanceLabel && (
+                          <span className="booking-item-meta-segment">
+                            <span className="booking-item-meta-icon" aria-hidden="true">
+                              <IconRadius />
+                            </span>
+                            {distanceLabel}
+                          </span>
+                        )}
                       </div>
                       {rescheduleMetaLabel && (
                         <div className={`booking-item-meta ${rescheduleMetaTone}`}>

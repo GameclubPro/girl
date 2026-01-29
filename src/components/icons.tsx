@@ -446,6 +446,20 @@ export const IconCalendar = () => (
   </svg>
 )
 
+export const IconRadius = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="12"
+      r="6.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <circle cx="12" cy="12" r="2" fill="currentColor" />
+  </svg>
+)
+
 export const IconRefresh = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
