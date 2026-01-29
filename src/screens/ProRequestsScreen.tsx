@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import {
-  IconChevron,
   IconClose,
   IconLock,
   IconSettings,
@@ -713,7 +712,7 @@ export const ProRequestsScreen = ({
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(
     null
   )
-  const [slotDetailId, setSlotDetailId] = useState<number | null>(null)
+  const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null)
   const [isPasteSlotsOpen, setIsPasteSlotsOpen] = useState(false)
   const [pasteInput, setPasteInput] = useState('')
   const [pastePreview, setPastePreview] = useState<ParsedSlotGroup[] | null>(
@@ -1721,7 +1720,7 @@ export const ProRequestsScreen = ({
     setSelectedDate(date)
     setCalendarInitialized(true)
     setSlotConfirm(null)
-    setSlotDetailId(null)
+    setExpandedSlotId(null)
     if (options?.scroll === false) return
     scrollToSlots()
   }
@@ -1741,6 +1740,11 @@ export const ProRequestsScreen = ({
     })
   }, [])
 
+  const toggleSlotExpand = (slotId: string) => {
+    setExpandedSlotId((current) => (current === slotId ? null : slotId))
+    setSlotConfirm(null)
+  }
+
   const focusPendingBooking = useCallback((bookingId: number) => {
     setFocusedBookingId(bookingId)
     requestAnimationFrame(() => {
@@ -1757,7 +1761,7 @@ export const ProRequestsScreen = ({
     setSelectedDate(date)
     setWeekStartDate(startOfWeek(date))
     setCalendarInitialized(true)
-    setSlotDetailId(booking.id)
+    setExpandedSlotId(`booking-${booking.id}`)
     setFocusedBookingId(booking.id)
     requestAnimationFrame(() => {
       document
@@ -3797,124 +3801,126 @@ export const ProRequestsScreen = ({
                                 ? 'Занято'
                                 : 'Закрыто'
                         const booking = slot.booking
-                        const hasDetails = booking && slotDetailId === booking.id
                         const isConfirmTarget = slotConfirm
                           ? slotConfirm.type === 'cancel-booking'
                             ? booking?.id === slotConfirm.bookingId
                             : slotConfirm.slotId === slot.id
                           : false
-                        const isExpanded = Boolean(hasDetails || isConfirmTarget)
+                        const isExpanded = expandedSlotId === slot.id || isConfirmTarget
+                        const isWide = isConfirmTarget || (booking && isExpanded)
+                        const detailsId = booking ? `pro-slot-details-${slot.id}` : undefined
+                        const toggleLabel = booking
+                          ? isExpanded
+                            ? 'Скрыть детали и действия'
+                            : 'Показать детали и действия'
+                          : isExpanded
+                            ? 'Скрыть действия'
+                            : 'Показать действия'
                         return (
                           <div
-                            className={`pro-slot-card${isExpanded ? ' is-expanded' : ''}`}
+                            className={`pro-slot-card${
+                              isWide ? ' is-expanded' : ''
+                            }${isExpanded ? ' is-open' : ''}`}
                             key={`${slot.id}-${timeLabel}`}
                           >
                             <div className="pro-slot-row">
                               <div className="pro-slot-body">
                                 <div className="pro-slot-top">
-                                  <span className="pro-slot-time">{timeLabel}</span>
-                                  <span className={`pro-slot-status is-${slot.status}`}>
-                                    {statusLabel}
-                                  </span>
-                                  <div className="pro-slot-actions">
-                                    {slot.status === 'free' && (
-                                      <>
-                                      <button
+                                  <button
+                                    className="pro-slot-toggle"
+                                    type="button"
+                                    aria-expanded={isExpanded}
+                                    aria-controls={detailsId}
+                                    aria-label={toggleLabel}
+                                    onClick={() => toggleSlotExpand(slot.id)}
+                                  >
+                                    <span className="pro-slot-time">{timeLabel}</span>
+                                    <span
+                                      className={`pro-slot-status is-${slot.status}`}
+                                    >
+                                      {statusLabel}
+                                    </span>
+                                  </button>
+                                  {isExpanded && !isConfirmTarget && (
+                                    <div className="pro-slot-actions">
+                                      {slot.status === 'free' && (
+                                        <>
+                                          <button
+                                            className="pro-slot-action pro-slot-action--icon"
+                                            type="button"
+                                            aria-label="Закрыть окно"
+                                            onClick={() => handleCloseSlot(slot.id)}
+                                          >
+                                            <IconLock />
+                                          </button>
+                                          <button
+                                            className="pro-slot-action pro-slot-action--icon is-danger"
+                                            type="button"
+                                            aria-label="Удалить окно"
+                                            onClick={() =>
+                                              setSlotConfirm({
+                                                type: 'delete',
+                                                slotId: slot.id,
+                                                timeLabel,
+                                              })
+                                            }
+                                          >
+                                            <IconTrash />
+                                          </button>
+                                        </>
+                                      )}
+                                      {(slot.status === 'booked' ||
+                                        slot.status === 'pending') &&
+                                        booking && (
+                                        <>
+                                          <button
+                                            className="pro-slot-action pro-slot-action--icon"
+                                            type="button"
+                                            aria-label="Перенести запись"
+                                            onClick={() =>
+                                              handleOpenAddSlots({
+                                                rescheduleBookingId: booking.id,
+                                              })
+                                            }
+                                          >
+                                            <IconSwap />
+                                          </button>
+                                          <button
+                                            className="pro-slot-action pro-slot-action--icon is-danger"
+                                            type="button"
+                                            aria-label="Отменить запись"
+                                            onClick={() =>
+                                              setSlotConfirm({
+                                                type: 'cancel-booking',
+                                                bookingId: booking.id,
+                                                timeLabel,
+                                              })
+                                            }
+                                          >
+                                            <IconClose />
+                                          </button>
+                                        </>
+                                      )}
+                                      {slot.status === 'closed' && (
+                                        <button
                                           className="pro-slot-action pro-slot-action--icon"
                                           type="button"
-                                          aria-label="Закрыть окно"
-                                          onClick={() => handleCloseSlot(slot.id)}
+                                          aria-label="Открыть окно"
+                                          onClick={() => handleOpenSlot(slot.id)}
                                         >
-                                          <IconLock />
+                                          <IconUnlock />
                                         </button>
-                                        <button
-                                          className="pro-slot-action pro-slot-action--icon is-danger"
-                                          type="button"
-                                          aria-label="Удалить окно"
-                                          onClick={() =>
-                                            setSlotConfirm({
-                                              type: 'delete',
-                                              slotId: slot.id,
-                                              timeLabel,
-                                            })
-                                          }
-                                        >
-                                          <IconTrash />
-                                        </button>
-                                      </>
-                                    )}
-                                    {(slot.status === 'booked' ||
-                                      slot.status === 'pending') &&
-                                      booking && (
-                                      <>
-                                        <button
-                                          className={`pro-slot-action pro-slot-action--icon${
-                                            hasDetails ? ' is-active' : ''
-                                          }`}
-                                          type="button"
-                                          aria-label={
-                                            hasDetails
-                                              ? 'Скрыть детали'
-                                              : 'Показать детали'
-                                          }
-                                          aria-pressed={hasDetails}
-                                          onClick={() =>
-                                            setSlotDetailId((current) =>
-                                              current === booking.id
-                                                ? null
-                                                : booking.id
-                                            )
-                                          }
-                                        >
-                                          <IconChevron />
-                                        </button>
-                                        <button
-                                          className="pro-slot-action pro-slot-action--icon"
-                                          type="button"
-                                          aria-label="Перенести запись"
-                                          onClick={() =>
-                                            handleOpenAddSlots({
-                                              rescheduleBookingId: booking.id,
-                                            })
-                                          }
-                                        >
-                                          <IconSwap />
-                                        </button>
-                                        <button
-                                          className="pro-slot-action pro-slot-action--icon is-danger"
-                                          type="button"
-                                          aria-label="Отменить запись"
-                                          onClick={() =>
-                                            setSlotConfirm({
-                                              type: 'cancel-booking',
-                                              bookingId: booking.id,
-                                              timeLabel,
-                                            })
-                                          }
-                                        >
-                                          <IconClose />
-                                        </button>
-                                      </>
-                                    )}
-                                    {slot.status === 'closed' && (
-                                      <button
-                                        className="pro-slot-action pro-slot-action--icon"
-                                        type="button"
-                                        aria-label="Открыть окно"
-                                        onClick={() => handleOpenSlot(slot.id)}
-                                      >
-                                        <IconUnlock />
-                                      </button>
-                                    )}
-                                  </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                                 {slot.status === 'closed' && slot.reason && (
                                   <div className="pro-slot-meta">{slot.reason}</div>
                                 )}
                               </div>
                             </div>
-                            {booking && hasDetails && (
-                              <div className="pro-slot-details">
+                            {booking && isExpanded && (
+                              <div className="pro-slot-details" id={detailsId}>
                                 {renderBookingItem(booking)}
                               </div>
                             )}
