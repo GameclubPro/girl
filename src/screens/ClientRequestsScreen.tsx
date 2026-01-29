@@ -303,6 +303,9 @@ export const ClientRequestsScreen = ({
     Record<number, string>
   >({})
   const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const [expandedBookingDetails, setExpandedBookingDetails] = useState<
+    Record<number, boolean>
+  >({})
   const requestsRequestIdRef = useRef(0)
   const bookingsRequestIdRef = useRef(0)
   const bookingListRef = useRef<HTMLDivElement | null>(null)
@@ -1639,11 +1642,8 @@ export const ClientRequestsScreen = ({
                         {item.budget ? ` • ${item.budget}` : ''}
                       </div>
                       <div className="request-item-meta">
-                        {locationLabel}
-                        {item.cityName ? ` • ${item.cityName}` : ''}
-                        {item.districtName ? ` • ${item.districtName}` : ''}
+                        {dateLabel} · {locationLabel}
                       </div>
-                      <div className="request-item-meta">{dateLabel}</div>
                       {dispatchedCount > 0 && (
                         <div className="request-item-meta request-item-meta--hint">
                           Отправлено: {dispatchedCount}
@@ -2048,10 +2048,6 @@ export const ClientRequestsScreen = ({
                     bookingStatusToneMap[booking.status] ?? 'is-waiting'
                   const locationLabel =
                     locationLabelMap[booking.locationType] ?? 'Не важно'
-                  const categoryLabel =
-                    categoryItems.find(
-                      (category) => category.id === booking.categoryId
-                    )?.label ?? booking.categoryId
                   const scheduledLabel = formatDateTime(booking.scheduledAt)
                   const rescheduleLabel = booking.rescheduleProposedTime
                     ? formatDateTime(booking.rescheduleProposedTime)
@@ -2201,6 +2197,11 @@ export const ClientRequestsScreen = ({
                   const photoItems = Array.isArray(booking.photoUrls)
                     ? booking.photoUrls
                     : []
+                  const hasExtraDetails =
+                    Boolean(booking.cityName || booking.districtName || booking.address) ||
+                    Boolean(booking.comment) ||
+                    photoItems.length > 0
+                  const isDetailsOpen = Boolean(expandedBookingDetails[booking.id])
                   const reviewDraft = reviewDrafts[booking.id] ?? {
                     rating: 0,
                     comment: '',
@@ -2265,6 +2266,20 @@ export const ClientRequestsScreen = ({
                                 <IconChat />
                               </span>
                               Чат
+                            </button>
+                          )}
+                          {hasExtraDetails && (
+                            <button
+                              className="booking-action-icon is-ghost"
+                              type="button"
+                              onClick={() =>
+                                setExpandedBookingDetails((current) => ({
+                                  ...current,
+                                  [booking.id]: !isDetailsOpen,
+                                }))
+                              }
+                            >
+                              {isDetailsOpen ? 'Скрыть' : 'Подробнее'}
                             </button>
                           )}
                           {reschedulePending && (
@@ -2419,24 +2434,29 @@ export const ClientRequestsScreen = ({
                         </div>
                       </div>
                       <div className="booking-item-meta">
-                        {categoryLabel}
-                        {scheduledLabel ? ` • ${scheduledLabel}` : ''}
+                        {scheduledLabel ? `${scheduledLabel} · ` : ''}
+                        {locationLabel}
                       </div>
                       {rescheduleMetaLabel && (
                         <div className={`booking-item-meta ${rescheduleMetaTone}`}>
                           {rescheduleMetaLabel}
                         </div>
                       )}
-                      <div className="booking-item-meta">
-                        {locationLabel}
-                        {booking.cityName ? ` • ${booking.cityName}` : ''}
-                        {booking.districtName ? ` • ${booking.districtName}` : ''}
-                      </div>
-                      {booking.locationType === 'client' && booking.address && (
+                      {isDetailsOpen && (booking.cityName || booking.districtName) && (
                         <div className="booking-item-meta">
-                          Адрес: {booking.address}
+                          {booking.cityName ? booking.cityName : ''}
+                          {booking.districtName
+                            ? `${booking.cityName ? ' • ' : ''}${booking.districtName}`
+                            : ''}
                         </div>
                       )}
+                      {isDetailsOpen &&
+                        booking.locationType === 'client' &&
+                        booking.address && (
+                          <div className="booking-item-meta">
+                            Адрес: {booking.address}
+                          </div>
+                        )}
                       <div className="booking-item-price">{priceLabel}</div>
                       {booking.status === 'price_proposed' && priceOfferTimeLeft && (
                         <div className="booking-item-meta booking-item-meta--highlight">
@@ -2598,10 +2618,10 @@ export const ClientRequestsScreen = ({
                           )}
                         </div>
                       )}
-                      {booking.comment && (
+                      {isDetailsOpen && booking.comment && (
                         <div className="booking-item-comment">{booking.comment}</div>
                       )}
-                      {photoItems.length > 0 && (
+                      {isDetailsOpen && photoItems.length > 0 && (
                         <div className="booking-photo-strip" role="list">
                           {photoItems.map((url, index) => (
                             <span

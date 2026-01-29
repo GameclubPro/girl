@@ -2578,6 +2578,12 @@
   background: rgba(var(--danger-rgb), 0.1);
 }
 
+.booking-action-icon.is-ghost {
+  background: rgba(var(--shadow-rgb), 0.04);
+  border-color: rgba(var(--shadow-rgb), 0.12);
+  color: var(--muted);
+}
+
 .booking-action-icon.is-reschedule {
   background: rgba(var(--accent-rgb), 0.12);
   border-color: rgba(var(--accent-rgb), 0.32);
@@ -25608,6 +25614,27 @@ h2 {
   font-weight: 600;
   color: var(--muted);
   padding: 8px 0;
+}
+
+.request-details-toggle {
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--shadow-rgb), 0.04);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.request-details-toggle:active {
+  transform: translateY(1px);
+}
+
+.request-details-toggle:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.24);
+  outline-offset: 2px;
 }
 
 .chat-support-intro {

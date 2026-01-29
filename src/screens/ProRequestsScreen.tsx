@@ -651,6 +651,12 @@ export const ProRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
+  const [expandedRequestDetails, setExpandedRequestDetails] = useState<
+    Record<number, boolean>
+  >({})
+  const [expandedBookingDetails, setExpandedBookingDetails] = useState<
+    Record<number, boolean>
+  >({})
   const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
   const pendingRequestFocusIdRef = useRef<number | null>(null)
@@ -2317,9 +2323,6 @@ export const ProRequestsScreen = ({
       bookingStatusLabelMap[booking.status] ?? booking.status
     const statusTone =
       bookingStatusToneMap[booking.status] ?? 'is-waiting'
-    const categoryLabel =
-      categoryItems.find((category) => category.id === booking.categoryId)
-        ?.label ?? booking.categoryId
     const locationLabel =
       locationLabelMap[booking.locationType] ?? 'Не важно'
     const distanceLabel = formatDistance(booking.distanceKm)
@@ -2404,6 +2407,10 @@ export const ProRequestsScreen = ({
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
+    const hasExtraDetails =
+      Boolean(booking.cityName || booking.districtName || booking.address) ||
+      photoItems.length > 0
+    const isDetailsOpen = Boolean(expandedBookingDetails[booking.id])
     const reschedulePending =
       Boolean(booking.rescheduleProposedTime) &&
       Boolean(booking.rescheduleProposedBy)
@@ -2453,21 +2460,38 @@ export const ProRequestsScreen = ({
           </span>
         </div>
         <div className="booking-item-meta">
-          {categoryLabel}
-          {scheduledLabel ? ` • ${scheduledLabel}` : ''}
+          {scheduledLabel ? `${scheduledLabel} · ` : ''}
+          {locationLabel}
+          {distanceLabel ? ` • ${distanceLabel}` : ''}
         </div>
         {rescheduleMetaLabel && (
           <div className={`booking-item-meta ${rescheduleMetaTone}`}>
             {rescheduleMetaLabel}
           </div>
         )}
-        <div className="booking-item-meta">
-          {locationLabel}
-          {booking.cityName ? ` • ${booking.cityName}` : ''}
-          {booking.districtName ? ` • ${booking.districtName}` : ''}
-          {distanceLabel ? ` • ${distanceLabel}` : ''}
-        </div>
-        {booking.locationType === 'client' && booking.address && (
+        {hasExtraDetails && (
+          <button
+            className="request-details-toggle"
+            type="button"
+            onClick={() =>
+              setExpandedBookingDetails((current) => ({
+                ...current,
+                [booking.id]: !isDetailsOpen,
+              }))
+            }
+          >
+            {isDetailsOpen ? 'Скрыть детали' : 'Подробнее'}
+          </button>
+        )}
+        {isDetailsOpen && (booking.cityName || booking.districtName) && (
+          <div className="booking-item-meta">
+            {booking.cityName ? booking.cityName : ''}
+            {booking.districtName
+              ? `${booking.cityName ? ' • ' : ''}${booking.districtName}`
+              : ''}
+          </div>
+        )}
+        {isDetailsOpen && booking.locationType === 'client' && booking.address && (
           <div className="booking-item-meta">
             Адрес: {booking.address}
           </div>
@@ -2496,6 +2520,19 @@ export const ProRequestsScreen = ({
         {depositAmount > 0 && depositStatusLabel && (
           <div className="booking-item-meta booking-item-meta--highlight">
             {depositStatusLabel}
+          </div>
+        )}
+        {isDetailsOpen && photoItems.length > 0 && (
+          <div className="booking-photo-strip" role="list">
+            {photoItems.map((url, index) => (
+              <span
+                className="booking-photo-thumb"
+                key={`${booking.id}-photo-${index}`}
+                role="listitem"
+              >
+                <img src={url} alt="" loading="lazy" />
+              </span>
+            ))}
           </div>
         )}
         {reschedulePending && (
@@ -3167,6 +3204,14 @@ export const ProRequestsScreen = ({
                     const leadReasons = Array.isArray(item.leadReasons)
                       ? item.leadReasons
                       : []
+                    const hasExtraDetails =
+                      Boolean(item.address) ||
+                      tagItems.length > 0 ||
+                      leadReasons.length > 0 ||
+                      Boolean(item.details) ||
+                      photoItems.length > 0 ||
+                      Boolean(item.cityName || item.districtName)
+                    const isDetailsOpen = Boolean(expandedRequestDetails[item.id])
                     const isFinalResponse = ['accepted', 'rejected', 'expired'].includes(
                       item.responseStatus ?? ''
                     )
@@ -3230,12 +3275,9 @@ export const ProRequestsScreen = ({
                           {item.budget ? ` • ${item.budget}` : ''}
                         </div>
                         <div className="request-item-meta">
-                          {locationLabel}
-                          {item.cityName ? ` • ${item.cityName}` : ''}
-                          {item.districtName ? ` • ${item.districtName}` : ''}
+                          {dateLabel} · {locationLabel}
                           {distanceLabel ? ` • ${distanceLabel}` : ''}
                         </div>
-                        <div className="request-item-meta">{dateLabel}</div>
                         {item.status === 'open' &&
                           !item.responseStatus &&
                           (dispatchTimeLeft || dispatchBatchLabel) && (
@@ -3247,42 +3289,11 @@ export const ProRequestsScreen = ({
                                 : 'Окно отклика истекло'}
                             </div>
                           )}
-                        {item.locationType === 'client' && item.address && (
-                            <div className="request-item-meta">
-                              Адрес: {item.address}
-                            </div>
-                          )}
-                          {tagItems.length > 0 && (
-                            <div className="request-tags" role="list">
-                              {tagItems.map((tag) => (
-                                <span
-                                  className="request-chip is-active"
-                                  key={`${item.id}-${tag}`}
-                                  role="listitem"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {leadReasons.length > 0 && (
-                            <div className="request-tags request-tags--lead" role="list">
-                              {leadReasons.map((reason, index) => (
-                                <span
-                                  className="request-chip"
-                                  key={`${item.id}-lead-${index}`}
-                                  role="listitem"
-                                >
-                                  {reason}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {responseStatusLabel && (
-                            <div className="request-item-meta">
-                              Ваш отклик: {responseStatusLabel}
-                            </div>
-                          )}
+                        {responseStatusLabel && (
+                          <div className="request-item-meta">
+                            Ваш отклик: {responseStatusLabel}
+                          </div>
+                        )}
                           {item.responseStatus === 'accepted' && item.chatId && (
                             <button
                               className="request-chat-cta"
@@ -3297,22 +3308,75 @@ export const ProRequestsScreen = ({
                               Чат создаётся...
                             </span>
                           )}
-                          {item.details && (
-                            <div className="request-item-details">{item.details}</div>
-                          )}
-                          {photoItems.length > 0 && (
-                            <div className="booking-photo-strip" role="list">
-                              {photoItems.map((url, index) => (
-                                <span
-                                  className="booking-photo-thumb"
-                                  key={`${item.id}-photo-${index}`}
-                                  role="listitem"
-                                >
-                                  <img src={url} alt="" loading="lazy" />
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                        {hasExtraDetails && (
+                          <button
+                            className="request-details-toggle"
+                            type="button"
+                            onClick={() =>
+                              setExpandedRequestDetails((current) => ({
+                                ...current,
+                                [item.id]: !isDetailsOpen,
+                              }))
+                            }
+                          >
+                            {isDetailsOpen ? 'Скрыть детали' : 'Подробнее'}
+                          </button>
+                        )}
+                        {isDetailsOpen && (item.cityName || item.districtName) && (
+                          <div className="request-item-meta">
+                            {item.cityName ? item.cityName : ''}
+                            {item.districtName
+                              ? `${item.cityName ? ' • ' : ''}${item.districtName}`
+                              : ''}
+                          </div>
+                        )}
+                        {isDetailsOpen && item.locationType === 'client' && item.address && (
+                          <div className="request-item-meta">
+                            Адрес: {item.address}
+                          </div>
+                        )}
+                        {isDetailsOpen && tagItems.length > 0 && (
+                          <div className="request-tags" role="list">
+                            {tagItems.map((tag) => (
+                              <span
+                                className="request-chip is-active"
+                                key={`${item.id}-${tag}`}
+                                role="listitem"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {isDetailsOpen && leadReasons.length > 0 && (
+                          <div className="request-tags request-tags--lead" role="list">
+                            {leadReasons.map((reason, index) => (
+                              <span
+                                className="request-chip"
+                                key={`${item.id}-lead-${index}`}
+                                role="listitem"
+                              >
+                                {reason}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {isDetailsOpen && item.details && (
+                          <div className="request-item-details">{item.details}</div>
+                        )}
+                        {isDetailsOpen && photoItems.length > 0 && (
+                          <div className="booking-photo-strip" role="list">
+                            {photoItems.map((url, index) => (
+                              <span
+                                className="booking-photo-thumb"
+                                key={`${item.id}-photo-${index}`}
+                                role="listitem"
+                              >
+                                <img src={url} alt="" loading="lazy" />
+                              </span>
+                            ))}
+                          </div>
+                        )}
 
                           {timeWindowChoices.length > 0 && (
                             <div className="request-chips pro-response-chips">
