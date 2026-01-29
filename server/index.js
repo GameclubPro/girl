@@ -2,7 +2,6 @@ import dotenv from 'dotenv'
 import cors from 'cors'
 import express from 'express'
 import compression from 'compression'
-import sharp from 'sharp'
 import { WebSocketServer } from 'ws'
 import { Pool } from 'pg'
 import { randomUUID, createHash } from 'crypto'
@@ -131,6 +130,9 @@ app.get('/uploads/*', async (req, res, next) => {
     width !== null || Boolean(normalizeText(req.query.q)) || Boolean(formatParam)
   if (!hasTransform) return next()
 
+  const sharp = await loadSharp()
+  if (!sharp) return next()
+
   let relativePath = ''
   try {
     relativePath = decodeURIComponent(req.path.replace(/^\/uploads\//, ''))
@@ -194,8 +196,12 @@ app.get('/uploads/*', async (req, res, next) => {
         break
     }
     const buffer = await pipeline.toBuffer()
-    await fs.mkdir(cacheTarget.folder, { recursive: true })
-    await fs.writeFile(cacheTarget.filePath, buffer)
+    try {
+      await fs.mkdir(cacheTarget.folder, { recursive: true })
+      await fs.writeFile(cacheTarget.filePath, buffer)
+    } catch (cacheError) {
+      console.warn('Image cache write failed:', cacheError)
+    }
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
     res.setHeader('Vary', 'Accept')
     res.type(`image/${format === 'jpeg' ? 'jpeg' : format}`)
@@ -896,6 +902,24 @@ const buildImageCachePath = (relativePath, options) => {
   const folder = path.join(imageCacheRoot, hash.slice(0, 2))
   const filename = `${hash}.${ext || 'jpg'}`
   return { folder, filePath: path.join(folder, filename) }
+}
+
+let sharpLoadPromise = null
+let sharpLoadFailed = false
+
+const loadSharp = async () => {
+  if (!sharpLoadPromise) {
+    sharpLoadPromise = import('sharp')
+      .then((mod) => mod.default ?? mod)
+      .catch((error) => {
+        if (!sharpLoadFailed) {
+          sharpLoadFailed = true
+          console.warn('Sharp unavailable, image resizing disabled:', error)
+        }
+        return null
+      })
+  }
+  return sharpLoadPromise
 }
 
 const buildPublicUrl = (req, relativePath) => {
@@ -11951,7 +11975,11 @@ const start = async () => {
   await ensureSchema()
   await seedLocations()
   await fs.mkdir(uploadsRoot, { recursive: true })
-  await fs.mkdir(imageCacheRoot, { recursive: true })
+  try {
+    await fs.mkdir(imageCacheRoot, { recursive: true })
+  } catch (error) {
+    console.warn('Image cache disabled:', error)
+  }
 
   if (shouldBackfillTrust) {
     try {
