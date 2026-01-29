@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
+import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStack'
 import {
   IconChevron,
   IconClose,
@@ -665,6 +666,9 @@ export const ProRequestsScreen = ({
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
   const pendingRequestFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusIdRef = useRef<number | null>(null)
+  const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
+  const pendingBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
+  const archivedBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const [leadConversionStats, setLeadConversionStats] =
     useState<LeadConversionStats | null>(null)
   const [bookingDrafts, setBookingDrafts] = useState<Record<number, string>>({})
@@ -1782,28 +1786,36 @@ export const ProRequestsScreen = ({
     setCalendarInitialized(true)
   }
 
-  const focusRequest = useCallback((requestId: number) => {
-    setFocusedRequestId(requestId)
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`pro-request-${requestId}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }, [])
+  const focusRequest = useCallback(
+    (requestId: number) => {
+      setFocusedRequestId(requestId)
+      const index = items.findIndex((item) => item.id === requestId)
+      requestAnimationFrame(() => {
+        if (index >= 0) {
+          requestsVirtualRef.current?.scrollToIndex(index)
+        }
+      })
+    },
+    [items]
+  )
 
   const toggleSlotExpand = (slotId: string) => {
     setExpandedSlotId((current) => (current === slotId ? null : slotId))
     setSlotConfirm(null)
   }
 
-  const focusPendingBooking = useCallback((bookingId: number) => {
-    setFocusedBookingId(bookingId)
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`pro-booking-${bookingId}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }, [])
+  const focusPendingBooking = useCallback(
+    (bookingId: number) => {
+      setFocusedBookingId(bookingId)
+      const index = pendingBookingItems.findIndex((item) => item.id === bookingId)
+      requestAnimationFrame(() => {
+        if (index >= 0) {
+          pendingBookingsVirtualRef.current?.scrollToIndex(index)
+        }
+      })
+    },
+    [pendingBookingItems]
+  )
 
   const focusBookingInCalendar = useCallback((booking: Booking) => {
     const date = parseDateOnly(booking.scheduledAt)
@@ -3216,8 +3228,15 @@ export const ProRequestsScreen = ({
                   <span className="requests-section-title">Входящие заявки</span>
                   <span className="requests-section-count">{items.length}</span>
                 </div>
-                <div className="requests-list">
-                  {items.map((item) => {
+                <VirtualStack
+                  ref={requestsVirtualRef}
+                  items={items}
+                  estimateSize={360}
+                  gap={10}
+                  overscan={8}
+                  className="requests-list"
+                  getItemKey={(item: ProRequest) => item.id}
+                  renderItem={(item: ProRequest) => {
                     const categoryLabel =
                       categoryItems.find(
                         (category) => category.id === item.categoryId
@@ -3456,8 +3475,8 @@ export const ProRequestsScreen = ({
                                     {chipLabel}
                                   </button>
                                 )
-                              })}
-                            </div>
+                            })}
+                          </div>
                           )}
 
                           {slotSuggestions.length > 0 && (
@@ -3618,8 +3637,8 @@ export const ProRequestsScreen = ({
                           </div>
                         </div>
                       )
-                    })}
-                  </div>
+                  }}
+                />
                 </div>
               )}
 
@@ -3633,9 +3652,16 @@ export const ProRequestsScreen = ({
                       {pendingBookingItems.length}
                     </span>
                   </div>
-                  <div className="requests-list booking-list">
-                    {pendingBookingItems.map((booking) => renderBookingItem(booking))}
-                  </div>
+                  <VirtualStack
+                    ref={pendingBookingsVirtualRef}
+                    items={pendingBookingItems}
+                    estimateSize={320}
+                    gap={12}
+                    overscan={6}
+                    className="requests-list booking-list"
+                    getItemKey={(item: Booking) => item.id}
+                    renderItem={(booking: Booking) => renderBookingItem(booking)}
+                  />
                 </div>
               )}
 
@@ -3667,14 +3693,18 @@ export const ProRequestsScreen = ({
                     </button>
                   </div>
                   {isHistoryOpen && (
-                    <div
+                    <VirtualStack
+                      ref={archivedBookingsVirtualRef}
+                      items={archivedBookingItems}
+                      estimateSize={300}
+                      gap={12}
+                      overscan={4}
                       className="requests-list booking-list is-archived"
-                      id={historySectionId}
-                    >
-                      {archivedBookingItems.map((booking) =>
+                      getItemKey={(item: Booking) => item.id}
+                      renderItem={(booking: Booking) =>
                         renderBookingItem(booking, { archived: true })
-                      )}
-                    </div>
+                      }
+                    />
                   )}
                 </div>
               )}

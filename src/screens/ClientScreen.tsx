@@ -6,15 +6,14 @@ import {
   useState,
   type MouseEvent,
 } from 'react'
-import {
-  IconUsers,
-} from '../components/icons'
+import { IconUsers } from '../components/icons'
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { StoryViewer } from '../components/StoryViewer'
 import { CollectionCarousel } from '../components/CollectionCarousel'
 import { categoryItems, type CollectionItem } from '../data/clientData'
 import type { MasterProfile, StoryGroup } from '../types/app'
 import { fetchJsonCached, readCache } from '../utils/dataCache'
+import { buildImageSrcSet, buildImageUrl, prefetchImages } from '../utils/media'
 import { isImageUrl, parsePortfolioItems } from '../utils/profileContent'
 
 const categoryLabelOverrides: Record<string, string> = {
@@ -67,23 +66,6 @@ const shuffleItems = <T,>(items: T[]) => {
 const parseLength = (value: string) => {
   const parsed = Number.parseFloat(value)
   return Number.isFinite(parsed) ? parsed : 0
-}
-
-const buildShowcaseUrl = (url: string, width: number) => {
-  if (!url || url.startsWith('data:')) return url
-  const [base, hash] = url.split('#')
-  const [path, query = ''] = base.split('?')
-  const params = new URLSearchParams(query)
-  params.set('w', String(width))
-  const next = `${path}?${params.toString()}`
-  return hash ? `${next}#${hash}` : next
-}
-
-const buildShowcaseSrcSet = (url: string, widths: number[] | null) => {
-  if (!widths || widths.length === 0 || url.startsWith('data:')) {
-    return undefined
-  }
-  return widths.map((width) => `${buildShowcaseUrl(url, width)} ${width}w`).join(', ')
 }
 
 const buildShowcasePool = (data: MasterProfile[]) =>
@@ -630,10 +612,15 @@ export const ClientScreen = ({
     return [base, base * 2, base * 3]
   }, [showcaseTileWidth])
 
+  const showcaseQuality = 70
+  const showcaseFallbackWidth =
+    showcaseResolutions?.[1] ?? showcaseResolutions?.[0] ?? 360
   const showcaseSizes = showcaseTileWidth ? `${showcaseTileWidth}px` : undefined
   const showcaseTileHeight = showcaseTileWidth
     ? Math.round(showcaseTileWidth * 0.75)
     : undefined
+  const storyAvatarWidths = useMemo(() => [58, 116], [])
+  const storyAvatarQuality = 72
 
   const formatStoryRole = (categories: string[] | undefined) => {
     const primary = categories?.[0]
@@ -681,6 +668,18 @@ export const ClientScreen = ({
     },
     [onCategoryChange, onViewMasters]
   )
+
+  useEffect(() => {
+    if (showcaseItems.length === 0) return
+    prefetchImages(
+      showcaseItems.slice(0, 4).map((item) => item.url),
+      {
+        width: showcaseFallbackWidth,
+        quality: showcaseQuality,
+        limit: 4,
+      }
+    )
+  }, [showcaseFallbackWidth, showcaseItems, showcaseQuality])
 
   return (
     <div className="screen screen--client">
@@ -744,11 +743,16 @@ export const ClientScreen = ({
                     style={{ gridArea: showcaseAreas[index % showcaseAreas.length] }}
                   >
                     <img
-                      src={item.url}
+                      src={buildImageUrl(item.url, {
+                        width: showcaseFallbackWidth,
+                        quality: showcaseQuality,
+                      })}
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      srcSet={buildShowcaseSrcSet(item.url, showcaseResolutions)}
+                      srcSet={buildImageSrcSet(item.url, showcaseResolutions, {
+                        quality: showcaseQuality,
+                      })}
                       sizes={showcaseSizes}
                       width={showcaseTileWidth ?? undefined}
                       height={showcaseTileHeight ?? undefined}
@@ -840,10 +844,19 @@ export const ClientScreen = ({
                       <span className="client-story-avatar">
                         {group.masterAvatarUrl ? (
                           <img
-                            src={group.masterAvatarUrl}
+                            src={buildImageUrl(group.masterAvatarUrl, {
+                              width: storyAvatarWidths[1],
+                              quality: storyAvatarQuality,
+                            })}
                             alt=""
                             loading="lazy"
                             decoding="async"
+                            srcSet={buildImageSrcSet(
+                              group.masterAvatarUrl,
+                              storyAvatarWidths,
+                              { quality: storyAvatarQuality }
+                            )}
+                            sizes="58px"
                           />
                         ) : (
                           <span>{masterInitial}</span>

@@ -3,6 +3,7 @@ import { IconChat, IconSupport } from '../components/icons'
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import { ProBottomNav } from '../components/ProBottomNav'
+import { VirtualStack } from '../components/VirtualStack'
 import type { ChatMessage, ChatSummary, RequestTimeWindow } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
@@ -251,6 +252,7 @@ export const ChatListScreen = ({
   const loadAbortRef = useRef<AbortController | null>(null)
   const loadRequestIdRef = useRef(0)
   const listUpdateTokenRef = useRef(0)
+  const includeContextsRef = useRef(false)
   const isSupportAgent = SUPPORT_AGENT_IDS.has(userId)
 
   const supportChat = useMemo(
@@ -362,10 +364,11 @@ export const ChatListScreen = ({
   )
 
   const loadChats = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean; includeContexts?: boolean }) => {
       if (!userId) return
       if (isLoadingRef.current) return
       const silent = options?.silent ?? false
+      const includeContexts = options?.includeContexts ?? includeContextsRef.current
       const requestId = (loadRequestIdRef.current += 1)
       const updateToken = listUpdateTokenRef.current
 
@@ -383,7 +386,9 @@ export const ChatListScreen = ({
 
       try {
         const response = await fetch(
-          `${apiBase}/api/chats?userId=${encodeURIComponent(userId)}`,
+          `${apiBase}/api/chats?userId=${encodeURIComponent(userId)}${
+            includeContexts ? '&contexts=1' : ''
+          }`,
           { signal: controller.signal }
         )
         if (!response.ok) {
@@ -401,6 +406,7 @@ export const ChatListScreen = ({
         setCachedChatList(apiBase, userId, next)
         setLoadError('')
         isReadyRef.current = true
+        includeContextsRef.current = includeContexts
       } catch (error) {
         if (controller.signal.aborted) {
           return
@@ -429,9 +435,17 @@ export const ChatListScreen = ({
     if (reloadTimerRef.current !== null) return
     reloadTimerRef.current = window.setTimeout(() => {
       reloadTimerRef.current = null
-      void loadChats({ silent: true })
+      void loadChats({ silent: true, includeContexts: includeContextsRef.current })
     }, 240)
   }, [loadChats])
+
+  const needsContexts = Boolean(searchQuery.trim())
+
+  useEffect(() => {
+    if (!isReadyRef.current) return
+    if (includeContextsRef.current === needsContexts) return
+    void loadChats({ silent: true, includeContexts: needsContexts })
+  }, [loadChats, needsContexts])
 
   useEffect(() => {
     const cached = getCachedChatList(apiBase, userId)
@@ -734,9 +748,16 @@ export const ChatListScreen = ({
           <span className="chat-section-title">{title}</span>
           <span className="chat-section-count">{items.length}</span>
         </div>
-        <div className="chat-list" role="list">
-          {items.map(renderChatCard)}
-        </div>
+        <VirtualStack
+          items={items}
+          estimateSize={96}
+          gap={10}
+          overscan={8}
+          className="chat-list"
+          role="list"
+          getItemKey={(item: ChatSummary) => item.id}
+          renderItem={(item: ChatSummary) => renderChatCard(item)}
+        />
       </section>
     )
   }
@@ -891,9 +912,16 @@ export const ChatListScreen = ({
                   </span>
                 </button>
                 {showArchived && (
-                  <div className="chat-list" role="list">
-                    {chatSections.archived.map(renderChatCard)}
-                  </div>
+                  <VirtualStack
+                    items={chatSections.archived}
+                    estimateSize={96}
+                    gap={10}
+                    overscan={6}
+                    className="chat-list"
+                    role="list"
+                    getItemKey={(item: ChatSummary) => item.id}
+                    renderItem={(item: ChatSummary) => renderChatCard(item)}
+                  />
                 )}
               </section>
             )}

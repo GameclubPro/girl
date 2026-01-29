@@ -9,6 +9,7 @@ import {
 } from '../components/icons'
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { RescheduleSheet } from '../components/RescheduleSheet'
+import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStack'
 import { categoryItems } from '../data/clientData'
 import type { Booking, ChatMessage, RequestResponse, ServiceRequest } from '../types/app'
 import { getChatStream } from '../utils/chatStream'
@@ -313,6 +314,8 @@ export const ClientRequestsScreen = ({
   const requestsRequestIdRef = useRef(0)
   const bookingsRequestIdRef = useRef(0)
   const bookingListRef = useRef<HTMLDivElement | null>(null)
+  const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
+  const bookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const reloadTimerRef = useRef<number | null>(null)
   const reloadFlagsRef = useRef({ requests: false, bookings: false })
   const [nowTick, setNowTick] = useState(() => Date.now())
@@ -787,6 +790,7 @@ export const ClientRequestsScreen = ({
   const focusBooking = useCallback((booking: Booking) => {
     const date = parseDateOnly(booking.scheduledAt)
     if (!date) return
+    setBookingFilter('all')
     setSelectedDate(date)
     setWeekStartDate(startOfWeek(date))
     setCalendarInitialized(true)
@@ -861,15 +865,16 @@ export const ClientRequestsScreen = ({
     if (!requestId || activeTab !== 'requests') return
     const item = requests.find((request) => request.id === requestId)
     if (!item) return
+    const requestIndex = requests.findIndex((request) => request.id === requestId)
     pendingRequestFocusIdRef.current = null
     setFocusedRequestId(requestId)
     if (expandedRequestId !== requestId) {
       openResponses(requestId)
     }
     requestAnimationFrame(() => {
-      document
-        .getElementById(`request-${requestId}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (requestIndex >= 0) {
+        requestsVirtualRef.current?.scrollToIndex(requestIndex)
+      }
     })
     onFocusHandled?.()
   }, [activeTab, expandedRequestId, onFocusHandled, openResponses, requests])
@@ -883,6 +888,15 @@ export const ClientRequestsScreen = ({
     focusBooking(booking)
     onFocusHandled?.()
   }, [activeTab, bookingItems, focusBooking, onFocusHandled])
+
+  useEffect(() => {
+    if (focusedBookingId === null) return
+    const index = visibleBookings.findIndex((booking) => booking.id === focusedBookingId)
+    if (index < 0) return
+    requestAnimationFrame(() => {
+      bookingsVirtualRef.current?.scrollToIndex(index)
+    })
+  }, [focusedBookingId, visibleBookings])
 
   const readFileAsDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -1611,386 +1625,394 @@ export const ClientRequestsScreen = ({
                 </p>
               )}
 
-              <div className="requests-list">
-                {items.map((item) => {
-                  const locationLabel =
-                    locationLabelMap[item.locationType] ?? 'Не важно'
-                  const baseDateLabel =
-                    item.dateOption === 'choose'
-                      ? formatDateTime(item.dateTime) || 'По договоренности'
-                      : dateLabelMap[item.dateOption]
-                  const timeWindowLabel = formatTimeWindowList(item.timeWindows)
-                  const dateLabel = timeWindowLabel
-                    ? `${baseDateLabel} · ${timeWindowLabel}`
-                    : baseDateLabel
-                  const statusLabel = item.status === 'open' ? 'Открыта' : 'Закрыта'
-                  const categoryLabel =
-                    categoryItems.find((category) => category.id === item.categoryId)
-                      ?.label ?? item.categoryId
-                  const responseCount = item.responsesCount ?? 0
-                  const responsePreview = Array.isArray(item.responsePreview)
-                    ? item.responsePreview
-                    : []
-                  const responseOverflow =
-                    responseCount > responsePreview.length
-                      ? responseCount - responsePreview.length
-                      : 0
-                  const dispatchedCount = item.dispatchedCount ?? 0
-                  const dispatchBatch =
-                    item.dispatchBatch ??
-                    (dispatchedCount > 0 ? 1 : 0)
-                  const dispatchTimeLeft = formatTimeLeft(item.dispatchExpiresAt)
-                  const isWaitingForResponses =
-                    item.status === 'open' && responseCount === 0
-                  const responses = responsesByRequestId[item.id] ?? []
-                  const isResponsesOpen = expandedRequestId === item.id
+              {items.length > 0 && (
+                <VirtualStack
+                  ref={requestsVirtualRef}
+                  items={items}
+                  estimateSize={240}
+                  gap={10}
+                  overscan={8}
+                  className="requests-list"
+                  getItemKey={(item: ServiceRequest) => item.id}
+                  renderItem={(item: ServiceRequest) => {
+                    const locationLabel =
+                      locationLabelMap[item.locationType] ?? 'Не важно'
+                    const baseDateLabel =
+                      item.dateOption === 'choose'
+                        ? formatDateTime(item.dateTime) || 'По договоренности'
+                        : dateLabelMap[item.dateOption]
+                    const timeWindowLabel = formatTimeWindowList(item.timeWindows)
+                    const dateLabel = timeWindowLabel
+                      ? `${baseDateLabel} · ${timeWindowLabel}`
+                      : baseDateLabel
+                    const statusLabel = item.status === 'open' ? 'Открыта' : 'Закрыта'
+                    const categoryLabel =
+                      categoryItems.find((category) => category.id === item.categoryId)
+                        ?.label ?? item.categoryId
+                    const responseCount = item.responsesCount ?? 0
+                    const responsePreview = Array.isArray(item.responsePreview)
+                      ? item.responsePreview
+                      : []
+                    const responseOverflow =
+                      responseCount > responsePreview.length
+                        ? responseCount - responsePreview.length
+                        : 0
+                    const dispatchedCount = item.dispatchedCount ?? 0
+                    const dispatchBatch =
+                      item.dispatchBatch ??
+                      (dispatchedCount > 0 ? 1 : 0)
+                    const dispatchTimeLeft = formatTimeLeft(item.dispatchExpiresAt)
+                    const isWaitingForResponses =
+                      item.status === 'open' && responseCount === 0
+                    const responses = responsesByRequestId[item.id] ?? []
+                    const isResponsesOpen = expandedRequestId === item.id
 
-                  return (
-                    <div
-                      className={`request-item${
-                        focusedRequestId === item.id ? ' is-focus' : ''
-                      }`}
-                      key={item.id}
-                      id={`request-${item.id}`}
-                    >
-                      <div className="request-item-top">
-                        <div className="request-item-title">{item.serviceName}</div>
-                        <span
-                          className={`request-status${
-                            item.status === 'open' ? ' is-open' : ' is-closed'
-                          }`}
-                        >
-                          {statusLabel}
-                        </span>
-                      </div>
-                      <div className="request-item-meta">
-                        {categoryLabel}
-                        {item.budget ? ` • ${item.budget}` : ''}
-                      </div>
-                      <div className="request-item-meta">
-                        {dateLabel} · {locationLabel}
-                      </div>
-                      {dispatchedCount > 0 && (
-                        <div className="request-item-meta request-item-meta--hint">
-                          Отправлено: {dispatchedCount}
-                          {dispatchBatch ? ` • Волна ${dispatchBatch}` : ''}
-                        </div>
-                      )}
-                      {isWaitingForResponses && (
-                        <div className="request-item-meta request-item-meta--hint">
-                          {dispatchTimeLeft
-                            ? `Осталось ${dispatchTimeLeft} до расширения поиска`
-                            : 'Поиск расширяется, подбираем больше мастеров'}
-                        </div>
-                      )}
-                      <div className="request-item-actions">
-                        <button
-                          className={`response-toggle${
-                            responseCount > 0 ? ' has-responses' : ''
-                          }${isResponsesOpen ? ' is-open' : ''}`}
-                          type="button"
-                          onClick={() => toggleResponses(item.id)}
-                        >
-                          <span className="response-toggle-pill">
-                            <span className="response-toggle-text">
-                              {isResponsesOpen ? 'Скрыть' : 'Отклики'}
-                            </span>
-                            <span className="response-toggle-count">
-                              ({responseCount})
-                            </span>
-                          </span>
-                          {!isResponsesOpen && responsePreview.length > 0 && (
-                            <span className="response-toggle-preview">
-                              <span
-                                className="response-preview-stack"
-                                aria-hidden="true"
-                              >
-                              {responsePreview.map((preview, index) => {
-                                const initials = getInitials(
-                                  preview.displayName || 'Мастер'
-                                )
-                                return (
-                                  <span
-                                    className="response-preview-avatar"
-                                    key={preview.masterId}
-                                    style={{ zIndex: 10 + index }}
-                                  >
-                                    {preview.avatarUrl ? (
-                                      <img src={preview.avatarUrl} alt="" />
-                                    ) : (
-                                      <span>{initials}</span>
-                                    )}
-                                  </span>
-                                )
-                              })}
-                              {responseOverflow > 0 && (
-                                <span
-                                  className="response-preview-more"
-                                  style={{ zIndex: 10 + responsePreview.length }}
-                                >
-                                  +{responseOverflow}
-                                </span>
-                              )}
-                              </span>
-                              <span className="response-preview-chevron" aria-hidden="true">
-                                ›
-                              </span>
-                            </span>
-                          )}
-                        </button>
-                        {item.chatId ? (
-                          <button
-                            className="request-chat-link"
-                            type="button"
-                            onClick={() => onOpenChat(item.chatId!)}
+                    return (
+                      <div
+                        className={`request-item${
+                          focusedRequestId === item.id ? ' is-focus' : ''
+                        }`}
+                        id={`request-${item.id}`}
+                      >
+                        <div className="request-item-top">
+                          <div className="request-item-title">{item.serviceName}</div>
+                          <span
+                            className={`request-status${
+                              item.status === 'open' ? ' is-open' : ' is-closed'
+                            }`}
                           >
-                            <IconChat />
-                            Чат по заявке
-                          </button>
-                        ) : (
-                          item.status === 'closed' && (
-                            <span className="request-chat-pending">
-                              Чат создаётся...
-                            </span>
-                          )
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <div className="request-item-meta">
+                          {categoryLabel}
+                          {item.budget ? ` • ${item.budget}` : ''}
+                        </div>
+                        <div className="request-item-meta">
+                          {dateLabel} · {locationLabel}
+                        </div>
+                        {dispatchedCount > 0 && (
+                          <div className="request-item-meta request-item-meta--hint">
+                            Отправлено: {dispatchedCount}
+                            {dispatchBatch ? ` • Волна ${dispatchBatch}` : ''}
+                          </div>
                         )}
-                      </div>
-                      {isResponsesOpen && (
-                        <div className="request-responses">
-                          {responsesLoadingId === item.id && (
-                            <p className="response-status">Загружаем отклики...</p>
-                          )}
-                          {responsesErrorId === item.id && responsesError && (
-                            <p className="response-error">{responsesError}</p>
-                          )}
-                          {responsesLoadingId !== item.id &&
-                            responses.length === 0 &&
-                            responsesErrorId !== item.id && (
-                              <p className="response-status">
-                                Откликов пока нет.
-                              </p>
-                            )}
-                          {responses.map((responseItem) => {
-                            const responseStatusLabel =
-                              responseStatusLabelMap[responseItem.status] ??
-                              responseItem.status
-                            const masterName = responseItem.displayName || 'Мастер'
-                            const masterInitials = getInitials(masterName)
-                            const ratingLabel = formatRating(
-                              responseItem.reviewsAverage,
-                              responseItem.reviewsCount
-                            )
-                            const experienceLabel = formatExperience(
-                              responseItem.experienceYears
-                            )
-                            const priceLabel =
-                              responseItem.price !== null &&
-                              responseItem.price !== undefined
-                                ? formatPrice(responseItem.price)
-                                : ''
-                            const priceRangeLabel =
-                              responseItem.price === null ||
-                              responseItem.price === undefined
-                                ? formatPriceRange(
-                                    responseItem.priceFrom,
-                                    responseItem.priceTo
-                                  )
-                                : ''
-                            const previewUrls = Array.isArray(
-                              responseItem.previewUrls
-                            )
-                              ? responseItem.previewUrls
-                              : []
-                            const proposedSlotLabel = responseItem.proposedSlotAt
-                              ? formatDateTime(responseItem.proposedSlotAt)
-                              : ''
-                            const holdTimeLeft = responseItem.holdExpiresAt
-                              ? formatTimeLeft(responseItem.holdExpiresAt)
-                              : ''
-                            const isAccepted = responseItem.status === 'accepted'
-                            const isRejected = responseItem.status === 'rejected'
-                            const canRespondAction =
-                              item.status === 'open' && responseItem.status === 'sent'
-                            const canInstantBook =
-                              canRespondAction &&
-                              Boolean(proposedSlotLabel) &&
-                              Boolean(holdTimeLeft)
-                            const isActionLoading = responseActionId === responseItem.id
-
-                            return (
-                              <div
-                                className={`response-card${
-                                  isAccepted
-                                    ? ' is-accepted'
-                                    : isRejected
-                                      ? ' is-rejected'
-                                      : ''
-                                }`}
-                                key={responseItem.id}
-                              >
-                                <button
-                                  className="response-link"
-                                  type="button"
-                                  aria-label={`Открыть профиль ${masterName}`}
-                                  onClick={() => onViewProfile(responseItem.masterId)}
+                        {isWaitingForResponses && (
+                          <div className="request-item-meta request-item-meta--hint">
+                            {dispatchTimeLeft
+                              ? `Осталось ${dispatchTimeLeft} до расширения поиска`
+                              : 'Поиск расширяется, подбираем больше мастеров'}
+                          </div>
+                        )}
+                        <div className="request-item-actions">
+                          <button
+                            className={`response-toggle${
+                              responseCount > 0 ? ' has-responses' : ''
+                            }${isResponsesOpen ? ' is-open' : ''}`}
+                            type="button"
+                            onClick={() => toggleResponses(item.id)}
+                          >
+                            <span className="response-toggle-pill">
+                              <span className="response-toggle-text">
+                                {isResponsesOpen ? 'Скрыть' : 'Отклики'}
+                              </span>
+                              <span className="response-toggle-count">
+                                ({responseCount})
+                              </span>
+                            </span>
+                            {!isResponsesOpen && responsePreview.length > 0 && (
+                              <span className="response-toggle-preview">
+                                <span
+                                  className="response-preview-stack"
+                                  aria-hidden="true"
                                 >
-                                  <div className="response-head">
-                                    <div className="response-avatar" aria-hidden="true">
-                                      {responseItem.avatarUrl ? (
-                                        <img src={responseItem.avatarUrl} alt="" />
+                                {responsePreview.map((preview, index) => {
+                                  const initials = getInitials(
+                                    preview.displayName || 'Мастер'
+                                  )
+                                  return (
+                                    <span
+                                      className="response-preview-avatar"
+                                      key={preview.masterId}
+                                      style={{ zIndex: 10 + index }}
+                                    >
+                                      {preview.avatarUrl ? (
+                                        <img src={preview.avatarUrl} alt="" />
                                       ) : (
-                                        <span>{masterInitials}</span>
+                                        <span>{initials}</span>
                                       )}
-                                    </div>
-                                    <div className="response-main">
-                                      <div className="response-name">{masterName}</div>
-                                      <div className="response-subline">
-                                        {experienceLabel && (
-                                          <span className="response-pill">
-                                            {experienceLabel}
-                                          </span>
-                                        )}
-                                        {ratingLabel && (
-                                          <span className="response-rating">
-                                            {ratingLabel}
-                                          </span>
+                                    </span>
+                                  )
+                                })}
+                                {responseOverflow > 0 && (
+                                  <span
+                                    className="response-preview-more"
+                                    style={{ zIndex: 10 + responsePreview.length }}
+                                  >
+                                    +{responseOverflow}
+                                  </span>
+                                )}
+                                </span>
+                                <span className="response-preview-chevron" aria-hidden="true">
+                                  ›
+                                </span>
+                              </span>
+                            )}
+                          </button>
+                          {item.chatId ? (
+                            <button
+                              className="request-chat-link"
+                              type="button"
+                              onClick={() => onOpenChat(item.chatId!)}
+                            >
+                              <IconChat />
+                              Чат по заявке
+                            </button>
+                          ) : (
+                            item.status === 'closed' && (
+                              <span className="request-chat-pending">
+                                Чат создаётся...
+                              </span>
+                            )
+                          )}
+                        </div>
+                        {isResponsesOpen && (
+                          <div className="request-responses">
+                            {responsesLoadingId === item.id && (
+                              <p className="response-status">Загружаем отклики...</p>
+                            )}
+                            {responsesErrorId === item.id && responsesError && (
+                              <p className="response-error">{responsesError}</p>
+                            )}
+                            {responsesLoadingId !== item.id &&
+                              responses.length === 0 &&
+                              responsesErrorId !== item.id && (
+                                <p className="response-status">
+                                  Откликов пока нет.
+                                </p>
+                              )}
+                            {responses.map((responseItem) => {
+                              const responseStatusLabel =
+                                responseStatusLabelMap[responseItem.status] ??
+                                responseItem.status
+                              const masterName = responseItem.displayName || 'Мастер'
+                              const masterInitials = getInitials(masterName)
+                              const ratingLabel = formatRating(
+                                responseItem.reviewsAverage,
+                                responseItem.reviewsCount
+                              )
+                              const experienceLabel = formatExperience(
+                                responseItem.experienceYears
+                              )
+                              const priceLabel =
+                                responseItem.price !== null &&
+                                responseItem.price !== undefined
+                                  ? formatPrice(responseItem.price)
+                                  : ''
+                              const priceRangeLabel =
+                                responseItem.price === null ||
+                                responseItem.price === undefined
+                                  ? formatPriceRange(
+                                      responseItem.priceFrom,
+                                      responseItem.priceTo
+                                    )
+                                  : ''
+                              const previewUrls = Array.isArray(
+                                responseItem.previewUrls
+                              )
+                                ? responseItem.previewUrls
+                                : []
+                              const proposedSlotLabel = responseItem.proposedSlotAt
+                                ? formatDateTime(responseItem.proposedSlotAt)
+                                : ''
+                              const holdTimeLeft = responseItem.holdExpiresAt
+                                ? formatTimeLeft(responseItem.holdExpiresAt)
+                                : ''
+                              const isAccepted = responseItem.status === 'accepted'
+                              const isRejected = responseItem.status === 'rejected'
+                              const canRespondAction =
+                                item.status === 'open' && responseItem.status === 'sent'
+                              const canInstantBook =
+                                canRespondAction &&
+                                Boolean(proposedSlotLabel) &&
+                                Boolean(holdTimeLeft)
+                              const isActionLoading = responseActionId === responseItem.id
+
+                              return (
+                                <div
+                                  className={`response-card${
+                                    isAccepted
+                                      ? ' is-accepted'
+                                      : isRejected
+                                        ? ' is-rejected'
+                                        : ''
+                                  }`}
+                                  key={responseItem.id}
+                                >
+                                  <button
+                                    className="response-link"
+                                    type="button"
+                                    aria-label={`Открыть профиль ${masterName}`}
+                                    onClick={() => onViewProfile(responseItem.masterId)}
+                                  >
+                                    <div className="response-head">
+                                      <div className="response-avatar" aria-hidden="true">
+                                        {responseItem.avatarUrl ? (
+                                          <img src={responseItem.avatarUrl} alt="" />
+                                        ) : (
+                                          <span>{masterInitials}</span>
                                         )}
                                       </div>
+                                      <div className="response-main">
+                                        <div className="response-name">{masterName}</div>
+                                        <div className="response-subline">
+                                          {experienceLabel && (
+                                            <span className="response-pill">
+                                              {experienceLabel}
+                                            </span>
+                                          )}
+                                          {ratingLabel && (
+                                            <span className="response-rating">
+                                              {ratingLabel}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {priceLabel && (
+                                        <span className="response-price">
+                                          {priceLabel}
+                                        </span>
+                                      )}
                                     </div>
-                                    {priceLabel && (
-                                      <span className="response-price">
-                                        {priceLabel}
-                                      </span>
-                                    )}
-                                  </div>
-                                </button>
-                                {priceRangeLabel && (
+                                  </button>
+                                  {priceRangeLabel && (
+                                    <div className="response-meta">
+                                      {priceRangeLabel}
+                                    </div>
+                                  )}
+                                  {responseItem.comment && (
+                                    <div className="response-comment">
+                                      {responseItem.comment}
+                                    </div>
+                                  )}
+                                  {responseItem.proposedTime && (
+                                    <div className="response-meta">
+                                      Время: {responseItem.proposedTime}
+                                    </div>
+                                  )}
+                                  {proposedSlotLabel && (
+                                    <div className="response-meta">
+                                      Слот: {proposedSlotLabel}
+                                    </div>
+                                  )}
+                                  {!holdTimeLeft && responseItem.proposedSlotAt && (
+                                    <div className="response-meta response-meta--warning">
+                                      Удержание слота истекло
+                                    </div>
+                                  )}
+                                  {holdTimeLeft && (
+                                    <div className="response-meta response-meta--highlight">
+                                      Удержание слота: {holdTimeLeft}
+                                    </div>
+                                  )}
+                                  {previewUrls.length > 0 && (
+                                    <div className="response-preview" role="list">
+                                      {previewUrls.map((url, index) => (
+                                        <span
+                                          className="response-preview-thumb"
+                                          key={`${responseItem.id}-preview-${index}`}
+                                          role="listitem"
+                                        >
+                                          <img src={url} alt="" loading="lazy" />
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                   <div className="response-meta">
-                                    {priceRangeLabel}
+                                    Статус: {responseStatusLabel}
                                   </div>
-                                )}
-                                {responseItem.comment && (
-                                  <div className="response-comment">
-                                    {responseItem.comment}
-                                  </div>
-                                )}
-                                {responseItem.proposedTime && (
-                                  <div className="response-meta">
-                                    Время: {responseItem.proposedTime}
-                                  </div>
-                                )}
-                                {proposedSlotLabel && (
-                                  <div className="response-meta">
-                                    Слот: {proposedSlotLabel}
-                                  </div>
-                                )}
-                                {!holdTimeLeft && responseItem.proposedSlotAt && (
-                                  <div className="response-meta response-meta--warning">
-                                    Удержание слота истекло
-                                  </div>
-                                )}
-                                {holdTimeLeft && (
-                                  <div className="response-meta response-meta--highlight">
-                                    Удержание слота: {holdTimeLeft}
-                                  </div>
-                                )}
-                                {previewUrls.length > 0 && (
-                                  <div className="response-preview" role="list">
-                                    {previewUrls.map((url, index) => (
-                                      <span
-                                        className="response-preview-thumb"
-                                        key={`${responseItem.id}-preview-${index}`}
-                                        role="listitem"
-                                      >
-                                        <img src={url} alt="" loading="lazy" />
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                <div className="response-meta">
-                                  Статус: {responseStatusLabel}
-                                </div>
-                                {canRespondAction && (
-                                  <div className="response-actions">
-                                    <button
-                                      className={`response-action${
-                                        canInstantBook ? '' : ' is-primary'
-                                      }`}
-                                      type="button"
-                                      onClick={() =>
-                                        handleResponseAction(
-                                          item.id,
-                                          responseItem.id,
-                                          'accept'
-                                        )
-                                      }
-                                      disabled={isActionLoading}
-                                    >
-                                      Выбрать мастера
-                                    </button>
-                                    {canInstantBook && (
+                                  {canRespondAction && (
+                                    <div className="response-actions">
                                       <button
-                                        className="response-action is-primary"
+                                        className={`response-action${
+                                          canInstantBook ? '' : ' is-primary'
+                                        }`}
                                         type="button"
                                         onClick={() =>
                                           handleResponseAction(
                                             item.id,
                                             responseItem.id,
-                                            'accept',
-                                            { bookNow: true }
+                                            'accept'
                                           )
                                         }
                                         disabled={isActionLoading}
                                       >
-                                        Записаться
+                                        Выбрать мастера
                                       </button>
-                                    )}
-                                    <button
-                                      className="response-action"
-                                      type="button"
-                                      onClick={() =>
-                                        handleResponseAction(
-                                          item.id,
-                                          responseItem.id,
-                                          'reject'
-                                        )
-                                      }
-                                      disabled={isActionLoading}
-                                    >
-                                      Отклонить
-                                    </button>
-                                  </div>
-                                )}
-                                {isAccepted && responseItem.chatId && (
-                                  <div className="response-actions">
-                                    <button
-                                      className="response-action is-primary"
-                                      type="button"
-                                      onClick={() => onOpenChat(responseItem.chatId!)}
-                                    >
-                                      Перейти в чат
-                                    </button>
-                                  </div>
-                                )}
-                                {isAccepted && !responseItem.chatId && (
-                                  <p className="response-status">
-                                    Чат создается...
-                                  </p>
-                                )}
-                                {responseActionError[responseItem.id] && (
-                                  <p className="response-error">
-                                    {responseActionError[responseItem.id]}
-                                  </p>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                                      {canInstantBook && (
+                                        <button
+                                          className="response-action is-primary"
+                                          type="button"
+                                          onClick={() =>
+                                            handleResponseAction(
+                                              item.id,
+                                              responseItem.id,
+                                              'accept',
+                                              { bookNow: true }
+                                            )
+                                          }
+                                          disabled={isActionLoading}
+                                        >
+                                          Записаться
+                                        </button>
+                                      )}
+                                      <button
+                                        className="response-action"
+                                        type="button"
+                                        onClick={() =>
+                                          handleResponseAction(
+                                            item.id,
+                                            responseItem.id,
+                                            'reject'
+                                          )
+                                        }
+                                        disabled={isActionLoading}
+                                      >
+                                        Отклонить
+                                      </button>
+                                    </div>
+                                  )}
+                                  {isAccepted && responseItem.chatId && (
+                                    <div className="response-actions">
+                                      <button
+                                        className="response-action is-primary"
+                                        type="button"
+                                        onClick={() => onOpenChat(responseItem.chatId!)}
+                                      >
+                                        Перейти в чат
+                                      </button>
+                                    </div>
+                                  )}
+                                  {isAccepted && !responseItem.chatId && (
+                                    <p className="response-status">
+                                      Чат создается...
+                                    </p>
+                                  )}
+                                  {responseActionError[responseItem.id] && (
+                                    <p className="response-error">
+                                      {responseActionError[responseItem.id]}
+                                    </p>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }}
+                />
+              )}
             </>
           )}
 
@@ -2066,8 +2088,16 @@ export const ClientRequestsScreen = ({
               )}
 
               {visibleBookingsCount > 0 && (
-                <div className="requests-list booking-list" ref={bookingListRef}>
-                  {visibleBookings.map((booking) => {
+                <div ref={bookingListRef}>
+                  <VirtualStack
+                    ref={bookingsVirtualRef}
+                    items={visibleBookings}
+                    estimateSize={340}
+                    gap={12}
+                    overscan={6}
+                    className="requests-list booking-list"
+                    getItemKey={(item: Booking) => item.id}
+                    renderItem={(booking: Booking) => {
                   const statusLabel =
                     bookingStatusLabelMap[booking.status] ?? booking.status
                   const statusTone =
@@ -2759,7 +2789,8 @@ export const ClientRequestsScreen = ({
                       )}
                     </div>
                   )
-                })}
+                    }}
+                  />
                 </div>
               )}
             </>

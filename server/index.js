@@ -2,9 +2,10 @@ import dotenv from 'dotenv'
 import cors from 'cors'
 import express from 'express'
 import compression from 'compression'
+import sharp from 'sharp'
 import { WebSocketServer } from 'ws'
 import { Pool } from 'pg'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -14,6 +15,7 @@ const app = express()
 const port = Number(process.env.API_PORT ?? process.env.PORT ?? 4000)
 const corsOrigin = process.env.CORS_ORIGIN ?? '*'
 const uploadsRoot = path.join(process.cwd(), 'uploads')
+const imageCacheRoot = path.join(process.cwd(), '.cache', 'image-derivatives')
 const MAX_UPLOAD_BYTES = 6 * 1024 * 1024
 const STORY_DEFAULT_TTL_HOURS = 24
 const STORY_MIN_TTL_HOURS = 1
@@ -21,6 +23,12 @@ const STORY_MAX_TTL_HOURS = 72
 const STORY_MAX_ACTIVE = 30
 const STORY_CAPTION_LIMIT = 200
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const allowedImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+const IMAGE_MIN_WIDTH = 24
+const IMAGE_MAX_WIDTH = 2048
+const IMAGE_MIN_QUALITY = 40
+const IMAGE_MAX_QUALITY = 88
+const IMAGE_DEFAULT_QUALITY = 72
 const REQUEST_INITIAL_BATCH_SIZE = 15
 const REQUEST_EXPANDED_BATCH_SIZE = 20
 const REQUEST_RESPONSE_WINDOW_MINUTES = 30
@@ -112,6 +120,91 @@ const chatMessageTypes = new Set([
 app.use(cors({ origin: corsOrigin }))
 app.use(compression())
 app.use(express.json({ limit: '12mb' }))
+app.get('/uploads/*', async (req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next()
+  const width = parseImageParam(req.query.w, IMAGE_MIN_WIDTH, IMAGE_MAX_WIDTH)
+  const qualityParam = parseImageParam(req.query.q, IMAGE_MIN_QUALITY, IMAGE_MAX_QUALITY)
+  const formatParam = normalizeImageFormat(
+    req.query.format ?? req.query.f ?? req.query.fm
+  )
+  const hasTransform =
+    width !== null || Boolean(normalizeText(req.query.q)) || Boolean(formatParam)
+  if (!hasTransform) return next()
+
+  let relativePath = ''
+  try {
+    relativePath = decodeURIComponent(req.path.replace(/^\/uploads\//, ''))
+  } catch (error) {
+    return next()
+  }
+  if (!relativePath || relativePath.includes('..')) return next()
+  const ext = path.extname(relativePath).toLowerCase()
+  if (!allowedImageExtensions.has(ext)) return next()
+  const absolutePath = path.join(uploadsRoot, relativePath)
+  if (!path.normalize(absolutePath).startsWith(uploadsRoot)) return next()
+
+  try {
+    const stat = await fs.stat(absolutePath)
+    if (!stat.isFile()) return next()
+  } catch (error) {
+    return next()
+  }
+
+  const format = resolveImageFormat(req, ext, formatParam)
+  const quality = qualityParam ?? IMAGE_DEFAULT_QUALITY
+  const cacheTarget = buildImageCachePath(relativePath, {
+    width,
+    quality,
+    format,
+  })
+
+  try {
+    const cached = await fs.stat(cacheTarget.filePath).then(() => true).catch(() => false)
+    if (cached) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+      res.setHeader('Vary', 'Accept')
+      res.type(`image/${format === 'jpeg' ? 'jpeg' : format}`)
+      return res.sendFile(cacheTarget.filePath)
+    }
+  } catch (error) {
+    // fall through to generate
+  }
+
+  try {
+    let pipeline = sharp(absolutePath, { failOn: 'none' })
+    if (width) {
+      pipeline = pipeline.resize({ width, withoutEnlargement: true })
+    }
+    switch (format) {
+      case 'png':
+        pipeline = pipeline.png({
+          quality,
+          compressionLevel: 9,
+          adaptiveFiltering: true,
+        })
+        break
+      case 'webp':
+        pipeline = pipeline.webp({ quality })
+        break
+      case 'avif':
+        pipeline = pipeline.avif({ quality: Math.min(quality, 80) })
+        break
+      default:
+        pipeline = pipeline.jpeg({ quality, mozjpeg: true })
+        break
+    }
+    const buffer = await pipeline.toBuffer()
+    await fs.mkdir(cacheTarget.folder, { recursive: true })
+    await fs.writeFile(cacheTarget.filePath, buffer)
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    res.setHeader('Vary', 'Accept')
+    res.type(`image/${format === 'jpeg' ? 'jpeg' : format}`)
+    return res.end(buffer)
+  } catch (error) {
+    console.error('Image resize failed:', error)
+    return next()
+  }
+})
 app.use(
   '/uploads',
   express.static(uploadsRoot, {
@@ -183,6 +276,21 @@ const parseOptionalInt = (value) => {
   if (!normalized) return null
   const parsed = Number(normalized)
   return Number.isInteger(parsed) ? parsed : null
+}
+
+const SLOW_QUERY_MS = parseOptionalInt(process.env.DB_SLOW_MS) ?? 180
+const PROFILE_ALL_QUERIES =
+  normalizeText(process.env.DB_PROFILE).toLowerCase() === 'true' ||
+  normalizeText(process.env.DB_PROFILE) === '1'
+
+const timedQuery = async (label, text, params) => {
+  const started = Date.now()
+  const result = await pool.query(text, params)
+  const duration = Date.now() - started
+  if (PROFILE_ALL_QUERIES || duration >= SLOW_QUERY_MS) {
+    console.log(`[db] ${label} ${duration}ms rows=${result.rowCount ?? 0}`)
+  }
+  return result
 }
 
 const resolveDepositType = (profile) => {
@@ -752,6 +860,42 @@ const isSafeChatUploadPath = (safeUserId, relativePath) => {
   const absolutePath = path.join(uploadsRoot, relativePath)
   const safeBase = path.join(uploadsRoot, 'chats', safeUserId)
   return path.normalize(absolutePath).startsWith(safeBase)
+}
+
+const parseImageParam = (value, min, max) => {
+  const parsed = parseOptionalInt(value)
+  if (!Number.isFinite(parsed)) return null
+  return clampValue(parsed, min, max)
+}
+
+const normalizeImageFormat = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (!normalized) return null
+  if (normalized === 'jpg') return 'jpeg'
+  if (['jpeg', 'png', 'webp', 'avif', 'auto'].includes(normalized)) return normalized
+  return null
+}
+
+const resolveImageFormat = (req, originalExt, forcedFormat) => {
+  const normalizedExt =
+    originalExt === '.jpg' || originalExt === '.jpeg' ? 'jpeg' : originalExt.slice(1)
+  if (forcedFormat && forcedFormat !== 'auto') return forcedFormat
+  const accept = String(req.headers.accept ?? '')
+  if (accept.includes('image/avif')) return 'avif'
+  if (accept.includes('image/webp')) return 'webp'
+  return normalizedExt || 'jpeg'
+}
+
+const buildImageCachePath = (relativePath, options) => {
+  const hash = createHash('sha1')
+    .update(
+      `${relativePath}|${options.width ?? ''}|${options.quality ?? ''}|${options.format ?? ''}`
+    )
+    .digest('hex')
+  const ext = options.format === 'jpeg' ? 'jpg' : options.format
+  const folder = path.join(imageCacheRoot, hash.slice(0, 2))
+  const filename = `${hash}.${ext || 'jpg'}`
+  return { folder, filePath: path.join(folder, filename) }
 }
 
 const buildPublicUrl = (req, relativePath) => {
@@ -2726,7 +2870,8 @@ const runRequestDispatchCycle = async () => {
   try {
     await expireStaleDispatches()
 
-    const result = await pool.query(
+    const result = await timedQuery(
+      'requests:list',
       `
         SELECT
           r.id,
@@ -3711,8 +3856,23 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_bookings_client_created_idx
+    ON service_bookings (client_id, created_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_bookings_master_created_idx
+    ON service_bookings (master_id, created_at DESC);
+  `)
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS service_requests_user_idx
     ON service_requests (user_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_requests_user_created_idx
+    ON service_requests (user_id, created_at DESC);
   `)
 
   await pool.query(`
@@ -5878,7 +6038,8 @@ app.get('/api/pro/requests', async (req, res) => {
     }
 
     const masterLocation = await loadUserLocation(normalizedUserId)
-    const result = await pool.query(
+    const result = await timedQuery(
+      'pro:requests:list',
       `
         SELECT
           r.id,
@@ -6071,7 +6232,8 @@ app.get('/api/bookings', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    const result = await timedQuery(
+      'bookings:list',
       `
         SELECT
           b.id,
@@ -6175,7 +6337,8 @@ app.get('/api/pro/bookings', async (req, res) => {
 
   try {
     const masterLocation = await loadUserLocation(normalizedUserId)
-    const result = await pool.query(
+    const result = await timedQuery(
+      'pro:bookings:list',
       `
         SELECT
           b.id,
@@ -10433,6 +10596,9 @@ app.post('/api/support/chat', async (req, res) => {
 
 app.get('/api/chats', async (req, res) => {
   const normalizedUserId = normalizeText(req.query.userId)
+  const includeContexts = ['1', 'true', 'yes'].includes(
+    normalizeText(req.query.contexts).toLowerCase()
+  )
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -10440,7 +10606,8 @@ app.get('/api/chats', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    const result = await timedQuery(
+      'chats:list',
       `
         SELECT
           c.id,
@@ -10632,133 +10799,138 @@ app.get('/api/chats', async (req, res) => {
       }
     })
 
-    const chatIds = payload.map((item) => item.id).filter((id) => Number.isInteger(id))
-    if (chatIds.length > 0) {
-      const contextsResult = await pool.query(
-        `
-          SELECT
-            cc.chat_id AS "chatId",
-            cc.context_type AS "contextType",
-            cc.context_id AS "contextId",
-            cc.created_at AS "contextCreatedAt",
-            sr.service_name AS "requestServiceName",
-            sr.status AS "requestStatus",
-            sr.location_type AS "requestLocationType",
-            sr.date_option AS "requestDateOption",
-            sr.date_time AS "requestDateTime",
-            sr.created_at AS "requestCreatedAt",
-            sb.service_name AS "bookingServiceName",
-            sb.status AS "bookingStatus",
-            sb.scheduled_at AS "bookingScheduledAt",
-            sb.service_duration AS "bookingServiceDuration",
-            sb.service_price AS "bookingServicePrice",
-            sb.outcome AS "bookingOutcome",
-            sb.late_minutes AS "bookingLateMinutes",
-            sb.created_at AS "bookingCreatedAt"
-          FROM chat_contexts cc
-          LEFT JOIN service_requests sr ON sr.id = cc.request_id
-          LEFT JOIN service_bookings sb ON sb.id = cc.booking_id
-          WHERE cc.chat_id = ANY($1::int[])
-          ORDER BY cc.created_at DESC
-        `,
-        [chatIds]
-      )
-      const contextsByChatId = new Map()
-      contextsResult.rows.forEach((row) => {
-        const context =
-          row.contextType === 'booking'
-            ? {
-                contextType: 'booking',
-                contextId: row.contextId,
-                serviceName: row.bookingServiceName ?? null,
-                status: row.bookingStatus ?? null,
-                scheduledAt: row.bookingScheduledAt ?? null,
-                serviceDuration: row.bookingServiceDuration ?? null,
-                servicePrice: row.bookingServicePrice ?? null,
-                outcome: row.bookingOutcome ?? null,
-                lateMinutes: row.bookingLateMinutes ?? null,
-                createdAt: row.contextCreatedAt ?? row.bookingCreatedAt ?? null,
-              }
-            : {
+    if (includeContexts) {
+      const chatIds = payload
+        .map((item) => item.id)
+        .filter((id) => Number.isInteger(id))
+      if (chatIds.length > 0) {
+        const contextsResult = await timedQuery(
+          'chats:contexts',
+          `
+            SELECT
+              cc.chat_id AS "chatId",
+              cc.context_type AS "contextType",
+              cc.context_id AS "contextId",
+              cc.created_at AS "contextCreatedAt",
+              sr.service_name AS "requestServiceName",
+              sr.status AS "requestStatus",
+              sr.location_type AS "requestLocationType",
+              sr.date_option AS "requestDateOption",
+              sr.date_time AS "requestDateTime",
+              sr.created_at AS "requestCreatedAt",
+              sb.service_name AS "bookingServiceName",
+              sb.status AS "bookingStatus",
+              sb.scheduled_at AS "bookingScheduledAt",
+              sb.service_duration AS "bookingServiceDuration",
+              sb.service_price AS "bookingServicePrice",
+              sb.outcome AS "bookingOutcome",
+              sb.late_minutes AS "bookingLateMinutes",
+              sb.created_at AS "bookingCreatedAt"
+            FROM chat_contexts cc
+            LEFT JOIN service_requests sr ON sr.id = cc.request_id
+            LEFT JOIN service_bookings sb ON sb.id = cc.booking_id
+            WHERE cc.chat_id = ANY($1::int[])
+            ORDER BY cc.created_at DESC
+          `,
+          [chatIds]
+        )
+        const contextsByChatId = new Map()
+        contextsResult.rows.forEach((row) => {
+          const context =
+            row.contextType === 'booking'
+              ? {
+                  contextType: 'booking',
+                  contextId: row.contextId,
+                  serviceName: row.bookingServiceName ?? null,
+                  status: row.bookingStatus ?? null,
+                  scheduledAt: row.bookingScheduledAt ?? null,
+                  serviceDuration: row.bookingServiceDuration ?? null,
+                  servicePrice: row.bookingServicePrice ?? null,
+                  outcome: row.bookingOutcome ?? null,
+                  lateMinutes: row.bookingLateMinutes ?? null,
+                  createdAt: row.contextCreatedAt ?? row.bookingCreatedAt ?? null,
+                }
+              : {
+                  contextType: 'request',
+                  contextId: row.contextId,
+                  serviceName: row.requestServiceName ?? null,
+                  status: row.requestStatus ?? null,
+                  locationType: row.requestLocationType ?? null,
+                  dateOption: row.requestDateOption ?? null,
+                  dateTime: row.requestDateTime ?? null,
+                  timeWindows: normalizeTimeWindows(row.requestTimeWindows),
+                  createdAt: row.contextCreatedAt ?? row.requestCreatedAt ?? null,
+                }
+          const bucket = contextsByChatId.get(row.chatId) ?? []
+          bucket.push(context)
+          contextsByChatId.set(row.chatId, bucket)
+        })
+        payload.forEach((item) => {
+          const contexts = contextsByChatId.get(item.id) ?? []
+          if (contexts.length === 0) {
+            if (item.request) {
+              contexts.push({
                 contextType: 'request',
-                contextId: row.contextId,
-                serviceName: row.requestServiceName ?? null,
-                status: row.requestStatus ?? null,
-                locationType: row.requestLocationType ?? null,
-                dateOption: row.requestDateOption ?? null,
-                dateTime: row.requestDateTime ?? null,
-                timeWindows: normalizeTimeWindows(row.requestTimeWindows),
-                createdAt: row.contextCreatedAt ?? row.requestCreatedAt ?? null,
-              }
-        const bucket = contextsByChatId.get(row.chatId) ?? []
-        bucket.push(context)
-        contextsByChatId.set(row.chatId, bucket)
-      })
-      payload.forEach((item) => {
-        const contexts = contextsByChatId.get(item.id) ?? []
-        if (contexts.length === 0) {
-          if (item.request) {
-            contexts.push({
-              contextType: 'request',
-              contextId: item.request.id,
-              serviceName: item.request.serviceName ?? null,
-              status: item.request.status ?? null,
-              locationType: item.request.locationType ?? null,
-              dateOption: item.request.dateOption ?? null,
-              dateTime: item.request.dateTime ?? null,
-              timeWindows: normalizeTimeWindows(item.request.timeWindows),
-              createdAt: item.request.createdAt ?? null,
-            })
-          } else if (item.booking) {
-            contexts.push({
-              contextType: 'booking',
-              contextId: item.booking.id,
-              serviceName: item.booking.serviceName ?? null,
-              status: item.booking.status ?? null,
-              scheduledAt: item.booking.scheduledAt ?? null,
-              serviceDuration: item.booking.serviceDuration ?? null,
-              servicePrice: item.booking.servicePrice ?? null,
-              outcome: item.booking.outcome ?? null,
-              lateMinutes: item.booking.lateMinutes ?? null,
-              createdAt: item.booking.createdAt ?? null,
-            })
+                contextId: item.request.id,
+                serviceName: item.request.serviceName ?? null,
+                status: item.request.status ?? null,
+                locationType: item.request.locationType ?? null,
+                dateOption: item.request.dateOption ?? null,
+                dateTime: item.request.dateTime ?? null,
+                timeWindows: normalizeTimeWindows(item.request.timeWindows),
+                createdAt: item.request.createdAt ?? null,
+              })
+            } else if (item.booking) {
+              contexts.push({
+                contextType: 'booking',
+                contextId: item.booking.id,
+                serviceName: item.booking.serviceName ?? null,
+                status: item.booking.status ?? null,
+                scheduledAt: item.booking.scheduledAt ?? null,
+                serviceDuration: item.booking.serviceDuration ?? null,
+                servicePrice: item.booking.servicePrice ?? null,
+                outcome: item.booking.outcome ?? null,
+                lateMinutes: item.booking.lateMinutes ?? null,
+                createdAt: item.booking.createdAt ?? null,
+              })
+            }
           }
-        }
-        item.contexts = contexts.slice(0, 6)
-      })
-    } else {
-      payload.forEach((item) => {
-        if (item.request) {
-          item.contexts = [
-            {
-              contextType: 'request',
-              contextId: item.request.id,
-              serviceName: item.request.serviceName ?? null,
-              status: item.request.status ?? null,
-              locationType: item.request.locationType ?? null,
-              dateOption: item.request.dateOption ?? null,
-              dateTime: item.request.dateTime ?? null,
-              timeWindows: normalizeTimeWindows(item.request.timeWindows),
-              createdAt: item.request.createdAt ?? null,
-            },
-          ]
-        } else if (item.booking) {
-          item.contexts = [
-            {
-              contextType: 'booking',
-              contextId: item.booking.id,
-              serviceName: item.booking.serviceName ?? null,
-              status: item.booking.status ?? null,
-              scheduledAt: item.booking.scheduledAt ?? null,
-              serviceDuration: item.booking.serviceDuration ?? null,
-              servicePrice: item.booking.servicePrice ?? null,
-              outcome: item.booking.outcome ?? null,
-              lateMinutes: item.booking.lateMinutes ?? null,
-              createdAt: item.booking.createdAt ?? null,
-            },
-          ]
-        }
-      })
+          item.contexts = contexts.slice(0, 6)
+        })
+      } else {
+        payload.forEach((item) => {
+          if (item.request) {
+            item.contexts = [
+              {
+                contextType: 'request',
+                contextId: item.request.id,
+                serviceName: item.request.serviceName ?? null,
+                status: item.request.status ?? null,
+                locationType: item.request.locationType ?? null,
+                dateOption: item.request.dateOption ?? null,
+                dateTime: item.request.dateTime ?? null,
+                timeWindows: normalizeTimeWindows(item.request.timeWindows),
+                createdAt: item.request.createdAt ?? null,
+              },
+            ]
+          } else if (item.booking) {
+            item.contexts = [
+              {
+                contextType: 'booking',
+                contextId: item.booking.id,
+                serviceName: item.booking.serviceName ?? null,
+                status: item.booking.status ?? null,
+                scheduledAt: item.booking.scheduledAt ?? null,
+                serviceDuration: item.booking.serviceDuration ?? null,
+                servicePrice: item.booking.servicePrice ?? null,
+                outcome: item.booking.outcome ?? null,
+                lateMinutes: item.booking.lateMinutes ?? null,
+                createdAt: item.booking.createdAt ?? null,
+              },
+            ]
+          }
+        })
+      }
     }
 
     res.json(payload)
@@ -11779,6 +11951,7 @@ const start = async () => {
   await ensureSchema()
   await seedLocations()
   await fs.mkdir(uploadsRoot, { recursive: true })
+  await fs.mkdir(imageCacheRoot, { recursive: true })
 
   if (shouldBackfillTrust) {
     try {

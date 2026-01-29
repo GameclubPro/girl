@@ -8,6 +8,7 @@ import { ClientBottomNav } from '../components/ClientBottomNav'
 import { categoryItems } from '../data/clientData'
 import type { MasterProfile, UserLocation } from '../types/app'
 import { fetchJsonCached, readCache } from '../utils/dataCache'
+import { buildImageSrcSet, buildImageUrl, prefetchImages } from '../utils/media'
 import {
   isImageUrl,
   parsePortfolioItems,
@@ -433,11 +434,28 @@ export const ClientShowcaseGalleryScreen = ({
     return showcasePool.filter((item) => item.categories.includes(activeCategoryId))
   }, [activeCategoryId, showcasePool])
 
+  const galleryWidths = useMemo(() => [160, 240, 320, 480], [])
+  const galleryQuality = 68
+  const galleryFallbackWidth = 320
+  const gallerySizes = '33vw'
+
   const countLabel = isLoading
     ? 'Загрузка...'
     : showcaseItems.length > 0
       ? `${showcaseItems.length} фото`
       : 'Нет работ'
+
+  useEffect(() => {
+    if (showcaseItems.length === 0) return
+    prefetchImages(
+      showcaseItems.slice(0, 6).map((item) => item.url),
+      {
+        width: galleryFallbackWidth,
+        quality: galleryQuality,
+        limit: 6,
+      }
+    )
+  }, [galleryFallbackWidth, galleryQuality, showcaseItems])
 
   return (
     <div className="screen screen--client screen--client-showcase screen--client-gallery">
@@ -497,10 +515,17 @@ export const ClientShowcaseGalleryScreen = ({
                     onClick={() => onViewDetail(item)}
                   >
                     <img
-                      src={item.url}
+                      src={buildImageUrl(item.url, {
+                        width: galleryFallbackWidth,
+                        quality: galleryQuality,
+                      })}
                       alt=""
-                      loading="lazy"
+                      loading={index < 3 ? 'eager' : 'lazy'}
                       decoding="async"
+                      srcSet={buildImageSrcSet(item.url, galleryWidths, {
+                        quality: galleryQuality,
+                      })}
+                      sizes={gallerySizes}
                       style={{
                         objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
                       }}
@@ -575,6 +600,12 @@ export const ClientShowcaseDetailScreen = ({
   const ratingLabel =
     item.reviewsAverage !== null ? item.reviewsAverage.toFixed(1) : 'Новый'
   const hasReviews = item.reviewsCount > 0 && item.reviewsAverage !== null
+  const heroWidths = useMemo(() => [360, 520, 720, 900], [])
+  const heroQuality = 76
+  const heroFallbackWidth = 720
+  const heroSizes = '100vw'
+  const avatarWidths = useMemo(() => [46, 92, 138], [])
+  const avatarQuality = 72
 
   useEffect(() => {
     if (isLiked) {
@@ -617,10 +648,16 @@ export const ClientShowcaseDetailScreen = ({
 
         <div className="client-gallery-detail-hero animate delay-1">
           <img
-            src={item.url}
+            src={buildImageUrl(item.url, {
+              width: heroFallbackWidth,
+              quality: heroQuality,
+            })}
             alt={item.title ?? 'Работа мастера'}
-            loading="lazy"
+            loading="eager"
             decoding="async"
+            fetchPriority="high"
+            srcSet={buildImageSrcSet(item.url, heroWidths, { quality: heroQuality })}
+            sizes={heroSizes}
             style={{ objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%` }}
           />
         </div>
@@ -641,10 +678,17 @@ export const ClientShowcaseDetailScreen = ({
           <span className="client-gallery-detail-avatar" aria-hidden="true">
             {item.masterAvatarUrl ? (
               <img
-                src={item.masterAvatarUrl}
+                src={buildImageUrl(item.masterAvatarUrl, {
+                  width: avatarWidths[1],
+                  quality: avatarQuality,
+                })}
                 alt=""
                 loading="lazy"
                 decoding="async"
+                srcSet={buildImageSrcSet(item.masterAvatarUrl, avatarWidths, {
+                  quality: avatarQuality,
+                })}
+                sizes="46px"
               />
             ) : (
               <span className="client-gallery-detail-avatar-fallback">
