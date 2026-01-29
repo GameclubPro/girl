@@ -3797,10 +3797,14 @@ export const ProRequestsScreen = ({
                           slot.status === 'free'
                             ? 'Свободно'
                             : slot.status === 'pending'
-                              ? 'Ожидает подтверждения'
+                              ? 'Ожидает'
                               : slot.status === 'booked'
                                 ? 'Занято'
                                 : 'Закрыто'
+                        const statusLabelFull =
+                          slot.status === 'pending'
+                            ? 'Ожидает подтверждения'
+                            : statusLabel
                         const booking = slot.booking
                         const isConfirmTarget = slotConfirm
                           ? slotConfirm.type === 'cancel-booking'
@@ -3838,6 +3842,8 @@ export const ProRequestsScreen = ({
                                     <span className="pro-slot-time">{timeLabel}</span>
                                     <span
                                       className={`pro-slot-status is-${slot.status}`}
+                                      aria-label={statusLabelFull}
+                                      title={statusLabelFull}
                                     >
                                       {statusLabel}
                                     </span>
