@@ -15329,7 +15329,7 @@
 
 .pro-slots-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 8px;
   padding-right: 0;
 }
@@ -15351,8 +15351,8 @@
 
 .pro-slot-card {
   border: 1px solid rgba(var(--shadow-rgb), 0.1);
-  border-radius: 16px;
-  padding: 8px;
+  border-radius: 14px;
+  padding: 6px;
   background: linear-gradient(
     180deg,
     rgba(var(--paper-rgb), 0.98),
@@ -15360,9 +15360,9 @@
   );
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
-  min-height: 74px;
+  gap: 4px;
+  box-shadow: 0 6px 12px rgba(var(--shadow-rgb), 0.06);
+  min-height: 60px;
 }
 
 .pro-slot-card.is-expanded {
@@ -15372,14 +15372,14 @@
 .pro-slot-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   align-items: flex-start;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
 .pro-slot-time {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--pro-ink);
   min-width: 0;
@@ -15415,10 +15415,10 @@
   align-items: center;
   gap: 5px;
   border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 9px;
+  padding: 2px 6px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   border: 1px solid transparent;
   white-space: nowrap;
@@ -15428,9 +15428,9 @@
 }
 
 .pro-slots-list .pro-slot-status {
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  padding: 4px 7px;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
   white-space: normal;
   text-align: center;
 }
@@ -15453,15 +15453,10 @@
   background: rgba(var(--danger-rgb), 0.88);
 }
 
-.pro-slot-status-icon {
-  font-size: 10px;
-  line-height: 1;
-}
-
 .pro-slot-actions {
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   overflow: visible;
   scrollbar-width: none;
   flex: 1 1 100%;
@@ -15499,8 +15494,8 @@
     rgba(var(--paper-rgb), 0.72)
   );
   border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 10px;
+  padding: 2px 6px;
+  font-size: 9px;
   font-weight: 700;
   color: var(--pro-muted);
   cursor: pointer;
@@ -15512,10 +15507,10 @@
 }
 
 .pro-slot-action--icon {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15524,14 +15519,14 @@
 }
 
 .pro-slot-action--icon svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   transition: transform 0.2s ease, filter 0.2s ease;
 }
 
 .pro-slot-action--icon img {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   object-fit: contain;
   display: block;
   transition: transform 0.2s ease, filter 0.2s ease;
