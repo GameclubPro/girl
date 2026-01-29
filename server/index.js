@@ -119,7 +119,7 @@ const chatMessageTypes = new Set([
 app.use(cors({ origin: corsOrigin }))
 app.use(compression())
 app.use(express.json({ limit: '12mb' }))
-app.get('/uploads/:path(*)', async (req, res, next) => {
+app.get(/^\/uploads\/(.+)/, async (req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next()
   const width = parseImageParam(req.query.w, IMAGE_MIN_WIDTH, IMAGE_MAX_WIDTH)
   const qualityParam = parseImageParam(req.query.q, IMAGE_MIN_QUALITY, IMAGE_MAX_QUALITY)
@@ -134,8 +134,8 @@ app.get('/uploads/:path(*)', async (req, res, next) => {
   if (!sharp) return next()
 
   let relativePath = ''
-  if (typeof req.params?.path === 'string') {
-    relativePath = req.params.path
+  if (Array.isArray(req.params) && typeof req.params[0] === 'string') {
+    relativePath = req.params[0]
   } else {
     try {
       relativePath = decodeURIComponent(req.path.replace(/^\/uploads\//, ''))
