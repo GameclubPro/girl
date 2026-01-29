@@ -27,35 +27,42 @@ import {
   type FavoriteMaster,
 } from './utils/favorites'
 import type { ShowcaseMedia } from './screens/ClientShowcaseScreen'
+import { StartScreen } from './screens/StartScreen'
 import './App.css'
 
+const loadAddressScreen = () => import('./screens/AddressScreen')
 const AddressScreen = lazy(() =>
-  import('./screens/AddressScreen').then((module) => ({
+  loadAddressScreen().then((module) => ({
     default: module.AddressScreen,
   }))
 )
+const loadChatListScreen = () => import('./screens/ChatListScreen')
 const ChatListScreen = lazy(() =>
-  import('./screens/ChatListScreen').then((module) => ({
+  loadChatListScreen().then((module) => ({
     default: module.ChatListScreen,
   }))
 )
+const loadChatThreadScreen = () => import('./screens/ChatThreadScreen')
 const ChatThreadScreen = lazy(() =>
-  import('./screens/ChatThreadScreen').then((module) => ({
+  loadChatThreadScreen().then((module) => ({
     default: module.ChatThreadScreen,
   }))
 )
+const loadClientRequestsScreen = () => import('./screens/ClientRequestsScreen')
 const ClientRequestsScreen = lazy(() =>
-  import('./screens/ClientRequestsScreen').then((module) => ({
+  loadClientRequestsScreen().then((module) => ({
     default: module.ClientRequestsScreen,
   }))
 )
+const loadClientProfileScreen = () => import('./screens/ClientProfileScreen')
 const ClientProfileScreen = lazy(() =>
-  import('./screens/ClientProfileScreen').then((module) => ({
+  loadClientProfileScreen().then((module) => ({
     default: module.ClientProfileScreen,
   }))
 )
+const loadClientScreen = () => import('./screens/ClientScreen')
 const ClientScreen = lazy(() =>
-  import('./screens/ClientScreen').then((module) => ({
+  loadClientScreen().then((module) => ({
     default: module.ClientScreen,
   }))
 )
@@ -75,64 +82,71 @@ const ClientShowcaseDetailScreen = lazy(() =>
     default: module.ClientShowcaseDetailScreen,
   }))
 )
+const loadClientMasterProfileScreen = () =>
+  import('./screens/ClientMasterProfileScreen')
 const ClientMasterProfileScreen = lazy(() =>
-  import('./screens/ClientMasterProfileScreen').then((module) => ({
+  loadClientMasterProfileScreen().then((module) => ({
     default: module.ClientMasterProfileScreen,
   }))
 )
+const loadBookingScreen = () => import('./screens/BookingScreen')
 const BookingScreen = lazy(() =>
-  import('./screens/BookingScreen').then((module) => ({
+  loadBookingScreen().then((module) => ({
     default: module.BookingScreen,
   }))
 )
+const loadProAnalyticsScreen = () => import('./screens/ProAnalyticsScreen')
 const ProAnalyticsScreen = lazy(() =>
-  import('./screens/ProAnalyticsScreen').then((module) => ({
+  loadProAnalyticsScreen().then((module) => ({
     default: module.ProAnalyticsScreen,
   }))
 )
+const loadProCabinetScreen = () => import('./screens/ProCabinetScreen')
 const ProCabinetScreen = lazy(() =>
-  import('./screens/ProCabinetScreen').then((module) => ({
+  loadProCabinetScreen().then((module) => ({
     default: module.ProCabinetScreen,
   }))
 )
+const loadProCampaignsScreen = () => import('./screens/ProCampaignsScreen')
 const ProCampaignsScreen = lazy(() =>
-  import('./screens/ProCampaignsScreen').then((module) => ({
+  loadProCampaignsScreen().then((module) => ({
     default: module.ProCampaignsScreen,
   }))
 )
+const loadProClientsScreen = () => import('./screens/ProClientsScreen')
 const ProClientsScreen = lazy(() =>
-  import('./screens/ProClientsScreen').then((module) => ({
+  loadProClientsScreen().then((module) => ({
     default: module.ProClientsScreen,
   }))
 )
+const loadProProfileScreen = () => import('./screens/ProProfileScreen')
 const ProProfileScreen = lazy(() =>
-  import('./screens/ProProfileScreen').then((module) => ({
+  loadProProfileScreen().then((module) => ({
     default: module.ProProfileScreen,
   }))
 )
+const loadProRequestsScreen = () => import('./screens/ProRequestsScreen')
 const ProRequestsScreen = lazy(() =>
-  import('./screens/ProRequestsScreen').then((module) => ({
+  loadProRequestsScreen().then((module) => ({
     default: module.ProRequestsScreen,
   }))
 )
+const loadProRemindersScreen = () => import('./screens/ProRemindersScreen')
 const ProRemindersScreen = lazy(() =>
-  import('./screens/ProRemindersScreen').then((module) => ({
+  loadProRemindersScreen().then((module) => ({
     default: module.ProRemindersScreen,
   }))
 )
+const loadProStoriesScreen = () => import('./screens/ProStoriesScreen')
 const ProStoriesScreen = lazy(() =>
-  import('./screens/ProStoriesScreen').then((module) => ({
+  loadProStoriesScreen().then((module) => ({
     default: module.ProStoriesScreen,
   }))
 )
+const loadRequestScreen = () => import('./screens/RequestScreen')
 const RequestScreen = lazy(() =>
-  import('./screens/RequestScreen').then((module) => ({
+  loadRequestScreen().then((module) => ({
     default: module.RequestScreen,
-  }))
-)
-const StartScreen = lazy(() =>
-  import('./screens/StartScreen').then((module) => ({
-    default: module.StartScreen,
   }))
 )
 
@@ -196,6 +210,56 @@ type NavAction =
   | { type: 'GO'; view: View; replace?: boolean; reset?: boolean }
   | { type: 'BACK'; fallback?: View }
 
+const viewLoaders: Partial<Record<View, () => Promise<unknown>>> = {
+  address: loadAddressScreen,
+  chats: loadChatListScreen,
+  'chat-thread': loadChatThreadScreen,
+  requests: loadClientRequestsScreen,
+  'client-profile': loadClientProfileScreen,
+  client: loadClientScreen,
+  'client-showcase': loadClientShowcase,
+  'client-gallery': loadClientShowcase,
+  'client-gallery-detail': loadClientShowcase,
+  'client-master-profile': loadClientMasterProfileScreen,
+  booking: loadBookingScreen,
+  'pro-analytics': loadProAnalyticsScreen,
+  'pro-cabinet': loadProCabinetScreen,
+  'pro-campaigns': loadProCampaignsScreen,
+  'pro-clients': loadProClientsScreen,
+  'pro-profile': loadProProfileScreen,
+  'pro-requests': loadProRequestsScreen,
+  'pro-reminders': loadProRemindersScreen,
+  'pro-stories': loadProStoriesScreen,
+  request: loadRequestScreen,
+}
+
+const clientWarmViews: View[] = [
+  'address',
+  'client',
+  'client-showcase',
+  'client-gallery',
+  'client-master-profile',
+  'booking',
+  'request',
+  'requests',
+  'client-profile',
+  'chats',
+  'chat-thread',
+]
+
+const proWarmViews: View[] = [
+  'pro-cabinet',
+  'pro-profile',
+  'pro-requests',
+  'pro-analytics',
+  'pro-clients',
+  'pro-campaigns',
+  'pro-reminders',
+  'pro-stories',
+  'chats',
+  'chat-thread',
+]
+
 const navReducer = (state: NavState, action: NavAction): NavState => {
   switch (action.type) {
     case 'GO': {
@@ -254,18 +318,54 @@ function App() {
   })
   const view = nav.view
   const navStack = nav.stack
+  const navIntentRef = useRef(0)
+  const preloadedViewsRef = useRef<Set<View>>(new Set())
+  const preloadPromisesRef = useRef<Map<View, Promise<void>>>(new Map())
+
+  const preloadView = useCallback((target: View) => {
+    const loader = viewLoaders[target]
+    if (!loader || preloadedViewsRef.current.has(target)) {
+      return null
+    }
+    const existing = preloadPromisesRef.current.get(target)
+    if (existing) {
+      return existing
+    }
+    const promise = loader()
+      .then(() => {
+        preloadedViewsRef.current.add(target)
+      })
+      .catch((error) => {
+        console.warn('Не удалось прогреть экран:', target, error)
+      })
+      .finally(() => {
+        preloadPromisesRef.current.delete(target)
+      })
+    preloadPromisesRef.current.set(target, promise)
+    return promise
+  }, [])
+
   const navigate = useCallback(
     (next: View, options?: { replace?: boolean; reset?: boolean }) => {
-      dispatchNav({ type: 'GO', view: next, ...options })
+      const intentId = ++navIntentRef.current
+      const commit = () => {
+        if (navIntentRef.current !== intentId) return
+        dispatchNav({ type: 'GO', view: next, ...options })
+      }
+      const promise = preloadView(next)
+      if (!promise) {
+        commit()
+        return
+      }
+      void promise.finally(commit)
     },
-    []
+    [preloadView]
   )
-  const goBack = useCallback(
-    (fallback?: View) => {
-      dispatchNav({ type: 'BACK', fallback })
-    },
-    []
-  )
+
+  const goBack = useCallback((fallback?: View) => {
+    navIntentRef.current += 1
+    dispatchNav({ type: 'BACK', fallback })
+  }, [])
   const [role, setRole] = useState<Role>('client')
   const [proProfileSection, setProProfileSection] =
     useState<ProProfileSection | null>(null)
@@ -348,12 +448,33 @@ function App() {
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const screenBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
+  const warmupDoneRef = useRef(false)
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
       .filter(Boolean)
       .join(' ')
       .trim() || telegramUser?.username?.trim() || ''
   const telegramAvatarUrl = telegramUser?.photo_url ?? null
+
+  useEffect(() => {
+    preloadedViewsRef.current.add(view)
+  }, [view])
+
+  useEffect(() => {
+    if (warmupDoneRef.current || view === 'start') return
+    warmupDoneRef.current = true
+    const queue = (role === 'pro' ? proWarmViews : clientWarmViews).filter(
+      (target) => target !== view
+    )
+    const timers = queue.map((target, index) =>
+      window.setTimeout(() => {
+        void preloadView(target)
+      }, 180 + index * 140)
+    )
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [preloadView, role, view])
 
   useEffect(() => {
     if (deepLinkHandledRef.current) return
@@ -1058,13 +1179,14 @@ function App() {
 
   const openSupportChat = useCallback(
     async (returnView: ChatReturnView) => {
+      void preloadView('chat-thread')
       const chatId = await ensureSupportChat()
       if (!chatId) return
       setSelectedChatId(chatId)
       setChatReturnView(returnView)
       navigate('chat-thread')
     },
-    [ensureSupportChat, navigate]
+    [ensureSupportChat, navigate, preloadView]
   )
 
   const syncFollowWithFavorite = useCallback(
