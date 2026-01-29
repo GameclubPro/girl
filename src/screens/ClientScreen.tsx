@@ -706,7 +706,7 @@ export const ClientScreen = ({
           >
             <span className="client-category-pill-icon" aria-hidden="true">
               {activeCategoryItem ? (
-                <img src={activeCategoryItem.icon} alt="" />
+                <img src={activeCategoryItem.icon} alt="" decoding="async" />
               ) : (
                 <span className="client-category-pill-plus">+</span>
               )}
@@ -839,7 +839,12 @@ export const ClientScreen = ({
                     <span className="client-story-ring" aria-hidden="true">
                       <span className="client-story-avatar">
                         {group.masterAvatarUrl ? (
-                          <img src={group.masterAvatarUrl} alt="" loading="lazy" />
+                          <img
+                            src={group.masterAvatarUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                          />
                         ) : (
                           <span>{masterInitial}</span>
                         )}
@@ -914,7 +919,7 @@ export const ClientScreen = ({
                       style={{ animationDelay: `${index * 45}ms` }}
                     >
                       <span className="category-overlay-card-icon" aria-hidden="true">
-                        <img src={item.icon} alt="" loading="lazy" />
+                        <img src={item.icon} alt="" loading="lazy" decoding="async" />
                       </span>
                       <span className="category-overlay-card-title">{label}</span>
                       <span className="category-overlay-card-arrow" aria-hidden="true">

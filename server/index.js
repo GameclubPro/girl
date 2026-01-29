@@ -1,6 +1,7 @@
 import dotenv from 'dotenv'
 import cors from 'cors'
 import express from 'express'
+import compression from 'compression'
 import { WebSocketServer } from 'ws'
 import { Pool } from 'pg'
 import { randomUUID } from 'crypto'
@@ -74,6 +75,17 @@ const BOOKING_OUTCOME_LABELS = {
   late: 'Опоздал',
   no_show: 'Не пришёл',
 }
+const API_CACHE_HEADER = 'private, max-age=30, stale-while-revalidate=30'
+const API_CACHE_PATHS = [
+  '/masters',
+  '/stories',
+  '/requests',
+  '/bookings',
+  '/pro/requests',
+  '/pro/bookings',
+  '/pro/analytics',
+  '/cities',
+]
 const MAX_CERTIFICATES = 12
 const SUPPORT_AGENT_IDS = Array.from(
   new Set(
@@ -98,8 +110,28 @@ const chatMessageTypes = new Set([
 ])
 
 app.use(cors({ origin: corsOrigin }))
+app.use(compression())
 app.use(express.json({ limit: '12mb' }))
-app.use('/uploads', express.static(uploadsRoot))
+app.use(
+  '/uploads',
+  express.static(uploadsRoot, {
+    setHeaders: (res) => {
+      res.setHeader(
+        'Cache-Control',
+        'public, max-age=604800, stale-while-revalidate=86400'
+      )
+    },
+  })
+)
+app.use('/api', (req, res, next) => {
+  if (req.method !== 'GET') return next()
+  if (req.path.startsWith('/chats/stream')) return next()
+  const isCacheable = API_CACHE_PATHS.some((prefix) => req.path.startsWith(prefix))
+  if (isCacheable) {
+    res.setHeader('Cache-Control', API_CACHE_HEADER)
+  }
+  return next()
+})
 
 const createPool = () => {
   if (process.env.DATABASE_URL) {

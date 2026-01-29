@@ -654,7 +654,12 @@ export const ChatListScreen = ({
           {isSupportChat ? (
             <IconSupport />
           ) : counterpart.avatarUrl ? (
-            <img src={counterpart.avatarUrl} alt="" loading="lazy" />
+            <img
+              src={counterpart.avatarUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <span>{getInitials(counterpart.name)}</span>
           )}

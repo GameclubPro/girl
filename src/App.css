@@ -28654,3 +28654,38 @@ h2 {
   color: var(--metal-active-text);
   box-shadow: var(--metal-active-shadow);
 }
+
+@supports (content-visibility: auto) {
+  .chat-card {
+    content-visibility: auto;
+    contain-intrinsic-size: 360px 96px;
+  }
+
+  .request-item,
+  .pro-request-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 360px 140px;
+  }
+
+  .booking-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 360px 150px;
+  }
+
+  .client-master-card {
+    content-visibility: auto;
+    contain-intrinsic-size: 360px 220px;
+  }
+
+  .client-gallery-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 180px 180px;
+  }
+
+  .cabinet-request-card,
+  .client-master-request-card,
+  .chat-request-card {
+    content-visibility: auto;
+    contain-intrinsic-size: 360px 180px;
+  }
+}

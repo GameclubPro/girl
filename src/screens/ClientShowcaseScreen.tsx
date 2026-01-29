@@ -500,6 +500,7 @@ export const ClientShowcaseGalleryScreen = ({
                       src={item.url}
                       alt=""
                       loading="lazy"
+                      decoding="async"
                       style={{
                         objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%`,
                       }}
@@ -619,6 +620,7 @@ export const ClientShowcaseDetailScreen = ({
             src={item.url}
             alt={item.title ?? 'Работа мастера'}
             loading="lazy"
+            decoding="async"
             style={{ objectPosition: `${item.focusX * 100}% ${item.focusY * 100}%` }}
           />
         </div>
@@ -638,7 +640,12 @@ export const ClientShowcaseDetailScreen = ({
         >
           <span className="client-gallery-detail-avatar" aria-hidden="true">
             {item.masterAvatarUrl ? (
-              <img src={item.masterAvatarUrl} alt="" loading="lazy" />
+              <img
+                src={item.masterAvatarUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
             ) : (
               <span className="client-gallery-detail-avatar-fallback">
                 {masterInitials}
@@ -1227,7 +1234,12 @@ export const ClientShowcaseScreen = ({
                       <div className="client-master-avatar-block">
                         <span className="client-master-avatar" aria-hidden="true">
                           {master.avatarUrl ? (
-                            <img src={master.avatarUrl} alt="" loading="lazy" />
+                            <img
+                              src={master.avatarUrl}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                            />
                           ) : (
                             <span className="client-master-avatar-fallback">
                               {master.initials}
@@ -1301,6 +1313,7 @@ export const ClientShowcaseScreen = ({
                               src={item.url}
                               alt=""
                               loading="lazy"
+                              decoding="async"
                               style={{ objectPosition: item.focus }}
                             />
                           ) : (
