@@ -2233,7 +2233,6 @@ export const ClientRequestsScreen = ({
                       : ''
                   const canDelete =
                     booking.status === 'cancelled' || booking.status === 'declined'
-                  const isConfirmed = booking.status === 'confirmed'
                   const canRescheduleAction = canReschedule && !reschedulePending
                   const actionVariant = canDelete
                     ? 'delete'
@@ -2274,6 +2273,11 @@ export const ClientRequestsScreen = ({
                   const rescheduleMetaTone = canRespondReschedule
                     ? 'booking-item-meta--warning'
                     : 'booking-item-meta--highlight'
+                  const showActions =
+                    Boolean(booking.chatId) ||
+                    hasExtraDetails ||
+                    reschedulePending ||
+                    actionVariant !== null
 
                   return (
                     <div
@@ -2293,50 +2297,58 @@ export const ClientRequestsScreen = ({
                         <div className="booking-item-main">
                           <div className="booking-item-main-row">
                             <div className="booking-item-master">{masterName}</div>
-                            {isConfirmed && (
-                              <span className={`booking-status ${statusTone}`}>
-                                {statusLabel}
-                              </span>
-                            )}
                           </div>
                           <div className="booking-item-service">
                             {booking.serviceName}
                           </div>
                         </div>
+                        <span className={`booking-status ${statusTone}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className="booking-item-meta">
+                        {scheduledLabel ? `${scheduledLabel} · ` : ''}
+                        {locationLabel}
+                      </div>
+                      {rescheduleMetaLabel && (
+                        <div className={`booking-item-meta ${rescheduleMetaTone}`}>
+                          {rescheduleMetaLabel}
+                        </div>
+                      )}
+                      {showActions && (
                         <div className="booking-item-actions">
-                          {!isConfirmed && (
-                            <span className={`booking-status ${statusTone}`}>
-                              {statusLabel}
-                            </span>
-                          )}
-                          {booking.chatId && (
-                            <button
-                              className="booking-action-icon is-chat"
-                              type="button"
-                              onClick={() => onOpenChat(booking.chatId!)}
-                            >
-                              <span
-                                className="booking-action-icon-symbol"
-                                aria-hidden="true"
-                              >
-                                <IconChat />
-                              </span>
-                              Чат
-                            </button>
-                          )}
-                          {hasExtraDetails && (
-                            <button
-                              className="booking-action-icon is-ghost"
-                              type="button"
-                              onClick={() =>
-                                setExpandedBookingDetails((current) => ({
-                                  ...current,
-                                  [booking.id]: !isDetailsOpen,
-                                }))
-                              }
-                            >
-                              {isDetailsOpen ? 'Скрыть' : 'Подробнее'}
-                            </button>
+                          {(booking.chatId || hasExtraDetails) && (
+                            <div className="booking-action-row">
+                              {booking.chatId && (
+                                <button
+                                  className="booking-action-icon is-chat"
+                                  type="button"
+                                  onClick={() => onOpenChat(booking.chatId!)}
+                                >
+                                  <span
+                                    className="booking-action-icon-symbol"
+                                    aria-hidden="true"
+                                  >
+                                    <IconChat />
+                                  </span>
+                                  Чат
+                                </button>
+                              )}
+                              {hasExtraDetails && (
+                                <button
+                                  className="booking-action-icon is-ghost"
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedBookingDetails((current) => ({
+                                      ...current,
+                                      [booking.id]: !isDetailsOpen,
+                                    }))
+                                  }
+                                >
+                                  {isDetailsOpen ? 'Скрыть' : 'Подробнее'}
+                                </button>
+                              )}
+                            </div>
                           )}
                           {reschedulePending && (
                             <div className="booking-action-row booking-action-row--top">
@@ -2487,15 +2499,6 @@ export const ClientRequestsScreen = ({
                           {actionVariant === 'reviewed' && (
                             <span className="booking-action-note">Отзыв отправлен</span>
                           )}
-                        </div>
-                      </div>
-                      <div className="booking-item-meta">
-                        {scheduledLabel ? `${scheduledLabel} · ` : ''}
-                        {locationLabel}
-                      </div>
-                      {rescheduleMetaLabel && (
-                        <div className={`booking-item-meta ${rescheduleMetaTone}`}>
-                          {rescheduleMetaLabel}
                         </div>
                       )}
                       {isDetailsOpen && (booking.cityName || booking.districtName) && (

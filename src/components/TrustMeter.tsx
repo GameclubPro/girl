@@ -46,6 +46,9 @@ export const TrustMeter = ({ trust, tips = [] }: TrustMeterProps) => {
         <div>
           <p className="trust-meter-kicker">Добросовестность</p>
           <h3 className="trust-meter-title">Шкала доверия</h3>
+          <p className="trust-meter-caption">
+            Индекс надёжности по истории визитов: явки, переносы, неявки.
+          </p>
         </div>
         <span className="trust-meter-level">{levelLabel}</span>
       </div>

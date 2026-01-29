@@ -2086,7 +2086,8 @@
   gap: 10px;
 }
 
-.screen--requests .booking-item-head {
+.screen--requests .booking-item-head,
+.screen--pro-requests .booking-item-head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
@@ -2118,7 +2119,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -2132,6 +2133,29 @@
 
 .booking-item-main-row .booking-item-master {
   min-width: 0;
+}
+
+.booking-item-trust-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  min-width: 0;
+}
+
+.booking-item-trust-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.booking-item-trust-note {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .trust-badge {
@@ -2213,8 +2237,8 @@
 .booking-item-actions {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -2332,19 +2356,13 @@
   --status-dot-ring: rgba(var(--danger-rgb), 0.22);
 }
 
-.screen--requests .booking-item-actions .booking-status {
-  text-align: right;
+.screen--requests .booking-item-head .booking-status,
+.screen--pro-requests .booking-item-head .booking-status {
   max-width: 45vw;
-  flex-basis: auto;
-  align-self: flex-end;
-}
-
-.screen--requests .booking-item-main-row .booking-status {
-  text-align: left;
-  max-width: none;
-  flex-basis: auto;
-  align-self: center;
-  white-space: nowrap;
+  justify-self: end;
+  align-self: flex-start;
+  white-space: normal;
+  text-align: center;
 }
 
 .booking-status.is-waiting {
@@ -2513,7 +2531,7 @@
 }
 
 .booking-action-row--top {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .booking-action-icon {
@@ -2562,7 +2580,7 @@
 }
 
 .booking-item-actions .booking-action-note {
-  text-align: right;
+  text-align: left;
 }
 
 .booking-action-icon:active {
@@ -14982,6 +15000,11 @@
   color: var(--pro-muted);
 }
 
+.screen--pro-requests .booking-item-trust-label,
+.screen--pro-requests .booking-item-trust-note {
+  color: var(--pro-muted);
+}
+
 .screen--pro-requests .booking-item-price {
   color: var(--ink);
 }
@@ -18132,6 +18155,13 @@ h2 {
   font-size: 17px;
   font-weight: 700;
   color: var(--ink);
+}
+
+.trust-meter-caption {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .trust-meter-level {
