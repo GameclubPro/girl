@@ -496,6 +496,7 @@ export const ChatThreadScreen = ({
   ]
     .filter(Boolean)
     .join(' · ')
+  const hasContextPill = !isSupportChat && Boolean(request || booking)
   const detailsRoleLabel = isProViewer ? 'Клиент' : 'Мастер'
   const detailsName = counterpart?.name ?? 'Пользователь'
   const detailsStatusLabel = isBookingChat
@@ -2547,7 +2548,32 @@ export const ChatThreadScreen = ({
 
   return (
     <div className="screen screen--chat-thread" ref={screenRef}>
-      <div className="chat-thread">
+      <div
+        className={`chat-thread${hasContextPill ? ' has-context-pill' : ''}`}
+      >
+        {hasContextPill && (
+          <div className="chat-context-float" role="region" aria-label="Контекст">
+            <button
+              className="chat-context-float-card"
+              type="button"
+              onClick={openContextSheet}
+              aria-label="Открыть детали заявки или записи"
+            >
+              <span className="chat-context-float-main">
+                <span className="chat-context-float-title">
+                  <span className="chat-context-float-type">
+                    {isBookingChat ? 'Запись' : 'Заявка'}
+                  </span>
+                  <span className="chat-context-float-name">{activeTitle}</span>
+                </span>
+                {summaryMeta && (
+                  <span className="chat-context-float-meta">{summaryMeta}</span>
+                )}
+              </span>
+              <span className="chat-context-float-action">Подробнее</span>
+            </button>
+          </div>
+        )}
         {showSupportIntro ? (
           <section className="chat-support-intro">
             <div className="chat-support-intro-top">
@@ -2578,38 +2604,6 @@ export const ChatThreadScreen = ({
           </section>
         ) : !isSupportChat && (request || booking) ? (
           <>
-            <section className="chat-context-summary">
-              <div className="chat-context-summary-main">
-                <span className="chat-context-summary-kicker">
-                  {isBookingChat ? 'Запись' : 'Заявка'}
-                </span>
-                <span className="chat-context-summary-title">{activeTitle}</span>
-                <span className="chat-context-summary-meta">{summaryMeta}</span>
-              </div>
-              <div className="chat-context-summary-actions">
-                {showTrustBadge && (
-                  <button
-                    className="trust-badge-button chat-context-summary-trust"
-                    type="button"
-                    onClick={openTrustSheet}
-                    aria-label="Открыть шкалу добросовестности"
-                  >
-                    <TrustBadge
-                      trust={counterpart?.trust ?? null}
-                      size="sm"
-                      className="chat-thread-trust"
-                    />
-                  </button>
-                )}
-                <button
-                  className="chat-context-summary-action"
-                  type="button"
-                  onClick={openContextSheet}
-                >
-                  Подробнее
-                </button>
-              </div>
-            </section>
             {stickyAction && (
               <section
                 className={`chat-sticky-action${
@@ -3298,12 +3292,19 @@ export const ChatThreadScreen = ({
                       {detailsStatusLabel}
                     </span>
                     {showTrustBadge && (
-                      <TrustBadge
-                        trust={counterpart?.trust ?? null}
-                        size="sm"
-                        variant="label"
-                        className="pro-slot-details-trust"
-                      />
+                      <button
+                        className="trust-badge-button"
+                        type="button"
+                        onClick={openTrustSheet}
+                        aria-label="Открыть шкалу добросовестности"
+                      >
+                        <TrustBadge
+                          trust={counterpart?.trust ?? null}
+                          size="sm"
+                          variant="label"
+                          className="pro-slot-details-trust"
+                        />
+                      </button>
                     )}
                   </div>
                 </div>

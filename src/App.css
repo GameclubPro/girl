@@ -24967,6 +24967,95 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  --chat-context-float-offset: 6px;
+}
+
+.chat-thread.has-context-pill {
+  --chat-context-float-offset: 64px;
+}
+
+.chat-context-float {
+  position: sticky;
+  top: calc(var(--safe-top) + var(--tg-top-offset) + 10px);
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.chat-context-float-card {
+  width: min(360px, 100%);
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.9);
+  border-radius: 18px;
+  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.chat-context-float-card:active {
+  transform: translateY(1px);
+}
+
+.chat-context-float-card:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.chat-context-float-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chat-context-float-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-context-float-type {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chat-context-float-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-context-float-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-context-float-action {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  white-space: nowrap;
 }
 
 .trust-badge-button {
@@ -25317,7 +25406,9 @@ h2 {
 
 .chat-sticky-action {
   position: sticky;
-  top: calc(var(--safe-top) + var(--tg-top-offset) + 6px);
+  top: calc(
+    var(--safe-top) + var(--tg-top-offset) + var(--chat-context-float-offset)
+  );
   z-index: 4;
   border: 1px solid rgba(var(--accent-rgb), 0.24);
   background: rgba(var(--paper-rgb), 0.96);
