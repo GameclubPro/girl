@@ -3863,6 +3863,33 @@ export const ProRequestsScreen = ({
                           : isExpanded
                             ? 'Скрыть действия'
                             : 'Показать действия'
+                        const bookingStatusLabel = booking
+                          ? bookingStatusLabelMap[booking.status] ?? booking.status
+                          : ''
+                        const bookingStatusTone = booking
+                          ? bookingStatusToneMap[booking.status] ?? 'is-waiting'
+                          : 'is-waiting'
+                        const bookingClientName = booking?.clientName ?? 'Клиент'
+                        const bookingLocationLabel = booking
+                          ? locationLabelMap[booking.locationType] ?? ''
+                          : ''
+                        const bookingScheduleLabel = booking
+                          ? formatDateTime(booking.scheduledAt)
+                          : ''
+                        const bookingDepositPercent =
+                          booking && typeof booking.depositPercent === 'number'
+                            ? Math.max(0, Math.round(booking.depositPercent))
+                            : 0
+                        const detailsMetaItems: string[] = []
+                        if (booking?.serviceName) {
+                          detailsMetaItems.push(booking.serviceName)
+                        }
+                        if (bookingLocationLabel) {
+                          detailsMetaItems.push(bookingLocationLabel)
+                        }
+                        if (bookingDepositPercent > 0) {
+                          detailsMetaItems.push(`Депозит ${bookingDepositPercent}%`)
+                        }
                         return (
                           <div
                             className={`pro-slot-card${
@@ -3976,7 +4003,52 @@ export const ProRequestsScreen = ({
                             </div>
                             {booking && isExpanded && (
                               <div className="pro-slot-details" id={detailsId}>
-                                {renderBookingItem(booking)}
+                                <div className="pro-slot-details-head">
+                                  <div className="pro-slot-details-title">
+                                    <span className="pro-slot-details-kicker">
+                                      Запись
+                                    </span>
+                                    <span className="pro-slot-details-name">
+                                      {bookingClientName}
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={`pro-slot-details-status ${bookingStatusTone}`}
+                                  >
+                                    {bookingStatusLabel}
+                                  </span>
+                                </div>
+                                {(detailsMetaItems.length > 0 ||
+                                  bookingScheduleLabel) && (
+                                  <div className="pro-slot-details-info">
+                                    {detailsMetaItems.length > 0 && (
+                                      <div className="pro-slot-details-meta">
+                                        {detailsMetaItems.map((item, index) => (
+                                          <span
+                                            className="pro-slot-details-meta-item"
+                                            key={`${slot.id}-meta-${index}`}
+                                          >
+                                            {item}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {bookingScheduleLabel && (
+                                      <div className="pro-slot-details-date">
+                                        <span
+                                          className="pro-slot-details-date-icon"
+                                          aria-hidden="true"
+                                        >
+                                          <IconCalendar />
+                                        </span>
+                                        <span>{bookingScheduleLabel}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="pro-slot-details-body">
+                                  {renderBookingItem(booking)}
+                                </div>
                               </div>
                             )}
                             {isConfirmTarget && slotConfirmContent && (
