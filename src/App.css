@@ -24968,11 +24968,12 @@ h2 {
   flex-direction: column;
   gap: 12px;
   --chat-context-float-offset: 8px;
-  --chat-context-float-top: 10px;
+  --chat-context-float-top: 6px;
 }
 
 .chat-thread.has-context-pill {
   --chat-context-float-offset: 72px;
+  padding-top: 56px;
 }
 
 .chat-thread.is-context-compact {
@@ -24980,7 +24981,11 @@ h2 {
 }
 
 .chat-context-float {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 0;
+  overflow: visible;
   top: calc(
     var(--safe-top) + var(--tg-top-offset) + var(--chat-context-float-top)
   );
@@ -24993,7 +24998,6 @@ h2 {
 }
 
 .chat-thread.is-context-compact .chat-context-float {
-  top: calc(var(--safe-top) + 6px);
   padding: 0 10px;
 }
 

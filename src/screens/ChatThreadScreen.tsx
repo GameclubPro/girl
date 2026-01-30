@@ -378,7 +378,6 @@ export const ChatThreadScreen = ({
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null)
   const composerRef = useRef<HTMLDivElement | null>(null)
   const hasMoreRef = useRef(true)
-  const lastScrollYRef = useRef(0)
   const isLoadingMoreRef = useRef(false)
   const hasInitialScrollRef = useRef(false)
   const messagesRef = useRef<LocalChatMessage[]>([])
@@ -2557,8 +2556,8 @@ export const ChatThreadScreen = ({
   useEffect(() => {
     if (typeof window === 'undefined' || !hasContextPill) return
     let ticking = false
-    const threshold = 32
-    const directionThreshold = 2
+    const compactThreshold = 72
+    const expandThreshold = 20
     const getScrollTop = () => {
       const container = getScrollElement()
       if (
@@ -2572,13 +2571,11 @@ export const ChatThreadScreen = ({
     }
     const handleScroll = () => {
       const current = getScrollTop()
-      const delta = current - lastScrollYRef.current
-      if (current <= threshold || delta < -directionThreshold) {
-        setIsContextCompact(false)
-      } else if (current > threshold) {
-        setIsContextCompact(true)
-      }
-      lastScrollYRef.current = current
+      setIsContextCompact((prev) => {
+        if (current > compactThreshold) return true
+        if (current < expandThreshold) return false
+        return prev
+      })
     }
     const onScroll = () => {
       if (ticking) return
