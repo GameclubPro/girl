@@ -354,7 +354,6 @@ export const ChatThreadScreen = ({
   apiBase,
   userId,
   chatId,
-  onBack,
   onViewRequests,
 }: ChatThreadScreenProps) => {
   const [detail, setDetail] = useState<ChatDetail | null>(null)
@@ -462,16 +461,6 @@ export const ChatThreadScreen = ({
   const contextType = detail?.chat?.contextType ?? null
   const isSupportChat = contextType === 'support'
   const isBookingChat = contextType === 'booking'
-  const relatedRequestId = detail?.chat?.requestId ?? request?.id ?? null
-  const relatedBookingId = detail?.chat?.bookingId ?? booking?.id ?? null
-  const hasRelatedActions = Boolean(
-    onViewRequests && (relatedRequestId || relatedBookingId)
-  )
-  const headerSubtitle = isSupportChat
-    ? 'Команда поддержки KIVEN'
-    : isBookingChat
-      ? booking?.serviceName ?? 'Запись подтверждена'
-      : request?.serviceName ?? 'Переговоры по заявке'
   const hasReschedulePending = Boolean(
     rescheduleProposedTime && rescheduleProposedBy
   )
@@ -2631,45 +2620,6 @@ export const ChatThreadScreen = ({
   return (
     <div className="screen screen--chat-thread" ref={screenRef}>
       <div className="chat-thread">
-        <header className="chat-thread-header">
-          <button className="chat-back" type="button" onClick={onBack}>
-            ←
-          </button>
-          <div className="chat-thread-title">
-            <div className="chat-thread-name-row">
-              <span className="chat-thread-name">
-                {counterpart?.name ?? 'Чат'}
-              </span>
-              {showTrustBadge && (
-                <button
-                  className="trust-badge-button"
-                  type="button"
-                  onClick={openTrustSheet}
-                  aria-label="Открыть шкалу добросовестности"
-                >
-                  <TrustBadge
-                    trust={counterpart?.trust ?? null}
-                    size="sm"
-                    className="chat-thread-trust"
-                  />
-                </button>
-              )}
-            </div>
-            <div className="chat-thread-subline">
-              <span className="chat-thread-subtitle">{headerSubtitle}</span>
-              {showConnection && (
-                <span
-                  className={`chat-connection is-compact ${connectionTone}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {connectionLabel}
-                </span>
-              )}
-            </div>
-          </div>
-        </header>
-
         {showSupportIntro ? (
           <section className="chat-support-intro">
             <div className="chat-support-intro-top">
@@ -2708,13 +2658,29 @@ export const ChatThreadScreen = ({
                 <span className="chat-context-summary-title">{activeTitle}</span>
                 <span className="chat-context-summary-meta">{summaryMeta}</span>
               </div>
-              <button
-                className="chat-context-summary-action"
-                type="button"
-                onClick={openContextSheet}
-              >
-                Подробнее
-              </button>
+              <div className="chat-context-summary-actions">
+                {showTrustBadge && (
+                  <button
+                    className="trust-badge-button chat-context-summary-trust"
+                    type="button"
+                    onClick={openTrustSheet}
+                    aria-label="Открыть шкалу добросовестности"
+                  >
+                    <TrustBadge
+                      trust={counterpart?.trust ?? null}
+                      size="sm"
+                      className="chat-thread-trust"
+                    />
+                  </button>
+                )}
+                <button
+                  className="chat-context-summary-action"
+                  type="button"
+                  onClick={openContextSheet}
+                >
+                  Подробнее
+                </button>
+              </div>
             </section>
             {contextChips.length > 0 && (
               <section className="chat-context-pills">
@@ -2769,41 +2735,6 @@ export const ChatThreadScreen = ({
                     {bookingActionError}
                   </p>
                 )}
-              </section>
-            )}
-            {hasRelatedActions && onViewRequests && (
-              <section className="chat-related">
-                <span className="chat-related-title">Связано</span>
-                <div className="chat-related-actions">
-                  {relatedRequestId && (
-                    <button
-                      className="chat-related-button"
-                      type="button"
-                      onClick={() =>
-                        onViewRequests({
-                          tab: 'requests',
-                          focusRequestId: relatedRequestId,
-                        })
-                      }
-                    >
-                      Перейти к заявке
-                    </button>
-                  )}
-                  {relatedBookingId && (
-                    <button
-                      className="chat-related-button is-primary"
-                      type="button"
-                      onClick={() =>
-                        onViewRequests({
-                          tab: 'bookings',
-                          focusBookingId: relatedBookingId,
-                        })
-                      }
-                    >
-                      Перейти к записи
-                    </button>
-                  )}
-                </div>
               </section>
             )}
             {!isBookingChat && request && (

@@ -24969,44 +24969,6 @@ h2 {
   gap: 12px;
 }
 
-.chat-thread-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.chat-back {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  border: none;
-  background: var(--accent);
-  font-size: 20px;
-  font-weight: 700;
-  color: #ffffff;
-  cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
-}
-
-.chat-thread-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.chat-thread-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.chat-thread-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
 .trust-badge-button {
   border: none;
   background: transparent;
@@ -25272,19 +25234,6 @@ h2 {
 }
 
 
-.chat-thread-subline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.chat-thread-subtitle {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
 .chat-context-summary {
   border: 1px solid rgba(var(--shadow-rgb), 0.14);
   border-radius: 18px;
@@ -25302,6 +25251,17 @@ h2 {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+}
+
+.chat-context-summary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.chat-context-summary-trust {
+  min-height: 0;
 }
 
 .chat-context-summary-kicker {
@@ -25464,55 +25424,6 @@ h2 {
   font-size: 11px;
   font-weight: 600;
   color: var(--danger);
-}
-
-.chat-related {
-  border: 1px solid rgba(var(--accent-rgb), 0.16);
-  background: rgba(var(--paper-rgb), 0.96);
-  border-radius: 16px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.08);
-}
-
-.chat-related-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.chat-related-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chat-related-button {
-  border: 1px solid rgba(var(--accent-rgb), 0.22);
-  background: rgba(var(--accent-rgb), 0.08);
-  color: var(--accent-strong);
-  font-weight: 700;
-  font-size: 12px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  min-height: 38px;
-}
-
-.chat-related-button.is-primary {
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.22);
-}
-
-.chat-related-button:focus-visible {
-  outline: 3px solid rgba(var(--accent-rgb), 0.24);
-  outline-offset: 2px;
 }
 
 .chat-active-card {
