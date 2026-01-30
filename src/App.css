@@ -15857,6 +15857,155 @@
   z-index: 1;
 }
 
+.pro-slot-details-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  background: rgba(var(--surface-muted-rgb), 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 14px calc(14px + var(--safe-bottom));
+}
+
+.pro-slot-details-sheet {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 24px);
+  border-radius: 26px 26px 20px 20px;
+  padding: 12px 14px 16px;
+  background: rgba(var(--paper-rgb), 0.98);
+  border: 1px solid rgba(var(--paper-rgb), 0.78);
+  box-shadow: 0 26px 40px rgba(var(--shadow-rgb), 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  animation: pro-slot-details-sheet-in 0.25s ease;
+}
+
+.pro-slot-details-sheet-handle {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--shadow-rgb), 0.24);
+}
+
+.pro-slot-details-sheet-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pro-slot-details-sheet-kicker {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-slot-details-sheet-title {
+  margin: 4px 0 0;
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-slot-details-sheet-subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.pro-slot-details-sheet-close {
+  border: none;
+  background: rgba(var(--shadow-rgb), 0.12);
+  color: var(--pro-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pro-slot-details-sheet-close:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.pro-slot-details-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.pro-slot-details-sheet-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pro-slot-details-sheet-actions.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pro-slot-details-sheet-action {
+  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  background: rgba(var(--paper-rgb), 0.92);
+  cursor: pointer;
+  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
+}
+
+.pro-slot-details-sheet-action.is-primary {
+  background: var(--accent-strong);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.22);
+}
+
+.pro-slot-details-sheet-action.is-danger {
+  border-color: rgba(var(--danger-rgb), 0.32);
+  background: rgba(var(--danger-rgb), 0.12);
+  color: var(--danger);
+}
+
+.pro-slot-details-sheet-action:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.pro-slots-confirm--sheet {
+  margin-top: 4px;
+}
+
+@keyframes pro-slot-details-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes pro-slot-details-in {
   from {
     opacity: 0;
@@ -15869,7 +16018,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pro-slot-details {
+  .pro-slot-details,
+  .pro-slot-details-sheet {
     animation: none;
   }
 }

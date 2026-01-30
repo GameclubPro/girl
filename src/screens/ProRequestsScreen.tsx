@@ -5,11 +5,9 @@ import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStac
 import {
   IconCalendar,
   IconChevron,
-  IconClose,
   IconLock,
   IconRadius,
   IconSettings,
-  IconSwap,
   IconTrash,
   IconUnlock,
 } from '../components/icons'
@@ -718,6 +716,7 @@ export const ProRequestsScreen = ({
     null
   )
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null)
+  const [slotDetailsId, setSlotDetailsId] = useState<string | null>(null)
   const [isPasteSlotsOpen, setIsPasteSlotsOpen] = useState(false)
   const [pasteInput, setPasteInput] = useState('')
   const [pastePreview, setPastePreview] = useState<ParsedSlotGroup[] | null>(
@@ -1370,6 +1369,10 @@ export const ProRequestsScreen = ({
     }
     return selectedSlotViews.filter((slot) => slot.status === slotFilter)
   }, [selectedSlotViews, slotFilter])
+  const slotDetails = useMemo(() => {
+    if (!slotDetailsId) return null
+    return selectedSlotViews.find((slot) => slot.id === slotDetailsId) ?? null
+  }, [selectedSlotViews, slotDetailsId])
   const slotStats = useMemo(() => {
     let free = 0
     let booked = 0
@@ -1406,6 +1409,53 @@ export const ProRequestsScreen = ({
       tone: 'is-danger',
     }
   }, [slotConfirm])
+  const slotDetailsBooking = slotDetails?.booking ?? null
+  const slotDetailsTimeLabel = slotDetails
+    ? formatMinutes(slotDetails.startMinutes)
+    : ''
+  const slotDetailsDate = slotDetails ? parseDateKey(slotDetails.dateKey) : null
+  const slotDetailsDateLabel = slotDetailsDate ? formatLongDate(slotDetailsDate) : ''
+  const slotDetailsStatusLabel = slotDetailsBooking
+    ? bookingStatusLabelMap[slotDetailsBooking.status] ?? slotDetailsBooking.status
+    : ''
+  const slotDetailsStatusTone = slotDetailsBooking
+    ? bookingStatusToneMap[slotDetailsBooking.status] ?? 'is-waiting'
+    : 'is-waiting'
+  const slotDetailsClientName = slotDetailsBooking?.clientName ?? 'Клиент'
+  const slotDetailsLocationLabel = slotDetailsBooking
+    ? locationLabelMap[slotDetailsBooking.locationType] ?? ''
+    : ''
+  const slotDetailsScheduleLabel = slotDetailsBooking
+    ? formatDateTime(slotDetailsBooking.scheduledAt)
+    : ''
+  const slotDetailsDepositPercent =
+    slotDetailsBooking && typeof slotDetailsBooking.depositPercent === 'number'
+      ? Math.max(0, Math.round(slotDetailsBooking.depositPercent))
+      : 0
+  const slotDetailsMetaItems: string[] = []
+  if (slotDetailsBooking?.serviceName) {
+    slotDetailsMetaItems.push(slotDetailsBooking.serviceName)
+  }
+  if (slotDetailsLocationLabel) {
+    slotDetailsMetaItems.push(slotDetailsLocationLabel)
+  }
+  if (slotDetailsDepositPercent > 0) {
+    slotDetailsMetaItems.push(`Депозит ${slotDetailsDepositPercent}%`)
+  }
+  const canSlotDetailsReschedule =
+    Boolean(slotDetailsBooking) &&
+    (slotDetails?.status === 'booked' || slotDetails?.status === 'pending')
+  const canSlotDetailsCancel = Boolean(slotDetailsBooking) && canSlotDetailsReschedule
+  const isSlotDetailsCancelConfirm =
+    slotConfirm?.type === 'cancel-booking' &&
+    slotConfirm.bookingId === slotDetailsBooking?.id
+  const slotDetailsActionsCount = Number(canSlotDetailsReschedule) + Number(
+    canSlotDetailsCancel
+  )
+  const slotDetailsActionClassName =
+    slotDetailsActionsCount <= 1
+      ? 'pro-slot-details-sheet-actions is-single'
+      : 'pro-slot-details-sheet-actions'
   const calendarDays = useMemo(
     () =>
       Array.from({ length: CALENDAR_RANGE_DAYS }, (_, index) =>
@@ -1772,6 +1822,7 @@ export const ProRequestsScreen = ({
     setCalendarInitialized(true)
     setSlotConfirm(null)
     setExpandedSlotId(null)
+    setSlotDetailsId(null)
     if (options?.scroll === false) return
     scrollToSlots()
   }
@@ -1780,6 +1831,9 @@ export const ProRequestsScreen = ({
     setWeekStartDate((current) => addDays(current, direction * CALENDAR_RANGE_DAYS))
     setSelectedDate((current) => addDays(current, direction * CALENDAR_RANGE_DAYS))
     setCalendarInitialized(true)
+    setSlotConfirm(null)
+    setExpandedSlotId(null)
+    setSlotDetailsId(null)
   }
 
   const focusRequest = useCallback(
@@ -1795,8 +1849,18 @@ export const ProRequestsScreen = ({
     [items]
   )
 
-  const toggleSlotExpand = (slotId: string) => {
-    setExpandedSlotId((current) => (current === slotId ? null : slotId))
+  const toggleSlotExpand = (slot: SlotView) => {
+    if (slot.booking) {
+      setExpandedSlotId(null)
+      setSlotConfirm(null)
+      setSlotDetailsId((current) => (current === slot.id ? null : slot.id))
+      if (slotDetailsId !== slot.id) {
+        hapticSelection()
+      }
+      return
+    }
+    setSlotDetailsId(null)
+    setExpandedSlotId((current) => (current === slot.id ? null : slot.id))
     setSlotConfirm(null)
   }
 
@@ -1820,7 +1884,9 @@ export const ProRequestsScreen = ({
     setSelectedDate(date)
     setWeekStartDate(startOfWeek(date))
     setCalendarInitialized(true)
-    setExpandedSlotId(`booking-${booking.id}`)
+    setSlotConfirm(null)
+    setExpandedSlotId(null)
+    setSlotDetailsId(`booking-${booking.id}`)
     setFocusedBookingId(booking.id)
     requestAnimationFrame(() => {
       document
@@ -1863,6 +1929,13 @@ export const ProRequestsScreen = ({
     focusPendingBooking,
     onFocusHandled,
   ])
+
+  useEffect(() => {
+    if (activeTab === 'bookings') return
+    if (!slotDetailsId) return
+    setSlotDetailsId(null)
+    setSlotConfirm(null)
+  }, [activeTab, slotDetailsId])
 
   const setShareMessage = (message: string) => {
     setShareStatus(message)
@@ -1940,6 +2013,8 @@ export const ProRequestsScreen = ({
     setSelectedTimes([])
     setAddSlotsError('')
     setPendingReplace(null)
+    setSlotConfirm(null)
+    setSlotDetailsId(null)
     setIsAddSlotsOpen(true)
   }
 
@@ -1955,6 +2030,8 @@ export const ProRequestsScreen = ({
     setPasteInput('')
     setPastePreview(null)
     setPasteError('')
+    setSlotConfirm(null)
+    setSlotDetailsId(null)
     setIsPasteSlotsOpen(true)
   }
 
@@ -2264,8 +2341,29 @@ export const ProRequestsScreen = ({
     }
     if (slotConfirm.type === 'cancel-booking') {
       handleCancelBooking(slotConfirm.bookingId)
+      setSlotDetailsId(null)
     }
     setSlotConfirm(null)
+  }
+
+  const handleCloseSlotDetails = () => {
+    setSlotDetailsId(null)
+    setSlotConfirm(null)
+  }
+
+  const handleSlotDetailsReschedule = () => {
+    if (!slotDetailsBooking) return
+    setSlotDetailsId(null)
+    handleOpenAddSlots({ rescheduleBookingId: slotDetailsBooking.id })
+  }
+
+  const handleSlotDetailsCancel = () => {
+    if (!slotDetailsBooking || !slotDetailsTimeLabel) return
+    setSlotConfirm({
+      type: 'cancel-booking',
+      bookingId: slotDetailsBooking.id,
+      timeLabel: slotDetailsTimeLabel,
+    })
   }
 
   const missingLabels = useMemo(() => {
@@ -3848,48 +3946,22 @@ export const ProRequestsScreen = ({
                             ? 'Ожидает подтверждения'
                             : statusLabel
                         const booking = slot.booking
-                        const isConfirmTarget = slotConfirm
-                          ? slotConfirm.type === 'cancel-booking'
-                            ? booking?.id === slotConfirm.bookingId
-                            : slotConfirm.slotId === slot.id
-                          : false
-                        const isExpanded = expandedSlotId === slot.id || isConfirmTarget
-                        const isWide = isConfirmTarget || (booking && isExpanded)
-                        const detailsId = booking ? `pro-slot-details-${slot.id}` : undefined
+                        const isSlotConfirmTarget =
+                          slotConfirm?.type !== 'cancel-booking' &&
+                          slotConfirm?.slotId === slot.id
+                        const isDetailsOpen = Boolean(booking) && slotDetails?.id === slot.id
+                        const isExpanded = booking
+                          ? isDetailsOpen
+                          : expandedSlotId === slot.id || isSlotConfirmTarget
+                        const isWide = isSlotConfirmTarget || (!booking && isExpanded)
+                        const detailsId = booking ? 'pro-slot-details-sheet' : undefined
                         const toggleLabel = booking
-                          ? isExpanded
-                            ? 'Скрыть детали и действия'
-                            : 'Показать детали и действия'
+                          ? isDetailsOpen
+                            ? 'Скрыть карточку записи'
+                            : 'Открыть карточку записи'
                           : isExpanded
                             ? 'Скрыть действия'
                             : 'Показать действия'
-                        const bookingStatusLabel = booking
-                          ? bookingStatusLabelMap[booking.status] ?? booking.status
-                          : ''
-                        const bookingStatusTone = booking
-                          ? bookingStatusToneMap[booking.status] ?? 'is-waiting'
-                          : 'is-waiting'
-                        const bookingClientName = booking?.clientName ?? 'Клиент'
-                        const bookingLocationLabel = booking
-                          ? locationLabelMap[booking.locationType] ?? ''
-                          : ''
-                        const bookingScheduleLabel = booking
-                          ? formatDateTime(booking.scheduledAt)
-                          : ''
-                        const bookingDepositPercent =
-                          booking && typeof booking.depositPercent === 'number'
-                            ? Math.max(0, Math.round(booking.depositPercent))
-                            : 0
-                        const detailsMetaItems: string[] = []
-                        if (booking?.serviceName) {
-                          detailsMetaItems.push(booking.serviceName)
-                        }
-                        if (bookingLocationLabel) {
-                          detailsMetaItems.push(bookingLocationLabel)
-                        }
-                        if (bookingDepositPercent > 0) {
-                          detailsMetaItems.push(`Депозит ${bookingDepositPercent}%`)
-                        }
                         return (
                           <div
                             className={`pro-slot-card${
@@ -3906,7 +3978,7 @@ export const ProRequestsScreen = ({
                                     aria-expanded={isExpanded}
                                     aria-controls={detailsId}
                                     aria-label={toggleLabel}
-                                    onClick={() => toggleSlotExpand(slot.id)}
+                                    onClick={() => toggleSlotExpand(slot)}
                                   >
                                     <span className="pro-slot-time">{timeLabel}</span>
                                     <span
@@ -3923,7 +3995,7 @@ export const ProRequestsScreen = ({
                                       <IconChevron />
                                     </span>
                                   </button>
-                                  {isExpanded && !isConfirmTarget && (
+                                  {isExpanded && !isSlotConfirmTarget && !booking && (
                                     <div className="pro-slot-actions">
                                       {slot.status === 'free' && (
                                         <>
@@ -3951,38 +4023,6 @@ export const ProRequestsScreen = ({
                                           </button>
                                         </>
                                       )}
-                                      {(slot.status === 'booked' ||
-                                        slot.status === 'pending') &&
-                                        booking && (
-                                        <>
-                                          <button
-                                            className="pro-slot-action pro-slot-action--icon"
-                                            type="button"
-                                            aria-label="Перенести запись"
-                                            onClick={() =>
-                                              handleOpenAddSlots({
-                                                rescheduleBookingId: booking.id,
-                                              })
-                                            }
-                                          >
-                                            <IconSwap />
-                                          </button>
-                                          <button
-                                            className="pro-slot-action pro-slot-action--icon is-danger"
-                                            type="button"
-                                            aria-label="Отменить запись"
-                                            onClick={() =>
-                                              setSlotConfirm({
-                                                type: 'cancel-booking',
-                                                bookingId: booking.id,
-                                                timeLabel,
-                                              })
-                                            }
-                                          >
-                                            <IconClose />
-                                          </button>
-                                        </>
-                                      )}
                                       {slot.status === 'closed' && (
                                         <button
                                           className="pro-slot-action pro-slot-action--icon"
@@ -4001,57 +4041,7 @@ export const ProRequestsScreen = ({
                                 )}
                               </div>
                             </div>
-                            {booking && isExpanded && (
-                              <div className="pro-slot-details" id={detailsId}>
-                                <div className="pro-slot-details-head">
-                                  <div className="pro-slot-details-title">
-                                    <span className="pro-slot-details-kicker">
-                                      Запись
-                                    </span>
-                                    <span className="pro-slot-details-name">
-                                      {bookingClientName}
-                                    </span>
-                                  </div>
-                                  <span
-                                    className={`pro-slot-details-status ${bookingStatusTone}`}
-                                  >
-                                    {bookingStatusLabel}
-                                  </span>
-                                </div>
-                                {(detailsMetaItems.length > 0 ||
-                                  bookingScheduleLabel) && (
-                                  <div className="pro-slot-details-info">
-                                    {detailsMetaItems.length > 0 && (
-                                      <div className="pro-slot-details-meta">
-                                        {detailsMetaItems.map((item, index) => (
-                                          <span
-                                            className="pro-slot-details-meta-item"
-                                            key={`${slot.id}-meta-${index}`}
-                                          >
-                                            {item}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {bookingScheduleLabel && (
-                                      <div className="pro-slot-details-date">
-                                        <span
-                                          className="pro-slot-details-date-icon"
-                                          aria-hidden="true"
-                                        >
-                                          <IconCalendar />
-                                        </span>
-                                        <span>{bookingScheduleLabel}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                <div className="pro-slot-details-body">
-                                  {renderBookingItem(booking)}
-                                </div>
-                              </div>
-                            )}
-                            {isConfirmTarget && slotConfirmContent && (
+                            {isSlotConfirmTarget && slotConfirmContent && (
                               <div className="pro-slots-confirm">
                                 <p className="pro-slots-confirm-title">
                                   {slotConfirmContent.title}
@@ -4117,6 +4107,142 @@ export const ProRequestsScreen = ({
             </>
           )}
       </div>
+
+      {slotDetailsBooking && (
+        <div
+          className="pro-slot-details-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pro-slot-details-sheet-title"
+          onClick={handleCloseSlotDetails}
+        >
+          <div
+            className="pro-slot-details-sheet"
+            id="pro-slot-details-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-slot-details-sheet-handle" aria-hidden="true" />
+            <header className="pro-slot-details-sheet-head">
+              <div>
+                <p className="pro-slot-details-sheet-kicker">Запись</p>
+                <h3
+                  className="pro-slot-details-sheet-title"
+                  id="pro-slot-details-sheet-title"
+                >
+                  {slotDetailsTimeLabel}
+                </h3>
+                {slotDetailsDateLabel && (
+                  <p className="pro-slot-details-sheet-subtitle">
+                    {slotDetailsDateLabel}
+                  </p>
+                )}
+              </div>
+              <button
+                className="pro-slot-details-sheet-close"
+                type="button"
+                onClick={handleCloseSlotDetails}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </header>
+            <div className="pro-slot-details-sheet-body">
+              <div className="pro-slot-details">
+                <div className="pro-slot-details-head">
+                  <div className="pro-slot-details-title">
+                    <span className="pro-slot-details-kicker">Клиент</span>
+                    <span className="pro-slot-details-name">
+                      {slotDetailsClientName}
+                    </span>
+                  </div>
+                  <span
+                    className={`pro-slot-details-status ${slotDetailsStatusTone}`}
+                  >
+                    {slotDetailsStatusLabel}
+                  </span>
+                </div>
+                {(slotDetailsMetaItems.length > 0 || slotDetailsScheduleLabel) && (
+                  <div className="pro-slot-details-info">
+                    {slotDetailsMetaItems.length > 0 && (
+                      <div className="pro-slot-details-meta">
+                        {slotDetailsMetaItems.map((item, index) => (
+                          <span
+                            className="pro-slot-details-meta-item"
+                            key={`slot-details-meta-${index}`}
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {slotDetailsScheduleLabel && (
+                      <div className="pro-slot-details-date">
+                        <span
+                          className="pro-slot-details-date-icon"
+                          aria-hidden="true"
+                        >
+                          <IconCalendar />
+                        </span>
+                        <span>{slotDetailsScheduleLabel}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="pro-slot-details-body">
+                  {renderBookingItem(slotDetailsBooking)}
+                </div>
+              </div>
+            </div>
+            {!isSlotDetailsCancelConfirm && slotDetailsActionsCount > 0 && (
+              <div className={slotDetailsActionClassName}>
+                {canSlotDetailsReschedule && (
+                  <button
+                    className="pro-slot-details-sheet-action is-primary"
+                    type="button"
+                    onClick={handleSlotDetailsReschedule}
+                  >
+                    Перенести запись
+                  </button>
+                )}
+                {canSlotDetailsCancel && (
+                  <button
+                    className="pro-slot-details-sheet-action is-danger"
+                    type="button"
+                    onClick={handleSlotDetailsCancel}
+                  >
+                    Отменить запись
+                  </button>
+                )}
+              </div>
+            )}
+            {isSlotDetailsCancelConfirm && slotConfirmContent && (
+              <div className="pro-slots-confirm pro-slots-confirm--sheet">
+                <p className="pro-slots-confirm-title">
+                  {slotConfirmContent.title}
+                </p>
+                <div className="pro-slots-confirm-actions">
+                  <button
+                    className={`pro-slots-confirm-primary ${
+                      slotConfirmContent.tone === 'is-danger' ? 'is-danger' : ''
+                    }`}
+                    type="button"
+                    onClick={handleConfirmSlotAction}
+                  >
+                    {slotConfirmContent.confirmLabel}
+                  </button>
+                  <button
+                    className="pro-slots-confirm-secondary"
+                    type="button"
+                    onClick={() => setSlotConfirm(null)}
+                  >
+                    {slotConfirmContent.cancelLabel}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {isAddSlotsOpen && (
         <div
