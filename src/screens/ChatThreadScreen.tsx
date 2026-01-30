@@ -350,6 +350,7 @@ export const ChatThreadScreen = ({
   >(null)
   const [quickValue, setQuickValue] = useState('')
   const [isContextSheetOpen, setIsContextSheetOpen] = useState(false)
+  const [isContextCompact, setIsContextCompact] = useState(false)
   const [isTrustSheetOpen, setIsTrustSheetOpen] = useState(false)
   const [outcomeSheetBookingId, setOutcomeSheetBookingId] = useState<number | null>(
     null
@@ -377,6 +378,7 @@ export const ChatThreadScreen = ({
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null)
   const composerRef = useRef<HTMLDivElement | null>(null)
   const hasMoreRef = useRef(true)
+  const lastScrollYRef = useRef(0)
   const isLoadingMoreRef = useRef(false)
   const hasInitialScrollRef = useRef(false)
   const messagesRef = useRef<LocalChatMessage[]>([])
@@ -2546,10 +2548,46 @@ export const ChatThreadScreen = ({
     return null
   }, [userId, visibleMessages])
 
+  useEffect(() => {
+    if (!hasContextPill) {
+      setIsContextCompact(false)
+    }
+  }, [hasContextPill])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hasContextPill) return
+    let ticking = false
+    const threshold = 32
+    const directionThreshold = 2
+    const handleScroll = () => {
+      const current = window.scrollY || 0
+      const delta = current - lastScrollYRef.current
+      if (current <= threshold || delta < -directionThreshold) {
+        setIsContextCompact(false)
+      } else if (current > threshold) {
+        setIsContextCompact(true)
+      }
+      lastScrollYRef.current = current
+    }
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      window.requestAnimationFrame(() => {
+        ticking = false
+        handleScroll()
+      })
+    }
+    handleScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [hasContextPill])
+
   return (
     <div className="screen screen--chat-thread" ref={screenRef}>
       <div
-        className={`chat-thread${hasContextPill ? ' has-context-pill' : ''}`}
+        className={`chat-thread${hasContextPill ? ' has-context-pill' : ''}${
+          isContextCompact ? ' is-context-compact' : ''
+        }`}
       >
         {hasContextPill && (
           <div className="chat-context-float" role="region" aria-label="Контекст">
