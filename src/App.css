@@ -24936,8 +24936,10 @@ h2 {
 
 .screen--chat-thread {
   background:
-    radial-gradient(160% 120% at 0% 0%, rgba(var(--accent-rgb), 0.08), transparent 55%),
-    linear-gradient(180deg, #f5f7fb 0%, #ffffff 48%, #ffffff 100%);
+    radial-gradient(150% 120% at 8% -12%, rgba(var(--accent-rgb), 0.1), transparent 55%),
+    radial-gradient(120% 120% at 92% -8%, rgba(var(--shadow-rgb), 0.08), transparent 60%),
+    radial-gradient(120% 120% at 50% 120%, rgba(var(--accent-rgb), 0.05), transparent 60%),
+    linear-gradient(180deg, #f6f8fc 0%, #ffffff 46%, #ffffff 100%);
   padding: calc(14px + var(--safe-top) + var(--tg-top-offset)) 14px
     calc(
       var(--chat-composer-height, calc(180px + var(--safe-bottom))) +
