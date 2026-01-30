@@ -658,12 +658,6 @@ export const ProRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
-  const [expandedRequestDetails, setExpandedRequestDetails] = useState<
-    Record<number, boolean>
-  >({})
-  const [expandedBookingDetails, setExpandedBookingDetails] = useState<
-    Record<number, boolean>
-  >({})
   const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
   const pendingRequestFocusIdRef = useRef<number | null>(null)
@@ -2476,10 +2470,6 @@ export const ProRequestsScreen = ({
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
-    const hasExtraDetails =
-      Boolean(booking.cityName || booking.districtName || booking.address) ||
-      photoItems.length > 0
-    const isDetailsOpen = Boolean(expandedBookingDetails[booking.id])
     const reschedulePending =
       Boolean(booking.rescheduleProposedTime) &&
       Boolean(booking.rescheduleProposedBy)
@@ -2557,21 +2547,7 @@ export const ProRequestsScreen = ({
             {rescheduleMetaLabel}
           </div>
         )}
-        {hasExtraDetails && (
-          <button
-            className="request-details-toggle"
-            type="button"
-            onClick={() =>
-              setExpandedBookingDetails((current) => ({
-                ...current,
-                [booking.id]: !isDetailsOpen,
-              }))
-            }
-          >
-            {isDetailsOpen ? 'Скрыть детали' : 'Подробнее'}
-          </button>
-        )}
-        {isDetailsOpen && (booking.cityName || booking.districtName) && (
+        {(booking.cityName || booking.districtName) && (
           <div className="booking-item-meta">
             {booking.cityName ? booking.cityName : ''}
             {booking.districtName
@@ -2579,7 +2555,7 @@ export const ProRequestsScreen = ({
               : ''}
           </div>
         )}
-        {isDetailsOpen && booking.locationType === 'client' && booking.address && (
+        {booking.locationType === 'client' && booking.address && (
           <div className="booking-item-meta">
             Адрес: {booking.address}
           </div>
@@ -2608,19 +2584,6 @@ export const ProRequestsScreen = ({
         {depositAmount > 0 && depositStatusLabel && (
           <div className="booking-item-meta booking-item-meta--highlight">
             {depositStatusLabel}
-          </div>
-        )}
-        {isDetailsOpen && photoItems.length > 0 && (
-          <div className="booking-photo-strip" role="list">
-            {photoItems.map((url, index) => (
-              <span
-                className="booking-photo-thumb"
-                key={`${booking.id}-photo-${index}`}
-                role="listitem"
-              >
-                <img src={url} alt="" loading="lazy" />
-              </span>
-            ))}
           </div>
         )}
         {reschedulePending && (
@@ -3299,14 +3262,6 @@ export const ProRequestsScreen = ({
                     const leadReasons = Array.isArray(item.leadReasons)
                       ? item.leadReasons
                       : []
-                    const hasExtraDetails =
-                      Boolean(item.address) ||
-                      tagItems.length > 0 ||
-                      leadReasons.length > 0 ||
-                      Boolean(item.details) ||
-                      photoItems.length > 0 ||
-                      Boolean(item.cityName || item.districtName)
-                    const isDetailsOpen = Boolean(expandedRequestDetails[item.id])
                     const isFinalResponse = ['accepted', 'rejected', 'expired'].includes(
                       item.responseStatus ?? ''
                     )
@@ -3403,21 +3358,7 @@ export const ProRequestsScreen = ({
                               Чат создаётся...
                             </span>
                           )}
-                        {hasExtraDetails && (
-                          <button
-                            className="request-details-toggle"
-                            type="button"
-                            onClick={() =>
-                              setExpandedRequestDetails((current) => ({
-                                ...current,
-                                [item.id]: !isDetailsOpen,
-                              }))
-                            }
-                          >
-                            {isDetailsOpen ? 'Скрыть детали' : 'Подробнее'}
-                          </button>
-                        )}
-                        {isDetailsOpen && (item.cityName || item.districtName) && (
+                        {(item.cityName || item.districtName) && (
                           <div className="request-item-meta">
                             {item.cityName ? item.cityName : ''}
                             {item.districtName
@@ -3425,12 +3366,12 @@ export const ProRequestsScreen = ({
                               : ''}
                           </div>
                         )}
-                        {isDetailsOpen && item.locationType === 'client' && item.address && (
+                        {item.locationType === 'client' && item.address && (
                           <div className="request-item-meta">
                             Адрес: {item.address}
                           </div>
                         )}
-                        {isDetailsOpen && tagItems.length > 0 && (
+                        {tagItems.length > 0 && (
                           <div className="request-tags" role="list">
                             {tagItems.map((tag) => (
                               <span
@@ -3443,7 +3384,7 @@ export const ProRequestsScreen = ({
                             ))}
                           </div>
                         )}
-                        {isDetailsOpen && leadReasons.length > 0 && (
+                        {leadReasons.length > 0 && (
                           <div className="request-tags request-tags--lead" role="list">
                             {leadReasons.map((reason, index) => (
                               <span
@@ -3456,10 +3397,10 @@ export const ProRequestsScreen = ({
                             ))}
                           </div>
                         )}
-                        {isDetailsOpen && item.details && (
+                        {item.details && (
                           <div className="request-item-details">{item.details}</div>
                         )}
-                        {isDetailsOpen && photoItems.length > 0 && (
+                        {photoItems.length > 0 && (
                           <div className="booking-photo-strip" role="list">
                             {photoItems.map((url, index) => (
                               <span
