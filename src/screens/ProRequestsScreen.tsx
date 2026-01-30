@@ -666,6 +666,8 @@ export const ProRequestsScreen = ({
   const [leadConversionStats, setLeadConversionStats] =
     useState<LeadConversionStats | null>(null)
   const [bookingDrafts, setBookingDrafts] = useState<Record<number, string>>({})
+  const requestsRequestIdRef = useRef(0)
+  const bookingsRequestIdRef = useRef(0)
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
   )
@@ -723,6 +725,8 @@ export const ProRequestsScreen = ({
     null
   )
   const [pasteError, setPasteError] = useState('')
+  const reloadTimerRef = useRef<number | null>(null)
+  const reloadFlagsRef = useRef({ requests: false, bookings: false })
   const bookingStartParam = useMemo(
     () => buildBookingStartParam(userId),
     [userId]
@@ -782,6 +786,197 @@ export const ProRequestsScreen = ({
   const shareText =
     'Запись к мастеру\nОткройте ссылку, чтобы выбрать услугу и время.'
   const shareUrl = shareLink ? buildTelegramShareUrl(shareLink, shareText) : ''
+  const applyRequestsPayload = useCallback(
+    (
+      data:
+        | ProRequest[]
+        | {
+            profileStatus?: ProfileStatus
+            missingFields?: string[]
+            isActive?: boolean
+            leadScoreVariant?: string | null
+            leadConversionStats?: LeadConversionStats | null
+            requests?: ProRequest[]
+          }
+    ) => {
+      const requestItems = Array.isArray(data) ? data : data.requests ?? []
+      const nextMissing = Array.isArray(data) ? [] : data.missingFields ?? []
+      const nextActive = Array.isArray(data) ? true : data.isActive ?? true
+      const nextLeadConversionStats = Array.isArray(data)
+        ? null
+        : data.leadConversionStats ?? null
+
+      setRequests(requestItems)
+      setMissingFields(nextMissing)
+      setIsActive(nextActive)
+      setLeadConversionStats(nextLeadConversionStats)
+      setDrafts((current) => {
+        const nextDrafts = { ...current }
+        requestItems.forEach((item) => {
+          if (!nextDrafts[item.id]) {
+            nextDrafts[item.id] = {
+              price:
+                item.responsePrice !== null && item.responsePrice !== undefined
+                  ? String(item.responsePrice)
+                  : '',
+              comment: item.responseComment ?? '',
+              proposedTime: item.responseProposedTime ?? '',
+              proposedSlotAt: normalizeSlotInputValue(item.responseProposedSlotAt),
+            }
+          }
+        })
+        return nextDrafts
+      })
+    },
+    []
+  )
+  const loadRequests = useCallback(
+    async (options?: { silent?: boolean; force?: boolean }) => {
+      if (!userId) return
+      const requestId = (requestsRequestIdRef.current += 1)
+      const silent = options?.silent ?? false
+      if (!silent) {
+        setIsLoading(true)
+        setLoadError('')
+      }
+
+      try {
+        const cacheKey = `${apiBase}/api/pro/requests?userId=${encodeURIComponent(
+          userId
+        )}`
+        const ttlMs = options?.force ? 0 : REQUESTS_CACHE_TTL_MS
+        const { data } = await fetchJsonCached<
+          | ProRequest[]
+          | {
+              profileStatus?: ProfileStatus
+              missingFields?: string[]
+              isActive?: boolean
+              leadScoreVariant?: string | null
+              leadConversionStats?: LeadConversionStats | null
+              requests?: ProRequest[]
+            }
+        >(cacheKey, {
+          ttlMs,
+          persist: true,
+        })
+        if (requestsRequestIdRef.current === requestId) {
+          applyRequestsPayload(data)
+        }
+      } catch (error) {
+        if (requestsRequestIdRef.current === requestId && !silent) {
+          setLoadError('Не удалось загрузить заявки.')
+        }
+      } finally {
+        if (requestsRequestIdRef.current === requestId && !silent) {
+          setIsLoading(false)
+        }
+      }
+    },
+    [apiBase, applyRequestsPayload, userId]
+  )
+  const applyBookingsPayload = useCallback((data: Booking[]) => {
+    const bookingItems = Array.isArray(data) ? data : []
+    setBookings(bookingItems)
+    setBookingDrafts((current) => {
+      const next = { ...current }
+      bookingItems.forEach((booking) => {
+        if (next[booking.id] === undefined) {
+          next[booking.id] =
+            typeof booking.proposedPrice === 'number'
+              ? String(booking.proposedPrice)
+              : ''
+        }
+      })
+      return next
+    })
+  }, [])
+  const loadBookings = useCallback(
+    async (options?: { silent?: boolean; force?: boolean }) => {
+      if (!userId) return
+      const requestId = (bookingsRequestIdRef.current += 1)
+      const silent = options?.silent ?? false
+      if (!silent) {
+        setIsBookingsLoading(true)
+        setBookingsError('')
+      }
+      try {
+        const cacheKey = `${apiBase}/api/pro/bookings?userId=${encodeURIComponent(
+          userId
+        )}`
+        const ttlMs = options?.force ? 0 : BOOKINGS_CACHE_TTL_MS
+        const { data } = await fetchJsonCached<Booking[]>(cacheKey, {
+          ttlMs,
+          persist: true,
+        })
+        if (bookingsRequestIdRef.current === requestId) {
+          applyBookingsPayload(data)
+        }
+      } catch (error) {
+        if (bookingsRequestIdRef.current === requestId && !silent) {
+          setBookings([])
+          setBookingsError('Не удалось загрузить записи.')
+        }
+      } finally {
+        if (bookingsRequestIdRef.current === requestId && !silent) {
+          setIsBookingsLoading(false)
+        }
+      }
+    },
+    [apiBase, applyBookingsPayload, userId]
+  )
+  const requestEvents = useMemo(
+    () =>
+      new Set([
+        'request_accepted',
+        'request_updated',
+        'request_closed',
+      ]),
+    []
+  )
+  const bookingEvents = useMemo(
+    () =>
+      new Set([
+        'booking_confirmed',
+        'booking_updated',
+        'booking_price_proposed',
+        'booking_cancelled',
+        'booking_declined',
+        'booking_reschedule_proposed',
+        'booking_reschedule_accepted',
+        'booking_reschedule_declined',
+        'booking_reschedule_cancelled',
+        'booking_outcome_marked',
+        'deposit_pending',
+        'deposit_submitted',
+        'deposit_confirmed',
+        'deposit_rejected',
+        'deposit_expired',
+      ]),
+    []
+  )
+  const scheduleReload = useCallback(
+    (targets: { requests?: boolean; bookings?: boolean }) => {
+      if (targets.requests) {
+        reloadFlagsRef.current.requests = true
+      }
+      if (targets.bookings) {
+        reloadFlagsRef.current.bookings = true
+      }
+      if (reloadTimerRef.current !== null) return
+      reloadTimerRef.current = window.setTimeout(() => {
+        const { requests, bookings } = reloadFlagsRef.current
+        reloadFlagsRef.current = { requests: false, bookings: false }
+        reloadTimerRef.current = null
+        if (requests) {
+          void loadRequests({ silent: true, force: true })
+        }
+        if (bookings) {
+          void loadBookings({ silent: true, force: true })
+        }
+      }, 240)
+    },
+    [loadBookings, loadRequests]
+  )
 
   useEffect(() => {
     if (!userId) return
@@ -838,112 +1033,28 @@ export const ProRequestsScreen = ({
 
   useEffect(() => {
     if (!userId) return
-    let cancelled = false
-
-    const loadRequests = async () => {
-      let silent = false
-      try {
-        const cacheKey = `${apiBase}/api/pro/requests?userId=${encodeURIComponent(
-          userId
-        )}`
-        const cached = readCache<
-          | ProRequest[]
-          | {
-              profileStatus?: ProfileStatus
-              missingFields?: string[]
-              isActive?: boolean
-              leadScoreVariant?: string | null
-              leadConversionStats?: LeadConversionStats | null
-              requests?: ProRequest[]
-            }
-        >(cacheKey, {
-          ttlMs: REQUESTS_CACHE_TTL_MS,
-          persist: true,
-        })
-        silent = Boolean(cached?.value)
-        const applyPayload = (
-          data:
-            | ProRequest[]
-            | {
-                profileStatus?: ProfileStatus
-                missingFields?: string[]
-                isActive?: boolean
-                leadScoreVariant?: string | null
-                leadConversionStats?: LeadConversionStats | null
-                requests?: ProRequest[]
-              }
-        ) => {
-          const requestItems = Array.isArray(data) ? data : data.requests ?? []
-          const nextMissing = Array.isArray(data) ? [] : data.missingFields ?? []
-          const nextActive = Array.isArray(data) ? true : data.isActive ?? true
-          const nextLeadConversionStats = Array.isArray(data)
-            ? null
-            : data.leadConversionStats ?? null
-
-          setRequests(requestItems)
-          setMissingFields(nextMissing)
-          setIsActive(nextActive)
-          setLeadConversionStats(nextLeadConversionStats)
-          setDrafts((current) => {
-            const nextDrafts = { ...current }
-            requestItems.forEach((item) => {
-              if (!nextDrafts[item.id]) {
-                nextDrafts[item.id] = {
-                  price:
-                    item.responsePrice !== null && item.responsePrice !== undefined
-                      ? String(item.responsePrice)
-                      : '',
-                  comment: item.responseComment ?? '',
-                  proposedTime: item.responseProposedTime ?? '',
-                  proposedSlotAt: normalizeSlotInputValue(item.responseProposedSlotAt),
-                }
-              }
-            })
-            return nextDrafts
-          })
+    const cacheKey = `${apiBase}/api/pro/requests?userId=${encodeURIComponent(
+      userId
+    )}`
+    const cached = readCache<
+      | ProRequest[]
+      | {
+          profileStatus?: ProfileStatus
+          missingFields?: string[]
+          isActive?: boolean
+          leadScoreVariant?: string | null
+          leadConversionStats?: LeadConversionStats | null
+          requests?: ProRequest[]
         }
-
-        if (cached?.value) {
-          applyPayload(cached.value)
-        }
-        if (!silent) {
-          setIsLoading(true)
-          setLoadError('')
-        }
-
-        const { data } = await fetchJsonCached<
-          | ProRequest[]
-          | {
-              profileStatus?: ProfileStatus
-              missingFields?: string[]
-              isActive?: boolean
-              leadScoreVariant?: string | null
-              leadConversionStats?: LeadConversionStats | null
-              requests?: ProRequest[]
-            }
-        >(cacheKey, {
-          ttlMs: REQUESTS_CACHE_TTL_MS,
-          persist: true,
-        })
-        if (cancelled) return
-        applyPayload(data)
-      } catch (error) {
-        if (!cancelled && !silent) {
-          setLoadError('Не удалось загрузить заявки.')
-        }
-      } finally {
-        if (!cancelled && !silent) {
-          setIsLoading(false)
-        }
-      }
+    >(cacheKey, {
+      ttlMs: REQUESTS_CACHE_TTL_MS,
+      persist: true,
+    })
+    if (cached?.value) {
+      applyRequestsPayload(cached.value)
     }
-
-    loadRequests()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiBase, userId])
+    void loadRequests({ silent: Boolean(cached?.value) })
+  }, [apiBase, applyRequestsPayload, loadRequests, userId])
 
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
@@ -956,66 +1067,26 @@ export const ProRequestsScreen = ({
 
   useEffect(() => {
     if (!userId) return
-    let cancelled = false
-
-    const loadBookings = async () => {
-      let silent = false
-      try {
-        const cacheKey = `${apiBase}/api/pro/bookings?userId=${encodeURIComponent(
-          userId
-        )}`
-        const cached = readCache<Booking[]>(cacheKey, {
-          ttlMs: BOOKINGS_CACHE_TTL_MS,
-          persist: true,
-        })
-        silent = Boolean(cached?.value)
-        if (cached?.value) {
-          setBookings(Array.isArray(cached.value) ? cached.value : [])
-        }
-        if (!silent) {
-          setIsBookingsLoading(true)
-          setBookingsError('')
-        }
-        const { data } = await fetchJsonCached<Booking[]>(cacheKey, {
-          ttlMs: BOOKINGS_CACHE_TTL_MS,
-          persist: true,
-        })
-        if (cancelled) return
-        const bookingItems = Array.isArray(data) ? data : []
-        setBookings(bookingItems)
-        setBookingDrafts((current) => {
-          const next = { ...current }
-          bookingItems.forEach((booking) => {
-            if (next[booking.id] === undefined) {
-              next[booking.id] =
-                typeof booking.proposedPrice === 'number'
-                  ? String(booking.proposedPrice)
-                  : ''
-            }
-          })
-          return next
-        })
-      } catch (error) {
-        if (!cancelled && !silent) {
-          setBookings([])
-          setBookingsError('Не удалось загрузить записи.')
-        }
-      } finally {
-        if (!cancelled && !silent) {
-          setIsBookingsLoading(false)
-        }
-      }
+    const cacheKey = `${apiBase}/api/pro/bookings?userId=${encodeURIComponent(
+      userId
+    )}`
+    const cached = readCache<Booking[]>(cacheKey, {
+      ttlMs: BOOKINGS_CACHE_TTL_MS,
+      persist: true,
+    })
+    if (cached?.value) {
+      applyBookingsPayload(cached.value)
     }
-
-    loadBookings()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiBase, userId])
+    void loadBookings({ silent: Boolean(cached?.value) })
+  }, [apiBase, applyBookingsPayload, loadBookings, userId])
 
   useEffect(() => {
+    if (!userId) return
     const unsubscribe = stream.subscribe((payload) => {
+      if (payload?.type === 'chat:created') {
+        scheduleReload({ requests: true, bookings: true })
+        return
+      }
       if (payload?.type === 'trust:update') {
         const trustUserId =
           typeof payload.userId === 'string' ? payload.userId : null
@@ -1037,7 +1108,14 @@ export const ProRequestsScreen = ({
         const message = payload.message as { meta?: Record<string, unknown> } | undefined
         const meta = message?.meta
         if (!meta || typeof meta !== 'object') return
-        if (meta.event !== 'booking_outcome_marked') return
+        const event = typeof meta.event === 'string' ? meta.event : ''
+        if (requestEvents.has(event)) {
+          scheduleReload({ requests: true })
+        }
+        if (bookingEvents.has(event)) {
+          scheduleReload({ bookings: true })
+        }
+        if (event !== 'booking_outcome_marked') return
         const rawId = meta.bookingId
         const bookingId = typeof rawId === 'number' ? rawId : Number(rawId)
         if (!Number.isInteger(bookingId)) return
@@ -1057,8 +1135,13 @@ export const ProRequestsScreen = ({
 
     return () => {
       unsubscribe()
+      if (reloadTimerRef.current !== null) {
+        window.clearTimeout(reloadTimerRef.current)
+        reloadTimerRef.current = null
+      }
+      reloadFlagsRef.current = { requests: false, bookings: false }
     }
-  }, [stream])
+  }, [bookingEvents, requestEvents, scheduleReload, stream, userId])
 
   useEffect(() => {
     return () => {
