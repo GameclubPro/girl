@@ -350,7 +350,6 @@ export const ChatThreadScreen = ({
   >(null)
   const [quickValue, setQuickValue] = useState('')
   const [isContextSheetOpen, setIsContextSheetOpen] = useState(false)
-  const [isContextCompact, setIsContextCompact] = useState(false)
   const [isTrustSheetOpen, setIsTrustSheetOpen] = useState(false)
   const [outcomeSheetBookingId, setOutcomeSheetBookingId] = useState<number | null>(
     null
@@ -2547,64 +2546,10 @@ export const ChatThreadScreen = ({
     return null
   }, [userId, visibleMessages])
 
-  useEffect(() => {
-    if (!hasContextPill) {
-      setIsContextCompact(false)
-    }
-  }, [hasContextPill])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !hasContextPill) return
-    let ticking = false
-    const compactThreshold = 72
-    const expandThreshold = 20
-    const getScrollTop = () => {
-      const container = getScrollElement()
-      if (
-        container === document.documentElement ||
-        container === document.body ||
-        container === document.scrollingElement
-      ) {
-        return window.scrollY || 0
-      }
-      return container.scrollTop ?? 0
-    }
-    const handleScroll = () => {
-      const current = getScrollTop()
-      setIsContextCompact((prev) => {
-        if (current > compactThreshold) return true
-        if (current < expandThreshold) return false
-        return prev
-      })
-    }
-    const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      window.requestAnimationFrame(() => {
-        ticking = false
-        handleScroll()
-      })
-    }
-    handleScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    const container = messagesContainerRef.current
-    if (container) {
-      container.addEventListener('scroll', onScroll, { passive: true })
-    }
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      if (container) {
-        container.removeEventListener('scroll', onScroll)
-      }
-    }
-  }, [getScrollElement, hasContextPill])
-
   return (
     <div className="screen screen--chat-thread" ref={screenRef}>
       <div
-        className={`chat-thread${hasContextPill ? ' has-context-pill' : ''}${
-          isContextCompact ? ' is-context-compact' : ''
-        }`}
+        className={`chat-thread${hasContextPill ? ' has-context-pill' : ''}`}
       >
         {hasContextPill && (
           <div className="chat-context-float" role="region" aria-label="Контекст">
