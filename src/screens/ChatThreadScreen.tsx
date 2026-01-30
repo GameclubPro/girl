@@ -323,24 +323,6 @@ const supportTopics = [
   },
 ]
 
-const clientQuickTemplates = [
-  {
-    id: 'confirm',
-    label: 'Подтверждаю',
-    template: 'Подтверждаю, мне подходит.',
-  },
-  {
-    id: 'reschedule',
-    label: 'Другое время',
-    template: 'Можно другое время? Мне удобнее ',
-  },
-  {
-    id: 'question',
-    label: 'Уточнить',
-    template: 'Есть вопрос по записи: ',
-  },
-]
-
 export const ChatThreadScreen = ({
   apiBase,
   userId,
@@ -388,7 +370,6 @@ export const ChatThreadScreen = ({
   const [isRescheduleSheetOpen, setIsRescheduleSheetOpen] = useState(false)
   const [rescheduleError, setRescheduleError] = useState('')
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const screenRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
@@ -515,6 +496,57 @@ export const ChatThreadScreen = ({
   ]
     .filter(Boolean)
     .join(' · ')
+  const detailsRoleLabel = isProViewer ? 'Клиент' : 'Мастер'
+  const detailsName = counterpart?.name ?? 'Пользователь'
+  const detailsStatusLabel = isBookingChat
+    ? bookingStatus
+      ? bookingStatusLabelMap[bookingStatus] ?? bookingStatusLabel
+      : bookingStatusLabel
+    : request?.status
+      ? requestStatusLabelMap[request.status] ?? 'Заявка'
+      : 'Заявка'
+  const detailsStatusTone = isBookingChat
+    ? bookingStatus === 'confirmed'
+      ? 'is-confirmed'
+      : bookingStatus === 'declined' || bookingStatus === 'cancelled'
+        ? 'is-cancelled'
+        : bookingStatus === 'price_proposed' || bookingStatus === 'price_pending'
+          ? 'is-offer'
+          : 'is-waiting'
+    : request?.status === 'closed'
+      ? 'is-confirmed'
+      : 'is-waiting'
+  const detailsMetaItems = useMemo(() => {
+    const items: string[] = []
+    if (isBookingChat && booking) {
+      const locationLabel = locationLabelMap[booking.locationType ?? 'client']
+      if (locationLabel) items.push(locationLabel)
+      if (bookingTimeLabel) items.push(bookingTimeLabel)
+      if (rescheduleTimeLabel) items.push(`Перенос: ${rescheduleTimeLabel}`)
+      if (bookingDurationLabel) items.push(`Длительность: ${bookingDurationLabel}`)
+      if (bookingPriceLabel) items.push(bookingPriceLabel)
+    } else if (request) {
+      const locationLabel = locationLabelMap[request.locationType ?? 'any']
+      if (locationLabel) items.push(locationLabel)
+      if (requestTimeLabel) items.push(requestTimeLabel)
+      if (requestBudgetLabel) items.push(requestBudgetLabel)
+    }
+    return items.filter(Boolean)
+  }, [
+    booking,
+    bookingDurationLabel,
+    bookingPriceLabel,
+    bookingTimeLabel,
+    isBookingChat,
+    request,
+    requestBudgetLabel,
+    requestTimeLabel,
+    rescheduleTimeLabel,
+  ])
+  const canRespondReschedule = hasReschedulePending && !isRescheduleProposer
+  const canCancelReschedule = hasReschedulePending && isRescheduleProposer
+  const canProposeReschedule =
+    isBookingChat && bookingStatus === 'confirmed' && !hasReschedulePending
 
   const visibleMessages = useMemo(() => {
     if (isProViewer) return messages
@@ -529,55 +561,6 @@ export const ChatThreadScreen = ({
       return visibility !== 'master_only'
     })
   }, [isProViewer, messages])
-
-  const contextHistory = useMemo(() => {
-    const contexts = detail?.contexts ?? []
-    if (contexts.length === 0) return []
-    const activeType = detail?.chat?.contextType ?? null
-    const activeId = detail?.chat?.contextId ?? null
-    return contexts.filter(
-      (context) =>
-        !(
-          context.contextType === activeType &&
-          context.contextId === activeId
-        )
-    )
-  }, [detail?.chat?.contextId, detail?.chat?.contextType, detail?.contexts])
-
-  const getHistoryStatusLabel = (
-    context: NonNullable<ChatDetail['contexts']>[number]
-  ) => {
-    if (context.contextType === 'booking') {
-      if (context.outcome) {
-        return bookingOutcomeLabelMap[context.outcome] ?? context.outcome
-      }
-      if (context.status) {
-        return bookingStatusLabelMap[context.status] ?? context.status
-      }
-      return 'Запись'
-    }
-    if (context.status) {
-      return requestStatusLabelMap[context.status] ?? context.status
-    }
-    return 'Заявка'
-  }
-
-  const getHistoryTimeLabel = (
-    context: NonNullable<ChatDetail['contexts']>[number]
-  ) => {
-    if (context.contextType === 'booking') {
-      return formatDateTime(context.scheduledAt ?? context.createdAt ?? null)
-    }
-    if (context.dateOption === 'today') return 'Сегодня'
-    if (context.dateOption === 'tomorrow') return 'Завтра'
-    if (context.dateOption === 'choose' && context.dateTime) {
-      return formatDateTime(context.dateTime)
-    }
-    if (context.dateTime) {
-      return formatDateTime(context.dateTime)
-    }
-    return context.createdAt ? formatDateTime(context.createdAt) : ''
-  }
 
   const connectionLabel =
     streamStatus === 'connecting' || streamStatus === 'reconnecting'
@@ -746,12 +729,6 @@ export const ChatThreadScreen = ({
     },
     [chatId, mergeMessages]
   )
-
-  const scrollToMessage = useCallback((messageId: number) => {
-    const element = document.getElementById(`chat-message-${messageId}`)
-    if (!element) return
-    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
 
   const sendMessageRequest = useCallback(
     async (
@@ -1197,7 +1174,6 @@ export const ChatThreadScreen = ({
   }, [booking?.id, booking?.servicePrice, booking?.status])
 
   useEffect(() => {
-    setIsHistoryOpen(false)
     setQuickMode(null)
     setQuickValue('')
     setIsContextSheetOpen(false)
@@ -2251,26 +2227,6 @@ export const ChatThreadScreen = ({
     applyComposerTemplate(template)
   }
 
-  const buildQuickTemplate = (
-    action: 'reschedule' | 'clarify' | 'update'
-  ) => {
-    const serviceLabel = booking?.serviceName ?? request?.serviceName ?? null
-    const subject = booking ? 'запись' : 'заявку'
-    if (action === 'reschedule') {
-      return serviceLabel
-        ? `Можем перенести ${subject} «${serviceLabel}»? Предлагаю другое время.`
-        : `Можем перенести ${subject}? Предлагаю другое время.`
-    }
-    if (action === 'clarify') {
-      return serviceLabel
-        ? `Хочу уточнить детали по ${subject} «${serviceLabel}».`
-        : 'Хочу уточнить детали.'
-    }
-    return serviceLabel
-      ? `Обновляю детали по ${subject} «${serviceLabel}»: `
-      : 'Обновляю детали: '
-  }
-
   const openTrustSheet = useCallback(() => {
     setIsTrustSheetOpen(true)
   }, [])
@@ -2301,35 +2257,6 @@ export const ChatThreadScreen = ({
     setQuickMode(null)
     setQuickValue('')
   }, [])
-
-  const contextAnchorMap = useMemo(() => {
-    const map = new Map<string, number>()
-    visibleMessages.forEach((message) => {
-      if (message.type !== 'system') return
-      const { bookingId, requestId } = extractContextIds(message.meta)
-      if (bookingId && !map.has(`booking-${bookingId}`)) {
-        map.set(`booking-${bookingId}`, message.id)
-      }
-      if (requestId && !map.has(`request-${requestId}`)) {
-        map.set(`request-${requestId}`, message.id)
-      }
-    })
-    return map
-  }, [visibleMessages])
-
-  const handleContextJump = useCallback(
-    (context: NonNullable<ChatDetail['contexts']>[number]) => {
-      const key = `${context.contextType}-${context.contextId}`
-      const messageId = contextAnchorMap.get(key)
-      closeContextSheet()
-      if (messageId) {
-        requestAnimationFrame(() => scrollToMessage(messageId))
-        return
-      }
-      requestAnimationFrame(() => scrollToBottom('smooth'))
-    },
-    [closeContextSheet, contextAnchorMap, scrollToBottom, scrollToMessage]
-  )
 
   const stickyAction = useMemo<StickyAction>(() => {
     if (!isBookingChat || !booking?.id) return null
@@ -2505,6 +2432,90 @@ export const ChatThreadScreen = ({
     runBookingAction,
     runRescheduleAction,
   ])
+  const detailActions = useMemo(() => {
+    const actions: {
+      id: string
+      label: string
+      tone?: 'primary' | 'danger'
+      onClick: () => void
+      disabled?: boolean
+    }[] = []
+    if (!isBookingChat || !booking?.id) return actions
+    if (hasReschedulePending) {
+      if (canRespondReschedule) {
+        actions.push({
+          id: 'reschedule-accept',
+          label: 'Подтвердить перенос',
+          tone: 'primary',
+          onClick: () => void runRescheduleAction('reschedule-accept'),
+          disabled: isBookingActionLoading,
+        })
+        actions.push({
+          id: 'reschedule-decline',
+          label: 'Отклонить перенос',
+          onClick: () => void runRescheduleAction('reschedule-decline'),
+          disabled: isBookingActionLoading,
+        })
+      }
+      if (canCancelReschedule) {
+        actions.push({
+          id: 'reschedule-cancel',
+          label: 'Отменить перенос',
+          tone: 'danger',
+          onClick: () => void runRescheduleAction('reschedule-cancel'),
+          disabled: isBookingActionLoading,
+        })
+      }
+      return actions
+    }
+    if (stickyAction?.primary) {
+      actions.push({
+        id: 'primary',
+        label: stickyAction.primary.label,
+        tone: 'primary',
+        onClick: stickyAction.primary.onClick,
+        disabled: isBookingActionLoading,
+      })
+    }
+    if (stickyAction?.secondary) {
+      actions.push({
+        id: 'secondary',
+        label: stickyAction.secondary.label,
+        onClick: stickyAction.secondary.onClick,
+        disabled: isBookingActionLoading,
+      })
+    }
+    if (actions.length === 0 && canProposeReschedule) {
+      actions.push({
+        id: 'reschedule-propose',
+        label: 'Перенести запись',
+        tone: 'primary',
+        onClick: () => {
+          setRescheduleError('')
+          setIsRescheduleSheetOpen(true)
+          closeContextSheet()
+        },
+        disabled: rescheduleSubmitting,
+      })
+    }
+    return actions
+  }, [
+    booking?.id,
+    canCancelReschedule,
+    canProposeReschedule,
+    canRespondReschedule,
+    closeContextSheet,
+    hasReschedulePending,
+    isBookingActionLoading,
+    isBookingChat,
+    rescheduleSubmitting,
+    runRescheduleAction,
+    stickyAction,
+  ])
+  const detailActionsClassName =
+    detailActions.length <= 1
+      ? 'pro-slot-details-sheet-actions is-single'
+      : 'pro-slot-details-sheet-actions'
 
   const onLoadMore = () => {
     const oldestId = messages[0]?.id
@@ -3272,198 +3283,130 @@ export const ChatThreadScreen = ({
             </header>
 
             <div className="pro-slot-details-sheet-body">
-              <section className="chat-active-card chat-active-card--sheet">
-                <div className="chat-active-top">
-                  <div>
-                    <p className="chat-active-kicker">
-                      {isBookingChat ? 'Запись' : 'Заявка'}
-                    </p>
-                    <h2 className="chat-active-title">{activeTitle}</h2>
-                  </div>
-                  <span
-                    className={`chat-active-pill is-${
-                      isBookingChat ? 'booking' : 'request'
-                    }`}
-                  >
-                    {activeStatusLabel}
-                  </span>
-                </div>
-                <div className="chat-active-meta">
-                  {isBookingChat && booking ? (
-                    <>
-                      <span>
-                        <IconPin /> {locationLabelMap[booking.locationType ?? 'client']}
-                      </span>
-                      <span>
-                        <IconClock /> {bookingTimeLabel}
-                      </span>
-                      {rescheduleTimeLabel && (
-                        <span className="chat-active-reschedule">
-                          Перенос: {rescheduleTimeLabel}
-                        </span>
-                      )}
-                      {bookingDurationLabel && (
-                        <span>Длительность: {bookingDurationLabel}</span>
-                      )}
-                      {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
-                    </>
-                  ) : request ? (
-                    <>
-                      <span>
-                        <IconPin /> {locationLabelMap[request.locationType ?? 'any']}
-                      </span>
-                      <span>
-                        <IconClock /> {requestTimeLabel}
-                      </span>
-                      {requestBudgetLabel && <span>{requestBudgetLabel}</span>}
-                    </>
-                  ) : null}
-                </div>
-                {request?.details && (
-                  <p className="chat-active-details">{request.details}</p>
-                )}
-                <div className="chat-active-actions">
-                  <button
-                    className="chat-active-action"
-                    type="button"
-                    onClick={() => {
-                      setRescheduleError('')
-                      setIsRescheduleSheetOpen(true)
-                      closeContextSheet()
-                    }}
-                  >
-                    Перенести
-                  </button>
-                  <button
-                    className="chat-active-action"
-                    type="button"
-                    onClick={() => {
-                      applyComposerTemplate(buildQuickTemplate('clarify'))
-                      closeContextSheet()
-                    }}
-                  >
-                    Уточнить
-                  </button>
-                  <button
-                    className="chat-active-action is-strong"
-                    type="button"
-                    onClick={() => {
-                      applyComposerTemplate(buildQuickTemplate('update'))
-                      closeContextSheet()
-                    }}
-                  >
-                    Обновить
-                  </button>
-                </div>
-              </section>
-
-              <section className="chat-context-quick">
-                <span className="chat-context-quick-title">
-                  {isProViewer ? 'Быстрые предложения' : 'Быстрые ответы'}
-                </span>
-                <div className="chat-context-quick-actions">
-                  {isProViewer ? (
-                    <>
-                      <button
-                        className="chat-context-quick-action"
-                        type="button"
-                        onClick={() => openQuickMode('price')}
-                      >
-                        Цена
-                      </button>
-                      <button
-                        className="chat-context-quick-action"
-                        type="button"
-                        onClick={() => openQuickMode('time')}
-                      >
-                        Время
-                      </button>
-                      <button
-                        className="chat-context-quick-action"
-                        type="button"
-                        onClick={() => openQuickMode('location')}
-                      >
-                        Место
-                      </button>
-                    </>
-                  ) : (
-                    clientQuickTemplates.map((template) => (
-                      <button
-                        key={template.id}
-                        className="chat-context-quick-action"
-                        type="button"
-                        onClick={() => {
-                          applyComposerTemplate(template.template)
-                          closeContextSheet()
-                        }}
-                      >
-                        {template.label}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              {contextHistory.length > 0 && (
-                <section
-                  className={`chat-history${isHistoryOpen ? ' is-open' : ''}`}
-                >
-                  <button
-                    className="chat-history-toggle"
-                    type="button"
-                    onClick={() => setIsHistoryOpen((prev) => !prev)}
-                    aria-expanded={isHistoryOpen}
-                  >
-                    <span className="chat-history-title">История контекстов</span>
-                    <span className="chat-history-count">{contextHistory.length}</span>
-                    <span
-                      className={`chat-history-chevron${
-                        isHistoryOpen ? ' is-open' : ''
-                      }`}
-                      aria-hidden="true"
-                    >
-                      ⌄
+              <div className="pro-slot-details">
+                <div className="pro-slot-details-head">
+                  <div className="pro-slot-details-title">
+                    <span className="pro-slot-details-kicker">
+                      {detailsRoleLabel}
                     </span>
-                  </button>
-                  <div className="chat-history-panel">
-                    <div className="chat-history-timeline" role="list">
-                      {contextHistory.map((context) => {
-                        const timeLabel = getHistoryTimeLabel(context)
-                        const statusLabel = getHistoryStatusLabel(context)
-                        const label =
-                          context.contextType === 'booking' ? 'Запись' : 'Заявка'
-                        return (
-                          <button
-                            key={`${context.contextType}-${context.contextId}`}
-                            className="chat-history-node"
-                            type="button"
-                            role="listitem"
-                            onClick={() => handleContextJump(context)}
-                          >
-                            <span
-                              className={`chat-history-badge is-${context.contextType}`}
-                            >
-                              {label}
-                            </span>
-                            <span className="chat-history-service">
-                              {context.serviceName ?? label}
-                            </span>
-                            <span className="chat-history-meta">
-                              {statusLabel && <span>{statusLabel}</span>}
-                              {timeLabel && <span>{timeLabel}</span>}
-                            </span>
-                            <span className="chat-history-jump">Перейти →</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <p className="chat-history-hint">
-                      Нажмите на этап, чтобы перейти в переписке.
-                    </p>
+                    <span className="pro-slot-details-name">{detailsName}</span>
                   </div>
-                </section>
-              )}
+                  <div className="pro-slot-details-badges">
+                    <span
+                      className={`pro-slot-details-status ${detailsStatusTone}`}
+                    >
+                      {detailsStatusLabel}
+                    </span>
+                    {showTrustBadge && (
+                      <TrustBadge
+                        trust={counterpart?.trust ?? null}
+                        size="sm"
+                        variant="label"
+                        className="pro-slot-details-trust"
+                      />
+                    )}
+                  </div>
+                </div>
+                {detailsMetaItems.length > 0 && (
+                  <div className="pro-slot-details-info">
+                    <div className="pro-slot-details-meta">
+                      {detailsMetaItems.map((item, index) => (
+                        <span
+                          className="pro-slot-details-meta-item"
+                          key={`chat-detail-meta-${index}`}
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="pro-slot-details-body">
+                  <section className="chat-active-card chat-active-card--sheet">
+                    <div className="chat-active-meta">
+                      {isBookingChat && booking ? (
+                        <>
+                          <span>
+                            <IconPin />{' '}
+                            {locationLabelMap[booking.locationType ?? 'client']}
+                          </span>
+                          <span>
+                            <IconClock /> {bookingTimeLabel}
+                          </span>
+                          {rescheduleTimeLabel && (
+                            <span className="chat-active-reschedule">
+                              Перенос: {rescheduleTimeLabel}
+                            </span>
+                          )}
+                          {bookingDurationLabel && (
+                            <span>Длительность: {bookingDurationLabel}</span>
+                          )}
+                          {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
+                        </>
+                      ) : request ? (
+                        <>
+                          <span>
+                            <IconPin />{' '}
+                            {locationLabelMap[request.locationType ?? 'any']}
+                          </span>
+                          <span>
+                            <IconClock /> {requestTimeLabel}
+                          </span>
+                          {requestBudgetLabel && <span>{requestBudgetLabel}</span>}
+                        </>
+                      ) : null}
+                    </div>
+                    {request?.details && !isBookingChat && (
+                      <p className="chat-active-details">{request.details}</p>
+                    )}
+                    {Array.isArray(request?.photoUrls) &&
+                      request.photoUrls.length > 0 &&
+                      !isBookingChat && (
+                        <div
+                          className="booking-photo-strip chat-request-media"
+                          role="list"
+                        >
+                          {request.photoUrls.map((url, index) => (
+                            <span
+                              className="booking-photo-thumb"
+                              key={`chat-detail-photo-${index}`}
+                              role="listitem"
+                            >
+                              <img src={url} alt="" loading="lazy" />
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                  </section>
+                </div>
+              </div>
             </div>
+            {detailActions.length > 0 && (
+              <div className={detailActionsClassName}>
+                {detailActions.map((action) => (
+                  <button
+                    key={action.id}
+                    className={`pro-slot-details-sheet-action${
+                      action.tone === 'primary'
+                        ? ' is-primary'
+                        : action.tone === 'danger'
+                          ? ' is-danger'
+                          : ''
+                    }`}
+                    type="button"
+                    onClick={action.onClick}
+                    disabled={action.disabled}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {bookingActionError && (
+              <p className="chat-sticky-error" role="alert">
+                {bookingActionError}
+              </p>
+            )}
           </div>
         </div>
       )}
