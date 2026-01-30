@@ -15763,6 +15763,14 @@
   min-width: 0;
 }
 
+.pro-slot-details-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
 .pro-slot-details-kicker {
   font-size: 9px;
   font-weight: 700;
@@ -15792,6 +15800,11 @@
   color: var(--accent-strong);
   background: rgba(var(--accent-rgb), 0.14);
   flex: 0 0 auto;
+  text-align: center;
+}
+
+.pro-slot-details-trust {
+  align-self: flex-end;
 }
 
 .pro-slot-details-status.is-waiting {

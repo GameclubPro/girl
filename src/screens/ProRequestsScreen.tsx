@@ -1425,9 +1425,10 @@ export const ProRequestsScreen = ({
   const slotDetailsLocationLabel = slotDetailsBooking
     ? locationLabelMap[slotDetailsBooking.locationType] ?? ''
     : ''
-  const slotDetailsScheduleLabel = slotDetailsBooking
-    ? formatDateTime(slotDetailsBooking.scheduledAt)
-    : ''
+  const slotDetailsDistanceLabel =
+    slotDetailsBooking && slotDetailsBooking.locationType === 'client'
+      ? formatDistance(slotDetailsBooking.distanceKm)
+      : ''
   const slotDetailsDepositPercent =
     slotDetailsBooking && typeof slotDetailsBooking.depositPercent === 'number'
       ? Math.max(0, Math.round(slotDetailsBooking.depositPercent))
@@ -1438,6 +1439,9 @@ export const ProRequestsScreen = ({
   }
   if (slotDetailsLocationLabel) {
     slotDetailsMetaItems.push(slotDetailsLocationLabel)
+  }
+  if (slotDetailsDistanceLabel) {
+    slotDetailsMetaItems.push(slotDetailsDistanceLabel)
   }
   if (slotDetailsDepositPercent > 0) {
     slotDetailsMetaItems.push(`Депозит ${slotDetailsDepositPercent}%`)
@@ -2479,7 +2483,10 @@ export const ProRequestsScreen = ({
       </div>
     </section>
   )
-  const renderBookingItem = (booking: Booking, options?: { archived?: boolean }) => {
+  const renderBookingItem = (
+    booking: Booking,
+    options?: { archived?: boolean; compact?: boolean }
+  ) => {
     const statusLabel =
       bookingStatusLabelMap[booking.status] ?? booking.status
     const statusTone =
@@ -2586,60 +2593,65 @@ export const ProRequestsScreen = ({
     const rescheduleMetaTone = canRespondReschedule
       ? 'booking-item-meta--warning'
       : 'booking-item-meta--highlight'
+    const isCompact = Boolean(options?.compact)
 
     return (
       <div
         className={`booking-item${options?.archived ? ' is-archived' : ''}${
           focusedBookingId === booking.id ? ' is-focus' : ''
-        }`}
+        }${isCompact ? ' is-compact' : ''}`}
         key={booking.id}
         id={`pro-booking-${booking.id}`}
       >
-        <div className="booking-item-head">
-          <span className="booking-item-avatar" aria-hidden="true">
-            <span>{clientInitials}</span>
-          </span>
-          <div className="booking-item-main">
-            <div className="booking-item-main-row">
-              <div className="booking-item-master">{clientName}</div>
+        {!isCompact && (
+          <div className="booking-item-head">
+            <span className="booking-item-avatar" aria-hidden="true">
+              <span>{clientInitials}</span>
+            </span>
+            <div className="booking-item-main">
+              <div className="booking-item-main-row">
+                <div className="booking-item-master">{clientName}</div>
+              </div>
+              <div className="booking-item-service">
+                {booking.serviceName}
+              </div>
             </div>
-            <div className="booking-item-service">
-              {booking.serviceName}
+            <div className="booking-item-aside">
+              <span className={`booking-status ${statusTone}`}>
+                {statusLabel}
+              </span>
+              <TrustBadge
+                trust={booking.clientTrust ?? null}
+                size="sm"
+                variant="label"
+                className="booking-item-trust"
+              />
             </div>
           </div>
-          <div className="booking-item-aside">
-            <span className={`booking-status ${statusTone}`}>
-              {statusLabel}
-            </span>
-            <TrustBadge
-              trust={booking.clientTrust ?? null}
-              size="sm"
-              variant="label"
-              className="booking-item-trust"
-            />
+        )}
+        {!isCompact && (
+          <div className="booking-item-meta booking-item-meta--row">
+            {scheduledLabel && (
+              <span className="booking-item-meta-segment">
+                <span className="booking-item-meta-icon" aria-hidden="true">
+                  <IconCalendar />
+                </span>
+                {scheduledLabel}
+              </span>
+            )}
+            {locationLabel && (
+              <span className="booking-item-meta-segment">{locationLabel}</span>
+            )}
+            {distanceLabel && (
+              <span className="booking-item-meta-segment">
+                <span className="booking-item-meta-icon" aria-hidden="true">
+                  <IconRadius />
+                </span>
+                {distanceLabel}
+              </span>
+            )}
           </div>
-        </div>
-        <div className="booking-item-meta booking-item-meta--row">
-          {scheduledLabel && (
-            <span className="booking-item-meta-segment">
-              <span className="booking-item-meta-icon" aria-hidden="true">
-                <IconCalendar />
-              </span>
-              {scheduledLabel}
-            </span>
-          )}
-          {locationLabel && (
-            <span className="booking-item-meta-segment">{locationLabel}</span>
-          )}
-          {distanceLabel && (
-            <span className="booking-item-meta-segment">
-              <span className="booking-item-meta-icon" aria-hidden="true">
-                <IconRadius />
-              </span>
-              {distanceLabel}
-            </span>
-          )}
-        </div>
+        )}
         {rescheduleMetaLabel && (
           <div className={`booking-item-meta ${rescheduleMetaTone}`}>
             {rescheduleMetaLabel}
@@ -2669,7 +2681,7 @@ export const ProRequestsScreen = ({
             Бесплатная отмена до: {freeCancelLabel}
           </div>
         )}
-        {depositPercent > 0 && (
+        {!isCompact && depositPercent > 0 && (
           <div className="booking-item-meta">
             Депозит: {depositPercent}%
           </div>
@@ -4155,13 +4167,21 @@ export const ProRequestsScreen = ({
                       {slotDetailsClientName}
                     </span>
                   </div>
-                  <span
-                    className={`pro-slot-details-status ${slotDetailsStatusTone}`}
-                  >
-                    {slotDetailsStatusLabel}
-                  </span>
+                  <div className="pro-slot-details-badges">
+                    <span
+                      className={`pro-slot-details-status ${slotDetailsStatusTone}`}
+                    >
+                      {slotDetailsStatusLabel}
+                    </span>
+                    <TrustBadge
+                      trust={slotDetailsBooking.clientTrust ?? null}
+                      size="sm"
+                      variant="label"
+                      className="pro-slot-details-trust"
+                    />
+                  </div>
                 </div>
-                {(slotDetailsMetaItems.length > 0 || slotDetailsScheduleLabel) && (
+                {slotDetailsMetaItems.length > 0 && (
                   <div className="pro-slot-details-info">
                     {slotDetailsMetaItems.length > 0 && (
                       <div className="pro-slot-details-meta">
@@ -4175,21 +4195,10 @@ export const ProRequestsScreen = ({
                         ))}
                       </div>
                     )}
-                    {slotDetailsScheduleLabel && (
-                      <div className="pro-slot-details-date">
-                        <span
-                          className="pro-slot-details-date-icon"
-                          aria-hidden="true"
-                        >
-                          <IconCalendar />
-                        </span>
-                        <span>{slotDetailsScheduleLabel}</span>
-                      </div>
-                    )}
                   </div>
                 )}
                 <div className="pro-slot-details-body">
-                  {renderBookingItem(slotDetailsBooking)}
+                  {renderBookingItem(slotDetailsBooking, { compact: true })}
                 </div>
               </div>
             </div>
