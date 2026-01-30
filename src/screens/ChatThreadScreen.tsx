@@ -2559,8 +2559,19 @@ export const ChatThreadScreen = ({
     let ticking = false
     const threshold = 32
     const directionThreshold = 2
+    const getScrollTop = () => {
+      const container = getScrollElement()
+      if (
+        container === document.documentElement ||
+        container === document.body ||
+        container === document.scrollingElement
+      ) {
+        return window.scrollY || 0
+      }
+      return container.scrollTop ?? 0
+    }
     const handleScroll = () => {
-      const current = window.scrollY || 0
+      const current = getScrollTop()
       const delta = current - lastScrollYRef.current
       if (current <= threshold || delta < -directionThreshold) {
         setIsContextCompact(false)
@@ -2579,8 +2590,17 @@ export const ChatThreadScreen = ({
     }
     handleScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [hasContextPill])
+    const container = messagesContainerRef.current
+    if (container) {
+      container.addEventListener('scroll', onScroll, { passive: true })
+    }
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (container) {
+        container.removeEventListener('scroll', onScroll)
+      }
+    }
+  }, [getScrollElement, hasContextPill])
 
   return (
     <div className="screen screen--chat-thread" ref={screenRef}>

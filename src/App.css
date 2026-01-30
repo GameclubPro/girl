@@ -25019,6 +25019,7 @@ h2 {
   text-align: left;
   cursor: pointer;
   pointer-events: auto;
+  touch-action: pan-y;
   transition:
     width 0.22s ease,
     max-width 0.22s ease,
