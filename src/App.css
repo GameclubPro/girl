@@ -24954,7 +24954,7 @@ h2 {
       transparent 9px
     ),
     linear-gradient(180deg, #e7f1ff 0%, #edf4ff 48%, #f1f6ff 100%);
-  padding: calc(14px + var(--safe-top) + var(--tg-top-offset)) 14px
+  padding: calc(20px + var(--safe-top) + var(--tg-top-offset)) 14px
     calc(
       var(--chat-composer-height, calc(180px + var(--safe-bottom))) +
         var(--chat-keyboard-offset, 0px) +
