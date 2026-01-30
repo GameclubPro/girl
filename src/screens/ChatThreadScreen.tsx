@@ -3237,228 +3237,233 @@ export const ChatThreadScreen = ({
 
       {isContextSheetOpen && !isSupportChat && (request || booking) && (
         <div
-          className="chat-context-sheet-overlay"
+          className="pro-slot-details-sheet-overlay"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="chat-context-sheet-title"
+          aria-labelledby="pro-slot-details-sheet-title"
           onClick={closeContextSheet}
         >
           <div
-            className="chat-context-sheet"
+            className="pro-slot-details-sheet"
             onClick={(event) => event.stopPropagation()}
           >
-            <span className="chat-context-sheet-handle" aria-hidden="true" />
-            <div className="chat-context-sheet-head">
+            <span className="pro-slot-details-sheet-handle" aria-hidden="true" />
+            <header className="pro-slot-details-sheet-head">
               <div>
-                <p className="chat-context-sheet-kicker">Контекст</p>
-                <h3 className="chat-context-sheet-title" id="chat-context-sheet-title">
-                  {isBookingChat ? 'Детали записи' : 'Детали заявки'}
-                </h3>
-                <p className="chat-context-sheet-subtitle">
-                  Быстрые действия и история в одном месте.
+                <p className="pro-slot-details-sheet-kicker">
+                  {isBookingChat ? 'Запись' : 'Заявка'}
                 </p>
+                <h3
+                  className="pro-slot-details-sheet-title"
+                  id="pro-slot-details-sheet-title"
+                >
+                  {activeTitle}
+                </h3>
+                <p className="pro-slot-details-sheet-subtitle">{summaryMeta}</p>
               </div>
               <button
-                className="chat-context-sheet-close"
+                className="pro-slot-details-sheet-close"
                 type="button"
                 onClick={closeContextSheet}
                 aria-label="Закрыть"
               >
                 ×
               </button>
-            </div>
+            </header>
 
-            <section className="chat-active-card chat-active-card--sheet">
-              <div className="chat-active-top">
-                <div>
-                  <p className="chat-active-kicker">
-                    {isBookingChat ? 'Запись' : 'Заявка'}
-                  </p>
-                  <h2 className="chat-active-title">{activeTitle}</h2>
-                </div>
-                <span
-                  className={`chat-active-pill is-${
-                    isBookingChat ? 'booking' : 'request'
-                  }`}
-                >
-                  {activeStatusLabel}
-                </span>
-              </div>
-              <div className="chat-active-meta">
-                {isBookingChat && booking ? (
-                  <>
-                    <span>
-                      <IconPin /> {locationLabelMap[booking.locationType ?? 'client']}
-                    </span>
-                    <span>
-                      <IconClock /> {bookingTimeLabel}
-                    </span>
-                    {rescheduleTimeLabel && (
-                      <span className="chat-active-reschedule">
-                        Перенос: {rescheduleTimeLabel}
-                      </span>
-                    )}
-                    {bookingDurationLabel && (
-                      <span>Длительность: {bookingDurationLabel}</span>
-                    )}
-                    {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
-                  </>
-                ) : request ? (
-                  <>
-                    <span>
-                      <IconPin /> {locationLabelMap[request.locationType ?? 'any']}
-                    </span>
-                    <span>
-                      <IconClock /> {requestTimeLabel}
-                    </span>
-                    {requestBudgetLabel && <span>{requestBudgetLabel}</span>}
-                  </>
-                ) : null}
-              </div>
-              {request?.details && (
-                <p className="chat-active-details">{request.details}</p>
-              )}
-              <div className="chat-active-actions">
-                <button
-                  className="chat-active-action"
-                  type="button"
-                  onClick={() => {
-                    setRescheduleError('')
-                    setIsRescheduleSheetOpen(true)
-                    closeContextSheet()
-                  }}
-                >
-                  Перенести
-                </button>
-                <button
-                  className="chat-active-action"
-                  type="button"
-                  onClick={() => {
-                    applyComposerTemplate(buildQuickTemplate('clarify'))
-                    closeContextSheet()
-                  }}
-                >
-                  Уточнить
-                </button>
-                <button
-                  className="chat-active-action is-strong"
-                  type="button"
-                  onClick={() => {
-                    applyComposerTemplate(buildQuickTemplate('update'))
-                    closeContextSheet()
-                  }}
-                >
-                  Обновить
-                </button>
-              </div>
-            </section>
-
-            <section className="chat-context-quick">
-              <span className="chat-context-quick-title">
-                {isProViewer ? 'Быстрые предложения' : 'Быстрые ответы'}
-              </span>
-              <div className="chat-context-quick-actions">
-                {isProViewer ? (
-                  <>
-                    <button
-                      className="chat-context-quick-action"
-                      type="button"
-                      onClick={() => openQuickMode('price')}
-                    >
-                      Цена
-                    </button>
-                    <button
-                      className="chat-context-quick-action"
-                      type="button"
-                      onClick={() => openQuickMode('time')}
-                    >
-                      Время
-                    </button>
-                    <button
-                      className="chat-context-quick-action"
-                      type="button"
-                      onClick={() => openQuickMode('location')}
-                    >
-                      Место
-                    </button>
-                  </>
-                ) : (
-                  clientQuickTemplates.map((template) => (
-                    <button
-                      key={template.id}
-                      className="chat-context-quick-action"
-                      type="button"
-                      onClick={() => {
-                        applyComposerTemplate(template.template)
-                        closeContextSheet()
-                      }}
-                    >
-                      {template.label}
-                    </button>
-                  ))
-                )}
-              </div>
-            </section>
-
-            {contextHistory.length > 0 && (
-              <section
-                className={`chat-history${isHistoryOpen ? ' is-open' : ''}`}
-              >
-                <button
-                  className="chat-history-toggle"
-                  type="button"
-                  onClick={() => setIsHistoryOpen((prev) => !prev)}
-                  aria-expanded={isHistoryOpen}
-                >
-                  <span className="chat-history-title">История контекстов</span>
-                  <span className="chat-history-count">{contextHistory.length}</span>
-                  <span
-                    className={`chat-history-chevron${
-                      isHistoryOpen ? ' is-open' : ''
-                    }`}
-                    aria-hidden="true"
-                  >
-                    ⌄
-                  </span>
-                </button>
-                <div className="chat-history-panel">
-                  <div className="chat-history-timeline" role="list">
-                    {contextHistory.map((context) => {
-                      const timeLabel = getHistoryTimeLabel(context)
-                      const statusLabel = getHistoryStatusLabel(context)
-                      const label =
-                        context.contextType === 'booking' ? 'Запись' : 'Заявка'
-                      return (
-                        <button
-                          key={`${context.contextType}-${context.contextId}`}
-                          className="chat-history-node"
-                          type="button"
-                          role="listitem"
-                          onClick={() => handleContextJump(context)}
-                        >
-                          <span
-                            className={`chat-history-badge is-${context.contextType}`}
-                          >
-                            {label}
-                          </span>
-                          <span className="chat-history-service">
-                            {context.serviceName ?? label}
-                          </span>
-                          <span className="chat-history-meta">
-                            {statusLabel && <span>{statusLabel}</span>}
-                            {timeLabel && <span>{timeLabel}</span>}
-                          </span>
-                          <span className="chat-history-jump">Перейти →</span>
-                        </button>
-                      )
-                    })}
+            <div className="pro-slot-details-sheet-body">
+              <section className="chat-active-card chat-active-card--sheet">
+                <div className="chat-active-top">
+                  <div>
+                    <p className="chat-active-kicker">
+                      {isBookingChat ? 'Запись' : 'Заявка'}
+                    </p>
+                    <h2 className="chat-active-title">{activeTitle}</h2>
                   </div>
-                  <p className="chat-history-hint">
-                    Нажмите на этап, чтобы перейти в переписке.
-                  </p>
+                  <span
+                    className={`chat-active-pill is-${
+                      isBookingChat ? 'booking' : 'request'
+                    }`}
+                  >
+                    {activeStatusLabel}
+                  </span>
+                </div>
+                <div className="chat-active-meta">
+                  {isBookingChat && booking ? (
+                    <>
+                      <span>
+                        <IconPin /> {locationLabelMap[booking.locationType ?? 'client']}
+                      </span>
+                      <span>
+                        <IconClock /> {bookingTimeLabel}
+                      </span>
+                      {rescheduleTimeLabel && (
+                        <span className="chat-active-reschedule">
+                          Перенос: {rescheduleTimeLabel}
+                        </span>
+                      )}
+                      {bookingDurationLabel && (
+                        <span>Длительность: {bookingDurationLabel}</span>
+                      )}
+                      {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
+                    </>
+                  ) : request ? (
+                    <>
+                      <span>
+                        <IconPin /> {locationLabelMap[request.locationType ?? 'any']}
+                      </span>
+                      <span>
+                        <IconClock /> {requestTimeLabel}
+                      </span>
+                      {requestBudgetLabel && <span>{requestBudgetLabel}</span>}
+                    </>
+                  ) : null}
+                </div>
+                {request?.details && (
+                  <p className="chat-active-details">{request.details}</p>
+                )}
+                <div className="chat-active-actions">
+                  <button
+                    className="chat-active-action"
+                    type="button"
+                    onClick={() => {
+                      setRescheduleError('')
+                      setIsRescheduleSheetOpen(true)
+                      closeContextSheet()
+                    }}
+                  >
+                    Перенести
+                  </button>
+                  <button
+                    className="chat-active-action"
+                    type="button"
+                    onClick={() => {
+                      applyComposerTemplate(buildQuickTemplate('clarify'))
+                      closeContextSheet()
+                    }}
+                  >
+                    Уточнить
+                  </button>
+                  <button
+                    className="chat-active-action is-strong"
+                    type="button"
+                    onClick={() => {
+                      applyComposerTemplate(buildQuickTemplate('update'))
+                      closeContextSheet()
+                    }}
+                  >
+                    Обновить
+                  </button>
                 </div>
               </section>
-            )}
+
+              <section className="chat-context-quick">
+                <span className="chat-context-quick-title">
+                  {isProViewer ? 'Быстрые предложения' : 'Быстрые ответы'}
+                </span>
+                <div className="chat-context-quick-actions">
+                  {isProViewer ? (
+                    <>
+                      <button
+                        className="chat-context-quick-action"
+                        type="button"
+                        onClick={() => openQuickMode('price')}
+                      >
+                        Цена
+                      </button>
+                      <button
+                        className="chat-context-quick-action"
+                        type="button"
+                        onClick={() => openQuickMode('time')}
+                      >
+                        Время
+                      </button>
+                      <button
+                        className="chat-context-quick-action"
+                        type="button"
+                        onClick={() => openQuickMode('location')}
+                      >
+                        Место
+                      </button>
+                    </>
+                  ) : (
+                    clientQuickTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        className="chat-context-quick-action"
+                        type="button"
+                        onClick={() => {
+                          applyComposerTemplate(template.template)
+                          closeContextSheet()
+                        }}
+                      >
+                        {template.label}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              {contextHistory.length > 0 && (
+                <section
+                  className={`chat-history${isHistoryOpen ? ' is-open' : ''}`}
+                >
+                  <button
+                    className="chat-history-toggle"
+                    type="button"
+                    onClick={() => setIsHistoryOpen((prev) => !prev)}
+                    aria-expanded={isHistoryOpen}
+                  >
+                    <span className="chat-history-title">История контекстов</span>
+                    <span className="chat-history-count">{contextHistory.length}</span>
+                    <span
+                      className={`chat-history-chevron${
+                        isHistoryOpen ? ' is-open' : ''
+                      }`}
+                      aria-hidden="true"
+                    >
+                      ⌄
+                    </span>
+                  </button>
+                  <div className="chat-history-panel">
+                    <div className="chat-history-timeline" role="list">
+                      {contextHistory.map((context) => {
+                        const timeLabel = getHistoryTimeLabel(context)
+                        const statusLabel = getHistoryStatusLabel(context)
+                        const label =
+                          context.contextType === 'booking' ? 'Запись' : 'Заявка'
+                        return (
+                          <button
+                            key={`${context.contextType}-${context.contextId}`}
+                            className="chat-history-node"
+                            type="button"
+                            role="listitem"
+                            onClick={() => handleContextJump(context)}
+                          >
+                            <span
+                              className={`chat-history-badge is-${context.contextType}`}
+                            >
+                              {label}
+                            </span>
+                            <span className="chat-history-service">
+                              {context.serviceName ?? label}
+                            </span>
+                            <span className="chat-history-meta">
+                              {statusLabel && <span>{statusLabel}</span>}
+                              {timeLabel && <span>{timeLabel}</span>}
+                            </span>
+                            <span className="chat-history-jump">Перейти →</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="chat-history-hint">
+                      Нажмите на этап, чтобы перейти в переписке.
+                    </p>
+                  </div>
+                </section>
+              )}
+            </div>
           </div>
         </div>
       )}
