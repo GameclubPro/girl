@@ -2990,12 +2990,35 @@
 }
 
 .pro-shell {
-  width: min(480px, 100%);
+  --pro-shell-width: min(480px, 100%);
+  --pro-shell-gap: clamp(12px, 1.8dvh, 18px);
+  --pro-shell-frame-opacity: 0.45;
+  --pro-shell-frame-radius: 28px;
+  --pro-shell-frame-shadow: 0 22px 36px rgba(var(--shadow-rgb), 0.12);
+  width: var(--pro-shell-width);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--pro-shell-gap);
   position: relative;
   z-index: 1;
+}
+
+.pro-shell::before {
+  content: '';
+  position: absolute;
+  inset: -10px 6px -14px;
+  border-radius: var(--pro-shell-frame-radius);
+  background:
+    radial-gradient(120% 120% at 12% 0%, rgba(var(--accent-rgb), 0.14), transparent 62%),
+    linear-gradient(
+      180deg,
+      rgba(var(--paper-rgb), 0.78),
+      rgba(var(--paper-rgb), 0.3)
+    );
+  box-shadow: var(--pro-shell-frame-shadow);
+  opacity: var(--pro-shell-frame-opacity);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .pro-cabinet-shell {
@@ -8502,7 +8525,12 @@
 }
 
 .pro-shell--ig {
-  gap: 18px;
+  --pro-shell-gap: 18px;
+  --pro-shell-frame-opacity: 0;
+}
+
+.pro-shell--hybrid {
+  --pro-shell-frame-opacity: 0;
 }
 
 .pro-profile-ig {
@@ -10208,23 +10236,27 @@
 }
 
 
-.pro-shell--ig .pro-profile-portfolio-panel {
-  border-radius: 0;
+.pro-shell--ig .pro-profile-portfolio-panel,
+.pro-shell--hybrid .pro-profile-portfolio-panel,
+.pro-shell--ig .pro-profile-reviews,
+.pro-shell--hybrid .pro-profile-reviews {
   background: rgba(var(--paper-rgb), 0.96);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.1);
+}
+
+.pro-shell--ig .pro-profile-portfolio-panel {
+  border-radius: 0;
 }
 
 .pro-shell--ig .pro-profile-portfolio-panel::before {
   opacity: 0.2;
 }
 
-.pro-shell--ig .pro-profile-portfolio-panel-nav {
-  background: rgba(var(--paper-rgb), 0.96);
-  border-color: rgba(var(--shadow-rgb), 0.1);
-}
-
-.pro-shell--ig .pro-profile-portfolio-panel-count {
+.pro-shell--ig .pro-profile-portfolio-panel-nav,
+.pro-shell--hybrid .pro-profile-portfolio-panel-nav,
+.pro-shell--ig .pro-profile-portfolio-panel-count,
+.pro-shell--hybrid .pro-profile-portfolio-panel-count {
   background: rgba(var(--paper-rgb), 0.96);
   border-color: rgba(var(--shadow-rgb), 0.1);
 }
@@ -10274,8 +10306,6 @@
 .pro-shell--ig .pro-profile-card {
   border-radius: 18px;
   padding: 14px;
-  border-color: rgba(var(--shadow-rgb), 0.08);
-  background: rgba(var(--paper-rgb), 0.96);
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.08);
 }
 
@@ -10285,9 +10315,6 @@
 
 .pro-shell--ig .pro-profile-reviews {
   border-radius: 22px;
-  background: rgba(var(--paper-rgb), 0.96);
-  border-color: rgba(var(--shadow-rgb), 0.08);
-  box-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.1);
 }
 
 .pro-shell--hybrid .pro-profile-hero {
@@ -10398,19 +10425,10 @@
   box-shadow: 0 14px 22px rgba(var(--accent-rgb), 0.22);
 }
 
-.pro-shell--hybrid .pro-profile-portfolio-panel,
-.pro-shell--hybrid .pro-profile-reviews {
-  background: rgba(var(--paper-rgb), 0.96);
-  border-color: rgba(var(--shadow-rgb), 0.08);
-  box-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.1);
-}
-
 .pro-shell--hybrid .pro-profile-portfolio-panel::before {
   opacity: 0.35;
 }
 
-.pro-shell--hybrid .pro-profile-portfolio-panel-nav,
-.pro-shell--hybrid .pro-profile-portfolio-panel-count,
 .pro-shell--hybrid .pro-profile-reviews-count-pill {
   background: rgba(var(--paper-rgb), 0.96);
   border-color: rgba(var(--shadow-rgb), 0.1);
@@ -10420,15 +10438,14 @@
   gap: 12px;
 }
 
+.pro-shell--ig .pro-profile-card,
 .pro-shell--hybrid .pro-profile-card {
   border-color: rgba(var(--shadow-rgb), 0.08);
   background: rgba(var(--paper-rgb), 0.96);
-  box-shadow: 0 14px 20px rgba(var(--shadow-rgb), 0.08);
 }
 
-.pro-shell--hybrid .pro-profile-card-icon {
-  background: transparent;
-  border-color: transparent;
+.pro-shell--hybrid .pro-profile-card {
+  box-shadow: 0 14px 20px rgba(var(--shadow-rgb), 0.08);
 }
 
 .pro-shell--hybrid .pro-profile-reviews-summary {
@@ -21231,7 +21248,6 @@ h2 {
 }
 
 .screen--client-master-profile .pro-shell {
-  gap: 18px;
   z-index: auto;
 }
 
@@ -27780,8 +27796,8 @@ h2 {
 
 /* Calm Premium Minimalism — Master Profile rebrand */
 .screen--pro-profile .pro-shell {
-  width: min(430px, 100%);
-  gap: 14px;
+  --pro-shell-width: min(430px, 100%);
+  --pro-shell-gap: 14px;
 }
 
 .screen--pro-profile .pro-profile-hero {
