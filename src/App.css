@@ -24968,7 +24968,7 @@ h2 {
   flex-direction: column;
   gap: 12px;
   --chat-context-float-offset: 6px;
-  --chat-context-float-top: -10px;
+  --chat-context-float-top: -18px;
 }
 
 .chat-thread.has-context-pill {
