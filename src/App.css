@@ -24968,7 +24968,7 @@ h2 {
   flex-direction: column;
   gap: 12px;
   --chat-context-float-offset: 6px;
-  --chat-context-float-top: 6px;
+  --chat-context-float-top: -2px;
 }
 
 .chat-thread.has-context-pill {
@@ -24988,8 +24988,8 @@ h2 {
 }
 
 .chat-context-float-card {
-  width: min(300px, 100%);
-  max-width: calc(100% - 96px);
+  width: min(280px, 100%);
+  max-width: calc(100% - 110px);
   margin: 0 auto;
   border: 1px solid rgba(var(--accent-rgb), 0.18);
   background: rgba(var(--paper-rgb), 0.9);
