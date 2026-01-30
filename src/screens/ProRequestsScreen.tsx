@@ -1446,20 +1446,35 @@ export const ProRequestsScreen = ({
   if (slotDetailsDepositPercent > 0) {
     slotDetailsMetaItems.push(`Депозит ${slotDetailsDepositPercent}%`)
   }
+  const slotDetailsReschedulePending =
+    Boolean(slotDetailsBooking?.rescheduleProposedTime) &&
+    Boolean(slotDetailsBooking?.rescheduleProposedBy)
+  const slotDetailsRescheduleByMaster =
+    slotDetailsBooking?.rescheduleProposedBy === 'master'
+  const slotDetailsCanRespondReschedule =
+    slotDetailsReschedulePending && !slotDetailsRescheduleByMaster
+  const slotDetailsCanCancelReschedule =
+    slotDetailsReschedulePending && slotDetailsRescheduleByMaster
   const canSlotDetailsReschedule =
+    !slotDetailsReschedulePending &&
     Boolean(slotDetailsBooking) &&
     (slotDetails?.status === 'booked' || slotDetails?.status === 'pending')
-  const canSlotDetailsCancel = Boolean(slotDetailsBooking) && canSlotDetailsReschedule
+  const canSlotDetailsCancelBooking =
+    !slotDetailsReschedulePending && Boolean(slotDetailsBooking) && canSlotDetailsReschedule
   const isSlotDetailsCancelConfirm =
     slotConfirm?.type === 'cancel-booking' &&
     slotConfirm.bookingId === slotDetailsBooking?.id
-  const slotDetailsActionsCount = Number(canSlotDetailsReschedule) + Number(
-    canSlotDetailsCancel
-  )
+  const slotDetailsActionsCount =
+    Number(slotDetailsCanRespondReschedule) * 2 +
+    Number(slotDetailsCanCancelReschedule) +
+    Number(canSlotDetailsReschedule) +
+    Number(canSlotDetailsCancelBooking)
   const slotDetailsActionClassName =
     slotDetailsActionsCount <= 1
       ? 'pro-slot-details-sheet-actions is-single'
       : 'pro-slot-details-sheet-actions'
+  const isSlotDetailsActionLoading =
+    Boolean(slotDetailsBooking) && bookingActionId === slotDetailsBooking?.id
   const calendarDays = useMemo(
     () =>
       Array.from({ length: CALENDAR_RANGE_DAYS }, (_, index) =>
@@ -2370,6 +2385,21 @@ export const ProRequestsScreen = ({
     })
   }
 
+  const handleSlotDetailsRescheduleAccept = () => {
+    if (!slotDetailsBooking) return
+    void handleBookingAction(slotDetailsBooking.id, 'reschedule-accept')
+  }
+
+  const handleSlotDetailsRescheduleDecline = () => {
+    if (!slotDetailsBooking) return
+    void handleBookingAction(slotDetailsBooking.id, 'reschedule-decline')
+  }
+
+  const handleSlotDetailsRescheduleCancel = () => {
+    if (!slotDetailsBooking) return
+    void handleBookingAction(slotDetailsBooking.id, 'reschedule-cancel')
+  }
+
   const missingLabels = useMemo(() => {
     const labels: string[] = []
     if (missingFields.includes('displayName')) {
@@ -2696,7 +2726,7 @@ export const ProRequestsScreen = ({
             {depositStatusLabel}
           </div>
         )}
-        {reschedulePending && (
+        {!isCompact && reschedulePending && (
           <div className="booking-actions">
             {canRespondReschedule && (
               <>
@@ -4204,20 +4234,52 @@ export const ProRequestsScreen = ({
             </div>
             {!isSlotDetailsCancelConfirm && slotDetailsActionsCount > 0 && (
               <div className={slotDetailsActionClassName}>
+                {slotDetailsCanRespondReschedule && (
+                  <>
+                    <button
+                      className="pro-slot-details-sheet-action is-primary"
+                      type="button"
+                      onClick={handleSlotDetailsRescheduleAccept}
+                      disabled={isSlotDetailsActionLoading}
+                    >
+                      Подтвердить перенос
+                    </button>
+                    <button
+                      className="pro-slot-details-sheet-action"
+                      type="button"
+                      onClick={handleSlotDetailsRescheduleDecline}
+                      disabled={isSlotDetailsActionLoading}
+                    >
+                      Отклонить перенос
+                    </button>
+                  </>
+                )}
+                {slotDetailsCanCancelReschedule && (
+                  <button
+                    className="pro-slot-details-sheet-action is-danger"
+                    type="button"
+                    onClick={handleSlotDetailsRescheduleCancel}
+                    disabled={isSlotDetailsActionLoading}
+                  >
+                    Отменить перенос
+                  </button>
+                )}
                 {canSlotDetailsReschedule && (
                   <button
                     className="pro-slot-details-sheet-action is-primary"
                     type="button"
                     onClick={handleSlotDetailsReschedule}
+                    disabled={isSlotDetailsActionLoading}
                   >
                     Перенести запись
                   </button>
                 )}
-                {canSlotDetailsCancel && (
+                {canSlotDetailsCancelBooking && (
                   <button
                     className="pro-slot-details-sheet-action is-danger"
                     type="button"
                     onClick={handleSlotDetailsCancel}
+                    disabled={isSlotDetailsActionLoading}
                   >
                     Отменить запись
                   </button>

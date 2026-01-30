@@ -15728,7 +15728,7 @@
   box-shadow: 0 18px 30px rgba(var(--shadow-rgb), 0.14);
   backdrop-filter: blur(12px) saturate(1.1);
   animation: pro-slot-details-in 0.25s ease;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pro-slot-details::before {

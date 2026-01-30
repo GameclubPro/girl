@@ -3094,10 +3094,14 @@ export const ChatThreadScreen = ({
                 hasReschedulePending &&
                 rescheduleProposedTime === rescheduleMeta.proposedAt &&
                 rescheduleProposedBy === rescheduleMeta.proposedBy
+              const proposedBy =
+                rescheduleMeta.proposedBy ?? rescheduleProposedBy ?? null
+              const viewerRole = isProViewer ? 'master' : 'client'
+              const isMessageProposer = proposedBy === viewerRole
               const canRespond =
-                isCurrentProposal && !isRescheduleProposer && !isBookingActionLoading
+                isCurrentProposal && !isMessageProposer && !isBookingActionLoading
               const canCancel =
-                isCurrentProposal && isRescheduleProposer && !isBookingActionLoading
+                isCurrentProposal && isMessageProposer && !isBookingActionLoading
               const toneClass =
                 rescheduleMeta.event === 'booking_reschedule_accepted'
                   ? 'is-accepted'
