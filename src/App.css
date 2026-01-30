@@ -24657,6 +24657,7 @@ h2 {
   background: rgba(var(--paper-rgb), 0.96);
   border-radius: 18px;
   padding: 12px;
+  width: 100%;
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 12px;
