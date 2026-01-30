@@ -345,6 +345,7 @@ export const ChatThreadScreen = ({
   )
   const [isCounterpartTyping, setIsCounterpartTyping] = useState(false)
   const [hasNewMessage, setHasNewMessage] = useState(false)
+  const [isContextCompact, setIsContextCompact] = useState(false)
   const [quickMode, setQuickMode] = useState<
     null | 'price' | 'time' | 'location'
   >(null)
@@ -382,6 +383,9 @@ export const ChatThreadScreen = ({
   const messagesRef = useRef<LocalChatMessage[]>([])
   const pendingByClientIdRef = useRef(new Map<string, number>())
   const isNearBottomRef = useRef(true)
+  const hasUserScrolledRef = useRef(false)
+  const contextCompactRef = useRef(false)
+  const lastScrollTopRef = useRef<number | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
   const selfTypingTimeoutRef = useRef<number | null>(null)
   const isSelfTypingRef = useRef(false)
@@ -906,25 +910,67 @@ export const ChatThreadScreen = ({
     [apiBase, chatId, userId]
   )
 
-  const handleScroll = useCallback(() => {
-    const container = getScrollElement()
-    const distance =
-      container.scrollHeight - container.scrollTop - container.clientHeight
-    isNearBottomRef.current = distance < 120
-    if (isNearBottomRef.current) {
-      setHasNewMessage(false)
-      const last = messagesRef.current[messagesRef.current.length - 1]
-      if (
-        last &&
-        last.senderId !== userId &&
-        last.id > 0 &&
-        last.id !== lastReadSentRef.current
-      ) {
-        lastReadSentRef.current = last.id
-        void markRead(last.id)
+  const handleScroll = useCallback(
+    (event?: { isTrusted?: boolean; nativeEvent?: { isTrusted?: boolean } }) => {
+      const container = getScrollElement()
+      const distance =
+        container.scrollHeight - container.scrollTop - container.clientHeight
+      isNearBottomRef.current = distance < 120
+      if (isNearBottomRef.current) {
+        setHasNewMessage(false)
+        const last = messagesRef.current[messagesRef.current.length - 1]
+        if (
+          last &&
+          last.senderId !== userId &&
+          last.id > 0 &&
+          last.id !== lastReadSentRef.current
+        ) {
+          lastReadSentRef.current = last.id
+          void markRead(last.id)
+        }
       }
-    }
-  }, [getScrollElement, markRead, userId])
+      const scrollTop = Math.max(0, container.scrollTop)
+      const prevScrollTop = lastScrollTopRef.current
+      const hasPrevScroll = typeof prevScrollTop === 'number'
+      const delta = hasPrevScroll ? Math.abs(scrollTop - prevScrollTop) : 0
+      lastScrollTopRef.current = scrollTop
+      const isTrusted =
+        typeof event?.isTrusted === 'boolean'
+          ? event.isTrusted
+          : typeof event?.nativeEvent?.isTrusted === 'boolean'
+            ? event.nativeEvent.isTrusted
+            : false
+      if (isTrusted && (!hasPrevScroll || delta > 1)) {
+        hasUserScrolledRef.current = true
+      }
+      if (hasUserScrolledRef.current) {
+        const compactThreshold = 12
+        const expandThreshold = 4
+        let next = contextCompactRef.current
+        if (!next && scrollTop > compactThreshold) {
+          next = true
+        }
+        if (next && scrollTop < expandThreshold) {
+          next = false
+        }
+        if (next !== contextCompactRef.current) {
+          contextCompactRef.current = next
+          setIsContextCompact(next)
+        }
+      } else if (contextCompactRef.current) {
+        contextCompactRef.current = false
+        setIsContextCompact(false)
+      }
+    },
+    [getScrollElement, markRead, userId]
+  )
+
+  useEffect(() => {
+    hasUserScrolledRef.current = false
+    contextCompactRef.current = false
+    lastScrollTopRef.current = null
+    setIsContextCompact(false)
+  }, [chatId])
 
   const loadMessages = useCallback(
     async (beforeId?: number, options?: { silent?: boolean }) => {
@@ -1434,7 +1480,7 @@ export const ChatThreadScreen = ({
 
   useEffect(() => {
     handleScroll()
-    const onScroll = () => handleScroll()
+    const onScroll = (event: Event) => handleScroll(event)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [handleScroll])
@@ -2549,12 +2595,16 @@ export const ChatThreadScreen = ({
   return (
     <div className="screen screen--chat-thread" ref={screenRef}>
       <div
-        className={`chat-thread${hasContextPill ? ' has-context-pill' : ''}`}
+        className={`chat-thread${hasContextPill ? ' has-context-pill' : ''}${
+          isContextCompact ? ' is-context-compact' : ''
+        }`}
       >
         {hasContextPill && (
           <div className="chat-context-float" role="region" aria-label="Контекст">
             <button
-              className="chat-context-float-card"
+              className={`chat-context-float-card${
+                isContextCompact ? ' is-compact' : ''
+              }`}
               type="button"
               onClick={openContextSheet}
               aria-label="Открыть детали заявки или записи"
