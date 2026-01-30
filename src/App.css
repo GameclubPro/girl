@@ -24968,7 +24968,7 @@ h2 {
   flex-direction: column;
   gap: 12px;
   --chat-context-float-offset: 6px;
-  --chat-context-float-top: -2px;
+  --chat-context-float-top: -10px;
 }
 
 .chat-thread.has-context-pill {
@@ -24988,15 +24988,15 @@ h2 {
 }
 
 .chat-context-float-card {
-  width: min(280px, 100%);
-  max-width: calc(100% - 110px);
+  width: min(240px, 100%);
+  max-width: calc(100% - 120px);
   margin: 0 auto;
   border: 1px solid rgba(var(--accent-rgb), 0.18);
   background: rgba(var(--paper-rgb), 0.9);
   border-radius: 18px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14);
@@ -25019,7 +25019,7 @@ h2 {
 .chat-context-float-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -25028,6 +25028,7 @@ h2 {
   align-items: baseline;
   gap: 6px;
   min-width: 0;
+  justify-content: center;
 }
 
 .chat-context-float-type {
@@ -25040,28 +25041,20 @@ h2 {
 }
 
 .chat-context-float-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .chat-context-float-meta {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .chat-context-float-action {
-  font-size: 11px;
+  margin-top: 4px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--accent-strong);
   white-space: nowrap;
+  text-align: center;
 }
 
 .trust-badge-button {
