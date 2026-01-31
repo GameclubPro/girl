@@ -14,8 +14,18 @@ const clampNumber = (value: number | undefined, min: number, max: number) => {
   return Math.min(max, Math.max(min, Math.round(value)))
 }
 
-const shouldSkipTransform = (url: string) =>
-  !url || url.startsWith('data:') || url.startsWith('blob:')
+const isLoadableUrl = (url: string) =>
+  Boolean(url) && !url.startsWith('data:') && !url.startsWith('blob:')
+
+const isAbsoluteHttpUrl = (url: string) => /^https?:\/\//i.test(url)
+
+const isTransformableUrl = (url: string) => {
+  if (!isLoadableUrl(url)) return false
+  if (isAbsoluteHttpUrl(url)) return url.includes('/uploads/')
+  return true
+}
+
+const shouldSkipTransform = (url: string) => !isTransformableUrl(url)
 
 export const buildImageUrl = (url: string, options: BuildImageOptions = {}) => {
   if (shouldSkipTransform(url)) return url
@@ -54,7 +64,7 @@ export const prefetchImages = (
   const limit = options.limit ?? 4
   const queue = urls
     .filter(Boolean)
-    .filter((url) => !shouldSkipTransform(url))
+    .filter((url) => isLoadableUrl(url))
     .filter((url) => {
       if (unique.has(url)) return false
       unique.add(url)

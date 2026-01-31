@@ -949,6 +949,29 @@ const resolveCertificateUrls = (req, value) =>
     url: certificate.url ? resolvePublicUrl(req, certificate.url) : null,
   }))
 
+const resolvePortfolioEntry = (req, value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return ''
+  if (normalized.startsWith('pf:')) {
+    try {
+      const payload = JSON.parse(normalized.slice(3))
+      if (!payload || typeof payload !== 'object') return normalized
+      const rawUrl = normalizeText(payload.url)
+      if (!rawUrl) return normalized
+      const resolvedUrl = resolvePublicUrl(req, rawUrl) ?? rawUrl
+      return `pf:${JSON.stringify({ ...payload, url: resolvedUrl })}`
+    } catch (error) {
+      return normalized
+    }
+  }
+  return resolvePublicUrl(req, normalized) ?? normalized
+}
+
+const resolvePortfolioUrls = (req, values) =>
+  (Array.isArray(values) ? values : [])
+    .map((value) => resolvePortfolioEntry(req, value))
+    .filter(Boolean)
+
 const extractPortfolioUrl = (value) => {
   const normalized = normalizeText(value)
   if (!normalized) return ''
@@ -4992,6 +5015,8 @@ app.get('/api/masters', async (req, res) => {
           : null
       const average = Number(row.reviewsAverage)
       const certificates = resolveCertificateUrls(req, row.certificates)
+      const portfolioUrls = resolvePortfolioUrls(req, row.portfolioUrls)
+      const showcaseUrls = resolvePortfolioUrls(req, row.showcaseUrls)
       const activePromotion = row.promotionId
         ? {
             id: Number(row.promotionId),
@@ -5020,9 +5045,9 @@ app.get('/api/masters', async (req, res) => {
         worksAtMaster: row.worksAtMaster,
         categories: row.categories,
         services: row.services,
-        portfolioUrls: row.portfolioUrls,
+        portfolioUrls,
         certificates,
-        showcaseUrls: row.showcaseUrls,
+        showcaseUrls,
         updatedAt: row.updatedAt,
         distanceKm,
         lateCancelFeePercent: 0,
@@ -5181,6 +5206,8 @@ app.get('/api/masters/:userId', async (req, res) => {
       ? Number(row.followersCount)
       : 0
     const certificates = resolveCertificateUrls(req, row.certificates)
+    const portfolioUrls = resolvePortfolioUrls(req, row.portfolioUrls)
+    const showcaseUrls = resolvePortfolioUrls(req, row.showcaseUrls)
     const activePromotion = row.promotionId
       ? {
           id: Number(row.promotionId),
@@ -5205,6 +5232,8 @@ app.get('/api/masters/:userId', async (req, res) => {
         typeof row.viewerMarketingOptIn === 'boolean'
           ? row.viewerMarketingOptIn
           : null,
+      portfolioUrls,
+      showcaseUrls,
       depositQrUrl: buildPublicUrl(req, row.depositQrPath),
       lateCancelFeePercent: 0,
       avatarUrl: buildPublicUrl(req, row.avatarPath),

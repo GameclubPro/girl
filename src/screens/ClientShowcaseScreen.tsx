@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   IconCalendar,
   IconFilter,
@@ -464,8 +464,21 @@ export const ClientShowcaseGalleryScreen = ({
   onViewClientProfile,
 }: ClientShowcaseGalleryScreenProps) => {
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
+  const [brokenShowcaseIds, setBrokenShowcaseIds] = useState<Set<string>>(
+    () => new Set()
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+
+  const markShowcaseBroken = useCallback((id: string) => {
+    if (!id) return
+    setBrokenShowcaseIds((prev) => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -509,9 +522,10 @@ export const ClientShowcaseGalleryScreen = ({
   }, [apiBase])
 
   const showcaseItems = useMemo(() => {
-    if (!activeCategoryId) return showcasePool
-    return showcasePool.filter((item) => item.categories.includes(activeCategoryId))
-  }, [activeCategoryId, showcasePool])
+    const filteredPool = showcasePool.filter((item) => !brokenShowcaseIds.has(item.id))
+    if (!activeCategoryId) return filteredPool
+    return filteredPool.filter((item) => item.categories.includes(activeCategoryId))
+  }, [activeCategoryId, brokenShowcaseIds, showcasePool])
 
   const galleryWidths = useMemo(() => [160, 240, 320, 480], [])
   const galleryQuality = 68
@@ -601,6 +615,7 @@ export const ClientShowcaseGalleryScreen = ({
                       alt=""
                       loading={index < 3 ? 'eager' : 'lazy'}
                       decoding="async"
+                      onError={() => markShowcaseBroken(item.id)}
                       srcSet={buildImageSrcSet(item.url, galleryWidths, {
                         quality: galleryQuality,
                       })}

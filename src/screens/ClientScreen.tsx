@@ -115,6 +115,9 @@ export const ClientScreen = ({
 }) => {
   type CategoryItem = (typeof categoryItems)[number]
   const [showcasePool, setShowcasePool] = useState<ShowcaseMedia[]>([])
+  const [brokenShowcaseIds, setBrokenShowcaseIds] = useState<Set<string>>(
+    () => new Set()
+  )
   const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([])
   const [isStoriesLoading, setIsStoriesLoading] = useState(false)
   const [storiesError, setStoriesError] = useState('')
@@ -146,6 +149,16 @@ export const ClientScreen = ({
     : ''
   const categoryPillLabel = activeCategoryLabel || 'Категория'
   const greetingText = buildGreeting(displayName)
+
+  const markShowcaseBroken = useCallback((id: string) => {
+    if (!id) return
+    setBrokenShowcaseIds((prev) => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     if (activeCategoryId) return
@@ -583,14 +596,15 @@ export const ClientScreen = ({
       ? showcasePool.filter((item) => item.categories.includes(activeCategoryId))
       : showcasePool
     const basePool = pool.length > 0 ? pool : showcasePool
-    if (basePool.length === 0) return []
-    const shuffled = shuffleItems(basePool)
+    const filteredPool = basePool.filter((item) => !brokenShowcaseIds.has(item.id))
+    if (filteredPool.length === 0) return []
+    const shuffled = shuffleItems(filteredPool)
     const poolByShape = {
       'is-small': [] as ShowcaseMedia[],
       'is-tall': [] as ShowcaseMedia[],
       'is-wide': [] as ShowcaseMedia[],
     }
-    basePool.forEach((item) => {
+    filteredPool.forEach((item) => {
       poolByShape[item.shape].push(item)
     })
     const used = new Set<string>()
@@ -607,7 +621,7 @@ export const ClientScreen = ({
       const fallback = pickRandom(shuffled)
       return fallback ?? shuffled[index % shuffled.length]
     })
-  }, [activeCategoryId, showcasePool])
+  }, [activeCategoryId, brokenShowcaseIds, showcasePool])
 
   const showcaseResolutions = useMemo(() => {
     if (!showcaseTileWidth) return null
@@ -757,6 +771,7 @@ export const ClientScreen = ({
                       alt=""
                       loading="lazy"
                       decoding="async"
+                      onError={() => markShowcaseBroken(item.id)}
                       srcSet={buildImageSrcSet(item.url, showcaseResolutions, {
                         quality: showcaseQuality,
                       })}
