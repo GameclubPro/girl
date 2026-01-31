@@ -46,6 +46,20 @@ export type StoryItem = {
 
 export const collectionItems = [
   {
+    id: 'promotions',
+    badge: '🔥',
+    label: 'Акции',
+    title: 'Спецпредложения',
+    meta: 'Скидки и бонусы',
+    tone: 'sky',
+    categoryId: null,
+    cornerImage: collectionBudgetArt,
+    cornerImagePosition: 'bottom-right',
+    cornerImageSize: 'clamp(120px, 42vw, 180px)',
+    cornerImageRight: '0px',
+    cornerImageBottom: '0px',
+  },
+  {
     id: 'verified',
     badge: '✅',
     label: 'Проверено',

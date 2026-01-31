@@ -28,6 +28,8 @@ type ClientShowcaseScreenProps = {
   userId: string
   activeCategoryId: string | null
   onCategoryChange: (categoryId: string | null) => void
+  preset?: { promotionsOnly?: boolean } | null
+  onPresetApplied?: () => void
   onBack: () => void
   onViewRequests: (tab?: 'requests' | 'bookings') => void
   onViewChats: () => void
@@ -852,6 +854,8 @@ export const ClientShowcaseScreen = ({
   userId,
   activeCategoryId,
   onCategoryChange,
+  preset,
+  onPresetApplied,
   onBack,
   onViewRequests,
   onViewChats,
@@ -889,6 +893,14 @@ export const ClientShowcaseScreen = ({
     : ''
 
   useEffect(() => {
+    if (!preset) return
+    if (typeof preset.promotionsOnly === 'boolean') {
+      setOnlyPromotions(preset.promotionsOnly)
+    }
+    onPresetApplied?.()
+  }, [onPresetApplied, preset])
+
+  useEffect(() => {
     let cancelled = false
 
     const loadMasters = async () => {
@@ -897,6 +909,9 @@ export const ClientShowcaseScreen = ({
         const params = new URLSearchParams()
         if (userId) {
           params.set('viewerId', userId)
+        }
+        if (onlyPromotions) {
+          params.set('promotionsOnly', '1')
         }
         if (typeof locationLat === 'number' && typeof locationLng === 'number') {
           params.set('clientLat', String(locationLat))
@@ -943,7 +958,15 @@ export const ClientShowcaseScreen = ({
     return () => {
       cancelled = true
     }
-  }, [apiBase, userId, locationLat, locationLng, hasClientLocation, sortMode])
+  }, [
+    apiBase,
+    userId,
+    locationLat,
+    locationLng,
+    hasClientLocation,
+    onlyPromotions,
+    sortMode,
+  ])
 
   useEffect(() => {
     let cancelled = false

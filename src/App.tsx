@@ -443,6 +443,9 @@ function App() {
   const [saveError, setSaveError] = useState('')
   const [locationError, setLocationError] = useState('')
   const [clientCategoryId, setClientCategoryId] = useState<string | null>(null)
+  const [clientShowcasePreset, setClientShowcasePreset] = useState<{
+    promotionsOnly?: boolean
+  } | null>(null)
   const [requestCategoryId, setRequestCategoryId] = useState<string>(
     categoryItems[0]?.id ?? ''
   )
@@ -1471,6 +1474,10 @@ function App() {
         onCategoryChange={setClientCategoryId}
         onViewShowcase={() => navigate('client-gallery')}
         onViewMasters={() => navigate('client-showcase')}
+        onViewPromotions={() => {
+          setClientShowcasePreset({ promotionsOnly: true })
+          navigate('client-showcase')
+        }}
         onViewChats={openChatList}
         onViewRequests={(tab) => openRequests(tab)}
         onViewProfile={() => navigate('client-profile')}
@@ -1534,6 +1541,8 @@ function App() {
         userId={userId}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
+        preset={clientShowcasePreset}
+        onPresetApplied={() => setClientShowcasePreset(null)}
         onBack={() => goBack('client')}
         onViewRequests={(tab) => openRequests(tab)}
         onViewChats={openChatList}
