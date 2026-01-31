@@ -7264,10 +7264,14 @@ const normalizeRepeatIntervals = (value) => {
 
 const resolveRepeatIntervalDays = (categoryId, overrides) => {
   const normalized = normalizeText(categoryId)
-  if (!normalized) return REPEAT_DEFAULT_INTERVALS.default
+  const defaultOverride = overrides?.default
+  const fallbackDefault =
+    (normalized && REPEAT_DEFAULT_INTERVALS[normalized]) ?? REPEAT_DEFAULT_INTERVALS.default
+  const baseDefault = defaultOverride && defaultOverride > 0 ? defaultOverride : fallbackDefault
+  if (!normalized) return baseDefault
   const custom = overrides?.[normalized]
   if (custom && custom > 0) return custom
-  return REPEAT_DEFAULT_INTERVALS[normalized] ?? REPEAT_DEFAULT_INTERVALS.default
+  return baseDefault
 }
 
 const getRepeatCategoryLabel = (categoryId) => {
@@ -7282,11 +7286,14 @@ const getRepeatCategoryLabel = (categoryId) => {
   return map[normalized] ?? normalized
 }
 
-const buildRepeatMessage = ({ template, categoryLabel }) => {
+const buildRepeatMessage = ({ template, categoryLabel, masterName }) => {
   const base =
     normalizeText(template) ||
     `Пора записаться на повторную услугу: ${categoryLabel}. Выберите удобное время по кнопке ниже.`
-  return base.replace(/\{\{\s*category\s*\}\}/gi, categoryLabel)
+  const resolvedMaster = normalizeText(masterName) || 'мастер'
+  return base
+    .replace(/\{\{\s*category\s*\}\}/gi, categoryLabel)
+    .replace(/\{\{\s*master\s*\}\}/gi, resolvedMaster)
 }
 
 const fetchRepeatBaseCandidates = async (masterId) => {
@@ -7358,6 +7365,110 @@ const fetchRepeatLogMap = async (masterId) => {
   return map
 }
 
+const buildRepeatTargets = async ({ masterId, intervals }) => {
+  const candidates = await fetchRepeatBaseCandidates(masterId)
+  if (candidates.length === 0) return []
+  const logMap = await fetchRepeatLogMap(masterId)
+  const now = Date.now()
+  const bestByClient = new Map()
+
+  candidates.forEach((row) => {
+    const clientId = normalizeText(row.clientId)
+    const categoryId = normalizeText(row.categoryId)
+    if (!clientId || !categoryId) return
+    const scheduledMs = new Date(row.scheduledAt).getTime()
+    if (Number.isNaN(scheduledMs)) return
+    const intervalDays = resolveRepeatIntervalDays(categoryId, intervals)
+    const dueAt = scheduledMs + intervalDays * DAY_MS
+    if (now < dueAt) return
+    const logKey = `${clientId}:${categoryId}`
+    const lastLog = logMap.get(logKey)
+    if (lastLog?.lastBookingId && lastLog.lastBookingId === row.bookingId) {
+      return
+    }
+    if (lastLog?.lastBookingAt) {
+      const loggedAt = new Date(lastLog.lastBookingAt).getTime()
+      if (!Number.isNaN(loggedAt) && loggedAt >= scheduledMs) {
+        return
+      }
+    }
+    const current = bestByClient.get(clientId)
+    if (!current || current.dueAt > dueAt) {
+      bestByClient.set(clientId, {
+        clientId,
+        categoryId,
+        bookingId: row.bookingId,
+        scheduledAt: row.scheduledAt,
+        dueAt,
+      })
+    }
+  })
+
+  let targets = Array.from(bestByClient.values())
+  if (targets.length > REPEAT_REMINDER_BATCH_LIMIT) {
+    targets = targets.slice(0, REPEAT_REMINDER_BATCH_LIMIT)
+  }
+  return targets
+}
+
+const loadRepeatSummary = async (masterId) => {
+  const settingsResult = await pool.query(
+    `
+      SELECT intervals
+      FROM marketing_repeat_settings
+      WHERE master_id = $1
+    `,
+    [masterId]
+  )
+  const intervals = normalizeRepeatIntervals(settingsResult.rows[0]?.intervals)
+  const targets = await buildRepeatTargets({ masterId, intervals })
+
+  const lastSentResult = await pool.query(
+    `
+      SELECT sent_at AS "sentAt"
+      FROM marketing_repeat_log
+      WHERE master_id = $1
+      ORDER BY sent_at DESC
+      LIMIT 1
+    `,
+    [masterId]
+  )
+  const lastSentAt = lastSentResult.rows[0]?.sentAt ?? null
+
+  if (targets.length === 0) {
+    return {
+      repeatEligibleTotal: 0,
+      repeatEligibleBotCount: 0,
+      repeatEligibleChatCount: 0,
+      repeatLastSentAt: lastSentAt,
+      repeatCheckedAt: new Date().toISOString(),
+    }
+  }
+
+  const [botRecipients, chatTargets] = await Promise.all([
+    fetchMarketingRecipients({ masterId }),
+    fetchChatBroadcastTargets({ masterId }),
+  ])
+  const botSet = new Set(botRecipients)
+  const chatSet = new Set(
+    chatTargets.map((target) => normalizeText(target.clientId)).filter(Boolean)
+  )
+  const repeatEligibleBotCount = targets.filter((target) =>
+    botSet.has(target.clientId)
+  ).length
+  const repeatEligibleChatCount = targets.filter((target) =>
+    chatSet.has(target.clientId)
+  ).length
+
+  return {
+    repeatEligibleTotal: targets.length,
+    repeatEligibleBotCount,
+    repeatEligibleChatCount,
+    repeatLastSentAt: lastSentAt,
+    repeatCheckedAt: new Date().toISOString(),
+  }
+}
+
 const buildMarketingBotPayload = async ({
   masterId,
   text,
@@ -7412,50 +7523,9 @@ const runRepeatReminderForMaster = async (settings) => {
   const includeUnsubscribe = settings?.includeUnsubscribe !== false
   const intervals = normalizeRepeatIntervals(settings?.intervals)
   const template = normalizeText(settings?.template)
-
-  const candidates = await fetchRepeatBaseCandidates(masterId)
-  if (candidates.length === 0) return { total: 0, sent: 0, failed: 0 }
-  const logMap = await fetchRepeatLogMap(masterId)
-  const now = Date.now()
-  const bestByClient = new Map()
-
-  candidates.forEach((row) => {
-    const clientId = normalizeText(row.clientId)
-    const categoryId = normalizeText(row.categoryId)
-    if (!clientId || !categoryId) return
-    const scheduledMs = new Date(row.scheduledAt).getTime()
-    if (Number.isNaN(scheduledMs)) return
-    const intervalDays = resolveRepeatIntervalDays(categoryId, intervals)
-    const dueAt = scheduledMs + intervalDays * DAY_MS
-    if (now < dueAt) return
-    const logKey = `${clientId}:${categoryId}`
-    const lastLog = logMap.get(logKey)
-    if (lastLog?.lastBookingId && lastLog.lastBookingId === row.bookingId) {
-      return
-    }
-    if (lastLog?.lastBookingAt) {
-      const loggedAt = new Date(lastLog.lastBookingAt).getTime()
-      if (!Number.isNaN(loggedAt) && loggedAt >= scheduledMs) {
-        return
-      }
-    }
-    const current = bestByClient.get(clientId)
-    if (!current || current.dueAt > dueAt) {
-      bestByClient.set(clientId, {
-        clientId,
-        categoryId,
-        bookingId: row.bookingId,
-        scheduledAt: row.scheduledAt,
-        dueAt,
-      })
-    }
-  })
-
-  let targets = Array.from(bestByClient.values())
+  const targets = await buildRepeatTargets({ masterId, intervals })
   if (targets.length === 0) return { total: 0, sent: 0, failed: 0 }
-  if (targets.length > REPEAT_REMINDER_BATCH_LIMIT) {
-    targets = targets.slice(0, REPEAT_REMINDER_BATCH_LIMIT)
-  }
+  const masterName = await resolveUserDisplayName(masterId)
 
   let sent = 0
   let failed = 0
@@ -7465,11 +7535,14 @@ const runRepeatReminderForMaster = async (settings) => {
     const recipientSet = new Set(recipientIds)
     const filteredTargets = targets.filter((target) => recipientSet.has(target.clientId))
     if (filteredTargets.length === 0) return { total: 0, sent: 0, failed: 0 }
-    const masterName = await resolveUserDisplayName(masterId)
 
     for (const target of filteredTargets) {
       const categoryLabel = getRepeatCategoryLabel(target.categoryId)
-      const messageText = buildRepeatMessage({ template, categoryLabel })
+      const messageText = buildRepeatMessage({
+        template,
+        categoryLabel,
+        masterName,
+      })
       try {
         const { payloadText, buttons } = await buildMarketingBotPayload({
           masterId,
@@ -7522,7 +7595,11 @@ const runRepeatReminderForMaster = async (settings) => {
       const chatId = chatMap.get(target.clientId)
       if (!chatId) continue
       const categoryLabel = getRepeatCategoryLabel(target.categoryId)
-      const messageText = buildRepeatMessage({ template, categoryLabel })
+      const messageText = buildRepeatMessage({
+        template,
+        categoryLabel,
+        masterName,
+      })
       try {
         const messageResult = await insertChatTextMessage({
           chatId,
@@ -7770,9 +7847,11 @@ app.get('/api/pro/marketing/summary', async (req, res) => {
       [masterId]
     )
     const row = result.rows[0] ?? {}
+    const repeatSummary = await loadRepeatSummary(masterId)
     res.json({
       botOptInCount: Number(row.botOptInCount) || 0,
       chatCount: Number(row.chatCount) || 0,
+      ...repeatSummary,
     })
   } catch (error) {
     console.error('GET /api/pro/marketing/summary failed:', error)

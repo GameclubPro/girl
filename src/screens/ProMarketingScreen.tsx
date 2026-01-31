@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { useProCabinetData } from '../hooks/useProCabinetData'
+import type { MarketingSummary, RepeatSettings } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
 import { buildShareLink } from '../utils/telegramShare'
 
 const MARKETING_TEXT_LIMIT = 800
 const DISCOUNT_OPTIONS = [0, 5, 10, 15]
+const REPEAT_INTERVAL_MIN = 7
+const REPEAT_INTERVAL_MAX = 180
 const REPEAT_INTERVALS = {
   'beauty-nails': 21,
   'brows-lashes': 21,
@@ -20,25 +23,11 @@ const REPEAT_CATEGORY_ORDER = [
   'cosmetology-care',
 ] as const
 
-type MarketingSummary = {
-  botOptInCount: number
-  chatCount: number
-}
-
 type Template = {
   id: string
   title: string
   description: string
   text: string
-}
-
-type RepeatSettings = {
-  enabled: boolean
-  channel: 'bot' | 'chat'
-  includeLink: boolean
-  includeUnsubscribe: boolean
-  intervals: Record<string, number>
-  template?: string | null
 }
 
 type ProMarketingScreenProps = {
@@ -60,6 +49,16 @@ const categoryLabelOverrides: Record<string, string> = {
 
 const getCategoryLabel = (categoryId: string) =>
   categoryLabelOverrides[categoryId] ?? categoryId
+
+const areIntervalsEqual = (
+  first: Record<string, number>,
+  second: Record<string, number>
+) => {
+  const firstKeys = Object.keys(first)
+  const secondKeys = Object.keys(second)
+  if (firstKeys.length !== secondKeys.length) return false
+  return firstKeys.every((key) => Number(first[key]) === Number(second[key]))
+}
 
 export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const {
@@ -95,6 +94,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [repeatLoading, setRepeatLoading] = useState(true)
   const [repeatError, setRepeatError] = useState('')
   const [repeatSaving, setRepeatSaving] = useState(false)
+  const [repeatTemplateDraft, setRepeatTemplateDraft] = useState('')
+  const [repeatIntervalsDraft, setRepeatIntervalsDraft] = useState<Record<string, number>>({})
+  const [repeatDraftInitialized, setRepeatDraftInitialized] = useState(false)
 
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null)
   const [marketingLoading, setMarketingLoading] = useState(true)
@@ -190,6 +192,20 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           setMarketingSummary({
             botOptInCount: Number(summaryPayload?.botOptInCount) || 0,
             chatCount: Number(summaryPayload?.chatCount) || 0,
+            repeatEligibleTotal:
+              summaryPayload?.repeatEligibleTotal === null
+                ? null
+                : Number(summaryPayload?.repeatEligibleTotal) || 0,
+            repeatEligibleBotCount:
+              summaryPayload?.repeatEligibleBotCount === null
+                ? null
+                : Number(summaryPayload?.repeatEligibleBotCount) || 0,
+            repeatEligibleChatCount:
+              summaryPayload?.repeatEligibleChatCount === null
+                ? null
+                : Number(summaryPayload?.repeatEligibleChatCount) || 0,
+            repeatLastSentAt: summaryPayload?.repeatLastSentAt ?? null,
+            repeatCheckedAt: summaryPayload?.repeatCheckedAt ?? null,
           })
         }
       } else {
@@ -235,6 +251,12 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   useEffect(() => {
     void loadMarketingData()
   }, [loadMarketingData])
+
+  useEffect(() => {
+    setRepeatDraftInitialized(false)
+    setRepeatTemplateDraft('')
+    setRepeatIntervalsDraft({})
+  }, [userId])
 
   const broadcastTemplates: Template[] = useMemo(() => {
     const slotsText = `Привет! ${masterLabel} появились свободные окна на ближайшие дни. Если хотите записаться, выберите время по кнопке ниже.`
@@ -303,12 +325,27 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const broadcastTemplateLabel = selectedBroadcastTemplate?.title ?? 'Шаблон сообщения'
   const repeatEnabled = repeatSettings?.enabled ?? false
   const repeatChannel = repeatSettings?.channel === 'chat' ? 'chat' : 'bot'
-  const repeatIntervals = repeatSettings?.intervals ?? {}
+  const repeatIntervals = repeatDraftInitialized
+    ? repeatIntervalsDraft
+    : repeatSettings?.intervals ?? {}
+  const repeatTemplateValue = repeatDraftInitialized
+    ? repeatTemplateDraft
+    : repeatSettings?.template ?? ''
+  const repeatTemplateLength = repeatTemplateValue.trim().length
+  const isRepeatTemplateTooLong = repeatTemplateLength > MARKETING_TEXT_LIMIT
+  const repeatDefaultDays =
+    typeof repeatIntervals.default === 'number' && repeatIntervals.default > 0
+      ? repeatIntervals.default
+      : REPEAT_INTERVALS.default
 
   const resolveRepeatInterval = useCallback(
     (categoryId: string) => {
       const custom = repeatIntervals[categoryId]
       if (typeof custom === 'number' && custom > 0) return custom
+      const defaultOverride = repeatIntervals.default
+      if (typeof defaultOverride === 'number' && defaultOverride > 0) {
+        return defaultOverride
+      }
       const preset = REPEAT_INTERVALS[categoryId as keyof typeof REPEAT_INTERVALS]
       return preset ?? REPEAT_INTERVALS.default
     },
@@ -333,10 +370,33 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   }, [bookings, resolveRepeatInterval])
 
   const repeatPreviewCategory = repeatCategories[0]?.label ?? 'вашу услугу'
-  const repeatTemplate = repeatSettings?.template?.trim() ?? ''
+  const repeatTemplate = repeatTemplateValue.trim()
   const repeatPreviewText = repeatTemplate
-    ? repeatTemplate.replace(/\{\{\s*category\s*\}\}/gi, repeatPreviewCategory)
+    ? repeatTemplate
+        .replace(/\{\{\s*category\s*\}\}/gi, repeatPreviewCategory)
+        .replace(
+          /\{\{\s*master\s*\}\}/gi,
+          displayName ? displayName : 'мастер'
+        )
     : `Пора записаться на повторную услугу: ${repeatPreviewCategory}. Выберите удобное время по кнопке ниже.`
+
+  const repeatDraftDirty = useMemo(() => {
+    if (!repeatDraftInitialized || !repeatSettings) return false
+    const baseTemplate = (repeatSettings.template ?? '').trim()
+    const currentTemplate = repeatTemplateDraft.trim()
+    if (baseTemplate !== currentTemplate) return true
+    const baseIntervals = repeatSettings.intervals ?? {}
+    return !areIntervalsEqual(repeatIntervalsDraft, baseIntervals)
+  }, [repeatDraftInitialized, repeatIntervalsDraft, repeatSettings, repeatTemplateDraft])
+
+  useEffect(() => {
+    if (!repeatSettings) return
+    if (!repeatDraftInitialized || !repeatDraftDirty) {
+      setRepeatTemplateDraft(repeatSettings.template ?? '')
+      setRepeatIntervalsDraft(repeatSettings.intervals ?? {})
+      setRepeatDraftInitialized(true)
+    }
+  }, [repeatDraftDirty, repeatDraftInitialized, repeatSettings])
 
   const handleInsertBroadcastTemplate = useCallback(
     (template: Template) => {
@@ -348,7 +408,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   )
 
   const saveRepeatSettings = useCallback(
-    async (next: Partial<RepeatSettings>) => {
+    async (
+      next: Partial<RepeatSettings>,
+      options?: { preserveDraft?: boolean }
+    ) => {
       if (!userId) return
       const base: RepeatSettings = repeatSettings ?? {
         enabled: false,
@@ -380,7 +443,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         if (!response.ok) {
           throw new Error(data?.error || 'repeat_save_failed')
         }
-        setRepeatSettings({
+        const nextSettings: RepeatSettings = {
           enabled: Boolean(data?.enabled),
           channel: data?.channel === 'chat' ? 'chat' : 'bot',
           includeLink: Boolean(data?.includeLink ?? data?.include_link ?? true),
@@ -390,7 +453,13 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           intervals:
             data?.intervals && typeof data.intervals === 'object' ? data.intervals : {},
           template: data?.template ?? null,
-        })
+        }
+        setRepeatSettings(nextSettings)
+        if (!options?.preserveDraft) {
+          setRepeatTemplateDraft(nextSettings.template ?? '')
+          setRepeatIntervalsDraft(nextSettings.intervals ?? {})
+          setRepeatDraftInitialized(true)
+        }
         showStatus('Настройки сохранены.')
       } catch (error) {
         setRepeatError('Не удалось сохранить авто-напоминания.')
@@ -470,12 +539,111 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     showStatus('Черновик очищен.')
   }, [showStatus])
 
+  const clampRepeatInterval = useCallback(
+    (value: number) =>
+      Math.min(REPEAT_INTERVAL_MAX, Math.max(REPEAT_INTERVAL_MIN, value)),
+    []
+  )
+
+  const handleRepeatIntervalAdjust = useCallback(
+    (categoryId: string, delta: number) => {
+      if (repeatLoading || repeatSaving) return
+      setRepeatDraftInitialized(true)
+      const current = resolveRepeatInterval(categoryId)
+      const nextValue = clampRepeatInterval(current + delta)
+      setRepeatIntervalsDraft((prev) => ({
+        ...prev,
+        [categoryId]: nextValue,
+      }))
+    },
+    [clampRepeatInterval, repeatLoading, repeatSaving, resolveRepeatInterval]
+  )
+
+  const handleRepeatIntervalReset = useCallback((categoryId: string) => {
+    setRepeatDraftInitialized(true)
+    setRepeatIntervalsDraft((prev) => {
+      if (!(categoryId in prev)) return prev
+      const next = { ...prev }
+      delete next[categoryId]
+      return next
+    })
+  }, [])
+
+  const handleRepeatDefaultAdjust = useCallback(
+    (delta: number) => {
+      if (repeatLoading || repeatSaving) return
+      setRepeatDraftInitialized(true)
+      const current =
+        typeof repeatIntervals.default === 'number' && repeatIntervals.default > 0
+          ? repeatIntervals.default
+          : REPEAT_INTERVALS.default
+      const nextValue = clampRepeatInterval(current + delta)
+      setRepeatIntervalsDraft((prev) => ({
+        ...prev,
+        default: nextValue,
+      }))
+    },
+    [clampRepeatInterval, repeatIntervals.default, repeatLoading, repeatSaving]
+  )
+
+  const handleRepeatDefaultReset = useCallback(() => {
+    setRepeatDraftInitialized(true)
+    setRepeatIntervalsDraft((prev) => {
+      if (!('default' in prev)) return prev
+      const next = { ...prev }
+      delete next.default
+      return next
+    })
+  }, [])
+
+  const handleRepeatDraftSave = useCallback(() => {
+    if (isRepeatTemplateTooLong) {
+      showStatus('Слишком длинный шаблон.', true)
+      return
+    }
+    void saveRepeatSettings({
+      intervals: repeatIntervalsDraft,
+      template: repeatTemplateDraft.trim() ? repeatTemplateDraft.trim() : null,
+    })
+  }, [isRepeatTemplateTooLong, repeatIntervalsDraft, repeatTemplateDraft, saveRepeatSettings, showStatus])
+
+  const handleRepeatDraftReset = useCallback(() => {
+    if (!repeatSettings) return
+    setRepeatIntervalsDraft(repeatSettings.intervals ?? {})
+    setRepeatTemplateDraft(repeatSettings.template ?? '')
+    setRepeatDraftInitialized(true)
+  }, [repeatSettings])
+
   const lastUpdatedLabel = lastUpdated
     ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
         hour: '2-digit',
         minute: '2-digit',
       })}`
     : ''
+
+  const repeatEligibleBotCount = marketingSummary?.repeatEligibleBotCount
+  const repeatEligibleChatCount = marketingSummary?.repeatEligibleChatCount
+  const repeatEligibleCount =
+    repeatChannel === 'bot' ? repeatEligibleBotCount : repeatEligibleChatCount
+  const repeatEligibleLabel =
+    marketingLoading || repeatEligibleCount === undefined || repeatEligibleCount === null
+      ? '—'
+      : repeatEligibleCount
+  const repeatLastSentAt = marketingSummary?.repeatLastSentAt ?? null
+  const repeatLastSentLabel = useMemo(() => {
+    if (!repeatLastSentAt) return 'Пока не отправляли'
+    const parsed = new Date(repeatLastSentAt)
+    if (Number.isNaN(parsed.getTime())) return 'Пока не отправляли'
+    const datePart = parsed.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: 'short',
+    })
+    const timePart = parsed.toLocaleTimeString('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    return `${datePart} ${timePart}`
+  }, [repeatLastSentAt])
 
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-marketing">
@@ -689,20 +857,33 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
             )}
           </section>
         ) : (
-          <section className="pro-detail-card pro-marketing-panel animate delay-1">
-            <div className="pro-detail-card-head">
-              <h2>Повторная запись</h2>
-              <span
-                className={`pro-detail-pill is-ghost${
-                  repeatEnabled ? '' : ' is-muted'
+          <section className="pro-detail-card pro-marketing-panel pro-marketing-repeat animate delay-1">
+            <div className="pro-detail-card-head pro-marketing-repeat-head">
+              <div className="pro-marketing-repeat-heading">
+                <h2>Повтор</h2>
+                <p className="pro-marketing-repeat-subtitle">
+                  Авто-напоминания о повторной записи.
+                </p>
+              </div>
+              <button
+                className={`pro-marketing-auto-toggle${
+                  repeatEnabled ? ' is-active' : ''
                 }`}
+                type="button"
+                onClick={() =>
+                  void saveRepeatSettings(
+                    { enabled: !repeatEnabled },
+                    { preserveDraft: true }
+                  )
+                }
+                aria-pressed={repeatEnabled}
+                disabled={repeatLoading || repeatSaving}
               >
-                Авто {repeatEnabled ? 'включено' : 'выключено'}
-              </span>
+                {repeatSaving ? '...' : repeatEnabled ? 'Вкл' : 'Выкл'}
+              </button>
             </div>
-            <p className="pro-detail-text">
-              Автоматически напомним клиентам записаться повторно, когда подходит
-              срок по услуге.
+            <p className="pro-marketing-repeat-note">
+              Проверяем каждые 12 часов и отправляем, если у клиента нет будущей записи.
             </p>
 
             {repeatLoading && (
@@ -716,91 +897,238 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               </p>
             )}
 
-            <div className="pro-marketing-auto-row">
-              <div className="pro-marketing-auto-text">
-                <p className="pro-marketing-auto-title">Авто-напоминания</p>
-                <p className="pro-marketing-auto-subtitle">
-                  Достаточно включить один раз.
+            <div className="pro-marketing-repeat-surface">
+              <p className="pro-marketing-section">Канал</p>
+              <div
+                className="pro-marketing-segment"
+                role="group"
+                aria-label="Канал напоминаний"
+              >
+                <button
+                  className={`pro-marketing-segment-item${
+                    repeatChannel === 'bot' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() =>
+                    void saveRepeatSettings(
+                      { channel: 'bot' },
+                      { preserveDraft: true }
+                    )
+                  }
+                  disabled={repeatLoading || repeatSaving}
+                >
+                  <span className="pro-marketing-segment-title">Бот</span>
+                  <span className="pro-marketing-segment-meta">
+                    {marketingLoading
+                      ? 'Считаем аудиторию...'
+                      : `Подписчиков: ${botAudience ?? 0}`}
+                  </span>
+                </button>
+                <button
+                  className={`pro-marketing-segment-item${
+                    repeatChannel === 'chat' ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() =>
+                    void saveRepeatSettings(
+                      { channel: 'chat' },
+                      { preserveDraft: true }
+                    )
+                  }
+                  disabled={repeatLoading || repeatSaving}
+                >
+                  <span className="pro-marketing-segment-title">Личные чаты</span>
+                  <span className="pro-marketing-segment-meta">
+                    {marketingLoading
+                      ? 'Считаем аудиторию...'
+                      : `Активных чатов: ${chatAudience ?? 0}`}
+                  </span>
+                </button>
+              </div>
+
+              <div className="pro-marketing-repeat-metrics">
+                <div className="pro-marketing-metric-card">
+                  <span className="pro-marketing-metric-label">
+                    Ожидают напоминания
+                  </span>
+                  <span className="pro-marketing-metric-value">
+                    {repeatEligibleLabel}
+                  </span>
+                </div>
+                <div className="pro-marketing-metric-card">
+                  <span className="pro-marketing-metric-label">
+                    Последняя отправка
+                  </span>
+                  <span className="pro-marketing-metric-value">
+                    {repeatLastSentLabel}
+                  </span>
+                </div>
+              </div>
+
+              {!shareConfigured && repeatChannel === 'bot' && (
+                <p className="pro-detail-warning" role="status">
+                  Добавьте VITE_TG_APP_URL, чтобы включить ссылку на запись.
                 </p>
+              )}
+            </div>
+
+            <div className="pro-marketing-repeat-surface">
+              <p className="pro-marketing-section">Сроки</p>
+              <div className="pro-marketing-interval-card is-base">
+                <div className="pro-marketing-interval-meta">
+                  <span className="pro-marketing-interval-title">
+                    Базовый интервал
+                  </span>
+                  <span className="pro-marketing-interval-subtitle">
+                    Для услуг без индивидуальных сроков.
+                  </span>
+                </div>
+                <div className="pro-marketing-interval-actions">
+                  <button
+                    className="pro-marketing-interval-step"
+                    type="button"
+                    onClick={() => handleRepeatDefaultAdjust(-1)}
+                    disabled={repeatLoading || repeatSaving}
+                    aria-label="Уменьшить базовый интервал"
+                  >
+                    −
+                  </button>
+                  <span className="pro-marketing-interval-value">
+                    {repeatDefaultDays} дней
+                  </span>
+                  <button
+                    className="pro-marketing-interval-step"
+                    type="button"
+                    onClick={() => handleRepeatDefaultAdjust(1)}
+                    disabled={repeatLoading || repeatSaving}
+                    aria-label="Увеличить базовый интервал"
+                  >
+                    +
+                  </button>
+                </div>
+                {'default' in repeatIntervalsDraft && (
+                  <button
+                    className="pro-marketing-interval-reset"
+                    type="button"
+                    onClick={handleRepeatDefaultReset}
+                    disabled={repeatLoading || repeatSaving}
+                  >
+                    Сбросить
+                  </button>
+                )}
               </div>
-              <button
-                className={`pro-marketing-auto-toggle${
-                  repeatEnabled ? ' is-active' : ''
-                }`}
-                type="button"
-                onClick={() => void saveRepeatSettings({ enabled: !repeatEnabled })}
-                aria-pressed={repeatEnabled}
-                disabled={repeatLoading || repeatSaving}
-              >
-                {repeatSaving ? '...' : repeatEnabled ? 'Вкл' : 'Выкл'}
-              </button>
-            </div>
 
-            <div
-              className="pro-marketing-channel-grid"
-              role="group"
-              aria-label="Канал рассылки"
-            >
-              <button
-                className={`pro-marketing-channel${
-                  repeatChannel === 'bot' ? ' is-active' : ''
-                }`}
-                type="button"
-                onClick={() => void saveRepeatSettings({ channel: 'bot' })}
-                disabled={repeatLoading || repeatSaving}
-              >
-                <span className="pro-marketing-channel-title">Бот</span>
-                <span className="pro-marketing-channel-meta">
-                  {marketingLoading
-                    ? 'Считаем аудиторию...'
-                    : `Подписчиков: ${botAudience ?? 0}`}
-                </span>
-              </button>
-              <button
-                className={`pro-marketing-channel${
-                  repeatChannel === 'chat' ? ' is-active' : ''
-                }`}
-                type="button"
-                onClick={() => void saveRepeatSettings({ channel: 'chat' })}
-                disabled={repeatLoading || repeatSaving}
-              >
-                <span className="pro-marketing-channel-title">Личные чаты</span>
-                <span className="pro-marketing-channel-meta">
-                  {marketingLoading
-                    ? 'Считаем аудиторию...'
-                    : `Активных чатов: ${chatAudience ?? 0}`}
-                </span>
-              </button>
-            </div>
-
-            <div className="pro-marketing-repeat-list">
-              <p className="pro-marketing-section">Сроки по категориям</p>
               <div className="pro-marketing-repeat-grid">
-                {repeatCategories.map((item) => (
-                  <div className="pro-marketing-repeat-card" key={item.id}>
-                    <span className="pro-marketing-repeat-title">{item.label}</span>
-                    <span className="pro-marketing-repeat-days">
-                      {item.days} дней
-                    </span>
-                  </div>
-                ))}
+                {repeatCategories.map((item) => {
+                  const isCustom = Object.prototype.hasOwnProperty.call(
+                    repeatIntervalsDraft,
+                    item.id
+                  )
+                  return (
+                    <div className="pro-marketing-interval-card" key={item.id}>
+                      <div className="pro-marketing-interval-meta">
+                        <span className="pro-marketing-interval-title">
+                          {item.label}
+                        </span>
+                        <span className="pro-marketing-interval-subtitle">
+                          {isCustom ? 'Свои сроки' : 'По умолчанию'}
+                        </span>
+                      </div>
+                      <div className="pro-marketing-interval-actions">
+                        <button
+                          className="pro-marketing-interval-step"
+                          type="button"
+                          onClick={() => handleRepeatIntervalAdjust(item.id, -1)}
+                          disabled={repeatLoading || repeatSaving}
+                          aria-label={`Уменьшить срок для ${item.label}`}
+                        >
+                          −
+                        </button>
+                        <span className="pro-marketing-interval-value">
+                          {item.days} дней
+                        </span>
+                        <button
+                          className="pro-marketing-interval-step"
+                          type="button"
+                          onClick={() => handleRepeatIntervalAdjust(item.id, 1)}
+                          disabled={repeatLoading || repeatSaving}
+                          aria-label={`Увеличить срок для ${item.label}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                      {isCustom && (
+                        <button
+                          className="pro-marketing-interval-reset"
+                          type="button"
+                          onClick={() => handleRepeatIntervalReset(item.id)}
+                          disabled={repeatLoading || repeatSaving}
+                        >
+                          Сбросить
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
-            <div className="pro-marketing-repeat-preview">
-              <p className="pro-marketing-section">Шаблон сообщения</p>
+            <div className="pro-marketing-repeat-surface">
+              <p className="pro-marketing-section">Сообщение</p>
+              <div className="pro-marketing-template-editor">
+                <textarea
+                  className={`pro-marketing-textarea pro-marketing-textarea--compact${
+                    isRepeatTemplateTooLong ? ' is-error' : ''
+                  }`}
+                  value={repeatTemplateValue}
+                  onChange={(event) => {
+                    setRepeatDraftInitialized(true)
+                    setRepeatTemplateDraft(event.target.value)
+                  }}
+                  placeholder="Напишите шаблон или оставьте пустым для стандартного текста"
+                  rows={4}
+                />
+                <div className="pro-marketing-template-footer">
+                  <span
+                    className={`pro-marketing-count${
+                      isRepeatTemplateTooLong ? ' is-error' : ''
+                    }`}
+                  >
+                    {repeatTemplateLength}/{MARKETING_TEXT_LIMIT}
+                  </span>
+                  <div className="pro-marketing-token-row">
+                    <span className="pro-marketing-token">{'{{category}}'}</span>
+                    <span className="pro-marketing-token">{'{{master}}'}</span>
+                  </div>
+                </div>
+              </div>
               <div className="pro-marketing-preview-card">{repeatPreviewText}</div>
+              <p className="pro-marketing-repeat-hint">
+                Кнопка записи добавится автоматически в бот-канале.
+              </p>
             </div>
 
-            {!shareConfigured && (
-              <p className="pro-detail-warning" role="status">
-                Добавьте VITE_TG_APP_URL, чтобы включить ссылку на запись.
-              </p>
+            {repeatDraftDirty && (
+              <div className="pro-detail-actions pro-detail-actions--compact">
+                <button
+                  className="pro-detail-action"
+                  type="button"
+                  onClick={handleRepeatDraftSave}
+                  disabled={repeatLoading || repeatSaving || isRepeatTemplateTooLong}
+                >
+                  {repeatSaving ? 'Сохраняем...' : 'Сохранить'}
+                </button>
+                <button
+                  className="pro-detail-action is-ghost"
+                  type="button"
+                  onClick={handleRepeatDraftReset}
+                  disabled={repeatLoading || repeatSaving}
+                >
+                  Сбросить
+                </button>
+              </div>
             )}
 
-            <p className="pro-marketing-repeat-hint">
-              Проверяем ежедневно и отправляем только если у клиента нет будущей записи.
-            </p>
             {status && (
               <p className="pro-detail-status" role="status">
                 {status}

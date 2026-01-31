@@ -99,6 +99,25 @@ export type MasterProfile = {
   viewerMarketingOptIn?: boolean | null
 }
 
+export type MarketingSummary = {
+  botOptInCount: number
+  chatCount: number
+  repeatEligibleTotal?: number | null
+  repeatEligibleBotCount?: number | null
+  repeatEligibleChatCount?: number | null
+  repeatLastSentAt?: string | null
+  repeatCheckedAt?: string | null
+}
+
+export type RepeatSettings = {
+  enabled: boolean
+  channel: 'bot' | 'chat'
+  includeLink: boolean
+  includeUnsubscribe: boolean
+  intervals: Record<string, number>
+  template?: string | null
+}
+
 export type StoryItem = {
   id: number
   mediaUrl: string | null
