@@ -9,6 +9,48 @@ const MARKETING_TEXT_LIMIT = 800
 const CAMPAIGN_LIMIT = 12
 const DISCOUNT_OPTIONS = [5, 10, 15]
 const PACKAGE_OPTIONS = [3, 5]
+const REMINDER_WINDOWS = [30, 60] as const
+
+type ReminderWindow = (typeof REMINDER_WINDOWS)[number]
+
+type MarketingSummary = {
+  botOptInCount: number
+  chatCount: number
+}
+
+type MarketingCampaign = {
+  id: number
+  channel: 'bot' | 'chat'
+  audience?: string | null
+  body: string
+  includeUnsubscribe: boolean
+  total: number
+  sent: number
+  failed: number
+  createdAt: string
+}
+
+type Template = {
+  id: string
+  title: string
+  description: string
+  pill?: string
+  text: string
+  isPromo?: boolean
+  isPackage?: boolean
+}
+
+type ProMarketingScreenProps = {
+  apiBase: string
+  userId: string
+  displayNameFallback: string
+  onBack: () => void
+  onViewRequests: () => void
+  onViewChats: () => void
+  onEditProfile: () => void
+  onOpenCampaigns: () => void
+  onOpenReminders: () => void
+}
 
 const formatShortDateTime = (value: number) =>
   new Intl.DateTimeFormat('ru-RU', {
@@ -25,59 +67,27 @@ const formatCampaignDate = (value?: string | null) => {
   return formatShortDateTime(parsed.getTime())
 }
 
-type MarketingSummary = {
-  botOptInCount: number
-  chatCount: number
+const formatAudienceLabel = (value?: string | null) => {
+  if (!value || value === 'all') return 'Все клиенты'
+  if (value === 'inactive_30') return 'Пауза 30+ дней'
+  if (value === 'inactive_60') return 'Пауза 60+ дней'
+  return 'Аудитория'
 }
 
-type MarketingCampaign = {
-  id: number
-  channel: 'bot' | 'chat'
-  body: string
-  includeUnsubscribe: boolean
-  total: number
-  sent: number
-  failed: number
-  createdAt: string
-}
-
-type Scenario = {
-  id: string
-  title: string
-  description: string
-  pill: string
-  text: string
-  showLink?: boolean
-  isPromo?: boolean
-  isPackage?: boolean
-  isShare?: boolean
-}
-
-type ProMarketingScreenProps = {
-  apiBase: string
-  userId: string
-  displayNameFallback: string
-  onBack: () => void
-  onViewRequests: () => void
-  onViewChats: () => void
-  onEditProfile: () => void
-  onOpenCampaigns: () => void
-  onOpenReminders: () => void
-}
-
-export const ProMarketingScreen = ({
-  apiBase,
-  userId,
-  displayNameFallback,
-  onBack,
-  onViewRequests,
-  onViewChats,
-  onEditProfile,
-  onOpenCampaigns,
-  onOpenReminders,
-}: ProMarketingScreenProps) => {
-  const { bookingStats, requestStats, lastUpdated, isLoading, combinedError } =
-    useProCabinetData(apiBase, userId)
+export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
+  const {
+    apiBase,
+    userId,
+    displayNameFallback,
+    onBack,
+    onViewRequests,
+    onViewChats,
+    onEditProfile,
+  } = props
+  const { bookingStats, lastUpdated, isLoading, combinedError } = useProCabinetData(
+    apiBase,
+    userId
+  )
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
   const bookingStartParam = useMemo(() => buildBookingStartParam(userId), [userId])
@@ -88,12 +98,20 @@ export const ProMarketingScreen = ({
   const displayName = displayNameFallback.trim()
   const masterLabel = displayName ? `у мастера ${displayName}` : 'у мастера'
 
+  const [activeTab, setActiveTab] = useState<'broadcast' | 'reminder'>('broadcast')
+  const [channel, setChannel] = useState<'bot' | 'chat'>('bot')
   const [discountPercent, setDiscountPercent] = useState(10)
   const [packageVisits, setPackageVisits] = useState(3)
-  const [channel, setChannel] = useState<'bot' | 'chat'>('bot')
-  const [message, setMessage] = useState('')
-  const [includeLink, setIncludeLink] = useState(true)
-  const [includeUnsubscribe, setIncludeUnsubscribe] = useState(true)
+  const [broadcastDraft, setBroadcastDraft] = useState('')
+  const [reminderDraft, setReminderDraft] = useState('')
+  const [broadcastIncludeLink, setBroadcastIncludeLink] = useState(true)
+  const [reminderIncludeLink, setReminderIncludeLink] = useState(true)
+  const [broadcastIncludeUnsubscribe, setBroadcastIncludeUnsubscribe] = useState(true)
+  const [reminderIncludeUnsubscribe, setReminderIncludeUnsubscribe] = useState(true)
+  const [reminderWindow, setReminderWindow] = useState<ReminderWindow>(30)
+  const [reminderTone, setReminderTone] = useState('friendly')
+  const [historyOpen, setHistoryOpen] = useState(false)
+
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null)
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([])
   const [marketingLoading, setMarketingLoading] = useState(true)
@@ -182,58 +200,60 @@ export const ProMarketingScreen = ({
     void loadMarketingData()
   }, [loadMarketingData])
 
-  const inactiveClients = useMemo(() => {
+  const inactiveCounts = useMemo(() => {
     const now = Date.now()
-    return bookingStats.clientSummaries.filter((client) => {
-      if (!client.lastSeenTime) return false
-      return now - client.lastSeenTime >= 30 * DAY_MS
-    }).length
+    let count30 = 0
+    let count60 = 0
+    bookingStats.clientSummaries.forEach((client) => {
+      if (!client.lastSeenTime) return
+      const diffDays = (now - client.lastSeenTime) / DAY_MS
+      if (diffDays >= 30) {
+        count30 += 1
+      }
+      if (diffDays >= 60) {
+        count60 += 1
+      }
+    })
+    return { count30, count60 }
   }, [bookingStats.clientSummaries])
+
   const repeatRate = bookingStats.uniqueClients
     ? bookingStats.repeatClients / bookingStats.uniqueClients
     : 0
-  const recommendation = useMemo(() => {
-    if (!bookingStats.uniqueClients) {
-      return { id: 'share', note: 'Сначала соберите базу клиентов.' }
-    }
-    if (bookingStats.upcomingWeek < 3) {
-      return { id: 'fill-week', note: 'На неделю меньше 3 записей.' }
-    }
-    if (inactiveClients >= Math.max(2, Math.ceil(bookingStats.uniqueClients * 0.3))) {
-      return { id: 'win-back', note: 'Много клиентов давно не были у вас.' }
-    }
-    if (repeatRate < 0.4) {
-      return { id: 'package', note: 'Нужно стимулировать повторные визиты.' }
-    }
-    return { id: 'promo-week', note: 'Поддержите спрос мягкой акцией.' }
-  }, [bookingStats.uniqueClients, bookingStats.upcomingWeek, inactiveClients, repeatRate])
 
-  const scenarios: Scenario[] = useMemo(() => {
-    const fillWeekText = `Открылись новые окна для записи ${masterLabel}. Если удобно, выберите время по ссылке.`
-    const winBackText = `Давно не виделись ${masterLabel}. Есть новые окна, если удобно, выберите время по ссылке.`
-    const promoText = `На этой неделе действует спец-условие: -${discountPercent}% на ближайшие окна ${masterLabel}. Если интересно, выберите время по ссылке.`
-    const packageText = `Пакет ${packageVisits} визитов выгоднее разовых ${masterLabel}. Если интересно, выберите время по ссылке.`
-    const shareText = `Запись ${masterLabel}. Свободные окна и условия доступны по ссылке.`
+  const recommendedTemplateId = useMemo(() => {
+    if (!bookingStats.uniqueClients) return 'share'
+    if (bookingStats.upcomingWeek < 3) return 'fill-week'
+    if (inactiveCounts.count30 >= Math.max(2, Math.ceil(bookingStats.uniqueClients * 0.3))) {
+      return 'win-back'
+    }
+    if (repeatRate < 0.4) return 'package'
+    return 'promo-week'
+  }, [
+    bookingStats.uniqueClients,
+    bookingStats.upcomingWeek,
+    inactiveCounts.count30,
+    repeatRate,
+  ])
+
+  const broadcastTemplates: Template[] = useMemo(() => {
+    const fillWeekText = `Открылись новые окна для записи ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
+    const promoText = `На этой неделе действует спец-условие: -${discountPercent}% на ближайшие окна ${masterLabel}. Если интересно, выберите время по кнопке ниже.`
+    const packageText = `Пакет ${packageVisits} визитов выгоднее разовых ${masterLabel}. Если интересно, выберите время по кнопке ниже.`
+    const winBackText = `Давно не виделись ${masterLabel}. Есть новые окна, если удобно, выберите время по кнопке ниже.`
 
     return [
       {
         id: 'fill-week',
-        title: 'Заполнить окна недели',
-        description: 'Мягкое сообщение о свободных слотах на ближайшие 7 дней.',
+        title: 'Свободные окна недели',
+        description: 'Короткое сообщение о доступных слотах.',
         pill: `На неделе: ${bookingStats.upcomingWeek}`,
         text: fillWeekText,
       },
       {
-        id: 'win-back',
-        title: 'Вернуть клиентов 30+ дней',
-        description: 'Напоминание для тех, кто давно не был на приеме.',
-        pill: `Спящих: ${inactiveClients}`,
-        text: winBackText,
-      },
-      {
         id: 'promo-week',
         title: 'Акция недели',
-        description: 'Аккуратное промо для ближайших окон без агрессивных скидок.',
+        description: 'Мягкое промо без агрессивных скидок.',
         pill: `Скидка ${discountPercent}%`,
         text: promoText,
         isPromo: true,
@@ -241,73 +261,122 @@ export const ProMarketingScreen = ({
       {
         id: 'package',
         title: `Пакет ${packageVisits} визитов`,
-        description: 'Предложение для лояльных клиентов и повторных визитов.',
+        description: 'Выгодное предложение для повторных клиентов.',
         pill: `Повторных: ${bookingStats.repeatClients}`,
         text: packageText,
         isPackage: true,
       },
       {
-        id: 'share',
-        title: 'Поделиться визиткой',
-        description: 'Быстрая публикация вашей ссылки для новых клиентов.',
-        pill: shareLink ? 'Ссылка готова' : 'Ссылка недоступна',
-        text: shareText,
-        showLink: true,
-        isShare: true,
+        id: 'win-back',
+        title: 'Вернуть клиентов',
+        description: 'Напоминание для тех, кто давно не был.',
+        pill: `Спящих: ${inactiveCounts.count30}`,
+        text: winBackText,
       },
     ]
   }, [
     bookingStats.repeatClients,
     bookingStats.upcomingWeek,
     discountPercent,
-    inactiveClients,
+    inactiveCounts.count30,
     masterLabel,
     packageVisits,
-    shareLink,
   ])
 
-  const recommendedScenario =
-    scenarios.find((scenario) => scenario.id === recommendation.id) ?? scenarios[0]
-  const lastUpdatedLabel = lastUpdated
-    ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
-    : ''
+  const reminderTemplates: Template[] = useMemo(() => {
+    const friendlyText = `Привет! Давно не виделись ${masterLabel}. Если хотите вернуться, выберите удобное время по кнопке ниже.`
+    const careText = `Напоминаем о себе ${masterLabel}: появились свободные окна. Если удобно, выберите время по кнопке ниже.`
+    const bonusText = `Для возвращения действует небольшой бонус: -${discountPercent}% на ближайшую запись ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
 
-  const sanitizedMessage = message.trim()
-  const includeLinkEnabled = includeLink && Boolean(shareLink)
+    return [
+      {
+        id: 'friendly',
+        title: 'Дружелюбно',
+        description: 'Легкое напоминание без давления.',
+        text: friendlyText,
+      },
+      {
+        id: 'care',
+        title: 'С заботой',
+        description: 'Спокойное, поддерживающее сообщение.',
+        text: careText,
+      },
+      {
+        id: 'bonus',
+        title: 'С бонусом',
+        description: `Скидка ${discountPercent}% для возвращения.`,
+        text: bonusText,
+        isPromo: true,
+      },
+    ]
+  }, [discountPercent, masterLabel])
+
+  const currentDraft = activeTab === 'broadcast' ? broadcastDraft : reminderDraft
+  const setCurrentDraft = activeTab === 'broadcast' ? setBroadcastDraft : setReminderDraft
+  const includeLinkEnabled =
+    activeTab === 'broadcast' ? broadcastIncludeLink : reminderIncludeLink
+  const includeUnsubscribeEnabled =
+    activeTab === 'broadcast'
+      ? broadcastIncludeUnsubscribe
+      : reminderIncludeUnsubscribe
+
   const payloadText = useMemo(() => {
-    if (!sanitizedMessage) return ''
-    if (channel === 'bot') return sanitizedMessage
-    if (includeLinkEnabled) {
-      return `${sanitizedMessage}\n${shareLink}`
+    const trimmed = currentDraft.trim()
+    if (!trimmed) return ''
+    if (channel === 'bot') return trimmed
+    if (includeLinkEnabled && shareLink) {
+      return `${trimmed}\n${shareLink}`
     }
-    return sanitizedMessage
-  }, [channel, includeLinkEnabled, sanitizedMessage, shareLink])
+    return trimmed
+  }, [channel, currentDraft, includeLinkEnabled, shareLink])
 
   const payloadLength = payloadText.length
   const isTextTooLong = payloadLength > MARKETING_TEXT_LIMIT
+
   const botAudience = marketingSummary?.botOptInCount
   const chatAudience = marketingSummary?.chatCount
-  const audienceCount = channel === 'bot' ? botAudience : chatAudience
+  const reminderAudience = reminderWindow === 60 ? inactiveCounts.count60 : inactiveCounts.count30
+  const audienceCount =
+    activeTab === 'broadcast'
+      ? channel === 'bot'
+        ? botAudience
+        : chatAudience
+      : reminderAudience
   const hasAudience = typeof audienceCount !== 'number' || audienceCount > 0
   const canSend = Boolean(payloadText) && !isTextTooLong && !isSending && hasAudience
 
-  const handleInsertScenario = useCallback(
-    (scenario: Scenario) => {
-      setMessage(scenario.text)
-      if (scenario.showLink && shareLink) {
-        setIncludeLink(true)
+  const audienceLabel =
+    activeTab === 'broadcast'
+      ? marketingLoading
+        ? 'Считаем аудиторию...'
+        : channel === 'bot'
+          ? `Подписчиков: ${botAudience ?? 0}`
+          : `Активных чатов: ${chatAudience ?? 0}`
+      : `Клиентов с паузой: ${reminderAudience}`
+
+  const channelHint =
+    channel === 'bot'
+      ? 'Сообщение уйдет подписчикам рассылки через бот.'
+      : 'Сообщение появится в активных чатах с клиентами.'
+
+  const reminderHint = `Напомним клиентам, которые не были ${reminderWindow}+ дней.`
+
+  const handleInsertTemplate = useCallback(
+    (tab: 'broadcast' | 'reminder', template: Template) => {
+      if (tab === 'broadcast') {
+        setBroadcastDraft(template.text)
+      } else {
+        setReminderDraft(template.text)
+        setReminderTone(template.id)
       }
-      showStatus('Текст вставлен в рассылку.')
+      showStatus('Текст вставлен в сообщение.')
     },
-    [shareLink, showStatus]
+    [showStatus]
   )
 
-  const handleCopyScenario = useCallback(
-    async (scenario: Scenario) => {
-      const payload = shareLink ? `${scenario.text}\n${shareLink}` : scenario.text
+  const handleCopyTemplate = useCallback(
+    async (template: Template) => {
+      const payload = shareLink ? `${template.text}\n${shareLink}` : template.text
       const success = await copyToClipboard(payload.trim())
       showStatus(success ? 'Текст скопирован.' : 'Не удалось скопировать.', !success)
     },
@@ -316,7 +385,7 @@ export const ProMarketingScreen = ({
 
   const handleSend = useCallback(async () => {
     if (!payloadText) {
-      showStatus('Введите текст рассылки.', true)
+      showStatus('Введите текст сообщения.', true)
       return
     }
     if (isTextTooLong) {
@@ -324,9 +393,21 @@ export const ProMarketingScreen = ({
       return
     }
     if (!hasAudience) {
-      showStatus('Нет получателей для рассылки.', true)
+      showStatus(
+        activeTab === 'broadcast'
+          ? 'Нет получателей для рассылки.'
+          : 'Нет клиентов для напоминания.',
+        true
+      )
       return
     }
+
+    const audience =
+      activeTab === 'broadcast'
+        ? 'all'
+        : reminderWindow === 60
+          ? 'inactive_60'
+          : 'inactive_30'
 
     setIsSending(true)
     setSendError('')
@@ -339,7 +420,8 @@ export const ProMarketingScreen = ({
           channel,
           text: payloadText,
           includeLink: channel === 'bot' && includeLinkEnabled,
-          includeUnsubscribe: channel === 'bot' && includeUnsubscribe,
+          includeUnsubscribe: channel === 'bot' && includeUnsubscribeEnabled,
+          audience,
         }),
       })
 
@@ -369,39 +451,46 @@ export const ProMarketingScreen = ({
       setIsSending(false)
     }
   }, [
+    activeTab,
     apiBase,
     channel,
-    includeUnsubscribe,
+    includeLinkEnabled,
+    includeUnsubscribeEnabled,
     isTextTooLong,
     payloadText,
     hasAudience,
+    reminderWindow,
     userId,
     showStatus,
   ])
 
   const handleClear = useCallback(() => {
-    setMessage('')
+    if (activeTab === 'broadcast') {
+      setBroadcastDraft('')
+    } else {
+      setReminderDraft('')
+    }
     showStatus('Черновик очищен.')
-  }, [showStatus])
+  }, [activeTab, showStatus])
 
   const handleToggleLink = useCallback(() => {
     if (!shareLink) {
       showStatus('Ссылка для записи недоступна.', true)
       return
     }
-    setIncludeLink((current) => !current)
-  }, [shareLink, showStatus])
+    if (activeTab === 'broadcast') {
+      setBroadcastIncludeLink((current) => !current)
+    } else {
+      setReminderIncludeLink((current) => !current)
+    }
+  }, [activeTab, shareLink, showStatus])
 
-  const channelHint =
-    channel === 'bot'
-      ? 'Сообщение уйдет подписчикам рассылки через бот.'
-      : 'Сообщение появится в активных чатах с клиентами.'
-
-  const audienceLabel = marketingLoading
-    ? 'Считаем аудиторию...'
-    : channel === 'bot'
-      ? `Подписчиков: ${botAudience ?? 0}`
-      : `Активных чатов: ${chatAudience ?? 0}`
+  const lastUpdatedLabel = lastUpdated
+    ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`
+    : ''
 
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-marketing">
@@ -412,9 +501,9 @@ export const ProMarketingScreen = ({
           </button>
           <div className="pro-detail-title">
             <p className="pro-detail-kicker">Маркетинг</p>
-            <h1 className="pro-detail-heading">Рост и возвращение</h1>
+            <h1 className="pro-detail-heading">Коммуникации</h1>
             <p className="pro-detail-subtitle">
-              Сценарии, рассылки и личные сообщения для клиентов.
+              Два удобных окна: массовая рассылка и повторные записи.
             </p>
           </div>
         </header>
@@ -439,307 +528,453 @@ export const ProMarketingScreen = ({
           </p>
         )}
 
-        <section className="pro-detail-card animate delay-1">
-          <div className="pro-detail-card-head">
-            <h2>Состояние роста</h2>
-            <span className="pro-detail-pill is-ghost">
-              Аудитория: {bookingStats.uniqueClients}
-            </span>
-          </div>
-          <div className="pro-detail-metric-grid">
-            <div className="pro-detail-metric">
-              <span className="pro-detail-metric-label">Повторные</span>
-              <span className="pro-detail-metric-value">{bookingStats.repeatClients}</span>
-              <span className="pro-detail-metric-meta">
-                Доля: {Math.round(repeatRate * 100) || 0}%
-              </span>
-            </div>
-            <div className="pro-detail-metric">
-              <span className="pro-detail-metric-label">Окна недели</span>
-              <span className="pro-detail-metric-value">
-                {Math.max(0, bookingStats.upcomingWeek)}
-              </span>
-              <span className="pro-detail-metric-meta">
-                Ответов: {requestStats.responses}
-              </span>
-            </div>
-            <div className="pro-detail-metric">
-              <span className="pro-detail-metric-label">Спящие</span>
-              <span className="pro-detail-metric-value">{inactiveClients}</span>
-              <span className="pro-detail-metric-meta">30+ дней</span>
-            </div>
-            <div className="pro-detail-metric">
-              <span className="pro-detail-metric-label">Активные</span>
-              <span className="pro-detail-metric-value">{bookingStats.upcoming}</span>
-              <span className="pro-detail-metric-meta">Предстоящие записи</span>
-            </div>
-          </div>
-          <div className="pro-marketing-reco">
-            <span className="pro-marketing-reco-label">Рекомендуем</span>
-            <span className="pro-marketing-reco-title">{recommendedScenario.title}</span>
-            <span className="pro-marketing-reco-meta">{recommendation.note}</span>
-          </div>
-        </section>
-
-        <p className="pro-marketing-section">Рассылка</p>
-        <section className="pro-detail-card pro-marketing-composer animate delay-2">
-          <div className="pro-detail-card-head">
-            <h2>Сообщение клиентам</h2>
-            <span className="pro-detail-pill is-ghost">
-              {channel === 'bot' ? 'Бот' : 'Личные чаты'}
-            </span>
-          </div>
-          <p className="pro-detail-text">{channelHint}</p>
-
-          <div
-            className="pro-marketing-channel-grid"
-            role="group"
-            aria-label="Канал рассылки"
+        <div className="pro-marketing-tabbar" role="tablist">
+          <button
+            className={`pro-marketing-tab${activeTab === 'broadcast' ? ' is-active' : ''}`}
+            type="button"
+            onClick={() => setActiveTab('broadcast')}
+            role="tab"
+            aria-selected={activeTab === 'broadcast'}
           >
-            <button
-              className={`pro-marketing-channel${channel === 'bot' ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => setChannel('bot')}
-            >
-              <span className="pro-marketing-channel-title">Бот</span>
-              <span className="pro-marketing-channel-meta">
-                {marketingLoading ? 'Считаем аудиторию...' : `Подписчиков: ${botAudience ?? 0}`}
-              </span>
-            </button>
-            <button
-              className={`pro-marketing-channel${channel === 'chat' ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => setChannel('chat')}
-            >
-              <span className="pro-marketing-channel-title">Личные чаты</span>
-              <span className="pro-marketing-channel-meta">
-                {marketingLoading
-                  ? 'Считаем аудиторию...'
-                  : `Активных чатов: ${chatAudience ?? 0}`}
-              </span>
-            </button>
-          </div>
-
-          <div className="pro-marketing-toggle-row">
-            <label
-              className={`pro-marketing-switch${shareLink ? '' : ' is-disabled'}`}
-            >
-              <input
-                type="checkbox"
-                checked={includeLinkEnabled}
-                onChange={handleToggleLink}
-                disabled={!shareLink}
-              />
-              <span>Добавлять ссылку на запись</span>
-            </label>
-            {channel === 'bot' && (
-              <label className="pro-marketing-switch">
-                <input
-                  type="checkbox"
-                  checked={includeUnsubscribe}
-                  onChange={() => setIncludeUnsubscribe((current) => !current)}
-                />
-                <span>Добавить ссылку «Отписаться»</span>
-              </label>
-            )}
-          </div>
-
-          {!shareConfigured && (
-            <p className="pro-detail-warning" role="status">
-              Добавьте VITE_TG_APP_URL, чтобы включить ссылку на запись.
-            </p>
-          )}
-
-          <div className="pro-marketing-textarea-wrap">
-            <textarea
-              className={`pro-marketing-textarea${isTextTooLong ? ' is-error' : ''}`}
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="Напишите короткое сообщение для клиентов"
-              rows={5}
-            />
-            <div className="pro-marketing-textarea-meta">
-              <span>{audienceLabel}</span>
-              <span className={isTextTooLong ? 'is-error' : ''}>
-                {payloadLength}/{MARKETING_TEXT_LIMIT}
-              </span>
-            </div>
-          </div>
-
-          {includeLinkEnabled && shareLink && (
-            <div className="pro-detail-link pro-marketing-link">
-              <span className="pro-detail-link-label">Ссылка для записи</span>
-              <span className="pro-detail-link-value">{shareLink}</span>
-            </div>
-          )}
-
-          <div className="pro-detail-actions">
-            <button
-              className="pro-detail-action"
-              type="button"
-              onClick={() => void handleSend()}
-              disabled={!canSend}
-            >
-              {isSending ? 'Отправляем...' : 'Отправить рассылку'}
-            </button>
-            <button
-              className="pro-detail-action is-ghost"
-              type="button"
-              onClick={handleClear}
-              disabled={!message}
-            >
-              Очистить
-            </button>
-          </div>
-          {sendError && (
-            <p className="pro-detail-warning" role="alert">
-              {sendError}
-            </p>
-          )}
-          {status && (
-            <p className="pro-detail-status" role="status">
-              {status}
-            </p>
-          )}
-        </section>
-
-        <p className="pro-marketing-section">Сценарии</p>
-        <div className="pro-marketing-stack">
-          {scenarios.map((scenario) => (
-            <section
-              key={scenario.id}
-              className={`pro-detail-card pro-marketing-card animate${
-                scenario.id === recommendation.id ? ' is-recommended' : ''
-              }`}
-            >
-              <div className="pro-detail-card-head">
-                <h2>{scenario.title}</h2>
-                <span className="pro-detail-pill">{scenario.pill}</span>
-              </div>
-              <p className="pro-detail-text">{scenario.description}</p>
-              {scenario.isPromo && (
-                <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
-                  {DISCOUNT_OPTIONS.map((value) => (
-                    <button
-                      key={`discount-${value}`}
-                      className={`pro-marketing-chip${
-                        value === discountPercent ? ' is-active' : ''
-                      }`}
-                      type="button"
-                      onClick={() => setDiscountPercent(value)}
-                    >
-                      -{value}%
-                    </button>
-                  ))}
-                </div>
-              )}
-              {scenario.isPackage && (
-                <div className="pro-marketing-chip-row" role="group" aria-label="Пакет">
-                  {PACKAGE_OPTIONS.map((value) => (
-                    <button
-                      key={`package-${value}`}
-                      className={`pro-marketing-chip${
-                        value === packageVisits ? ' is-active' : ''
-                      }`}
-                      type="button"
-                      onClick={() => setPackageVisits(value)}
-                    >
-                      {value} визита
-                    </button>
-                  ))}
-                </div>
-              )}
-              {scenario.showLink && shareLink && (
-                <div className="pro-detail-link">
-                  <span className="pro-detail-link-label">Ссылка для записи</span>
-                  <span className="pro-detail-link-value">{shareLink}</span>
-                </div>
-              )}
-              <div className="pro-detail-actions">
-                <button
-                  className="pro-detail-action"
-                  type="button"
-                  onClick={() => handleInsertScenario(scenario)}
-                >
-                  Вставить в рассылку
-                </button>
-                <button
-                  className="pro-detail-action is-ghost"
-                  type="button"
-                  onClick={() => void handleCopyScenario(scenario)}
-                >
-                  Скопировать
-                </button>
-              </div>
-            </section>
-          ))}
+            Рассылка
+          </button>
+          <button
+            className={`pro-marketing-tab${activeTab === 'reminder' ? ' is-active' : ''}`}
+            type="button"
+            onClick={() => setActiveTab('reminder')}
+            role="tab"
+            aria-selected={activeTab === 'reminder'}
+          >
+            Напомнить
+          </button>
         </div>
 
-        <p className="pro-marketing-section">Быстрые действия</p>
-        <section className="pro-detail-card">
-          <div className="pro-detail-card-head">
-            <h2>Коммуникации и возвраты</h2>
-            <span className="pro-detail-pill is-ghost">1 касание</span>
-          </div>
-          <p className="pro-detail-text">
-            Быстро переходите к готовым шаблонам рассылок и сценариям возврата.
-          </p>
-          <div className="pro-detail-actions">
-            <button className="pro-detail-action" type="button" onClick={onOpenCampaigns}>
-              Коммуникации
-            </button>
-            <button
-              className="pro-detail-action is-ghost"
-              type="button"
-              onClick={onOpenReminders}
-            >
-              Возврат клиентов
-            </button>
-          </div>
-        </section>
-
-        <p className="pro-marketing-section">История рассылок</p>
-        <section className="pro-detail-card">
-          <div className="pro-detail-card-head">
-            <h2>Последние кампании</h2>
-            <span className="pro-detail-pill is-ghost">{campaigns.length}</span>
-          </div>
-          {marketingLoading ? (
-            <p className="pro-detail-empty">Загружаем историю...</p>
-          ) : campaigns.length === 0 ? (
-            <p className="pro-detail-empty">Пока нет рассылок. Запустите первую.</p>
-          ) : (
-            <div className="pro-detail-list">
-              {campaigns.map((item) => {
-                const preview =
-                  item.body.length > 120 ? `${item.body.slice(0, 117)}...` : item.body
-                return (
-                  <div className="pro-detail-list-item" key={item.id}>
-                    <span className="pro-detail-avatar">
-                      {item.channel === 'bot' ? 'BOT' : 'CHAT'}
-                    </span>
-                    <div className="pro-detail-list-body">
-                      <div className="pro-detail-list-title-row">
-                        <span className="pro-detail-list-title">
-                          {item.channel === 'bot' ? 'Бот' : 'Личные чаты'}
-                        </span>
-                        <span className="pro-detail-pill is-ghost">
-                          {item.sent}/{item.total}
-                        </span>
-                      </div>
-                      <span className="pro-detail-list-subtitle">{preview}</span>
-                      <span className="pro-detail-list-meta">
-                        {formatCampaignDate(item.createdAt)}
-                        {item.failed > 0 ? ` · Ошибок: ${item.failed}` : ''}
-                        {item.includeUnsubscribe ? ' · Отписка' : ''}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
+        {activeTab === 'broadcast' ? (
+          <section className="pro-detail-card pro-marketing-panel animate delay-1">
+            <div className="pro-detail-card-head">
+              <h2>Рассылка клиентам</h2>
+              <span className="pro-detail-pill is-ghost">{audienceLabel}</span>
             </div>
+            <p className="pro-detail-text">{channelHint}</p>
+
+            <div
+              className="pro-marketing-channel-grid"
+              role="group"
+              aria-label="Канал рассылки"
+            >
+              <button
+                className={`pro-marketing-channel${channel === 'bot' ? ' is-active' : ''}`}
+                type="button"
+                onClick={() => setChannel('bot')}
+              >
+                <span className="pro-marketing-channel-title">Бот</span>
+                <span className="pro-marketing-channel-meta">
+                  {marketingLoading ? 'Считаем аудиторию...' : `Подписчиков: ${botAudience ?? 0}`}
+                </span>
+              </button>
+              <button
+                className={`pro-marketing-channel${channel === 'chat' ? ' is-active' : ''}`}
+                type="button"
+                onClick={() => setChannel('chat')}
+              >
+                <span className="pro-marketing-channel-title">Личные чаты</span>
+                <span className="pro-marketing-channel-meta">
+                  {marketingLoading
+                    ? 'Считаем аудиторию...'
+                    : `Активных чатов: ${chatAudience ?? 0}`}
+                </span>
+              </button>
+            </div>
+
+            <div className="pro-marketing-templates">
+              <p className="pro-marketing-section">Шаблоны</p>
+              <div className="pro-marketing-template-grid">
+                {broadcastTemplates.map((template) => (
+                  <section
+                    key={template.id}
+                    className={`pro-marketing-template-card${
+                      template.id === recommendedTemplateId ? ' is-recommended' : ''
+                    }`}
+                  >
+                    <div className="pro-marketing-template-head">
+                      <div>
+                        <h3 className="pro-marketing-template-title">{template.title}</h3>
+                        <p className="pro-marketing-template-desc">
+                          {template.description}
+                        </p>
+                      </div>
+                      <button
+                        className="pro-marketing-template-action"
+                        type="button"
+                        onClick={() => handleInsertTemplate('broadcast', template)}
+                      >
+                        Вставить
+                      </button>
+                    </div>
+                    {template.pill && (
+                      <span className="pro-detail-pill is-ghost">{template.pill}</span>
+                    )}
+                    {template.isPromo && (
+                      <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
+                        {DISCOUNT_OPTIONS.map((value) => (
+                          <button
+                            key={`discount-${value}`}
+                            className={`pro-marketing-chip${
+                              value === discountPercent ? ' is-active' : ''
+                            }`}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setDiscountPercent(value)
+                            }}
+                          >
+                            -{value}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {template.isPackage && (
+                      <div className="pro-marketing-chip-row" role="group" aria-label="Пакет">
+                        {PACKAGE_OPTIONS.map((value) => (
+                          <button
+                            key={`package-${value}`}
+                            className={`pro-marketing-chip${
+                              value === packageVisits ? ' is-active' : ''
+                            }`}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setPackageVisits(value)
+                            }}
+                          >
+                            {value} визита
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      className="pro-marketing-template-link"
+                      type="button"
+                      onClick={() => void handleCopyTemplate(template)}
+                    >
+                      Скопировать текст
+                    </button>
+                  </section>
+                ))}
+              </div>
+            </div>
+
+            <div className="pro-marketing-textarea-wrap">
+              <textarea
+                className={`pro-marketing-textarea${isTextTooLong ? ' is-error' : ''}`}
+                value={currentDraft}
+                onChange={(event) => setCurrentDraft(event.target.value)}
+                placeholder="Напишите короткое сообщение для клиентов"
+                rows={5}
+              />
+              <div className="pro-marketing-textarea-meta">
+                <span>{audienceLabel}</span>
+                <span className={isTextTooLong ? 'is-error' : ''}>
+                  {payloadLength}/{MARKETING_TEXT_LIMIT}
+                </span>
+              </div>
+            </div>
+
+            <div className="pro-marketing-toggle-row">
+              <label
+                className={`pro-marketing-switch${shareLink ? '' : ' is-disabled'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={includeLinkEnabled && Boolean(shareLink)}
+                  onChange={handleToggleLink}
+                  disabled={!shareLink}
+                />
+                <span>Добавлять ссылку на запись</span>
+              </label>
+              {channel === 'bot' && (
+                <label className="pro-marketing-switch">
+                  <input
+                    type="checkbox"
+                    checked={includeUnsubscribeEnabled}
+                    onChange={() =>
+                      setBroadcastIncludeUnsubscribe((current) => !current)
+                    }
+                  />
+                  <span>Добавить кнопку «Отписаться»</span>
+                </label>
+              )}
+            </div>
+
+            {!shareConfigured && (
+              <p className="pro-detail-warning" role="status">
+                Добавьте VITE_TG_APP_URL, чтобы включить ссылку на запись.
+              </p>
+            )}
+
+            <div className="pro-detail-actions">
+              <button
+                className="pro-detail-action"
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={!canSend}
+              >
+                {isSending ? 'Отправляем...' : 'Отправить'}
+              </button>
+              <button
+                className="pro-detail-action is-ghost"
+                type="button"
+                onClick={handleClear}
+                disabled={!currentDraft}
+              >
+                Очистить
+              </button>
+            </div>
+            {sendError && (
+              <p className="pro-detail-warning" role="alert">
+                {sendError}
+              </p>
+            )}
+            {status && (
+              <p className="pro-detail-status" role="status">
+                {status}
+              </p>
+            )}
+          </section>
+        ) : (
+          <section className="pro-detail-card pro-marketing-panel animate delay-1">
+            <div className="pro-detail-card-head">
+              <h2>Напомнить записаться</h2>
+              <span className="pro-detail-pill is-ghost">{audienceLabel}</span>
+            </div>
+            <p className="pro-detail-text">{reminderHint}</p>
+
+            <div
+              className="pro-marketing-channel-grid"
+              role="group"
+              aria-label="Канал рассылки"
+            >
+              <button
+                className={`pro-marketing-channel${channel === 'bot' ? ' is-active' : ''}`}
+                type="button"
+                onClick={() => setChannel('bot')}
+              >
+                <span className="pro-marketing-channel-title">Бот</span>
+                <span className="pro-marketing-channel-meta">
+                  {marketingLoading ? 'Считаем аудиторию...' : `Подписчиков: ${botAudience ?? 0}`}
+                </span>
+              </button>
+              <button
+                className={`pro-marketing-channel${channel === 'chat' ? ' is-active' : ''}`}
+                type="button"
+                onClick={() => setChannel('chat')}
+              >
+                <span className="pro-marketing-channel-title">Личные чаты</span>
+                <span className="pro-marketing-channel-meta">
+                  {marketingLoading
+                    ? 'Считаем аудиторию...'
+                    : `Активных чатов: ${chatAudience ?? 0}`}
+                </span>
+              </button>
+            </div>
+
+            <div className="pro-marketing-window-row" role="group" aria-label="Пауза">
+              {REMINDER_WINDOWS.map((value) => (
+                <button
+                  key={`reminder-${value}`}
+                  className={`pro-marketing-chip${
+                    value === reminderWindow ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => setReminderWindow(value)}
+                >
+                  {value}+ дней
+                </button>
+              ))}
+            </div>
+
+            <div className="pro-marketing-templates">
+              <p className="pro-marketing-section">Тон сообщения</p>
+              <div className="pro-marketing-tone-grid">
+                {reminderTemplates.map((template) => (
+                  <section
+                    key={template.id}
+                    className={`pro-marketing-tone-card${
+                      template.id === reminderTone ? ' is-active' : ''
+                    }`}
+                  >
+                    <div className="pro-marketing-template-head">
+                      <div>
+                        <h3 className="pro-marketing-template-title">{template.title}</h3>
+                        <p className="pro-marketing-template-desc">
+                          {template.description}
+                        </p>
+                      </div>
+                      <button
+                        className="pro-marketing-template-action"
+                        type="button"
+                        onClick={() => handleInsertTemplate('reminder', template)}
+                      >
+                        Вставить
+                      </button>
+                    </div>
+                    {template.isPromo && (
+                      <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
+                        {DISCOUNT_OPTIONS.map((value) => (
+                          <button
+                            key={`reminder-discount-${value}`}
+                            className={`pro-marketing-chip${
+                              value === discountPercent ? ' is-active' : ''
+                            }`}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setDiscountPercent(value)
+                            }}
+                          >
+                            -{value}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            </div>
+
+            <div className="pro-marketing-textarea-wrap">
+              <textarea
+                className={`pro-marketing-textarea${isTextTooLong ? ' is-error' : ''}`}
+                value={currentDraft}
+                onChange={(event) => setCurrentDraft(event.target.value)}
+                placeholder="Напишите короткое сообщение для клиентов"
+                rows={5}
+              />
+              <div className="pro-marketing-textarea-meta">
+                <span>{audienceLabel}</span>
+                <span className={isTextTooLong ? 'is-error' : ''}>
+                  {payloadLength}/{MARKETING_TEXT_LIMIT}
+                </span>
+              </div>
+            </div>
+
+            <div className="pro-marketing-toggle-row">
+              <label
+                className={`pro-marketing-switch${shareLink ? '' : ' is-disabled'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={includeLinkEnabled && Boolean(shareLink)}
+                  onChange={handleToggleLink}
+                  disabled={!shareLink}
+                />
+                <span>Добавлять ссылку на запись</span>
+              </label>
+              {channel === 'bot' && (
+                <label className="pro-marketing-switch">
+                  <input
+                    type="checkbox"
+                    checked={includeUnsubscribeEnabled}
+                    onChange={() =>
+                      setReminderIncludeUnsubscribe((current) => !current)
+                    }
+                  />
+                  <span>Добавить кнопку «Отписаться»</span>
+                </label>
+              )}
+            </div>
+
+            {!shareConfigured && (
+              <p className="pro-detail-warning" role="status">
+                Добавьте VITE_TG_APP_URL, чтобы включить ссылку на запись.
+              </p>
+            )}
+
+            <div className="pro-detail-actions">
+              <button
+                className="pro-detail-action"
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={!canSend}
+              >
+                {isSending ? 'Отправляем...' : 'Отправить'}
+              </button>
+              <button
+                className="pro-detail-action is-ghost"
+                type="button"
+                onClick={handleClear}
+                disabled={!currentDraft}
+              >
+                Очистить
+              </button>
+            </div>
+            {sendError && (
+              <p className="pro-detail-warning" role="alert">
+                {sendError}
+              </p>
+            )}
+            {status && (
+              <p className="pro-detail-status" role="status">
+                {status}
+              </p>
+            )}
+          </section>
+        )}
+
+        <div className="pro-marketing-history">
+          <button
+            className="pro-marketing-history-toggle"
+            type="button"
+            onClick={() => setHistoryOpen((current) => !current)}
+          >
+            История рассылок
+            <span>{historyOpen ? 'Свернуть' : `${campaigns.length} кампаний`}</span>
+          </button>
+          {historyOpen && (
+            <section className="pro-detail-card">
+              <div className="pro-detail-card-head">
+                <h2>Последние кампании</h2>
+                <span className="pro-detail-pill is-ghost">{campaigns.length}</span>
+              </div>
+              {marketingLoading ? (
+                <p className="pro-detail-empty">Загружаем историю...</p>
+              ) : campaigns.length === 0 ? (
+                <p className="pro-detail-empty">Пока нет рассылок. Запустите первую.</p>
+              ) : (
+                <div className="pro-detail-list">
+                  {campaigns.map((item) => {
+                    const preview =
+                      item.body.length > 120 ? `${item.body.slice(0, 117)}...` : item.body
+                    return (
+                      <div className="pro-detail-list-item" key={item.id}>
+                        <span className="pro-detail-avatar">
+                          {item.channel === 'bot' ? 'BOT' : 'CHAT'}
+                        </span>
+                        <div className="pro-detail-list-body">
+                          <div className="pro-detail-list-title-row">
+                            <span className="pro-detail-list-title">
+                              {item.channel === 'bot' ? 'Бот' : 'Личные чаты'}
+                            </span>
+                            <span className="pro-detail-pill is-ghost">
+                              {item.sent}/{item.total}
+                            </span>
+                          </div>
+                          <span className="pro-detail-list-subtitle">{preview}</span>
+                          <span className="pro-detail-list-meta">
+                            {formatCampaignDate(item.createdAt)}
+                            {item.failed > 0 ? ` · Ошибок: ${item.failed}` : ''}
+                            {item.includeUnsubscribe ? ' · Отписка' : ''}
+                            {item.audience ? ` · ${formatAudienceLabel(item.audience)}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
           )}
-        </section>
+        </div>
       </div>
 
       <ProBottomNav

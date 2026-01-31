@@ -3633,6 +3633,7 @@ const ensureSchema = async () => {
       id SERIAL PRIMARY KEY,
       master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
       channel TEXT NOT NULL CHECK (channel IN ('bot', 'chat')),
+      audience TEXT,
       body TEXT NOT NULL,
       include_unsubscribe BOOLEAN NOT NULL DEFAULT FALSE,
       total INTEGER NOT NULL DEFAULT 0,
@@ -3645,6 +3646,11 @@ const ensureSchema = async () => {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS marketing_campaigns_master_idx
     ON marketing_campaigns (master_id, created_at DESC);
+  `)
+
+  await pool.query(`
+    ALTER TABLE marketing_campaigns
+    ADD COLUMN IF NOT EXISTS audience TEXT;
   `)
 
   await pool.query(`
@@ -7220,11 +7226,85 @@ const fetchMarketingRecipients = async ({ masterId, limit }) => {
   return result.rows.map((row) => normalizeText(row.userId)).filter(Boolean)
 }
 
+const resolveMarketingAudience = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (!normalized || normalized === 'all') return { key: 'all', inactiveDays: null }
+  if (normalized === 'inactive_30') return { key: 'inactive_30', inactiveDays: 30 }
+  if (normalized === 'inactive_60') return { key: 'inactive_60', inactiveDays: 60 }
+  return { key: null, inactiveDays: null }
+}
+
+const fetchInactiveClientIds = async ({ masterId, days, candidateIds, limit }) => {
+  const normalizedDays = parseOptionalInt(days)
+  if (!normalizedDays || normalizedDays <= 0) return []
+  const normalizedCandidates = normalizeStringArray(candidateIds)
+  if (candidateIds && normalizedCandidates.length === 0) return []
+
+  const values = [masterId, `${normalizedDays} days`]
+  const candidateClause = normalizedCandidates.length
+    ? `AND sb.client_id = ANY($3::text[])`
+    : ''
+  if (normalizedCandidates.length) {
+    values.push(normalizedCandidates)
+  }
+  const limitClause = limit ? `LIMIT $${values.length + 1}` : ''
+  if (limit) {
+    values.push(limit)
+  }
+
+  const result = await pool.query(
+    `
+      SELECT sb.client_id AS "userId", MAX(sb.created_at) AS "lastSeenAt"
+      FROM service_bookings sb
+      JOIN users u ON u.user_id = sb.client_id
+      WHERE sb.master_id = $1
+        AND COALESCE(u.is_blocked, FALSE) = FALSE
+        ${candidateClause}
+      GROUP BY sb.client_id
+      HAVING MAX(sb.created_at) < NOW() - $2::interval
+      ORDER BY MAX(sb.created_at) DESC
+      ${limitClause}
+    `,
+    values
+  )
+
+  return result.rows.map((row) => normalizeText(row.userId)).filter(Boolean)
+}
+
+const filterRecipientIdsByInactive = async ({ masterId, recipientIds, inactiveDays }) => {
+  if (!inactiveDays) return recipientIds
+  const normalizedRecipients = normalizeStringArray(recipientIds)
+  if (normalizedRecipients.length === 0) return []
+  const inactiveIds = await fetchInactiveClientIds({
+    masterId,
+    days: inactiveDays,
+    candidateIds: normalizedRecipients,
+    limit: normalizedRecipients.length,
+  })
+  const inactiveSet = new Set(inactiveIds)
+  return normalizedRecipients.filter((id) => inactiveSet.has(id))
+}
+
+const filterChatTargetsByInactive = async ({ masterId, targets, inactiveDays }) => {
+  if (!inactiveDays) return targets
+  const candidateIds = targets.map((target) => target.clientId).filter(Boolean)
+  if (candidateIds.length === 0) return []
+  const inactiveIds = await fetchInactiveClientIds({
+    masterId,
+    days: inactiveDays,
+    candidateIds,
+    limit: candidateIds.length,
+  })
+  const inactiveSet = new Set(inactiveIds)
+  return targets.filter((target) => inactiveSet.has(target.clientId))
+}
+
 const sendMarketingBotBroadcast = async ({
   masterId,
   text,
   includeLink,
   includeUnsubscribe,
+  inactiveDays,
   limit,
 }) => {
   if (!telegramBotToken) {
@@ -7261,15 +7341,24 @@ const sendMarketingBotBroadcast = async ({
     buttons.push({ text: 'Отписаться', webAppUrl: unsubscribeLink })
   }
   const recipients = await fetchMarketingRecipients({ masterId, limit })
+  const filteredRecipients = await filterRecipientIdsByInactive({
+    masterId,
+    recipientIds: recipients,
+    inactiveDays,
+  })
 
-  if (recipients.length === 0) {
+  if (filteredRecipients.length === 0) {
     return { total: 0, sent: 0, failed: 0 }
   }
 
   let sent = 0
   let failed = 0
-  for (let index = 0; index < recipients.length; index += MARKETING_BROADCAST_CHUNK) {
-    const chunk = recipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
+  for (
+    let index = 0;
+    index < filteredRecipients.length;
+    index += MARKETING_BROADCAST_CHUNK
+  ) {
+    const chunk = filteredRecipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
     const results = await Promise.all(
       chunk.map((recipientId) =>
         sendTelegramMessage({
@@ -7288,7 +7377,7 @@ const sendMarketingBotBroadcast = async ({
     })
   }
 
-  return { total: recipients.length, sent, failed }
+  return { total: filteredRecipients.length, sent, failed }
 }
 
 const fetchChatBroadcastTargets = async ({ masterId, limit }) => {
@@ -7316,16 +7405,26 @@ const fetchChatBroadcastTargets = async ({ masterId, limit }) => {
     .filter((row) => Number.isInteger(row.chatId) && row.clientId)
 }
 
-const sendMarketingChatBroadcast = async ({ masterId, text, limit }) => {
+const sendMarketingChatBroadcast = async ({
+  masterId,
+  text,
+  inactiveDays,
+  limit,
+}) => {
   const targets = await fetchChatBroadcastTargets({ masterId, limit })
-  if (targets.length === 0) {
+  const filteredTargets = await filterChatTargetsByInactive({
+    masterId,
+    targets,
+    inactiveDays,
+  })
+  if (filteredTargets.length === 0) {
     return { total: 0, sent: 0, failed: 0 }
   }
   await ensureUser(masterId)
 
   let sent = 0
   let failed = 0
-  for (const target of targets) {
+  for (const target of filteredTargets) {
     try {
       const messageResult = await insertChatTextMessage({
         chatId: target.chatId,
@@ -7361,7 +7460,7 @@ const sendMarketingChatBroadcast = async ({ masterId, text, limit }) => {
     }
   }
 
-  return { total: targets.length, sent, failed }
+  return { total: filteredTargets.length, sent, failed }
 }
 
 app.post('/api/pro/marketing/broadcast', async (req, res) => {
@@ -7382,6 +7481,12 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
 
   const includeUnsubscribe = Boolean(req.body?.includeUnsubscribe)
   const includeLink = Boolean(req.body?.includeLink)
+  const audienceParam = normalizeText(req.body?.audience)
+  const audience = resolveMarketingAudience(audienceParam)
+  if (audienceParam && !audience.key) {
+    res.status(400).json({ error: 'audience_invalid' })
+    return
+  }
   const rawLimit = parseOptionalInt(req.body?.limit)
   const limit =
     rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
@@ -7392,6 +7497,7 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
       text,
       includeLink,
       includeUnsubscribe,
+      inactiveDays: audience.inactiveDays,
       limit,
     })
     res.json({ ok: true, ...result })
@@ -7462,6 +7568,7 @@ app.get('/api/pro/marketing/campaigns', async (req, res) => {
         SELECT
           id,
           channel,
+          audience,
           body,
           include_unsubscribe AS "includeUnsubscribe",
           total,
@@ -7493,6 +7600,12 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
     res.status(400).json({ error: 'channel_invalid' })
     return
   }
+  const audienceParam = normalizeText(req.body?.audience)
+  const audience = resolveMarketingAudience(audienceParam)
+  if (audienceParam && !audience.key) {
+    res.status(400).json({ error: 'audience_invalid' })
+    return
+  }
   const text = normalizeText(req.body?.text)
   if (!text) {
     res.status(400).json({ error: 'text_required' })
@@ -7517,25 +7630,33 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
             text,
             includeLink,
             includeUnsubscribe,
+            inactiveDays: audience.inactiveDays,
             limit,
           })
-        : await sendMarketingChatBroadcast({ masterId, text, limit })
+        : await sendMarketingChatBroadcast({
+            masterId,
+            text,
+            inactiveDays: audience.inactiveDays,
+            limit,
+          })
 
     const campaignResult = await pool.query(
       `
         INSERT INTO marketing_campaigns (
           master_id,
           channel,
+          audience,
           body,
           include_unsubscribe,
           total,
           sent,
           failed
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING
           id,
           channel,
+          audience,
           body,
           include_unsubscribe AS "includeUnsubscribe",
           total,
@@ -7546,6 +7667,7 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
       [
         masterId,
         channel,
+        audience.key ?? 'all',
         text,
         includeUnsubscribe && channel === 'bot',
         result.total,
