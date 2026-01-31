@@ -3674,6 +3674,10 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    DROP TABLE IF EXISTS marketing_campaigns;
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS master_profile_views (
       master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
       viewer_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -7246,156 +7250,6 @@ const fetchMarketingRecipients = async ({ masterId, limit }) => {
   return result.rows.map((row) => normalizeText(row.userId)).filter(Boolean)
 }
 
-const resolveMarketingAudience = (value) => {
-  const normalized = normalizeText(value).toLowerCase()
-  if (!normalized || normalized === 'all') return { key: 'all', inactiveDays: null }
-  if (normalized === 'repeat') return { key: 'repeat', inactiveDays: null, repeatOnly: true }
-  if (normalized === 'inactive_30') return { key: 'inactive_30', inactiveDays: 30 }
-  if (normalized === 'inactive_60') return { key: 'inactive_60', inactiveDays: 60 }
-  return { key: null, inactiveDays: null }
-}
-
-const fetchInactiveClientIds = async ({ masterId, days, candidateIds, limit }) => {
-  const normalizedDays = parseOptionalInt(days)
-  if (!normalizedDays || normalizedDays <= 0) return []
-  const normalizedCandidates = normalizeStringArray(candidateIds)
-  if (candidateIds && normalizedCandidates.length === 0) return []
-
-  const values = [masterId, `${normalizedDays} days`]
-  const candidateClause = normalizedCandidates.length
-    ? `AND sb.client_id = ANY($3::text[])`
-    : ''
-  if (normalizedCandidates.length) {
-    values.push(normalizedCandidates)
-  }
-  const limitClause = limit ? `LIMIT $${values.length + 1}` : ''
-  if (limit) {
-    values.push(limit)
-  }
-
-  const result = await pool.query(
-    `
-      SELECT sb.client_id AS "userId", MAX(sb.created_at) AS "lastSeenAt"
-      FROM service_bookings sb
-      JOIN users u ON u.user_id = sb.client_id
-      WHERE sb.master_id = $1
-        AND COALESCE(u.is_blocked, FALSE) = FALSE
-        ${candidateClause}
-      GROUP BY sb.client_id
-      HAVING MAX(sb.created_at) < NOW() - $2::interval
-      ORDER BY MAX(sb.created_at) DESC
-      ${limitClause}
-    `,
-    values
-  )
-
-  return result.rows.map((row) => normalizeText(row.userId)).filter(Boolean)
-}
-
-const fetchRepeatClientIds = async ({
-  masterId,
-  candidateIds,
-  limit,
-  minVisits = 2,
-}) => {
-  const normalizedMin = parseOptionalInt(minVisits) ?? 2
-  if (normalizedMin <= 1) return []
-  const normalizedCandidates = normalizeStringArray(candidateIds)
-  if (candidateIds && normalizedCandidates.length === 0) return []
-
-  const values = [masterId, normalizedMin]
-  const candidateClause = normalizedCandidates.length
-    ? `AND sb.client_id = ANY($3::text[])`
-    : ''
-  if (normalizedCandidates.length) {
-    values.push(normalizedCandidates)
-  }
-  const limitClause = limit ? `LIMIT $${values.length + 1}` : ''
-  if (limit) {
-    values.push(limit)
-  }
-
-  const result = await pool.query(
-    `
-      SELECT sb.client_id AS "userId", COUNT(*)::int AS "visits", MAX(sb.created_at) AS "lastSeenAt"
-      FROM service_bookings sb
-      JOIN users u ON u.user_id = sb.client_id
-      WHERE sb.master_id = $1
-        AND COALESCE(u.is_blocked, FALSE) = FALSE
-        ${candidateClause}
-      GROUP BY sb.client_id
-      HAVING COUNT(*) >= $2
-      ORDER BY MAX(sb.created_at) DESC
-      ${limitClause}
-    `,
-    values
-  )
-
-  return result.rows.map((row) => normalizeText(row.userId)).filter(Boolean)
-}
-
-const filterRecipientIdsByRepeat = async ({
-  masterId,
-  recipientIds,
-  minVisits,
-}) => {
-  const normalizedRecipients = normalizeStringArray(recipientIds)
-  if (normalizedRecipients.length === 0) return []
-  const repeatIds = await fetchRepeatClientIds({
-    masterId,
-    candidateIds: normalizedRecipients,
-    limit: normalizedRecipients.length,
-    minVisits,
-  })
-  const repeatSet = new Set(repeatIds)
-  return normalizedRecipients.filter((id) => repeatSet.has(id))
-}
-
-const filterChatTargetsByRepeat = async ({
-  masterId,
-  targets,
-  minVisits,
-}) => {
-  const candidateIds = targets.map((target) => target.clientId).filter(Boolean)
-  if (candidateIds.length === 0) return []
-  const repeatIds = await fetchRepeatClientIds({
-    masterId,
-    candidateIds,
-    limit: candidateIds.length,
-    minVisits,
-  })
-  const repeatSet = new Set(repeatIds)
-  return targets.filter((target) => repeatSet.has(target.clientId))
-}
-
-const filterRecipientIdsByInactive = async ({ masterId, recipientIds, inactiveDays }) => {
-  if (!inactiveDays) return recipientIds
-  const normalizedRecipients = normalizeStringArray(recipientIds)
-  if (normalizedRecipients.length === 0) return []
-  const inactiveIds = await fetchInactiveClientIds({
-    masterId,
-    days: inactiveDays,
-    candidateIds: normalizedRecipients,
-    limit: normalizedRecipients.length,
-  })
-  const inactiveSet = new Set(inactiveIds)
-  return normalizedRecipients.filter((id) => inactiveSet.has(id))
-}
-
-const filterChatTargetsByInactive = async ({ masterId, targets, inactiveDays }) => {
-  if (!inactiveDays) return targets
-  const candidateIds = targets.map((target) => target.clientId).filter(Boolean)
-  if (candidateIds.length === 0) return []
-  const inactiveIds = await fetchInactiveClientIds({
-    masterId,
-    days: inactiveDays,
-    candidateIds,
-    limit: candidateIds.length,
-  })
-  const inactiveSet = new Set(inactiveIds)
-  return targets.filter((target) => inactiveSet.has(target.clientId))
-}
-
 const normalizeRepeatIntervals = (value) => {
   if (!value || typeof value !== 'object') return {}
   const result = {}
@@ -7728,8 +7582,6 @@ const sendMarketingBotBroadcast = async ({
   text,
   includeLink,
   includeUnsubscribe,
-  inactiveDays,
-  repeatOnly,
   limit,
 }) => {
   const { payloadText, buttons } = await buildMarketingBotPayload({
@@ -7739,31 +7591,14 @@ const sendMarketingBotBroadcast = async ({
     includeUnsubscribe,
   })
   const recipients = await fetchMarketingRecipients({ masterId, limit })
-  let filteredRecipients = recipients
-  if (repeatOnly) {
-    filteredRecipients = await filterRecipientIdsByRepeat({
-      masterId,
-      recipientIds: filteredRecipients,
-    })
-  }
-  filteredRecipients = await filterRecipientIdsByInactive({
-    masterId,
-    recipientIds: filteredRecipients,
-    inactiveDays,
-  })
-
-  if (filteredRecipients.length === 0) {
+  if (recipients.length === 0) {
     return { total: 0, sent: 0, failed: 0 }
   }
 
   let sent = 0
   let failed = 0
-  for (
-    let index = 0;
-    index < filteredRecipients.length;
-    index += MARKETING_BROADCAST_CHUNK
-  ) {
-    const chunk = filteredRecipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
+  for (let index = 0; index < recipients.length; index += MARKETING_BROADCAST_CHUNK) {
+    const chunk = recipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
     const results = await Promise.all(
       chunk.map((recipientId) =>
         sendTelegramMessage({
@@ -7782,7 +7617,7 @@ const sendMarketingBotBroadcast = async ({
     })
   }
 
-  return { total: filteredRecipients.length, sent, failed }
+  return { total: recipients.length, sent, failed }
 }
 
 const fetchChatBroadcastTargets = async ({ masterId, limit }) => {
@@ -7813,31 +7648,17 @@ const fetchChatBroadcastTargets = async ({ masterId, limit }) => {
 const sendMarketingChatBroadcast = async ({
   masterId,
   text,
-  inactiveDays,
-  repeatOnly,
   limit,
 }) => {
   const targets = await fetchChatBroadcastTargets({ masterId, limit })
-  let filteredTargets = targets
-  if (repeatOnly) {
-    filteredTargets = await filterChatTargetsByRepeat({
-      masterId,
-      targets: filteredTargets,
-    })
-  }
-  filteredTargets = await filterChatTargetsByInactive({
-    masterId,
-    targets: filteredTargets,
-    inactiveDays,
-  })
-  if (filteredTargets.length === 0) {
+  if (targets.length === 0) {
     return { total: 0, sent: 0, failed: 0 }
   }
   await ensureUser(masterId)
 
   let sent = 0
   let failed = 0
-  for (const target of filteredTargets) {
+  for (const target of targets) {
     try {
       const messageResult = await insertChatTextMessage({
         chatId: target.chatId,
@@ -7873,7 +7694,7 @@ const sendMarketingChatBroadcast = async ({
     }
   }
 
-  return { total: filteredTargets.length, sent, failed }
+  return { total: targets.length, sent, failed }
 }
 
 app.post('/api/pro/marketing/broadcast', async (req, res) => {
@@ -7894,12 +7715,6 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
 
   const includeUnsubscribe = Boolean(req.body?.includeUnsubscribe)
   const includeLink = Boolean(req.body?.includeLink)
-  const audienceParam = normalizeText(req.body?.audience)
-  const audience = resolveMarketingAudience(audienceParam)
-  if (audienceParam && !audience.key) {
-    res.status(400).json({ error: 'audience_invalid' })
-    return
-  }
   const rawLimit = parseOptionalInt(req.body?.limit)
   const limit =
     rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
@@ -7910,8 +7725,6 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
       text,
       includeLink,
       includeUnsubscribe,
-      inactiveDays: audience.inactiveDays,
-      repeatOnly: audience.repeatOnly,
       limit,
     })
     res.json({ ok: true, ...result })
@@ -8088,12 +7901,6 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
     res.status(400).json({ error: 'channel_invalid' })
     return
   }
-  const audienceParam = normalizeText(req.body?.audience)
-  const audience = resolveMarketingAudience(audienceParam)
-  if (audienceParam && !audience.key) {
-    res.status(400).json({ error: 'audience_invalid' })
-    return
-  }
   const text = normalizeText(req.body?.text)
   if (!text) {
     res.status(400).json({ error: 'text_required' })
@@ -8118,15 +7925,11 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
             text,
             includeLink,
             includeUnsubscribe,
-            inactiveDays: audience.inactiveDays,
-            repeatOnly: audience.repeatOnly,
             limit,
           })
         : await sendMarketingChatBroadcast({
             masterId,
             text,
-            inactiveDays: audience.inactiveDays,
-            repeatOnly: audience.repeatOnly,
             limit,
           })
 

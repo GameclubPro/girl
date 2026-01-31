@@ -4379,12 +4379,6 @@
   color: var(--pro-muted);
 }
 
-.pro-marketing-head-controls {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
 .pro-marketing-select-trigger {
   position: relative;
   appearance: none;

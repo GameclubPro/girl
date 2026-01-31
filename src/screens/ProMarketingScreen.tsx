@@ -71,8 +71,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     onViewChats,
     onEditProfile,
   } = props
-  const { bookings, bookingStats, lastUpdated, isLoading, combinedError } =
-    useProCabinetData(apiBase, userId)
+  const { bookings, lastUpdated, isLoading, combinedError } = useProCabinetData(
+    apiBase,
+    userId
+  )
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
   const bookingStartParam = useMemo(() => buildBookingStartParam(userId), [userId])
@@ -86,11 +88,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [activeTab, setActiveTab] = useState<'broadcast' | 'repeat'>('broadcast')
   const [broadcastChannel, setBroadcastChannel] = useState<'bot' | 'chat'>('bot')
   const [discountPercent, setDiscountPercent] = useState(10)
-  const [broadcastAudience, setBroadcastAudience] = useState<'all' | 'repeat'>(
-    'all'
-  )
   const [broadcastDraft, setBroadcastDraft] = useState('')
-  const [audienceOpen, setAudienceOpen] = useState(false)
   const [broadcastTemplateOpen, setBroadcastTemplateOpen] = useState(false)
   const [broadcastTemplateId, setBroadcastTemplateId] = useState<string | null>(null)
   const [repeatSettings, setRepeatSettings] = useState<RepeatSettings | null>(null)
@@ -106,7 +104,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [sendError, setSendError] = useState('')
   const statusTimerRef = useRef<number | null>(null)
   const marketingAbortRef = useRef<AbortController | null>(null)
-  const audienceRef = useRef<HTMLDivElement | null>(null)
   const broadcastTemplateRef = useRef<HTMLDivElement | null>(null)
 
   const showStatus = useCallback((nextStatus: string, isError = false) => {
@@ -138,17 +135,14 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   }, [])
 
   useEffect(() => {
-    if (!audienceOpen && !broadcastTemplateOpen) return
+    if (!broadcastTemplateOpen) return
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node
-      if (audienceRef.current?.contains(target)) return
       if (broadcastTemplateRef.current?.contains(target)) return
-      setAudienceOpen(false)
       setBroadcastTemplateOpen(false)
     }
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setAudienceOpen(false)
         setBroadcastTemplateOpen(false)
       }
     }
@@ -158,11 +152,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       document.removeEventListener('mousedown', handleClick)
       document.removeEventListener('keydown', handleKey)
     }
-  }, [audienceOpen, broadcastTemplateOpen])
+  }, [broadcastTemplateOpen])
 
   useEffect(() => {
     if (activeTab !== 'broadcast') {
-      setAudienceOpen(false)
       setBroadcastTemplateOpen(false)
     }
   }, [activeTab])
@@ -294,20 +287,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
   const botAudience = marketingSummary?.botOptInCount
   const chatAudience = marketingSummary?.chatCount
-  const broadcastFilterCount =
-    broadcastAudience === 'repeat'
-      ? bookingStats.repeatClients
-      : bookingStats.uniqueClients
   const broadcastChannelCount = broadcastChannel === 'bot' ? botAudience : chatAudience
   const broadcastHasAudience =
-    (typeof broadcastChannelCount !== 'number' || broadcastChannelCount > 0) &&
-    broadcastFilterCount > 0
+    typeof broadcastChannelCount !== 'number' || broadcastChannelCount > 0
   const canSend = Boolean(payloadText) && !isTextTooLong && !isSending && broadcastHasAudience
-
-  const broadcastAudienceLabel =
-    broadcastAudience === 'repeat'
-      ? `Постоянные · ${bookingStats.repeatClients}`
-      : `Все клиенты · ${bookingStats.uniqueClients}`
 
   const channelHint =
     broadcastChannel === 'bot'
@@ -432,8 +415,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       return
     }
 
-    const audience = broadcastAudience === 'repeat' ? 'repeat' : 'all'
-
     setIsSending(true)
     setSendError('')
     try {
@@ -446,7 +427,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           text: payloadText,
           includeLink: broadcastChannel === 'bot' && includeLinkEnabled,
           includeUnsubscribe: broadcastChannel === 'bot' && includeUnsubscribeEnabled,
-          audience,
         }),
       })
 
@@ -474,7 +454,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     }
   }, [
     apiBase,
-    broadcastAudience,
     broadcastChannel,
     includeLinkEnabled,
     includeUnsubscribeEnabled,
@@ -559,58 +538,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           <section className="pro-detail-card pro-marketing-panel animate delay-1">
             <div className="pro-detail-card-head">
               <h2>Рассылка клиентам</h2>
-              <div className="pro-marketing-head-controls" ref={audienceRef}>
-                <button
-                  className={`pro-marketing-select-trigger${
-                    audienceOpen ? ' is-open' : ''
-                  }`}
-                  type="button"
-                  onClick={() => {
-                    setAudienceOpen((current) => !current)
-                    setBroadcastTemplateOpen(false)
-                  }}
-                  aria-haspopup="listbox"
-                  aria-expanded={audienceOpen}
-                >
-                  {broadcastAudienceLabel}
-                </button>
-                {audienceOpen && (
-                  <div
-                    className="pro-marketing-select-menu"
-                    role="listbox"
-                    aria-label="Аудитория рассылки"
-                  >
-                    <button
-                      className={`pro-marketing-select-option${
-                        broadcastAudience === 'all' ? ' is-active' : ''
-                      }`}
-                      type="button"
-                      role="option"
-                      aria-selected={broadcastAudience === 'all'}
-                      onClick={() => {
-                        setBroadcastAudience('all')
-                        setAudienceOpen(false)
-                      }}
-                    >
-                      Все клиенты · {bookingStats.uniqueClients}
-                    </button>
-                    <button
-                      className={`pro-marketing-select-option${
-                        broadcastAudience === 'repeat' ? ' is-active' : ''
-                      }`}
-                      type="button"
-                      role="option"
-                      aria-selected={broadcastAudience === 'repeat'}
-                      onClick={() => {
-                        setBroadcastAudience('repeat')
-                        setAudienceOpen(false)
-                      }}
-                    >
-                      Постоянные · {bookingStats.repeatClients}
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
             <p className="pro-detail-text">{channelHint}</p>
 
@@ -666,7 +593,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                   type="button"
                   onClick={() => {
                     setBroadcastTemplateOpen((current) => !current)
-                    setAudienceOpen(false)
                   }}
                   aria-haspopup="listbox"
                   aria-expanded={broadcastTemplateOpen}
