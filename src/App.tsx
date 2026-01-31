@@ -1390,6 +1390,32 @@ function App() {
     (favorite: Omit<FavoriteMaster, 'savedAt'>) => {
       setFavorites((prev) => {
         const existing = prev.find((item) => item.masterId === favorite.masterId)
+        if (existing) {
+          const existingCategories = Array.isArray(existing.categories)
+            ? existing.categories
+            : []
+          const nextCategories = Array.isArray(favorite.categories)
+            ? favorite.categories
+            : []
+          const categoriesEqual =
+            existingCategories.length === nextCategories.length &&
+            existingCategories.every((item, index) => item === nextCategories[index])
+          const isSame =
+            categoriesEqual &&
+            existing.masterId === favorite.masterId &&
+            existing.displayName === favorite.displayName &&
+            (existing.avatarUrl ?? null) === (favorite.avatarUrl ?? null) &&
+            (existing.cityName ?? null) === (favorite.cityName ?? null) &&
+            (existing.districtName ?? null) === (favorite.districtName ?? null) &&
+            (existing.reviewsAverage ?? null) === (favorite.reviewsAverage ?? null) &&
+            (existing.reviewsCount ?? null) === (favorite.reviewsCount ?? null) &&
+            (existing.priceFrom ?? null) === (favorite.priceFrom ?? null) &&
+            (existing.priceTo ?? null) === (favorite.priceTo ?? null) &&
+            (existing.updatedAt ?? null) === (favorite.updatedAt ?? null)
+          if (isSame) {
+            return prev
+          }
+        }
         const savedAt = existing?.savedAt ?? new Date().toISOString()
         if (!existing) {
           return [{ ...favorite, savedAt }, ...prev]
