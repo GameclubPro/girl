@@ -24000,14 +24000,17 @@ h2 {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  width: 100%;
+  align-items: stretch;
 }
 
 .collection-title-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  width: calc(100% + var(--collection-card-content-safe, 0px));
-  margin-right: calc(-1 * var(--collection-card-content-safe, 0px));
+  max-width: calc(100% + var(--collection-card-content-safe, 0px));
+  align-self: flex-start;
+  box-sizing: border-box;
   padding: 5px 10px;
   border-radius: 999px;
   background: rgba(var(--paper-rgb), 0.92);
