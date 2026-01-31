@@ -326,10 +326,6 @@ export const ClientMasterProfileScreen = ({
     masterId: '',
     isFavorite: false,
   })
-  const marketingFollowRef = useRef<{ masterId: string; isFavorite: boolean }>({
-    masterId: '',
-    isFavorite: false,
-  })
 
   useEffect(() => {
     if (!masterId) return
@@ -353,10 +349,6 @@ export const ClientMasterProfileScreen = ({
           setProfile(data)
           if (typeof data.viewerMarketingOptIn === 'boolean') {
             setMarketingOptIn(data.viewerMarketingOptIn)
-          } else if (data.viewerIsFollower) {
-            setMarketingOptIn(true)
-          } else if (data.viewerIsFollower === false) {
-            setMarketingOptIn(false)
           } else {
             setMarketingOptIn(null)
           }
@@ -992,32 +984,20 @@ export const ClientMasterProfileScreen = ({
     )
   }, [isFavorite, masterId, profile])
   useEffect(() => {
-    if (marketingFollowRef.current.masterId !== masterId) {
-      marketingFollowRef.current = { masterId, isFavorite }
-      return
-    }
-    if (marketingFollowRef.current.isFavorite === isFavorite) return
-    marketingFollowRef.current = { masterId, isFavorite }
-    if (!isFavorite) {
-      setMarketingOptIn(false)
-      return
-    }
+    if (marketingOptIn !== null) return
+    if (!isFavorite) return
     setMarketingOptIn(true)
-  }, [isFavorite, masterId])
+  }, [isFavorite, marketingOptIn])
   const followActionLabel = isFavorite ? 'Вы подписаны' : 'Подписаться'
   const followAriaLabel = isFavorite
     ? 'Отписаться от мастера'
     : 'Подписаться на мастера'
-  const isViewerFollower =
-    typeof profile?.viewerIsFollower === 'boolean' ? profile.viewerIsFollower : isFavorite
-  const isMarketingEnabled = isViewerFollower && (marketingOptIn ?? true)
-  const marketingHint = !isViewerFollower
-    ? 'Подпишитесь, чтобы получать уведомления'
-    : isMarketingEnabled
-      ? 'Уведомления включены'
-      : 'Уведомления выключены'
+  const isMarketingEnabled = marketingOptIn === true
+  const marketingHint = isMarketingEnabled
+    ? 'Уведомления включены'
+    : 'Уведомления выключены'
   const handleMarketingToggle = useCallback(async () => {
-    if (!userId || !masterId || !isViewerFollower || isMarketingBusy) return
+    if (!userId || !masterId || isMarketingBusy) return
     const previousOptIn = marketingOptIn
     const nextEnabled = !isMarketingEnabled
     setMarketingOptIn(nextEnabled)
@@ -1036,9 +1016,7 @@ export const ClientMasterProfileScreen = ({
         throw new Error('Marketing toggle failed')
       }
     } catch (error) {
-      setMarketingOptIn(
-        previousOptIn ?? (isViewerFollower ? true : false)
-      )
+      setMarketingOptIn(previousOptIn ?? null)
     } finally {
       setIsMarketingBusy(false)
     }
@@ -1046,7 +1024,6 @@ export const ClientMasterProfileScreen = ({
     apiBase,
     isMarketingBusy,
     isMarketingEnabled,
-    isViewerFollower,
     marketingOptIn,
     masterId,
     userId,
@@ -1179,7 +1156,7 @@ export const ClientMasterProfileScreen = ({
                     aria-label={marketingHint}
                     aria-pressed={isMarketingEnabled}
                     title={marketingHint}
-                    disabled={!isViewerFollower || isMarketingBusy}
+                    disabled={isMarketingBusy}
                   >
                     <span className="pro-profile-ig-button-icon" aria-hidden="true">
                       <IconBell />

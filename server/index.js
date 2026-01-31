@@ -3496,6 +3496,46 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_marketing_subscriptions (
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      subscriber_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      opt_in BOOLEAN NOT NULL DEFAULT TRUE,
+      opt_in_at TIMESTAMPTZ,
+      opt_out_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (master_id, subscriber_id)
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_marketing_master_idx
+    ON master_marketing_subscriptions (master_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_marketing_subscriber_idx
+    ON master_marketing_subscriptions (subscriber_id);
+  `)
+
+  await pool.query(`
+    INSERT INTO master_marketing_subscriptions (
+      master_id,
+      subscriber_id,
+      opt_in,
+      opt_in_at,
+      opt_out_at
+    )
+    SELECT
+      master_id,
+      follower_id,
+      marketing_opt_in,
+      marketing_opt_in_at,
+      marketing_opt_out_at
+    FROM master_followers
+    ON CONFLICT (master_id, subscriber_id) DO NOTHING
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS master_profile_views (
       master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
       viewer_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -4724,7 +4764,7 @@ app.get('/api/masters/:userId', async (req, res) => {
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
           COALESCE(mf.followers_count, 0) AS "followersCount",
           CASE WHEN $2::text IS NULL THEN NULL ELSE (mvu.follower_id IS NOT NULL) END AS "viewerIsFollower",
-          CASE WHEN $2::text IS NULL THEN NULL ELSE mvu.marketing_opt_in END AS "viewerMarketingOptIn",
+          CASE WHEN $2::text IS NULL THEN NULL ELSE mms.opt_in END AS "viewerMarketingOptIn",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN users u ON u.user_id = mp.user_id
@@ -4749,6 +4789,9 @@ app.get('/api/masters/:userId', async (req, res) => {
         LEFT JOIN master_followers mvu
           ON mvu.master_id = mp.user_id
           AND mvu.follower_id = $2
+        LEFT JOIN master_marketing_subscriptions mms
+          ON mms.master_id = mp.user_id
+          AND mms.subscriber_id = $2
         WHERE mp.user_id = $1
       `,
       [normalizedUserId, viewerId || null]
@@ -4856,6 +4899,20 @@ app.post('/api/masters/:userId/follow', async (req, res) => {
       `,
       [masterId, followerId]
     )
+    await pool.query(
+      `
+        INSERT INTO master_marketing_subscriptions (
+          master_id,
+          subscriber_id,
+          opt_in,
+          opt_in_at,
+          opt_out_at
+        )
+        VALUES ($1, $2, TRUE, NOW(), NULL)
+        ON CONFLICT (master_id, subscriber_id) DO NOTHING
+      `,
+      [masterId, followerId]
+    )
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/masters/:userId/follow failed:', error)
@@ -4903,20 +4960,22 @@ app.post('/api/masters/:userId/marketing/opt-out', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    await pool.query(
       `
-        UPDATE master_followers
-        SET marketing_opt_in = FALSE,
-            marketing_opt_out_at = NOW()
-        WHERE master_id = $1 AND follower_id = $2
-        RETURNING master_id
+        INSERT INTO master_marketing_subscriptions (
+          master_id,
+          subscriber_id,
+          opt_in,
+          opt_out_at
+        )
+        VALUES ($1, $2, FALSE, NOW())
+        ON CONFLICT (master_id, subscriber_id)
+        DO UPDATE SET
+          opt_in = FALSE,
+          opt_out_at = NOW()
       `,
       [masterId, followerId]
     )
-    if (!result.rows.length) {
-      res.status(404).json({ error: 'follow_not_found' })
-      return
-    }
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/masters/:userId/marketing/opt-out failed:', error)
@@ -4937,21 +4996,24 @@ app.post('/api/masters/:userId/marketing/opt-in', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    await pool.query(
       `
-        UPDATE master_followers
-        SET marketing_opt_in = TRUE,
-            marketing_opt_in_at = NOW(),
-            marketing_opt_out_at = NULL
-        WHERE master_id = $1 AND follower_id = $2
-        RETURNING master_id
+        INSERT INTO master_marketing_subscriptions (
+          master_id,
+          subscriber_id,
+          opt_in,
+          opt_in_at,
+          opt_out_at
+        )
+        VALUES ($1, $2, TRUE, NOW(), NULL)
+        ON CONFLICT (master_id, subscriber_id)
+        DO UPDATE SET
+          opt_in = TRUE,
+          opt_in_at = NOW(),
+          opt_out_at = NULL
       `,
       [masterId, followerId]
     )
-    if (!result.rows.length) {
-      res.status(404).json({ error: 'follow_not_found' })
-      return
-    }
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/masters/:userId/marketing/opt-in failed:', error)
@@ -7063,13 +7125,13 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
     const limitClause = limit ? 'LIMIT $2' : ''
     const result = await pool.query(
       `
-        SELECT mf.follower_id AS "userId"
-        FROM master_followers mf
-        JOIN users u ON u.user_id = mf.follower_id
-        WHERE mf.master_id = $1
-          AND mf.marketing_opt_in = TRUE
+        SELECT mms.subscriber_id AS "userId"
+        FROM master_marketing_subscriptions mms
+        JOIN users u ON u.user_id = mms.subscriber_id
+        WHERE mms.master_id = $1
+          AND mms.opt_in = TRUE
           AND COALESCE(u.is_blocked, FALSE) = FALSE
-        ORDER BY mf.created_at DESC
+        ORDER BY mms.created_at DESC
         ${limitClause}
       `,
       values

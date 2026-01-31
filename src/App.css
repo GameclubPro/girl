@@ -21564,21 +21564,6 @@ h2 {
   box-shadow: 0 16px 24px rgba(47, 109, 246, 0.28);
 }
 
-.screen--client-master-profile .master-profile-marketing-button::after {
-  content: 'бот';
-  position: absolute;
-  right: -6px;
-  bottom: -6px;
-  padding: 2px 6px;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #ffffff;
-  background: linear-gradient(120deg, #2b6cf6 0%, #5fb8ff 100%);
-  border-radius: 999px;
-  box-shadow: 0 6px 10px rgba(47, 109, 246, 0.28);
-}
 
 .screen--client-master-profile .pro-profile-hero-avatar {
   width: 96px;
