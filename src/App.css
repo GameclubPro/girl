@@ -3567,6 +3567,13 @@
   gap: clamp(4px, 1dvh, 6px);
 }
 
+.pro-cabinet-nav-preview.is-showcase-preview {
+  padding: clamp(6px, 1.2dvh, 8px);
+  border-radius: clamp(12px, 3.2vw, 16px);
+  background: rgba(var(--tile-accent), 0.1);
+  border: 1px solid rgba(var(--tile-accent), 0.18);
+}
+
 .pro-cabinet-nav-stories {
   display: grid;
   gap: clamp(6px, 1.2dvh, 8px);

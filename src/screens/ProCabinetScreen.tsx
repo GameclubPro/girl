@@ -488,7 +488,7 @@ export const ProCabinetScreen = ({
                 <span className="pro-cabinet-nav-title">Витрина</span>
               </div>
             </div>
-            <div className="pro-cabinet-nav-preview">
+            <div className="pro-cabinet-nav-preview is-showcase-preview">
               <div className="pro-cabinet-nav-mosaic" aria-hidden="true">
                 {showcaseTiles.map((item, index) => {
                   const slotClass =
