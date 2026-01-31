@@ -5,7 +5,6 @@ import { buildBookingStartParam } from '../utils/deeplink'
 import { buildShareLink } from '../utils/telegramShare'
 
 const MARKETING_TEXT_LIMIT = 800
-const CAMPAIGN_LIMIT = 12
 const DISCOUNT_OPTIONS = [0, 5, 10, 15]
 const REPEAT_INTERVALS = {
   'beauty-nails': 21,
@@ -24,18 +23,6 @@ const REPEAT_CATEGORY_ORDER = [
 type MarketingSummary = {
   botOptInCount: number
   chatCount: number
-}
-
-type MarketingCampaign = {
-  id: number
-  channel: 'bot' | 'chat'
-  audience?: string | null
-  body: string
-  includeUnsubscribe: boolean
-  total: number
-  sent: number
-  failed: number
-  createdAt: string
 }
 
 type Template = {
@@ -62,29 +49,6 @@ type ProMarketingScreenProps = {
   onViewRequests: () => void
   onViewChats: () => void
   onEditProfile: () => void
-}
-
-const formatShortDateTime = (value: number) =>
-  new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-
-const formatCampaignDate = (value?: string | null) => {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return ''
-  return formatShortDateTime(parsed.getTime())
-}
-
-const formatAudienceLabel = (value?: string | null) => {
-  if (!value || value === 'all') return 'Все клиенты'
-  if (value === 'repeat') return 'Постоянные клиенты'
-  if (value === 'inactive_30') return 'Пауза 30+ дней'
-  if (value === 'inactive_60') return 'Пауза 60+ дней'
-  return 'Аудитория'
 }
 
 const categoryLabelOverrides: Record<string, string> = {
@@ -126,7 +90,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     'all'
   )
   const [broadcastDraft, setBroadcastDraft] = useState('')
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [audienceOpen, setAudienceOpen] = useState(false)
   const [broadcastTemplateOpen, setBroadcastTemplateOpen] = useState(false)
   const [broadcastTemplateId, setBroadcastTemplateId] = useState<string | null>(null)
@@ -136,7 +99,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [repeatSaving, setRepeatSaving] = useState(false)
 
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null)
-  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([])
   const [marketingLoading, setMarketingLoading] = useState(true)
   const [marketingError, setMarketingError] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -221,15 +183,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       const summaryUrl = `${apiBase}/api/pro/marketing/summary?userId=${encodeURIComponent(
         userId
       )}`
-      const campaignsUrl = `${apiBase}/api/pro/marketing/campaigns?userId=${encodeURIComponent(
-        userId
-      )}&limit=${CAMPAIGN_LIMIT}`
       const repeatUrl = `${apiBase}/api/pro/marketing/repeat-settings?userId=${encodeURIComponent(
         userId
       )}`
-      const [summaryRes, campaignsRes, repeatRes] = await Promise.all([
+      const [summaryRes, repeatRes] = await Promise.all([
         fetch(summaryUrl, { signal: controller.signal }),
-        fetch(campaignsUrl, { signal: controller.signal }),
         fetch(repeatUrl, { signal: controller.signal }),
       ])
 
@@ -240,17 +198,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
             botOptInCount: Number(summaryPayload?.botOptInCount) || 0,
             chatCount: Number(summaryPayload?.chatCount) || 0,
           })
-        }
-      } else {
-        setMarketingError('Не удалось загрузить данные рассылок. Повторите позже.')
-      }
-
-      if (campaignsRes.ok) {
-        const campaignsPayload = await campaignsRes.json().catch(() => null)
-        if (!controller.signal.aborted) {
-          setCampaigns(
-            Array.isArray(campaignsPayload?.items) ? campaignsPayload.items : []
-          )
         }
       } else {
         setMarketingError('Не удалось загрузить данные рассылок. Повторите позже.')
@@ -517,9 +464,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         return
       }
 
-      if (data?.campaign) {
-        setCampaigns((current) => [data.campaign, ...current].slice(0, CAMPAIGN_LIMIT))
-      }
       const sent = Number(data?.stats?.sent) || 0
       const total = Number(data?.stats?.total) || 0
       showStatus(`Рассылка отправлена: ${sent}/${total}.`)
@@ -939,60 +883,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           </section>
         )}
 
-        <div className="pro-marketing-history">
-          <button
-            className="pro-marketing-history-toggle"
-            type="button"
-            onClick={() => setHistoryOpen((current) => !current)}
-          >
-            История рассылок
-            <span>{historyOpen ? 'Свернуть' : `${campaigns.length} кампаний`}</span>
-          </button>
-          {historyOpen && (
-            <section className="pro-detail-card">
-              <div className="pro-detail-card-head">
-                <h2>Последние кампании</h2>
-                <span className="pro-detail-pill is-ghost">{campaigns.length}</span>
-              </div>
-              {marketingLoading ? (
-                <p className="pro-detail-empty">Загружаем историю...</p>
-              ) : campaigns.length === 0 ? (
-                <p className="pro-detail-empty">Пока нет рассылок. Запустите первую.</p>
-              ) : (
-                <div className="pro-detail-list">
-                  {campaigns.map((item) => {
-                    const preview =
-                      item.body.length > 120 ? `${item.body.slice(0, 117)}...` : item.body
-                    return (
-                      <div className="pro-detail-list-item" key={item.id}>
-                        <span className="pro-detail-avatar">
-                          {item.channel === 'bot' ? 'BOT' : 'CHAT'}
-                        </span>
-                        <div className="pro-detail-list-body">
-                          <div className="pro-detail-list-title-row">
-                            <span className="pro-detail-list-title">
-                              {item.channel === 'bot' ? 'Бот' : 'Личные чаты'}
-                            </span>
-                            <span className="pro-detail-pill is-ghost">
-                              {item.sent}/{item.total}
-                            </span>
-                          </div>
-                          <span className="pro-detail-list-subtitle">{preview}</span>
-                          <span className="pro-detail-list-meta">
-                            {formatCampaignDate(item.createdAt)}
-                            {item.failed > 0 ? ` · Ошибок: ${item.failed}` : ''}
-                            {item.includeUnsubscribe ? ' · Отписка' : ''}
-                            {item.audience ? ` · ${formatAudienceLabel(item.audience)}` : ''}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </section>
-          )}
-        </div>
       </div>
 
       <ProBottomNav
