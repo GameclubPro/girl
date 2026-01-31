@@ -1212,11 +1212,13 @@ export const ClientMasterProfileScreen = ({
                         </span>
                       </button>
                     </div>
-                    {!isFavorite && (
-                      <p className="master-profile-follow-note master-profile-follow-note--hero">
-                        Подписка включает предложения от мастера.
-                      </p>
-                    )}
+                    <p
+                      className={`master-profile-follow-note master-profile-follow-note--hero${
+                        isFavorite ? ' is-hidden' : ''
+                      }`}
+                    >
+                      Подписка включает предложения от мастера.
+                    </p>
                   </div>
                 </div>
                 <p

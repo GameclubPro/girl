@@ -21832,6 +21832,11 @@ h2 {
   margin: 2px 0 0;
 }
 
+.screen--client-master-profile .master-profile-follow-note.is-hidden {
+  visibility: hidden;
+  opacity: 0;
+}
+
 .screen--client-master-profile .pro-profile-ig-actions {
   display: grid;
   gap: 10px;
