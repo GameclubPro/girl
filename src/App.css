@@ -81,7 +81,7 @@
 }
 
 .screen--start .content {
-  position: relative;
+  position: static;
   z-index: 1;
   padding-bottom: clamp(64px, 12vw, 96px);
 }
@@ -17651,14 +17651,14 @@ h2 {
 .footer-image--left {
   position: absolute;
   left: -24px;
-  bottom: -40px;
+  bottom: 0;
   width: min(30vw, 140px);
 }
 
 .footer-image--right {
   position: absolute;
   right: -14px;
-  bottom: -6px;
+  bottom: 0;
   width: min(30vw, 150px);
   transform: rotate(6deg);
   transform-origin: bottom right;
