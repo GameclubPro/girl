@@ -21819,23 +21819,6 @@ h2 {
   z-index: 2;
 }
 
-.screen--client-master-profile .master-profile-follow-note {
-  margin: 22px 0 0;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--pro-muted);
-  line-height: 1.3;
-}
-
-.screen--client-master-profile
-  .master-profile-follow-note.master-profile-follow-note--hero {
-  margin: 2px 0 0;
-}
-
-.screen--client-master-profile .master-profile-follow-note.is-hidden {
-  visibility: hidden;
-  opacity: 0;
-}
 
 .screen--client-master-profile .pro-profile-ig-actions {
   display: grid;

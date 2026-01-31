@@ -1212,13 +1212,6 @@ export const ClientMasterProfileScreen = ({
                         </span>
                       </button>
                     </div>
-                    <p
-                      className={`master-profile-follow-note master-profile-follow-note--hero${
-                        isFavorite ? ' is-hidden' : ''
-                      }`}
-                    >
-                      Подписка включает предложения от мастера.
-                    </p>
                   </div>
                 </div>
                 <p
