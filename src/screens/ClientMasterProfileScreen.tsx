@@ -14,8 +14,6 @@ import {
   IconHomeMaster,
   IconPin,
   IconPrice,
-  IconStar,
-  IconCheck,
 } from '../components/icons'
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { categoryItems } from '../data/clientData'
@@ -1071,54 +1069,103 @@ export const ClientMasterProfileScreen = ({
           </div>
         ) : profile ? (
           <>
-            <section className="pro-profile-ig animate delay-1">
+            <section className="pro-profile-hero animate delay-1">
               <div
-                className={`pro-profile-ig-cover${coverUrl ? ' has-image' : ''}`}
+                className={`pro-profile-ig-cover pro-profile-hero-cover${
+                  coverUrl ? ' has-image' : ''
+                }`}
                 style={
                   coverUrl
                     ? { backgroundImage: `url(${coverUrl})`, backgroundPosition: coverFocus }
                     : undefined
                 }
               >
-                <div className="pro-profile-ig-cover-glow" aria-hidden="true" />
+                <div
+                  className="pro-profile-ig-cover-glow pro-profile-hero-cover-glow"
+                  aria-hidden="true"
+                />
                 {!coverUrl && (
                   <span className="master-profile-cover-fallback" aria-hidden="true">
                     {initials}
                   </span>
                 )}
               </div>
-              <div className="pro-profile-ig-header">
-                <div className="pro-profile-ig-avatar">
-                  {profile.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
+              <div className="pro-profile-hero-card">
+                <div className="pro-profile-hero-identity">
+                  <div className="pro-profile-ig-avatar pro-profile-hero-avatar">
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
+                    ) : (
+                      <span aria-hidden="true">{initials}</span>
+                    )}
+                  </div>
+                  <div className="pro-profile-hero-main">
+                    <div className="pro-profile-hero-name-row">
+                      <div className="pro-profile-hero-name-wrap">
+                        <h1 className="pro-profile-hero-name">{displayName}</h1>
+                      </div>
+                    </div>
+                    <div className="pro-profile-hero-status-row">
+                      <button
+                        className={`pro-profile-ig-status master-profile-follow-button master-profile-follow-status${
+                          isFavorite ? ' is-active' : ''
+                        }`}
+                        type="button"
+                        onClick={() => onToggleFavorite(favoritePayload)}
+                        aria-label={followAriaLabel}
+                      >
+                        <span className="pro-profile-ig-status-label">
+                          {followActionLabel}
+                        </span>
+                      </button>
+                    </div>
+                    {!isFavorite && (
+                      <p className="master-profile-follow-note master-profile-follow-note--hero">
+                        Подписка включает предложения от мастера.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <p
+                  className={`pro-profile-hero-about${aboutValue ? '' : ' is-muted'}`}
+                >
+                  {aboutText}
+                </p>
+                <div className="pro-profile-hero-tags pro-profile-ig-tags">
+                  <span
+                    className={`pro-profile-tag is-status${
+                      isActive ? '' : ' is-muted'
+                    }`}
+                  >
+                    {statusLabel}
+                  </span>
+                  {previewTags.length > 0 ? (
+                    <>
+                      {previewTags.map((label, index) => (
+                        <span className="pro-profile-tag" key={`${label}-${index}`}>
+                          {label}
+                        </span>
+                      ))}
+                      {previewTagRemainder > 0 && (
+                        <span className="pro-profile-tag is-muted">
+                          +{previewTagRemainder}
+                        </span>
+                      )}
+                    </>
                   ) : (
-                    <span aria-hidden="true">{initials}</span>
+                    <span className="pro-profile-tag is-muted">
+                      Теги появятся здесь
+                    </span>
+                  )}
+                  {reviewCount > 0 ? (
+                    <span className="pro-profile-tag is-review">
+                      ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
+                    </span>
+                  ) : (
+                    <span className="pro-profile-tag is-muted">Нет отзывов</span>
                   )}
                 </div>
-                <div className="pro-profile-ig-name-row">
-                  <h1 className="pro-profile-ig-name">{displayName}</h1>
-                  <button
-                    className={`pro-profile-ig-button master-profile-follow-button master-profile-follow-inline${
-                      isFavorite ? ' is-active' : ''
-                    }`}
-                    type="button"
-                    onClick={() => onToggleFavorite(favoritePayload)}
-                    aria-label={followAriaLabel}
-                  >
-                    <span className="pro-profile-ig-button-icon" aria-hidden="true">
-                      {isFavorite ? <IconCheck /> : <IconStar />}
-                    </span>
-                    <span className="pro-profile-ig-button-label">
-                      {followActionLabel}
-                    </span>
-                  </button>
-                </div>
-                {!isFavorite && (
-                  <p className="master-profile-follow-note">
-                    Подписка включает предложения от мастера.
-                  </p>
-                )}
-                <div className="pro-profile-ig-stats">
+                <div className="pro-profile-ig-stats pro-profile-hero-stats">
                   {profileStats.map((stat) => (
                     <button
                       className={`pro-profile-ig-stat pro-profile-ig-stat-button${
@@ -1138,15 +1185,15 @@ export const ClientMasterProfileScreen = ({
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="pro-profile-ig-actions">
-                <button
-                  className="pro-profile-ig-button pro-profile-ig-button--primary master-profile-booking-cta"
-                  type="button"
-                  onClick={onCreateBooking}
-                >
-                  Записаться
-                </button>
+                <div className="pro-profile-hero-actions" role="list">
+                  <button
+                    className="pro-profile-hero-action is-primary"
+                    type="button"
+                    onClick={onCreateBooking}
+                  >
+                    Записаться
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -1185,26 +1232,6 @@ export const ClientMasterProfileScreen = ({
                 role="region"
                 aria-labelledby="master-profile-tab-overview"
               >
-                <div className="pro-profile-status-card">
-                  <div className="pro-profile-status-head">
-                    <span className="pro-profile-status-title">Статус</span>
-                    <span
-                      className={`pro-profile-ig-status${
-                        isActive ? '' : ' is-paused'
-                      }`}
-                    >
-                      <span className="pro-profile-social-dot" aria-hidden="true" />
-                      {statusLabel}
-                    </span>
-                  </div>
-                  <p
-                    className={`pro-profile-status-text${
-                      aboutValue ? '' : ' is-muted'
-                    }`}
-                  >
-                    {aboutText}
-                  </p>
-                </div>
                 <div className="pro-profile-facts-grid">
                   {profileFacts.map((fact) => (
                     <div
@@ -1322,33 +1349,6 @@ export const ClientMasterProfileScreen = ({
                         )
                       })}
                     </div>
-                  )}
-                </div>
-                <div className="pro-profile-ig-tags">
-                  {previewTags.length > 0 ? (
-                    <>
-                      {previewTags.map((label, index) => (
-                        <span className="pro-profile-tag" key={`${label}-${index}`}>
-                          {label}
-                        </span>
-                      ))}
-                      {previewTagRemainder > 0 && (
-                        <span className="pro-profile-tag is-muted">
-                          +{previewTagRemainder}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="pro-profile-tag is-muted">
-                      Теги появятся здесь
-                    </span>
-                  )}
-                  {reviewCount > 0 ? (
-                    <span className="pro-profile-tag is-review">
-                      ★ {reviewAverage.toFixed(1)} · {reviewCountLabel}
-                    </span>
-                  ) : (
-                    <span className="pro-profile-tag is-muted">Нет отзывов</span>
                   )}
                 </div>
               </section>
