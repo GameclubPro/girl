@@ -21989,6 +21989,10 @@ h2 {
   gap: 8px;
 }
 
+.client-promo-actions.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .client-promo-cta {
   border: none;
   border-radius: 16px;
