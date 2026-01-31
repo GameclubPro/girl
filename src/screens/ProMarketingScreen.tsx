@@ -8,7 +8,6 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const MARKETING_TEXT_LIMIT = 800
 const CAMPAIGN_LIMIT = 12
 const DISCOUNT_OPTIONS = [5, 10, 15]
-const PACKAGE_OPTIONS = [3, 5]
 const REMINDER_WINDOWS = [30, 60] as const
 
 type ReminderWindow = (typeof REMINDER_WINDOWS)[number]
@@ -37,7 +36,6 @@ type Template = {
   pill?: string
   text: string
   isPromo?: boolean
-  isPackage?: boolean
 }
 
 type ProMarketingScreenProps = {
@@ -67,6 +65,7 @@ const formatCampaignDate = (value?: string | null) => {
 
 const formatAudienceLabel = (value?: string | null) => {
   if (!value || value === 'all') return 'Все клиенты'
+  if (value === 'repeat') return 'Постоянные клиенты'
   if (value === 'inactive_30') return 'Пауза 30+ дней'
   if (value === 'inactive_60') return 'Пауза 60+ дней'
   return 'Аудитория'
@@ -99,7 +98,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [activeTab, setActiveTab] = useState<'broadcast' | 'reminder'>('broadcast')
   const [channel, setChannel] = useState<'bot' | 'chat'>('bot')
   const [discountPercent, setDiscountPercent] = useState(10)
-  const [packageVisits, setPackageVisits] = useState(3)
+  const [broadcastAudience, setBroadcastAudience] = useState<'all' | 'repeat'>(
+    'all'
+  )
   const [broadcastDraft, setBroadcastDraft] = useState('')
   const [reminderDraft, setReminderDraft] = useState('')
   const [reminderTouched, setReminderTouched] = useState(false)
@@ -216,30 +217,14 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     return { count30, count60 }
   }, [bookingStats.clientSummaries])
 
-  const repeatRate = bookingStats.uniqueClients
-    ? bookingStats.repeatClients / bookingStats.uniqueClients
-    : 0
-
   const recommendedTemplateId = useMemo(() => {
-    if (!bookingStats.uniqueClients) return 'fill-week'
     if (bookingStats.upcomingWeek < 3) return 'fill-week'
-    if (inactiveCounts.count30 >= Math.max(2, Math.ceil(bookingStats.uniqueClients * 0.3))) {
-      return 'win-back'
-    }
-    if (repeatRate < 0.4) return 'package'
     return 'promo-week'
-  }, [
-    bookingStats.uniqueClients,
-    bookingStats.upcomingWeek,
-    inactiveCounts.count30,
-    repeatRate,
-  ])
+  }, [bookingStats.upcomingWeek])
 
   const broadcastTemplates: Template[] = useMemo(() => {
     const fillWeekText = `Открылись новые окна для записи ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
     const promoText = `На этой неделе действует спец-условие: -${discountPercent}% на ближайшие окна ${masterLabel}. Если интересно, выберите время по кнопке ниже.`
-    const packageText = `Пакет ${packageVisits} визитов выгоднее разовых ${masterLabel}. Если интересно, выберите время по кнопке ниже.`
-    const winBackText = `Давно не виделись ${masterLabel}. Есть новые окна, если удобно, выберите время по кнопке ниже.`
 
     return [
       {
@@ -257,29 +242,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         text: promoText,
         isPromo: true,
       },
-      {
-        id: 'package',
-        title: `Пакет ${packageVisits} визитов`,
-        description: 'Выгодное предложение для повторных клиентов.',
-        pill: `Повторных: ${bookingStats.repeatClients}`,
-        text: packageText,
-        isPackage: true,
-      },
-      {
-        id: 'win-back',
-        title: 'Вернуть клиентов',
-        description: 'Напоминание для тех, кто давно не был.',
-        pill: `Спящих: ${inactiveCounts.count30}`,
-        text: winBackText,
-      },
     ]
   }, [
-    bookingStats.repeatClients,
     bookingStats.upcomingWeek,
     discountPercent,
-    inactiveCounts.count30,
     masterLabel,
-    packageVisits,
   ])
 
   const reminderTemplates: Template[] = useMemo(() => {
@@ -345,22 +312,22 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const botAudience = marketingSummary?.botOptInCount
   const chatAudience = marketingSummary?.chatCount
   const reminderAudience = reminderWindow === 60 ? inactiveCounts.count60 : inactiveCounts.count30
-  const audienceCount =
-    activeTab === 'broadcast'
-      ? channel === 'bot'
-        ? botAudience
-        : chatAudience
-      : reminderAudience
-  const hasAudience = typeof audienceCount !== 'number' || audienceCount > 0
+  const broadcastFilterCount =
+    broadcastAudience === 'repeat'
+      ? bookingStats.repeatClients
+      : bookingStats.uniqueClients
+  const broadcastChannelCount = channel === 'bot' ? botAudience : chatAudience
+  const broadcastHasAudience =
+    (typeof broadcastChannelCount !== 'number' || broadcastChannelCount > 0) &&
+    broadcastFilterCount > 0
+  const hasAudience = activeTab === 'broadcast' ? broadcastHasAudience : reminderAudience > 0
   const canSend = Boolean(payloadText) && !isTextTooLong && !isSending && hasAudience
 
   const audienceLabel =
     activeTab === 'broadcast'
-      ? marketingLoading
-        ? 'Считаем аудиторию...'
-        : channel === 'bot'
-          ? `Подписчиков: ${botAudience ?? 0}`
-          : `Активных чатов: ${chatAudience ?? 0}`
+      ? broadcastAudience === 'repeat'
+        ? `Постоянные: ${bookingStats.repeatClients}`
+        : `Все клиенты: ${bookingStats.uniqueClients}`
       : `Клиентов с паузой: ${reminderAudience}`
 
   const channelHint =
@@ -414,7 +381,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
     const audience =
       activeTab === 'broadcast'
-        ? 'all'
+        ? broadcastAudience === 'repeat'
+          ? 'repeat'
+          : 'all'
         : reminderWindow === 60
           ? 'inactive_60'
           : 'inactive_30'
@@ -463,6 +432,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   }, [
     activeTab,
     apiBase,
+    broadcastAudience,
     channel,
     includeLinkEnabled,
     includeUnsubscribeEnabled,
@@ -564,7 +534,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           <section className="pro-detail-card pro-marketing-panel animate delay-1">
             <div className="pro-detail-card-head">
               <h2>Рассылка клиентам</h2>
-              <span className="pro-detail-pill is-ghost">{audienceLabel}</span>
             </div>
             <p className="pro-detail-text">{channelHint}</p>
 
@@ -594,6 +563,27 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     ? 'Считаем аудиторию...'
                     : `Активных чатов: ${chatAudience ?? 0}`}
                 </span>
+              </button>
+            </div>
+
+            <div className="pro-marketing-window-row" role="group" aria-label="Аудитория">
+              <button
+                className={`pro-marketing-chip${
+                  broadcastAudience === 'all' ? ' is-active' : ''
+                }`}
+                type="button"
+                onClick={() => setBroadcastAudience('all')}
+              >
+                Все клиенты · {bookingStats.uniqueClients}
+              </button>
+              <button
+                className={`pro-marketing-chip${
+                  broadcastAudience === 'repeat' ? ' is-active' : ''
+                }`}
+                type="button"
+                onClick={() => setBroadcastAudience('repeat')}
+              >
+                Постоянные · {bookingStats.repeatClients}
               </button>
             </div>
 
@@ -640,25 +630,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                             }}
                           >
                             -{value}%
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {template.isPackage && (
-                      <div className="pro-marketing-chip-row" role="group" aria-label="Пакет">
-                        {PACKAGE_OPTIONS.map((value) => (
-                          <button
-                            key={`package-${value}`}
-                            className={`pro-marketing-chip${
-                              value === packageVisits ? ' is-active' : ''
-                            }`}
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setPackageVisits(value)
-                            }}
-                          >
-                            {value} визита
                           </button>
                         ))}
                       </div>

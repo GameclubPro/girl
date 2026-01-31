@@ -4652,10 +4652,6 @@
 }
 
 @media (max-width: 380px) {
-  .pro-marketing-channel-grid {
-    grid-template-columns: 1fr;
-  }
-
   .pro-marketing-tone-grid {
     grid-template-columns: 1fr;
   }
