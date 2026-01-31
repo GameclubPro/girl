@@ -21529,6 +21529,8 @@ h2 {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  position: relative;
+  width: 100%;
 }
 
 .screen--client-master-profile .pro-profile-hero-settings {
@@ -21611,6 +21613,7 @@ h2 {
   align-items: center;
   min-height: calc(2 * 1.15em);
   min-width: 0;
+  padding-right: 44px;
 }
 
 .screen--client-master-profile .pro-profile-hero-name-wrap {
