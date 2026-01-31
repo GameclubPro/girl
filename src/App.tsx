@@ -242,7 +242,6 @@ const ScreenPerfMarker = ({
 
   return children
 }
-  | 'pro-cabinet'
 
 type RequestsNavOptions = {
   tab?: 'requests' | 'bookings'
