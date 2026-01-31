@@ -342,6 +342,31 @@ const ensureDateValue = (value) => {
   return parsed
 }
 
+const loadPromotionEligibility = async (masterId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        COALESCE(mp.avatar_path, u.avatar_url) AS "avatarPath",
+        mp.portfolio_urls AS "portfolioUrls",
+        COALESCE(ms.showcase_urls, '{}'::text[]) AS "showcaseUrls"
+      FROM master_profiles mp
+      LEFT JOIN users u ON u.user_id = mp.user_id
+      LEFT JOIN master_showcases ms ON ms.user_id = mp.user_id
+      WHERE mp.user_id = $1
+    `,
+    [masterId]
+  )
+  const row = result.rows[0]
+  if (!row) {
+    return { ok: false, hasAvatar: false, hasPortfolio: false }
+  }
+  const hasAvatar = Boolean(row.avatarPath)
+  const portfolioUrls = Array.isArray(row.portfolioUrls) ? row.portfolioUrls : []
+  const showcaseUrls = Array.isArray(row.showcaseUrls) ? row.showcaseUrls : []
+  const hasPortfolio = portfolioUrls.length > 0 || showcaseUrls.length > 0
+  return { ok: hasAvatar && hasPortfolio, hasAvatar, hasPortfolio }
+}
+
 const parseOptionalInt = (value) => {
   if (typeof value === 'number') {
     return Number.isInteger(value) ? value : null
@@ -8304,6 +8329,19 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
         res.status(400).json({ error: 'duration_too_long' })
         return
       }
+      if (nextStatus === 'active') {
+        const eligibility = await loadPromotionEligibility(masterId)
+        if (!eligibility.ok) {
+          res.status(400).json({
+            error: 'promotion_requirements',
+            missing: {
+              avatar: !eligibility.hasAvatar,
+              portfolio: !eligibility.hasPortfolio,
+            },
+          })
+          return
+        }
+      }
 
       const updateResult = await pool.query(
         `
@@ -8352,6 +8390,19 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
       )
       row = updateResult.rows[0]
     } else {
+      if (status === 'active') {
+        const eligibility = await loadPromotionEligibility(masterId)
+        if (!eligibility.ok) {
+          res.status(400).json({
+            error: 'promotion_requirements',
+            missing: {
+              avatar: !eligibility.hasAvatar,
+              portfolio: !eligibility.hasPortfolio,
+            },
+          })
+          return
+        }
+      }
       const insertResult = await pool.query(
         `
           INSERT INTO master_promotions (
@@ -8449,6 +8500,19 @@ app.post('/api/pro/marketing/promotions/:promotionId/action', async (req, res) =
     if (action === 'resume' && endAt && endAt < new Date()) {
       res.status(400).json({ error: 'promotion_expired' })
       return
+    }
+    if (action === 'resume') {
+      const eligibility = await loadPromotionEligibility(masterId)
+      if (!eligibility.ok) {
+        res.status(400).json({
+          error: 'promotion_requirements',
+          missing: {
+            avatar: !eligibility.hasAvatar,
+            portfolio: !eligibility.hasPortfolio,
+          },
+        })
+        return
+      }
     }
     const nextStatus =
       action === 'pause' ? 'paused' : action === 'resume' ? 'active' : 'archived'

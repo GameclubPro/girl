@@ -11,6 +11,7 @@ const PROMOTION_TITLE_LIMIT = 60
 const PROMOTION_DESCRIPTION_LIMIT = 180
 const DISCOUNT_OPTIONS = [0, 5, 10, 15]
 const PROMOTION_DURATION_OPTIONS = [3, 7, 14]
+const PROMOTION_MAX_DURATION_DAYS = 14
 const REPEAT_INTERVAL_MIN = 7
 const REPEAT_INTERVAL_MAX = 180
 const REPEAT_INTERVALS = {
@@ -33,11 +34,6 @@ const PROMOTION_TYPES = [
   { id: 'slots', label: 'Быстрые окна' },
 ] as const
 
-const PROMOTION_AUDIENCES = [
-  { id: 'all', label: 'Все' },
-  { id: 'followers', label: 'Подписчики' },
-  { id: 'clients', label: 'Клиенты' },
-] as const
 
 type Template = {
   id: string
@@ -51,7 +47,6 @@ type PromotionDraft = {
   title: string
   description: string
   durationDays: number
-  audience: Promotion['audience']
   categories: string[]
 }
 
@@ -140,7 +135,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     title: '',
     description: '',
     durationDays: PROMOTION_DURATION_OPTIONS[1],
-    audience: 'all',
     categories: [],
   })
 
@@ -327,7 +321,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       title: '',
       description: '',
       durationDays: PROMOTION_DURATION_OPTIONS[1],
-      audience: 'all',
       categories: [],
     })
   }, [userId])
@@ -673,13 +666,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       PROMOTION_TYPES.find((item) => item.id === value)?.label ?? 'Акция',
     []
   )
-  const resolvePromotionAudienceLabel = useCallback(
-    (value: Promotion['audience']) =>
-      PROMOTION_AUDIENCES.find((item) => item.id === value)?.label ??
-      'Все клиенты',
-    []
-  )
-
   const resolvePromotionStatus = useCallback((promotion: Promotion) => {
     const now = Date.now()
     const startMs = Date.parse(promotion.startAt)
@@ -737,13 +723,21 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           categories: promotionDraft.categories,
           startAt: startAt.toISOString(),
           endAt: endAt.toISOString(),
-          audience: promotionDraft.audience,
           status: 'active',
         }),
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) {
-        throw new Error(data?.error || 'promotion_save_failed')
+        const errorCode = data?.error
+        if (errorCode === 'promotion_requirements') {
+          showStatus('Нужны аватар и минимум 1 работа в портфолио.', true)
+          return
+        }
+        if (errorCode === 'duration_too_long') {
+          showStatus('Максимальный срок акции — 14 дней.', true)
+          return
+        }
+        throw new Error(errorCode || 'promotion_save_failed')
       }
       const promotion = data as Promotion
       setPromotions((prev) => [
@@ -788,7 +782,16 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         )
         const data = await response.json().catch(() => null)
         if (!response.ok) {
-          throw new Error(data?.error || 'promotion_action_failed')
+          const errorCode = data?.error
+          if (errorCode === 'promotion_requirements') {
+            showStatus('Нужны аватар и минимум 1 работа в портфолио.', true)
+            return
+          }
+          if (errorCode === 'promotion_expired') {
+            showStatus('Срок акции истёк.', true)
+            return
+          }
+          throw new Error(errorCode || 'promotion_action_failed')
         }
         const promotion = data as Promotion
         setPromotions((prev) => [
@@ -798,6 +801,62 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         showStatus('Готово.')
       } catch (error) {
         setPromotionsError('Не удалось обновить акцию.')
+      } finally {
+        setPromotionsSaving(false)
+      }
+    },
+    [apiBase, showStatus, userId]
+  )
+
+  const handlePromotionExtend = useCallback(
+    async (promotion: Promotion) => {
+      if (!userId) return
+      const startAt = new Date(promotion.startAt)
+      const endAt = new Date(promotion.endAt)
+      if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+        showStatus('Не удалось продлить акцию.', true)
+        return
+      }
+      const currentDuration =
+        Math.ceil((endAt.getTime() - startAt.getTime()) / (24 * 60 * 60 * 1000))
+      if (currentDuration >= PROMOTION_MAX_DURATION_DAYS) {
+        showStatus('Максимальный срок акции — 14 дней.', true)
+        return
+      }
+      const nextEnd = new Date(endAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+      setPromotionsSaving(true)
+      setPromotionsError('')
+      try {
+        const response = await fetch(`${apiBase}/api/pro/marketing/promotions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            promotionId: promotion.id,
+            endAt: nextEnd.toISOString(),
+          }),
+        })
+        const data = await response.json().catch(() => null)
+        if (!response.ok) {
+          const errorCode = data?.error
+          if (errorCode === 'promotion_requirements') {
+            showStatus('Нужны аватар и минимум 1 работа в портфолио.', true)
+            return
+          }
+          if (errorCode === 'duration_too_long') {
+            showStatus('Максимальный срок акции — 14 дней.', true)
+            return
+          }
+          throw new Error(errorCode || 'promotion_extend_failed')
+        }
+        const updated = data as Promotion
+        setPromotions((prev) => [
+          updated,
+          ...prev.filter((item) => item.id !== updated.id),
+        ])
+        showStatus('Акция продлена на 7 дней.')
+      } catch (error) {
+        setPromotionsError('Не удалось продлить акцию.')
       } finally {
         setPromotionsSaving(false)
       }
@@ -1335,12 +1394,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                           {activePromotion.description}
                         </p>
                       )}
-                      <div className="pro-marketing-promo-meta">
-                        <span>
-                          {resolvePromotionAudienceLabel(activePromotion.audience)}
-                        </span>
-                        {dateLabel && <span>до {dateLabel}</span>}
-                      </div>
+                      {dateLabel && (
+                        <div className="pro-marketing-promo-meta">
+                          <span>до {dateLabel}</span>
+                        </div>
+                      )}
                       {categoryLabels.length > 0 && (
                         <div className="pro-detail-chip-row">
                           {categoryLabels.map((label) => (
@@ -1351,6 +1409,29 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                         </div>
                       )}
                       <div className="pro-detail-actions pro-detail-actions--compact">
+                        {(() => {
+                          const startAt = new Date(activePromotion.startAt)
+                          const endAt = new Date(activePromotion.endAt)
+                          const durationDays =
+                            Number.isNaN(startAt.getTime()) ||
+                            Number.isNaN(endAt.getTime())
+                              ? PROMOTION_MAX_DURATION_DAYS
+                              : Math.ceil(
+                                  (endAt.getTime() - startAt.getTime()) /
+                                    (24 * 60 * 60 * 1000)
+                                )
+                          const canExtend = durationDays < PROMOTION_MAX_DURATION_DAYS
+                          return (
+                            <button
+                              className="pro-detail-action"
+                              type="button"
+                              onClick={() => void handlePromotionExtend(activePromotion)}
+                              disabled={promotionsSaving || !canExtend}
+                            >
+                              +7 дней
+                            </button>
+                          )
+                        })()}
                         {statusMeta.canPause && (
                           <button
                             className="pro-detail-action is-ghost"
@@ -1424,9 +1505,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                           </span>
                         </div>
                         <div className="pro-marketing-promo-meta">
-                          <span>
-                            {resolvePromotionAudienceLabel(promotion.audience)}
-                          </span>
                           {dateLabel && <span>до {dateLabel}</span>}
                         </div>
                         <div className="pro-detail-actions pro-detail-actions--compact">
@@ -1566,26 +1644,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                       }
                     >
                       {value} дн.
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pro-marketing-promo-field">
-                <span className="pro-marketing-promo-label">Аудитория</span>
-                <div className="pro-marketing-promo-segment" role="group" aria-label="Аудитория">
-                  {PROMOTION_AUDIENCES.map((item) => (
-                    <button
-                      key={`promo-audience-${item.id}`}
-                      className={`pro-marketing-promo-segment-item${
-                        promotionDraft.audience === item.id ? ' is-active' : ''
-                      }`}
-                      type="button"
-                      onClick={() =>
-                        setPromotionDraft((prev) => ({ ...prev, audience: item.id }))
-                      }
-                    >
-                      {item.label}
                     </button>
                   ))}
                 </div>

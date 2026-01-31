@@ -4728,37 +4728,6 @@
   transform: translateY(1px);
 }
 
-.pro-marketing-promo-segment {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding: 4px;
-  border-radius: 14px;
-  background: rgba(var(--paper-rgb), 0.7);
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-}
-
-.pro-marketing-promo-segment-item {
-  appearance: none;
-  border: none;
-  background: transparent;
-  border-radius: 12px;
-  padding: 8px 10px;
-  text-align: center;
-  font: inherit;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--pro-muted);
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
-}
-
-.pro-marketing-promo-segment-item.is-active {
-  background: rgba(var(--accent-rgb), 0.16);
-  color: var(--accent-strong);
-  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.16);
-}
-
 .pro-marketing-promo-hint,
 .pro-marketing-promo-note {
   margin: 0;
