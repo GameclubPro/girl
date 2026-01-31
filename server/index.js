@@ -2074,6 +2074,73 @@ const insertSystemMessage = async (
   }
 }
 
+const insertChatTextMessage = async (
+  { chatId, body, meta, senderId },
+  options = {}
+) => {
+  const db = options.client ?? pool
+  const shouldManageTransaction = !options.client
+  if (shouldManageTransaction) {
+    await db.query('BEGIN')
+  }
+  try {
+    const metaPayload =
+      meta && typeof meta === 'object' && !Array.isArray(meta) ? { ...meta } : null
+    const messageResult = await db.query(
+      `
+        INSERT INTO chat_messages (chat_id, sender_id, type, body, meta)
+        VALUES ($1, $2, 'text', $3, $4)
+        RETURNING id, created_at AS "createdAt"
+      `,
+      [chatId, senderId ?? null, body ?? null, metaPayload]
+    )
+    const messageId = messageResult.rows[0]?.id ?? null
+    const createdAt = messageResult.rows[0]?.createdAt ?? null
+    if (!messageId) {
+      throw new Error('message_insert_failed')
+    }
+
+    await db.query(
+      `
+        UPDATE chats
+        SET last_message_id = $2,
+            last_message_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [chatId, messageId]
+    )
+
+    await db.query(
+      `
+        UPDATE chat_members
+        SET unread_count = CASE
+              WHEN user_id = $2 THEN 0
+              ELSE unread_count + 1
+            END,
+            last_read_message_id = CASE
+              WHEN user_id = $2 THEN $3
+              ELSE last_read_message_id
+            END,
+            updated_at = NOW()
+        WHERE chat_id = $1
+      `,
+      [chatId, senderId ?? null, messageId]
+    )
+
+    if (shouldManageTransaction) {
+      await db.query('COMMIT')
+    }
+
+    return { id: messageId, createdAt }
+  } catch (error) {
+    if (shouldManageTransaction) {
+      await db.query('ROLLBACK')
+    }
+    throw error
+  }
+}
+
 const createSupportChat = async ({ userId }) => {
   if (SUPPORT_AGENT_IDS.length === 0) {
     throw new Error('support_agents_missing')
@@ -3533,6 +3600,25 @@ const ensureSchema = async () => {
       marketing_opt_out_at
     FROM master_followers
     ON CONFLICT (master_id, subscriber_id) DO NOTHING
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marketing_campaigns (
+      id SERIAL PRIMARY KEY,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      channel TEXT NOT NULL CHECK (channel IN ('bot', 'chat')),
+      body TEXT NOT NULL,
+      include_unsubscribe BOOLEAN NOT NULL DEFAULT FALSE,
+      total INTEGER NOT NULL DEFAULT 0,
+      sent INTEGER NOT NULL DEFAULT 0,
+      failed INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS marketing_campaigns_master_idx
+    ON marketing_campaigns (master_id, created_at DESC);
   `)
 
   await pool.query(`
@@ -7088,6 +7174,147 @@ app.get('/api/pro/analytics', async (req, res) => {
   }
 })
 
+const fetchMarketingRecipients = async ({ masterId, limit }) => {
+  const values = limit ? [masterId, limit] : [masterId]
+  const limitClause = limit ? 'LIMIT $2' : ''
+  const result = await pool.query(
+    `
+      SELECT mms.subscriber_id AS "userId"
+      FROM master_marketing_subscriptions mms
+      JOIN users u ON u.user_id = mms.subscriber_id
+      WHERE mms.master_id = $1
+        AND mms.opt_in = TRUE
+        AND COALESCE(u.is_blocked, FALSE) = FALSE
+      ORDER BY mms.created_at DESC
+      ${limitClause}
+    `,
+    values
+  )
+
+  return result.rows.map((row) => normalizeText(row.userId)).filter(Boolean)
+}
+
+const sendMarketingBotBroadcast = async ({
+  masterId,
+  text,
+  includeUnsubscribe,
+  limit,
+}) => {
+  if (!telegramBotToken) {
+    const error = new Error('bot_not_configured')
+    error.code = 'bot_not_configured'
+    throw error
+  }
+  const unsubscribeLink =
+    includeUnsubscribe && telegramWebAppUrl
+      ? buildStartAppUrl(telegramWebAppUrl, `unsub_${masterId}`)
+      : ''
+  const payloadText = unsubscribeLink
+    ? `${text}\n\nОтписаться: ${unsubscribeLink}`
+    : text
+  const recipients = await fetchMarketingRecipients({ masterId, limit })
+
+  if (recipients.length === 0) {
+    return { total: 0, sent: 0, failed: 0 }
+  }
+
+  let sent = 0
+  let failed = 0
+  for (let index = 0; index < recipients.length; index += MARKETING_BROADCAST_CHUNK) {
+    const chunk = recipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
+    const results = await Promise.all(
+      chunk.map((recipientId) =>
+        sendTelegramMessage({
+          recipientId,
+          text: payloadText,
+        })
+      )
+    )
+    results.forEach((ok) => {
+      if (ok) {
+        sent += 1
+      } else {
+        failed += 1
+      }
+    })
+  }
+
+  return { total: recipients.length, sent, failed }
+}
+
+const fetchChatBroadcastTargets = async ({ masterId, limit }) => {
+  const values = limit ? [masterId, limit] : [masterId]
+  const limitClause = limit ? 'LIMIT $2' : ''
+  const result = await pool.query(
+    `
+      SELECT c.id AS "chatId", c.client_id AS "clientId"
+      FROM chats c
+      JOIN users u ON u.user_id = c.client_id
+      WHERE c.master_id = $1
+        AND c.status = 'active'
+        AND c.context_type <> 'support'
+        AND COALESCE(u.is_blocked, FALSE) = FALSE
+      ORDER BY c.updated_at DESC
+      ${limitClause}
+    `,
+    values
+  )
+  return result.rows
+    .map((row) => ({
+      chatId: parseOptionalInt(row.chatId),
+      clientId: normalizeText(row.clientId),
+    }))
+    .filter((row) => Number.isInteger(row.chatId) && row.clientId)
+}
+
+const sendMarketingChatBroadcast = async ({ masterId, text, limit }) => {
+  const targets = await fetchChatBroadcastTargets({ masterId, limit })
+  if (targets.length === 0) {
+    return { total: 0, sent: 0, failed: 0 }
+  }
+  await ensureUser(masterId)
+
+  let sent = 0
+  let failed = 0
+  for (const target of targets) {
+    try {
+      const messageResult = await insertChatTextMessage({
+        chatId: target.chatId,
+        senderId: masterId,
+        body: text,
+        meta: { kind: 'marketing', channel: 'chat' },
+      })
+      const messagePayload = {
+        id: messageResult.id,
+        chatId: target.chatId,
+        senderId: masterId,
+        type: 'text',
+        body: text,
+        meta: { kind: 'marketing', channel: 'chat' },
+        attachmentUrl: null,
+        createdAt: messageResult.createdAt,
+      }
+      void notifyChatMembers(target.chatId, {
+        type: 'message:new',
+        chatId: target.chatId,
+        message: messagePayload,
+      })
+      const preview = text.length > 120 ? `${text.slice(0, 117)}...` : text
+      void sendChatNotification({
+        chatId: target.chatId,
+        senderId: masterId,
+        preview,
+        audience: 'client',
+      })
+      sent += 1
+    } catch (error) {
+      failed += 1
+    }
+  }
+
+  return { total: targets.length, sent, failed }
+}
+
 app.post('/api/pro/marketing/broadcast', async (req, res) => {
   const masterId = normalizeText(req.body?.userId ?? req.body?.masterId)
   if (!masterId) {
@@ -7103,8 +7330,125 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
     res.status(400).json({ error: 'text_too_long' })
     return
   }
-  if (!telegramBotToken) {
-    res.status(400).json({ error: 'bot_not_configured' })
+
+  const includeUnsubscribe = Boolean(req.body?.includeUnsubscribe)
+  const rawLimit = parseOptionalInt(req.body?.limit)
+  const limit =
+    rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
+
+  try {
+    const result = await sendMarketingBotBroadcast({
+      masterId,
+      text,
+      includeUnsubscribe,
+      limit,
+    })
+    res.json({ ok: true, ...result })
+  } catch (error) {
+    if (error?.code === 'bot_not_configured') {
+      res.status(400).json({ error: 'bot_not_configured' })
+      return
+    }
+    console.error('POST /api/pro/marketing/broadcast failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/pro/marketing/summary', async (req, res) => {
+  const masterId = normalizeText(req.query.userId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          (
+            SELECT COUNT(*)::int
+            FROM master_marketing_subscriptions mms
+            JOIN users u ON u.user_id = mms.subscriber_id
+            WHERE mms.master_id = $1
+              AND mms.opt_in = TRUE
+              AND COALESCE(u.is_blocked, FALSE) = FALSE
+          ) AS "botOptInCount",
+          (
+            SELECT COUNT(*)::int
+            FROM chats c
+            JOIN users u ON u.user_id = c.client_id
+            WHERE c.master_id = $1
+              AND c.status = 'active'
+              AND c.context_type <> 'support'
+              AND COALESCE(u.is_blocked, FALSE) = FALSE
+          ) AS "chatCount"
+      `,
+      [masterId]
+    )
+    const row = result.rows[0] ?? {}
+    res.json({
+      botOptInCount: Number(row.botOptInCount) || 0,
+      chatCount: Number(row.chatCount) || 0,
+    })
+  } catch (error) {
+    console.error('GET /api/pro/marketing/summary failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/pro/marketing/campaigns', async (req, res) => {
+  const masterId = normalizeText(req.query.userId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  const rawLimit = parseOptionalInt(req.query.limit)
+  const limit = rawLimit && rawLimit > 0 ? Math.min(rawLimit, 30) : 20
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          channel,
+          body,
+          include_unsubscribe AS "includeUnsubscribe",
+          total,
+          sent,
+          failed,
+          created_at AS "createdAt"
+        FROM marketing_campaigns
+        WHERE master_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+      `,
+      [masterId, limit]
+    )
+    res.json({ items: result.rows })
+  } catch (error) {
+    console.error('GET /api/pro/marketing/campaigns failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
+  const masterId = normalizeText(req.body?.userId ?? req.body?.masterId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  const channel = normalizeText(req.body?.channel)
+  if (channel !== 'bot' && channel !== 'chat') {
+    res.status(400).json({ error: 'channel_invalid' })
+    return
+  }
+  const text = normalizeText(req.body?.text)
+  if (!text) {
+    res.status(400).json({ error: 'text_required' })
+    return
+  }
+  if (text.length > MARKETING_TEXT_LIMIT) {
+    res.status(400).json({ error: 'text_too_long' })
     return
   }
 
@@ -7112,64 +7456,58 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
   const rawLimit = parseOptionalInt(req.body?.limit)
   const limit =
     rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
-  const unsubscribeLink =
-    includeUnsubscribe && telegramWebAppUrl
-      ? buildStartAppUrl(telegramWebAppUrl, `unsub_${masterId}`)
-      : ''
-  const payloadText = unsubscribeLink
-    ? `${text}\n\nОтписаться: ${unsubscribeLink}`
-    : text
 
   try {
-    const values = limit ? [masterId, limit] : [masterId]
-    const limitClause = limit ? 'LIMIT $2' : ''
-    const result = await pool.query(
+    const result =
+      channel === 'bot'
+        ? await sendMarketingBotBroadcast({
+            masterId,
+            text,
+            includeUnsubscribe,
+            limit,
+          })
+        : await sendMarketingChatBroadcast({ masterId, text, limit })
+
+    const campaignResult = await pool.query(
       `
-        SELECT mms.subscriber_id AS "userId"
-        FROM master_marketing_subscriptions mms
-        JOIN users u ON u.user_id = mms.subscriber_id
-        WHERE mms.master_id = $1
-          AND mms.opt_in = TRUE
-          AND COALESCE(u.is_blocked, FALSE) = FALSE
-        ORDER BY mms.created_at DESC
-        ${limitClause}
+        INSERT INTO marketing_campaigns (
+          master_id,
+          channel,
+          body,
+          include_unsubscribe,
+          total,
+          sent,
+          failed
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING
+          id,
+          channel,
+          body,
+          include_unsubscribe AS "includeUnsubscribe",
+          total,
+          sent,
+          failed,
+          created_at AS "createdAt"
       `,
-      values
+      [
+        masterId,
+        channel,
+        text,
+        includeUnsubscribe && channel === 'bot',
+        result.total,
+        result.sent,
+        result.failed,
+      ]
     )
-
-    const recipients = result.rows
-      .map((row) => normalizeText(row.userId))
-      .filter(Boolean)
-
-    if (recipients.length === 0) {
-      res.json({ ok: true, total: 0, sent: 0, failed: 0 })
+    const campaign = campaignResult.rows[0]
+    res.json({ ok: true, campaign, stats: result })
+  } catch (error) {
+    if (error?.code === 'bot_not_configured') {
+      res.status(400).json({ error: 'bot_not_configured' })
       return
     }
-
-    let sent = 0
-    let failed = 0
-    for (let index = 0; index < recipients.length; index += MARKETING_BROADCAST_CHUNK) {
-      const chunk = recipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
-      const results = await Promise.all(
-        chunk.map((recipientId) =>
-          sendTelegramMessage({
-            recipientId,
-            text: payloadText,
-          })
-        )
-      )
-      results.forEach((ok) => {
-        if (ok) {
-          sent += 1
-        } else {
-          failed += 1
-        }
-      })
-    }
-
-    res.json({ ok: true, total: recipients.length, sent, failed })
-  } catch (error) {
-    console.error('POST /api/pro/marketing/broadcast failed:', error)
+    console.error('POST /api/pro/marketing/campaigns/send failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
