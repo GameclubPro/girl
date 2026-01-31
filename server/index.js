@@ -7232,6 +7232,19 @@ const sendMarketingBotBroadcast = async ({
     error.code = 'bot_not_configured'
     throw error
   }
+  const masterName = await resolveUserDisplayName(masterId)
+  const senderPrefix = masterName
+    ? `Сообщение от мастера ${masterName}.`
+    : 'Сообщение от мастера.'
+  const maxBodyLength = MARKETING_TEXT_LIMIT - senderPrefix.length - 1
+  let bodyText = text
+  if (maxBodyLength > 0 && bodyText.length > maxBodyLength) {
+    const trimmedLength = Math.max(0, maxBodyLength - 1)
+    bodyText = `${bodyText.slice(0, trimmedLength).trimEnd()}…`
+  }
+  const payloadText =
+    maxBodyLength > 0 ? `${senderPrefix}\n${bodyText}` : senderPrefix
+
   const bookingLink =
     includeLink && telegramWebAppUrl
       ? buildStartAppUrl(telegramWebAppUrl, `book_${masterId}`)
@@ -7247,7 +7260,6 @@ const sendMarketingBotBroadcast = async ({
   if (unsubscribeLink) {
     buttons.push({ text: 'Отписаться', webAppUrl: unsubscribeLink })
   }
-  const payloadText = text
   const recipients = await fetchMarketingRecipients({ masterId, limit })
 
   if (recipients.length === 0) {
