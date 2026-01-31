@@ -23917,9 +23917,9 @@ h2 {
   );
   border: 1px solid rgba(var(--surface-rgb), 0.9);
   border-radius: 22px;
-  padding: 12px 14px 14px;
+  padding: 8px 14px 14px;
   padding-right: calc(14px + var(--collection-card-content-safe));
-  min-height: 128px;
+  min-height: 142px;
   display: flex;
   flex-direction: column;
   gap: 10px;
