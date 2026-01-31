@@ -3486,12 +3486,7 @@
   --tile-accent: var(--accent-rgb);
 }
 
-.pro-cabinet-nav-card.is-campaigns,
 .pro-cabinet-nav-card.is-marketing {
-  --tile-accent: var(--accent-rgb);
-}
-
-.pro-cabinet-nav-card.is-reminders {
   --tile-accent: var(--accent-rgb);
 }
 
