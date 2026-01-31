@@ -23919,7 +23919,7 @@ h2 {
   border-radius: 22px;
   padding: 12px 14px 14px;
   padding-right: calc(14px + var(--collection-card-content-safe));
-  min-height: 120px;
+  min-height: 128px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -24008,16 +24008,14 @@ h2 {
   gap: 8px;
   width: calc(100% + 18px);
   margin-right: -18px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: rgba(var(--paper-rgb), 0.92);
   color: var(--ink);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
   box-shadow:
     inset 0 1px 0 rgba(var(--paper-rgb), 0.7),
     0 6px 14px rgba(var(--shadow-rgb), 0.14);
@@ -24027,11 +24025,11 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
+  min-width: 24px;
+  height: 24px;
   border-radius: 999px;
   background: rgba(var(--paper-rgb), 0.96);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
   flex: 0 0 auto;
 }
@@ -24039,8 +24037,6 @@ h2 {
 .collection-title-text {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .collection-meta {
