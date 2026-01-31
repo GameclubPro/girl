@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { useProCabinetData } from '../hooks/useProCabinetData'
 import { buildBookingStartParam } from '../utils/deeplink'
-import { buildShareLink, copyToClipboard } from '../utils/telegramShare'
+import { buildShareLink } from '../utils/telegramShare'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MARKETING_TEXT_LIMIT = 800
 const CAMPAIGN_LIMIT = 12
-const DISCOUNT_OPTIONS = [5, 10, 15]
+const DISCOUNT_OPTIONS = [0, 5, 10, 15]
 const REMINDER_WINDOWS = [30, 60] as const
 
 type ReminderWindow = (typeof REMINDER_WINDOWS)[number]
@@ -33,9 +33,7 @@ type Template = {
   id: string
   title: string
   description: string
-  pill?: string
   text: string
-  isPromo?: boolean
 }
 
 type ProMarketingScreenProps = {
@@ -213,42 +211,13 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     return { count30, count60 }
   }, [bookingStats.clientSummaries])
 
-  const recommendedTemplateId = useMemo(() => {
-    if (bookingStats.upcomingWeek < 3) return 'fill-week'
-    return 'promo-week'
-  }, [bookingStats.upcomingWeek])
-
-  const broadcastTemplates: Template[] = useMemo(() => {
-    const fillWeekText = `Открылись новые окна для записи ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
-    const promoText = `На этой неделе действует спец-условие: -${discountPercent}% на ближайшие окна ${masterLabel}. Если интересно, выберите время по кнопке ниже.`
-
-    return [
-      {
-        id: 'fill-week',
-        title: 'Свободные окна недели',
-        description: 'Короткое сообщение о доступных слотах.',
-        pill: `На неделе: ${bookingStats.upcomingWeek}`,
-        text: fillWeekText,
-      },
-      {
-        id: 'promo-week',
-        title: 'Акция недели',
-        description: 'Мягкое промо без агрессивных скидок.',
-        pill: `Скидка ${discountPercent}%`,
-        text: promoText,
-        isPromo: true,
-      },
-    ]
-  }, [
-    bookingStats.upcomingWeek,
-    discountPercent,
-    masterLabel,
-  ])
-
   const reminderTemplates: Template[] = useMemo(() => {
     const friendlyText = `Привет! Давно не виделись ${masterLabel}. Если хотите вернуться, выберите удобное время по кнопке ниже.`
     const careText = `Напоминаем о себе ${masterLabel}: появились свободные окна. Если удобно, выберите время по кнопке ниже.`
-    const bonusText = `Для возвращения действует небольшой бонус: -${discountPercent}% на ближайшую запись ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
+    const bonusText =
+      discountPercent > 0
+        ? `Для возвращения действует небольшой бонус: -${discountPercent}% на ближайшую запись ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
+        : `Для возвращения действует небольшой бонус ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
 
     return [
       {
@@ -268,7 +237,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         title: 'С бонусом',
         description: `Скидка ${discountPercent}% для возвращения.`,
         text: bonusText,
-        isPromo: true,
       },
     ]
   }, [discountPercent, masterLabel])
@@ -329,27 +297,14 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
   const reminderHint = `Напомним клиентам, которые не были ${reminderWindow}+ дней.`
 
-  const handleInsertTemplate = useCallback(
-    (tab: 'broadcast' | 'reminder', template: Template) => {
-      if (tab === 'broadcast') {
-        setBroadcastDraft(template.text)
-      } else {
-        setReminderDraft(template.text)
-        setReminderTone(template.id)
-        setReminderTouched(true)
-      }
+  const handleInsertReminderTemplate = useCallback(
+    (template: Template) => {
+      setReminderDraft(template.text)
+      setReminderTone(template.id)
+      setReminderTouched(true)
       showStatus('Текст вставлен в сообщение.')
     },
     [showStatus]
-  )
-
-  const handleCopyTemplate = useCallback(
-    async (template: Template) => {
-      const payload = shareLink ? `${template.text}\n${shareLink}` : template.text
-      const success = await copyToClipboard(payload.trim())
-      showStatus(success ? 'Текст скопирован.' : 'Не удалось скопировать.', !success)
-    },
-    [shareLink, showStatus]
   )
 
   const handleSend = useCallback(async () => {
@@ -567,46 +522,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               </button>
             </div>
 
-            <div className="pro-marketing-templates">
-              <p className="pro-marketing-section">Шаблоны</p>
-              <div className="pro-marketing-template-grid">
-                {broadcastTemplates.map((template) => (
-                  <section
-                    key={template.id}
-                    className={`pro-marketing-template-card${
-                      template.id === recommendedTemplateId ? ' is-recommended' : ''
-                    }`}
-                  >
-                    <div className="pro-marketing-template-head">
-                      <div>
-                        <h3 className="pro-marketing-template-title">{template.title}</h3>
-                        <p className="pro-marketing-template-desc">
-                          {template.description}
-                        </p>
-                      </div>
-                      <button
-                        className="pro-marketing-template-action"
-                        type="button"
-                        onClick={() => handleInsertTemplate('broadcast', template)}
-                      >
-                        Вставить
-                      </button>
-                    </div>
-                    {template.pill && (
-                      <span className="pro-detail-pill is-ghost">{template.pill}</span>
-                    )}
-                    <button
-                      className="pro-marketing-template-link"
-                      type="button"
-                      onClick={() => void handleCopyTemplate(template)}
-                    >
-                      Скопировать текст
-                    </button>
-                  </section>
-                ))}
-              </div>
-            </div>
-
             <div className="pro-marketing-textarea-wrap">
               <textarea
                 className={`pro-marketing-textarea${isTextTooLong ? ' is-error' : ''}`}
@@ -635,7 +550,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     type="button"
                     onClick={() => setDiscountPercent(value)}
                   >
-                    -{value}%
+                    {value === 0 ? '— без скидки' : `-${value}%`}
                   </button>
                 ))}
               </div>
@@ -756,7 +671,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                       <button
                         className="pro-marketing-template-action"
                         type="button"
-                        onClick={() => handleInsertTemplate('reminder', template)}
+                        onClick={() => handleInsertReminderTemplate(template)}
                       >
                         Вставить
                       </button>
@@ -797,7 +712,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     type="button"
                     onClick={() => setDiscountPercent(value)}
                   >
-                    -{value}%
+                    {value === 0 ? '— без скидки' : `-${value}%`}
                   </button>
                 ))}
               </div>
