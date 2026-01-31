@@ -879,7 +879,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 aria-pressed={repeatEnabled}
                 disabled={repeatLoading || repeatSaving}
               >
-                {repeatSaving ? '...' : repeatEnabled ? 'Вкл' : 'Выкл'}
+                <span className="pro-marketing-auto-toggle-text">
+                  {repeatSaving ? '...' : repeatEnabled ? 'Вкл' : 'Выкл'}
+                </span>
               </button>
             </div>
             <p className="pro-marketing-repeat-note">
@@ -974,7 +976,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
             <div className="pro-marketing-repeat-surface">
               <p className="pro-marketing-section">Сроки</p>
-              <div className="pro-marketing-interval-card is-base">
+              <div className="pro-marketing-interval-card">
                 <div className="pro-marketing-interval-meta">
                   <span className="pro-marketing-interval-title">
                     Базовый интервал
