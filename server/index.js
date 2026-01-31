@@ -47,6 +47,9 @@ const OUTCOME_PROMPT_ACTION_WINDOW_HOURS = 48
 const BOOKING_DURATION_FALLBACK_MINUTES = 60
 const BOOKING_FREE_CANCEL_HOURS = 12
 const BOOKING_PRICE_OFFER_HOURS = 12
+const MARKETING_TEXT_LIMIT = 800
+const MARKETING_BROADCAST_CHUNK = 25
+const MARKETING_BROADCAST_MAX = 5000
 const CHAT_MESSAGE_DEFAULT_LIMIT = 30
 const CHAT_MESSAGE_MAX_LIMIT = 80
 const CHAT_STREAM_PATH = '/api/chats/stream'
@@ -983,8 +986,8 @@ const resolveUserDisplayName = async (userId) => {
 }
 
 const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl }) => {
-  if (!telegramBotToken) return
-  if (typeof fetch !== 'function') return
+  if (!telegramBotToken) return false
+  if (typeof fetch !== 'function') return false
   const button = webAppUrl
     ? { text: 'Открыть чат', web_app: { url: webAppUrl } }
     : url
@@ -1004,13 +1007,20 @@ const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl }) => {
   }
 
   try {
-    await fetch(`${telegramApiBase}/bot${telegramBotToken}/sendMessage`, {
+    const response = await fetch(`${telegramApiBase}/bot${telegramBotToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
+    if (!response.ok) {
+      return false
+    }
+    const data = await response.json().catch(() => null)
+    if (data && data.ok === false) return false
+    return true
   } catch (error) {
     console.error('Telegram notification failed:', error)
+    return false
   }
 }
 
@@ -3465,6 +3475,27 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    ALTER TABLE master_followers
+    ADD COLUMN IF NOT EXISTS marketing_opt_in BOOLEAN NOT NULL DEFAULT TRUE;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_followers
+    ADD COLUMN IF NOT EXISTS marketing_opt_in_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_followers
+    ADD COLUMN IF NOT EXISTS marketing_opt_out_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    UPDATE master_followers
+    SET marketing_opt_in_at = COALESCE(marketing_opt_in_at, created_at)
+    WHERE marketing_opt_in = TRUE
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS master_profile_views (
       master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
       viewer_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -4797,9 +4828,19 @@ app.post('/api/masters/:userId/follow', async (req, res) => {
   try {
     await pool.query(
       `
-        INSERT INTO master_followers (master_id, follower_id)
-        VALUES ($1, $2)
-        ON CONFLICT DO NOTHING
+        INSERT INTO master_followers (
+          master_id,
+          follower_id,
+          marketing_opt_in,
+          marketing_opt_in_at,
+          marketing_opt_out_at
+        )
+        VALUES ($1, $2, TRUE, NOW(), NULL)
+        ON CONFLICT (master_id, follower_id)
+        DO UPDATE SET
+          marketing_opt_in = TRUE,
+          marketing_opt_in_at = NOW(),
+          marketing_opt_out_at = NULL
       `,
       [masterId, followerId]
     )
@@ -4833,6 +4874,40 @@ app.post('/api/masters/:userId/unfollow', async (req, res) => {
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/masters/:userId/unfollow failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/:userId/marketing/opt-out', async (req, res) => {
+  const masterId = normalizeText(req.params.userId)
+  const followerId = normalizeText(req.body?.userId ?? req.body?.followerId)
+  if (!masterId || !followerId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (masterId === followerId) {
+    res.status(400).json({ error: 'self_opt_out_forbidden' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE master_followers
+        SET marketing_opt_in = FALSE,
+            marketing_opt_out_at = NOW()
+        WHERE master_id = $1 AND follower_id = $2
+        RETURNING master_id
+      `,
+      [masterId, followerId]
+    )
+    if (!result.rows.length) {
+      res.status(404).json({ error: 'follow_not_found' })
+      return
+    }
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/masters/:userId/marketing/opt-out failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -6900,6 +6975,92 @@ app.get('/api/pro/analytics', async (req, res) => {
     res.json(payload)
   } catch (error) {
     console.error('GET /api/pro/analytics failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/pro/marketing/broadcast', async (req, res) => {
+  const masterId = normalizeText(req.body?.userId ?? req.body?.masterId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  const text = normalizeText(req.body?.text)
+  if (!text) {
+    res.status(400).json({ error: 'text_required' })
+    return
+  }
+  if (text.length > MARKETING_TEXT_LIMIT) {
+    res.status(400).json({ error: 'text_too_long' })
+    return
+  }
+  if (!telegramBotToken) {
+    res.status(400).json({ error: 'bot_not_configured' })
+    return
+  }
+
+  const includeUnsubscribe = Boolean(req.body?.includeUnsubscribe)
+  const rawLimit = parseOptionalInt(req.body?.limit)
+  const limit =
+    rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
+  const unsubscribeLink =
+    includeUnsubscribe && telegramWebAppUrl
+      ? buildStartAppUrl(telegramWebAppUrl, `unsub_${masterId}`)
+      : ''
+  const payloadText = unsubscribeLink
+    ? `${text}\n\nОтписаться: ${unsubscribeLink}`
+    : text
+
+  try {
+    const values = limit ? [masterId, limit] : [masterId]
+    const limitClause = limit ? 'LIMIT $2' : ''
+    const result = await pool.query(
+      `
+        SELECT mf.follower_id AS "userId"
+        FROM master_followers mf
+        JOIN users u ON u.user_id = mf.follower_id
+        WHERE mf.master_id = $1
+          AND mf.marketing_opt_in = TRUE
+          AND COALESCE(u.is_blocked, FALSE) = FALSE
+        ORDER BY mf.created_at DESC
+        ${limitClause}
+      `,
+      values
+    )
+
+    const recipients = result.rows
+      .map((row) => normalizeText(row.userId))
+      .filter(Boolean)
+
+    if (recipients.length === 0) {
+      res.json({ ok: true, total: 0, sent: 0, failed: 0 })
+      return
+    }
+
+    let sent = 0
+    let failed = 0
+    for (let index = 0; index < recipients.length; index += MARKETING_BROADCAST_CHUNK) {
+      const chunk = recipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
+      const results = await Promise.all(
+        chunk.map((recipientId) =>
+          sendTelegramMessage({
+            recipientId,
+            text: payloadText,
+          })
+        )
+      )
+      results.forEach((ok) => {
+        if (ok) {
+          sent += 1
+        } else {
+          failed += 1
+        }
+      })
+    }
+
+    res.json({ ok: true, total: recipients.length, sent, failed })
+  } catch (error) {
+    console.error('POST /api/pro/marketing/broadcast failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

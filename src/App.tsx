@@ -21,7 +21,11 @@ import type {
   UserLocation,
 } from './types/app'
 import { isGeoFailure, requestPreciseLocation } from './utils/geo'
-import { parseBookingStartParam, parseChatStartParam } from './utils/deeplink'
+import {
+  parseBookingStartParam,
+  parseChatStartParam,
+  parseUnsubscribeStartParam,
+} from './utils/deeplink'
 import {
   loadFavorites,
   saveFavorites,
@@ -603,9 +607,46 @@ function App() {
       : null
     const parsedChatId = parseChatStartParam(decodedParam)
     const parsedMasterId = parseBookingStartParam(decodedParam)
+    const parsedUnsubMasterId = parseUnsubscribeStartParam(decodedParam)
     const rawChatId = parsedChatId ?? queryChat?.trim() ?? null
     const parsedChatNumber = rawChatId ? Number(rawChatId) : null
     const masterId = parsedMasterId ?? queryMaster?.trim() ?? null
+
+    if (parsedUnsubMasterId) {
+      deepLinkHandledRef.current = true
+      setRole('client')
+      const targetMasterId = parsedUnsubMasterId
+      const runOptOut = async () => {
+        if (!userId) {
+          window.alert('Не удалось подтвердить пользователя.')
+          navigate('client', { reset: true })
+          return
+        }
+        try {
+          const response = await fetch(
+            `${apiBase}/api/masters/${encodeURIComponent(
+              targetMasterId
+            )}/marketing/opt-out`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId }),
+            }
+          )
+          if (response.ok) {
+            window.alert('Вы отписались от предложений мастера.')
+          } else {
+            window.alert('Не удалось отписаться. Попробуйте еще раз.')
+          }
+        } catch (error) {
+          window.alert('Не удалось отписаться. Попробуйте еще раз.')
+        } finally {
+          navigate('client', { reset: true })
+        }
+      }
+      void runOptOut()
+      return
+    }
 
     if (parsedChatNumber && Number.isInteger(parsedChatNumber)) {
       deepLinkHandledRef.current = true
@@ -624,7 +665,7 @@ function App() {
     setBookingPreferredCategoryId(null)
     setBookingReturnView('client-master-profile')
     navigate('booking', { reset: true })
-  }, [navigate])
+  }, [apiBase, navigate, userId])
 
   const handleDistrictChange = (value: number | null) => {
     setDistrictId(value)

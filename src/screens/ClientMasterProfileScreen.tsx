@@ -1113,6 +1113,11 @@ export const ClientMasterProfileScreen = ({
                     </span>
                   </button>
                 </div>
+                {!isFavorite && (
+                  <p className="master-profile-follow-note">
+                    Подписка включает предложения от мастера.
+                  </p>
+                )}
                 <div className="pro-profile-ig-stats">
                   {profileStats.map((stat) => (
                     <button
