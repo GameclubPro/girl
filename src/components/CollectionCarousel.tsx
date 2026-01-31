@@ -291,11 +291,11 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
               }}
             >
               <span className="collection-body">
-                <span className="collection-title">
-                  <span className="collection-title-badge" aria-hidden="true">
+                <span className="collection-title-badge">
+                  <span className="collection-title-emoji" aria-hidden="true">
                     {item.badge}
                   </span>
-                  {item.title}
+                  <span className="collection-title-text">{item.title}</span>
                 </span>
                 <span className="collection-meta">{item.meta}</span>
               </span>
