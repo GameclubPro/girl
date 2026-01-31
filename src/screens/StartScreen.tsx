@@ -1,4 +1,4 @@
-import brandHeroImage from '../assets/kiven-brand-hero.webp'
+import brandHeroImage from '../assets/start-logo.webp'
 import girlOneImage from '../assets/kiven-girl-1.webp'
 import girlTwoImage from '../assets/kiven-girl-2.webp'
 import clientRoleImage from '../assets/start-role-client-new.webp'
