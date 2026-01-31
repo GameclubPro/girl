@@ -46,16 +46,16 @@ export const ProBottomNav = ({
   return (
     <nav className="pro-bottom-nav" aria-label="Навигация мастера">
       <button
-        className={`pro-nav-item${active === 'cabinet' ? ' is-active' : ''}`}
+        className={`pro-nav-item${active === 'profile' ? ' is-active' : ''}`}
         type="button"
-        onClick={handleClick('cabinet', onCabinet)}
-        onPointerDown={() => handlePreload('cabinet')}
-        aria-current={active === 'cabinet' ? 'page' : undefined}
+        onClick={handleClick('profile', onProfile)}
+        onPointerDown={() => handlePreload('profile')}
+        aria-current={active === 'profile' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">
-          <IconNavCabinet />
+          <IconNavProfile />
         </span>
-        <span className="pro-nav-label">Кабинет</span>
+        <span className="pro-nav-label">Профиль</span>
       </button>
       <button
         className={`pro-nav-item${active === 'requests' ? ' is-active' : ''}`}
@@ -82,16 +82,16 @@ export const ProBottomNav = ({
         <span className="pro-nav-label">Чаты</span>
       </button>
       <button
-        className={`pro-nav-item${active === 'profile' ? ' is-active' : ''}`}
+        className={`pro-nav-item${active === 'cabinet' ? ' is-active' : ''}`}
         type="button"
-        onClick={handleClick('profile', onProfile)}
-        onPointerDown={() => handlePreload('profile')}
-        aria-current={active === 'profile' ? 'page' : undefined}
+        onClick={handleClick('cabinet', onCabinet)}
+        onPointerDown={() => handlePreload('cabinet')}
+        aria-current={active === 'cabinet' ? 'page' : undefined}
       >
         <span className="pro-nav-icon" aria-hidden="true">
-          <IconNavProfile />
+          <IconNavCabinet />
         </span>
-        <span className="pro-nav-label">Профиль</span>
+        <span className="pro-nav-label">Кабинет</span>
       </button>
     </nav>
   )
