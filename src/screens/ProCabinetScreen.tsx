@@ -524,31 +524,24 @@ export const ProCabinetScreen = ({
               </div>
             </div>
           </button>
-          <button
-            className="pro-cabinet-nav-card is-support animate delay-7"
-            type="button"
-            onClick={onOpenSupport}
-          >
-            {tapHint}
-            <div className="pro-cabinet-nav-head">
-              <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconSupport />
-              </span>
-              <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Сервис</span>
-                <span className="pro-cabinet-nav-title">Поддержка</span>
-              </div>
-            </div>
-            <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-support">
-                <span className="pro-cabinet-nav-support-pill">24/7</span>
-                <span className="pro-cabinet-nav-support-text">
-                  Поможем с записью, оплатой и профилем.
-                </span>
-              </div>
-            </div>
-          </button>
         </div>
+
+        <button
+          className="pro-cabinet-support-card animate delay-7"
+          type="button"
+          onClick={onOpenSupport}
+        >
+          <span className="pro-cabinet-support-icon" aria-hidden="true">
+            <IconSupport />
+          </span>
+          <span className="pro-cabinet-support-body">
+            <span className="pro-cabinet-support-title">Поддержка</span>
+            <span className="pro-cabinet-support-subtitle">
+              Ответим быстро и поможем с записью или оплатой.
+            </span>
+          </span>
+          <span className="pro-cabinet-support-action">Написать</span>
+        </button>
       </div>
 
       <ProBottomNav
