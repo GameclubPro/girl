@@ -24011,13 +24011,26 @@ h2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  width: calc(100% + 18px);
+  padding-right: 18px;
 }
 
-.collection-title-emoji {
-  display: inline-block;
-  font-size: 18px;
-  line-height: 1;
+.collection-title-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
   margin-right: 8px;
+  border-radius: 999px;
+  background: rgba(var(--paper-rgb), 0.92);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.7),
+    0 6px 14px rgba(var(--shadow-rgb), 0.14);
 }
 
 .collection-meta {

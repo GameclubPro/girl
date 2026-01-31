@@ -69,7 +69,7 @@ export const collectionItems = [
     categoryId: null,
     cornerImage: collectionVerifiedArt,
     cornerImagePosition: 'right',
-    cornerImageSize: 'clamp(90px, 32vw, 140px)',
+    cornerImageSize: 'clamp(70px, 26vw, 120px)',
     cornerImageRight: '10px',
     cornerImageRotate: '8deg',
   },
