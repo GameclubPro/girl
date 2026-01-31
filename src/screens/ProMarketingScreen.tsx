@@ -4,13 +4,22 @@ import { useProCabinetData } from '../hooks/useProCabinetData'
 import { buildBookingStartParam } from '../utils/deeplink'
 import { buildShareLink } from '../utils/telegramShare'
 
-const DAY_MS = 24 * 60 * 60 * 1000
 const MARKETING_TEXT_LIMIT = 800
 const CAMPAIGN_LIMIT = 12
 const DISCOUNT_OPTIONS = [0, 5, 10, 15]
-const REMINDER_WINDOWS = [30, 60] as const
-
-type ReminderWindow = (typeof REMINDER_WINDOWS)[number]
+const REPEAT_INTERVALS = {
+  'beauty-nails': 21,
+  'brows-lashes': 21,
+  hair: 35,
+  'cosmetology-care': 30,
+  default: 30,
+} as const
+const REPEAT_CATEGORY_ORDER = [
+  'beauty-nails',
+  'brows-lashes',
+  'hair',
+  'cosmetology-care',
+] as const
 
 type MarketingSummary = {
   botOptInCount: number
@@ -34,6 +43,15 @@ type Template = {
   title: string
   description: string
   text: string
+}
+
+type RepeatSettings = {
+  enabled: boolean
+  channel: 'bot' | 'chat'
+  includeLink: boolean
+  includeUnsubscribe: boolean
+  intervals: Record<string, number>
+  template?: string | null
 }
 
 type ProMarketingScreenProps = {
@@ -69,6 +87,16 @@ const formatAudienceLabel = (value?: string | null) => {
   return 'Аудитория'
 }
 
+const categoryLabelOverrides: Record<string, string> = {
+  'beauty-nails': 'Ногти',
+  'brows-lashes': 'Брови и ресницы',
+  hair: 'Волосы',
+  'cosmetology-care': 'Уход за лицом',
+}
+
+const getCategoryLabel = (categoryId: string) =>
+  categoryLabelOverrides[categoryId] ?? categoryId
+
 export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const {
     apiBase,
@@ -79,10 +107,8 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     onViewChats,
     onEditProfile,
   } = props
-  const { bookingStats, lastUpdated, isLoading, combinedError } = useProCabinetData(
-    apiBase,
-    userId
-  )
+  const { bookings, bookingStats, lastUpdated, isLoading, combinedError } =
+    useProCabinetData(apiBase, userId)
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
   const bookingStartParam = useMemo(() => buildBookingStartParam(userId), [userId])
@@ -93,22 +119,21 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const displayName = displayNameFallback.trim()
   const masterLabel = displayName ? `у мастера ${displayName}` : 'у мастера'
 
-  const [activeTab, setActiveTab] = useState<'broadcast' | 'reminder'>('broadcast')
-  const [channel, setChannel] = useState<'bot' | 'chat'>('bot')
+  const [activeTab, setActiveTab] = useState<'broadcast' | 'repeat'>('broadcast')
+  const [broadcastChannel, setBroadcastChannel] = useState<'bot' | 'chat'>('bot')
   const [discountPercent, setDiscountPercent] = useState(10)
   const [broadcastAudience, setBroadcastAudience] = useState<'all' | 'repeat'>(
     'all'
   )
   const [broadcastDraft, setBroadcastDraft] = useState('')
-  const [reminderDraft, setReminderDraft] = useState('')
-  const [reminderTouched, setReminderTouched] = useState(false)
-  const [reminderWindow, setReminderWindow] = useState<ReminderWindow>(30)
-  const [reminderTone, setReminderTone] = useState('friendly')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [audienceOpen, setAudienceOpen] = useState(false)
   const [broadcastTemplateOpen, setBroadcastTemplateOpen] = useState(false)
-  const [reminderTemplateOpen, setReminderTemplateOpen] = useState(false)
   const [broadcastTemplateId, setBroadcastTemplateId] = useState<string | null>(null)
+  const [repeatSettings, setRepeatSettings] = useState<RepeatSettings | null>(null)
+  const [repeatLoading, setRepeatLoading] = useState(true)
+  const [repeatError, setRepeatError] = useState('')
+  const [repeatSaving, setRepeatSaving] = useState(false)
 
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null)
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([])
@@ -121,7 +146,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const marketingAbortRef = useRef<AbortController | null>(null)
   const audienceRef = useRef<HTMLDivElement | null>(null)
   const broadcastTemplateRef = useRef<HTMLDivElement | null>(null)
-  const reminderTemplateRef = useRef<HTMLDivElement | null>(null)
 
   const showStatus = useCallback((nextStatus: string, isError = false) => {
     if (statusTimerRef.current) {
@@ -152,21 +176,18 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   }, [])
 
   useEffect(() => {
-    if (!audienceOpen && !broadcastTemplateOpen && !reminderTemplateOpen) return
+    if (!audienceOpen && !broadcastTemplateOpen) return
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node
       if (audienceRef.current?.contains(target)) return
       if (broadcastTemplateRef.current?.contains(target)) return
-      if (reminderTemplateRef.current?.contains(target)) return
       setAudienceOpen(false)
       setBroadcastTemplateOpen(false)
-      setReminderTemplateOpen(false)
     }
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setAudienceOpen(false)
         setBroadcastTemplateOpen(false)
-        setReminderTemplateOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -175,15 +196,12 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       document.removeEventListener('mousedown', handleClick)
       document.removeEventListener('keydown', handleKey)
     }
-  }, [audienceOpen, broadcastTemplateOpen, reminderTemplateOpen])
+  }, [audienceOpen, broadcastTemplateOpen])
 
   useEffect(() => {
     if (activeTab !== 'broadcast') {
       setAudienceOpen(false)
       setBroadcastTemplateOpen(false)
-    }
-    if (activeTab !== 'reminder') {
-      setReminderTemplateOpen(false)
     }
   }, [activeTab])
 
@@ -196,6 +214,8 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     marketingAbortRef.current = controller
     setMarketingLoading(true)
     setMarketingError('')
+    setRepeatLoading(true)
+    setRepeatError('')
 
     try {
       const summaryUrl = `${apiBase}/api/pro/marketing/summary?userId=${encodeURIComponent(
@@ -204,31 +224,70 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       const campaignsUrl = `${apiBase}/api/pro/marketing/campaigns?userId=${encodeURIComponent(
         userId
       )}&limit=${CAMPAIGN_LIMIT}`
-      const [summaryRes, campaignsRes] = await Promise.all([
+      const repeatUrl = `${apiBase}/api/pro/marketing/repeat-settings?userId=${encodeURIComponent(
+        userId
+      )}`
+      const [summaryRes, campaignsRes, repeatRes] = await Promise.all([
         fetch(summaryUrl, { signal: controller.signal }),
         fetch(campaignsUrl, { signal: controller.signal }),
+        fetch(repeatUrl, { signal: controller.signal }),
       ])
 
-      if (!summaryRes.ok || !campaignsRes.ok) {
-        throw new Error('marketing_load_failed')
+      if (summaryRes.ok) {
+        const summaryPayload = await summaryRes.json().catch(() => null)
+        if (!controller.signal.aborted) {
+          setMarketingSummary({
+            botOptInCount: Number(summaryPayload?.botOptInCount) || 0,
+            chatCount: Number(summaryPayload?.chatCount) || 0,
+          })
+        }
+      } else {
+        setMarketingError('Не удалось загрузить данные рассылок. Повторите позже.')
       }
 
-      const summaryPayload = await summaryRes.json().catch(() => null)
-      const campaignsPayload = await campaignsRes.json().catch(() => null)
+      if (campaignsRes.ok) {
+        const campaignsPayload = await campaignsRes.json().catch(() => null)
+        if (!controller.signal.aborted) {
+          setCampaigns(
+            Array.isArray(campaignsPayload?.items) ? campaignsPayload.items : []
+          )
+        }
+      } else {
+        setMarketingError('Не удалось загрузить данные рассылок. Повторите позже.')
+      }
 
-      if (controller.signal.aborted) return
-
-      setMarketingSummary({
-        botOptInCount: Number(summaryPayload?.botOptInCount) || 0,
-        chatCount: Number(summaryPayload?.chatCount) || 0,
-      })
-      setCampaigns(Array.isArray(campaignsPayload?.items) ? campaignsPayload.items : [])
+      if (repeatRes.ok) {
+        const repeatPayload = await repeatRes.json().catch(() => null)
+        if (!controller.signal.aborted) {
+          setRepeatSettings({
+            enabled: Boolean(repeatPayload?.enabled),
+            channel: repeatPayload?.channel === 'chat' ? 'chat' : 'bot',
+            includeLink: Boolean(
+              repeatPayload?.includeLink ?? repeatPayload?.include_link ?? true
+            ),
+            includeUnsubscribe: Boolean(
+              repeatPayload?.includeUnsubscribe ??
+                repeatPayload?.include_unsubscribe ??
+                true
+            ),
+            intervals:
+              repeatPayload?.intervals && typeof repeatPayload.intervals === 'object'
+                ? repeatPayload.intervals
+                : {},
+            template: repeatPayload?.template ?? null,
+          })
+        }
+      } else {
+        setRepeatError('Не удалось загрузить авто-напоминания.')
+      }
     } catch (error) {
       if (controller.signal.aborted) return
       setMarketingError('Не удалось загрузить данные рассылок. Повторите позже.')
+      setRepeatError('Не удалось загрузить авто-напоминания.')
     } finally {
       if (!controller.signal.aborted) {
         setMarketingLoading(false)
+        setRepeatLoading(false)
       }
     }
   }, [apiBase, userId])
@@ -236,53 +295,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   useEffect(() => {
     void loadMarketingData()
   }, [loadMarketingData])
-
-  const inactiveCounts = useMemo(() => {
-    const now = Date.now()
-    let count30 = 0
-    let count60 = 0
-    bookingStats.clientSummaries.forEach((client) => {
-      if (!client.lastSeenTime) return
-      const diffDays = (now - client.lastSeenTime) / DAY_MS
-      if (diffDays >= 30) {
-        count30 += 1
-      }
-      if (diffDays >= 60) {
-        count60 += 1
-      }
-    })
-    return { count30, count60 }
-  }, [bookingStats.clientSummaries])
-
-  const reminderTemplates: Template[] = useMemo(() => {
-    const friendlyText = `Привет! Давно не виделись ${masterLabel}. Если хотите вернуться, выберите удобное время по кнопке ниже.`
-    const careText = `Напоминаем о себе ${masterLabel}: появились свободные окна. Если удобно, выберите время по кнопке ниже.`
-    const bonusText =
-      discountPercent > 0
-        ? `Для возвращения действует небольшой бонус: -${discountPercent}% на ближайшую запись ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
-        : `Для возвращения действует небольшой бонус ${masterLabel}. Если удобно, выберите время по кнопке ниже.`
-
-    return [
-      {
-        id: 'friendly',
-        title: 'Дружелюбно',
-        description: 'Легкое напоминание без давления.',
-        text: friendlyText,
-      },
-      {
-        id: 'care',
-        title: 'С заботой',
-        description: 'Спокойное, поддерживающее сообщение.',
-        text: careText,
-      },
-      {
-        id: 'bonus',
-        title: 'С бонусом',
-        description: `Скидка ${discountPercent}% для возвращения.`,
-        text: bonusText,
-      },
-    ]
-  }, [discountPercent, masterLabel])
 
   const broadcastTemplates: Template[] = useMemo(() => {
     const slotsText = `Привет! ${masterLabel} появились свободные окна на ближайшие дни. Если хотите записаться, выберите время по кнопке ниже.`
@@ -317,54 +329,33 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     ]
   }, [discountPercent, masterLabel])
 
-  useEffect(() => {
-    if (activeTab !== 'reminder') return
-    if (reminderTouched || reminderDraft.trim()) return
-    const fallback = reminderTemplates.find((template) => template.id === reminderTone)
-    const next = fallback ?? reminderTemplates[0]
-    if (next) {
-      setReminderDraft(next.text)
-    }
-  }, [activeTab, reminderDraft, reminderTemplates, reminderTone, reminderTouched])
-
-  const currentDraft = activeTab === 'broadcast' ? broadcastDraft : reminderDraft
-  const setCurrentDraft = activeTab === 'broadcast' ? setBroadcastDraft : setReminderDraft
   const includeLinkEnabled = Boolean(shareLink)
   const includeUnsubscribeEnabled = true
 
   const payloadText = useMemo(() => {
-    const trimmed = currentDraft.trim()
+    const trimmed = broadcastDraft.trim()
     if (!trimmed) return ''
-    if (channel === 'bot') return trimmed
+    if (broadcastChannel === 'bot') return trimmed
     if (includeLinkEnabled && shareLink) {
       return `${trimmed}\n${shareLink}`
     }
     return trimmed
-  }, [channel, currentDraft, includeLinkEnabled, shareLink])
+  }, [broadcastChannel, broadcastDraft, includeLinkEnabled, shareLink])
 
   const payloadLength = payloadText.length
   const isTextTooLong = payloadLength > MARKETING_TEXT_LIMIT
 
   const botAudience = marketingSummary?.botOptInCount
   const chatAudience = marketingSummary?.chatCount
-  const reminderAudience = reminderWindow === 60 ? inactiveCounts.count60 : inactiveCounts.count30
   const broadcastFilterCount =
     broadcastAudience === 'repeat'
       ? bookingStats.repeatClients
       : bookingStats.uniqueClients
-  const broadcastChannelCount = channel === 'bot' ? botAudience : chatAudience
+  const broadcastChannelCount = broadcastChannel === 'bot' ? botAudience : chatAudience
   const broadcastHasAudience =
     (typeof broadcastChannelCount !== 'number' || broadcastChannelCount > 0) &&
     broadcastFilterCount > 0
-  const hasAudience = activeTab === 'broadcast' ? broadcastHasAudience : reminderAudience > 0
-  const canSend = Boolean(payloadText) && !isTextTooLong && !isSending && hasAudience
-
-  const audienceLabel =
-    activeTab === 'broadcast'
-      ? broadcastAudience === 'repeat'
-        ? `Постоянные: ${bookingStats.repeatClients}`
-        : `Все клиенты: ${bookingStats.uniqueClients}`
-      : `Клиентов с паузой: ${reminderAudience}`
+  const canSend = Boolean(payloadText) && !isTextTooLong && !isSending && broadcastHasAudience
 
   const broadcastAudienceLabel =
     broadcastAudience === 'repeat'
@@ -372,19 +363,50 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       : `Все клиенты · ${bookingStats.uniqueClients}`
 
   const channelHint =
-    channel === 'bot'
+    broadcastChannel === 'bot'
       ? 'Сообщение уйдет подписчикам рассылки через бот.'
       : 'Сообщение появится в активных чатах с клиентами.'
 
-  const reminderHint = `Напомним клиентам, которые не были ${reminderWindow}+ дней.`
-
-  const reminderTemplateLabel =
-    reminderTemplates.find((template) => template.id === reminderTone)?.title ??
-    'Шаблон сообщения'
   const selectedBroadcastTemplate = broadcastTemplateId
     ? broadcastTemplates.find((template) => template.id === broadcastTemplateId)
     : null
   const broadcastTemplateLabel = selectedBroadcastTemplate?.title ?? 'Шаблон сообщения'
+  const repeatEnabled = repeatSettings?.enabled ?? false
+  const repeatChannel = repeatSettings?.channel === 'chat' ? 'chat' : 'bot'
+  const repeatIntervals = repeatSettings?.intervals ?? {}
+
+  const resolveRepeatInterval = useCallback(
+    (categoryId: string) => {
+      const custom = repeatIntervals[categoryId]
+      if (typeof custom === 'number' && custom > 0) return custom
+      const preset = REPEAT_INTERVALS[categoryId as keyof typeof REPEAT_INTERVALS]
+      return preset ?? REPEAT_INTERVALS.default
+    },
+    [repeatIntervals]
+  )
+
+  const repeatCategories = useMemo(() => {
+    const bookedCategories = Array.from(
+      new Set(
+        bookings
+          .map((booking) => booking.categoryId)
+          .filter((categoryId): categoryId is string => Boolean(categoryId))
+      )
+    )
+    const baseList =
+      bookedCategories.length > 0 ? bookedCategories : [...REPEAT_CATEGORY_ORDER]
+    return baseList.map((categoryId) => ({
+      id: categoryId,
+      label: getCategoryLabel(categoryId),
+      days: resolveRepeatInterval(categoryId),
+    }))
+  }, [bookings, resolveRepeatInterval])
+
+  const repeatPreviewCategory = repeatCategories[0]?.label ?? 'вашу услугу'
+  const repeatTemplate = repeatSettings?.template?.trim() ?? ''
+  const repeatPreviewText = repeatTemplate
+    ? repeatTemplate.replace(/\{\{\s*category\s*\}\}/gi, repeatPreviewCategory)
+    : `Пора записаться на повторную услугу: ${repeatPreviewCategory}. Выберите удобное время по кнопке ниже.`
 
   const handleInsertBroadcastTemplate = useCallback(
     (template: Template) => {
@@ -395,14 +417,58 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     [showStatus]
   )
 
-  const handleInsertReminderTemplate = useCallback(
-    (template: Template) => {
-      setReminderDraft(template.text)
-      setReminderTone(template.id)
-      setReminderTouched(true)
-      showStatus('Текст вставлен в сообщение.')
+  const saveRepeatSettings = useCallback(
+    async (next: Partial<RepeatSettings>) => {
+      if (!userId) return
+      const base: RepeatSettings = repeatSettings ?? {
+        enabled: false,
+        channel: 'bot',
+        includeLink: true,
+        includeUnsubscribe: true,
+        intervals: {},
+        template: null,
+      }
+      const payload = { ...base, ...next }
+      setRepeatSettings(payload)
+      setRepeatSaving(true)
+      setRepeatError('')
+      try {
+        const response = await fetch(`${apiBase}/api/pro/marketing/repeat-settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            enabled: payload.enabled,
+            channel: payload.channel,
+            includeLink: payload.includeLink,
+            includeUnsubscribe: payload.includeUnsubscribe,
+            intervals: payload.intervals,
+            template: payload.template,
+          }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          throw new Error(data?.error || 'repeat_save_failed')
+        }
+        setRepeatSettings({
+          enabled: Boolean(data?.enabled),
+          channel: data?.channel === 'chat' ? 'chat' : 'bot',
+          includeLink: Boolean(data?.includeLink ?? data?.include_link ?? true),
+          includeUnsubscribe: Boolean(
+            data?.includeUnsubscribe ?? data?.include_unsubscribe ?? true
+          ),
+          intervals:
+            data?.intervals && typeof data.intervals === 'object' ? data.intervals : {},
+          template: data?.template ?? null,
+        })
+        showStatus('Настройки сохранены.')
+      } catch (error) {
+        setRepeatError('Не удалось сохранить авто-напоминания.')
+      } finally {
+        setRepeatSaving(false)
+      }
     },
-    [showStatus]
+    [apiBase, repeatSettings, showStatus, userId]
   )
 
   const handleSend = useCallback(async () => {
@@ -414,24 +480,12 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       showStatus('Слишком длинное сообщение.', true)
       return
     }
-    if (!hasAudience) {
-      showStatus(
-        activeTab === 'broadcast'
-          ? 'Нет получателей для рассылки.'
-          : 'Нет клиентов для напоминания.',
-        true
-      )
+    if (!broadcastHasAudience) {
+      showStatus('Нет получателей для рассылки.', true)
       return
     }
 
-    const audience =
-      activeTab === 'broadcast'
-        ? broadcastAudience === 'repeat'
-          ? 'repeat'
-          : 'all'
-        : reminderWindow === 60
-          ? 'inactive_60'
-          : 'inactive_30'
+    const audience = broadcastAudience === 'repeat' ? 'repeat' : 'all'
 
     setIsSending(true)
     setSendError('')
@@ -441,10 +495,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          channel,
+          channel: broadcastChannel,
           text: payloadText,
-          includeLink: channel === 'bot' && includeLinkEnabled,
-          includeUnsubscribe: channel === 'bot' && includeUnsubscribeEnabled,
+          includeLink: broadcastChannel === 'bot' && includeLinkEnabled,
+          includeUnsubscribe: broadcastChannel === 'bot' && includeUnsubscribeEnabled,
           audience,
         }),
       })
@@ -475,30 +529,23 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       setIsSending(false)
     }
   }, [
-    activeTab,
     apiBase,
     broadcastAudience,
-    channel,
+    broadcastChannel,
     includeLinkEnabled,
     includeUnsubscribeEnabled,
     isTextTooLong,
     payloadText,
-    hasAudience,
-    reminderWindow,
+    broadcastHasAudience,
     userId,
     showStatus,
   ])
 
   const handleClear = useCallback(() => {
-    if (activeTab === 'broadcast') {
-      setBroadcastDraft('')
-      setBroadcastTemplateId(null)
-    } else {
-      setReminderDraft('')
-      setReminderTouched(true)
-    }
+    setBroadcastDraft('')
+    setBroadcastTemplateId(null)
     showStatus('Черновик очищен.')
-  }, [activeTab, showStatus])
+  }, [showStatus])
 
   const lastUpdatedLabel = lastUpdated
     ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
@@ -554,13 +601,13 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
             Рассылка
           </button>
           <button
-            className={`pro-marketing-tab${activeTab === 'reminder' ? ' is-active' : ''}`}
+            className={`pro-marketing-tab${activeTab === 'repeat' ? ' is-active' : ''}`}
             type="button"
-            onClick={() => setActiveTab('reminder')}
+            onClick={() => setActiveTab('repeat')}
             role="tab"
-            aria-selected={activeTab === 'reminder'}
+            aria-selected={activeTab === 'repeat'}
           >
-            Напомнить
+            Повтор
           </button>
         </div>
 
@@ -577,7 +624,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                   onClick={() => {
                     setAudienceOpen((current) => !current)
                     setBroadcastTemplateOpen(false)
-                    setReminderTemplateOpen(false)
                   }}
                   aria-haspopup="listbox"
                   aria-expanded={audienceOpen}
@@ -630,9 +676,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               aria-label="Канал рассылки"
             >
               <button
-                className={`pro-marketing-channel${channel === 'bot' ? ' is-active' : ''}`}
+                className={`pro-marketing-channel${
+                  broadcastChannel === 'bot' ? ' is-active' : ''
+                }`}
                 type="button"
-                onClick={() => setChannel('bot')}
+                onClick={() => setBroadcastChannel('bot')}
               >
                 <span className="pro-marketing-channel-title">Бот</span>
                 <span className="pro-marketing-channel-meta">
@@ -640,9 +688,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 </span>
               </button>
               <button
-                className={`pro-marketing-channel${channel === 'chat' ? ' is-active' : ''}`}
+                className={`pro-marketing-channel${
+                  broadcastChannel === 'chat' ? ' is-active' : ''
+                }`}
                 type="button"
-                onClick={() => setChannel('chat')}
+                onClick={() => setBroadcastChannel('chat')}
               >
                 <span className="pro-marketing-channel-title">Личные чаты</span>
                 <span className="pro-marketing-channel-meta">
@@ -656,8 +706,8 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
             <div className="pro-marketing-textarea-wrap">
               <textarea
                 className={`pro-marketing-textarea${isTextTooLong ? ' is-error' : ''}`}
-                value={currentDraft}
-                onChange={(event) => setCurrentDraft(event.target.value)}
+                value={broadcastDraft}
+                onChange={(event) => setBroadcastDraft(event.target.value)}
                 placeholder="Напишите короткое сообщение для клиентов"
                 rows={5}
               />
@@ -672,7 +722,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                   type="button"
                   onClick={() => {
                     setBroadcastTemplateOpen((current) => !current)
-                    setReminderTemplateOpen(false)
                     setAudienceOpen(false)
                   }}
                   aria-haspopup="listbox"
@@ -753,7 +802,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 className="pro-detail-action is-ghost"
                 type="button"
                 onClick={handleClear}
-                disabled={!currentDraft}
+                disabled={!broadcastDraft}
               >
                 Очистить
               </button>
@@ -772,10 +821,50 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         ) : (
           <section className="pro-detail-card pro-marketing-panel animate delay-1">
             <div className="pro-detail-card-head">
-              <h2>Напомнить записаться</h2>
-              <span className="pro-detail-pill is-ghost">{audienceLabel}</span>
+              <h2>Повторная запись</h2>
+              <span
+                className={`pro-detail-pill is-ghost${
+                  repeatEnabled ? '' : ' is-muted'
+                }`}
+              >
+                Авто {repeatEnabled ? 'включено' : 'выключено'}
+              </span>
             </div>
-            <p className="pro-detail-text">{reminderHint}</p>
+            <p className="pro-detail-text">
+              Автоматически напомним клиентам записаться повторно, когда подходит
+              срок по услуге.
+            </p>
+
+            {repeatLoading && (
+              <p className="pro-detail-status" role="status">
+                Загружаем настройки...
+              </p>
+            )}
+            {repeatError && (
+              <p className="pro-detail-warning" role="alert">
+                {repeatError}
+              </p>
+            )}
+
+            <div className="pro-marketing-auto-row">
+              <div className="pro-marketing-auto-text">
+                <p className="pro-marketing-auto-title">Авто-напоминания</p>
+                <p className="pro-marketing-auto-subtitle">
+                  Достаточно включить один раз.
+                </p>
+              </div>
+              <button
+                className={`pro-marketing-auto-toggle${
+                  repeatEnabled ? ' is-active' : ''
+                }`}
+                type="button"
+                onClick={() => void saveRepeatSettings({ enabled: !repeatEnabled })}
+                aria-pressed={repeatEnabled}
+                disabled={repeatLoading || repeatSaving}
+              >
+                {repeatSaving ? '...' : repeatEnabled ? 'Вкл' : 'Выкл'}
+              </button>
+            </div>
 
             <div
               className="pro-marketing-channel-grid"
@@ -783,19 +872,27 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               aria-label="Канал рассылки"
             >
               <button
-                className={`pro-marketing-channel${channel === 'bot' ? ' is-active' : ''}`}
+                className={`pro-marketing-channel${
+                  repeatChannel === 'bot' ? ' is-active' : ''
+                }`}
                 type="button"
-                onClick={() => setChannel('bot')}
+                onClick={() => void saveRepeatSettings({ channel: 'bot' })}
+                disabled={repeatLoading || repeatSaving}
               >
                 <span className="pro-marketing-channel-title">Бот</span>
                 <span className="pro-marketing-channel-meta">
-                  {marketingLoading ? 'Считаем аудиторию...' : `Подписчиков: ${botAudience ?? 0}`}
+                  {marketingLoading
+                    ? 'Считаем аудиторию...'
+                    : `Подписчиков: ${botAudience ?? 0}`}
                 </span>
               </button>
               <button
-                className={`pro-marketing-channel${channel === 'chat' ? ' is-active' : ''}`}
+                className={`pro-marketing-channel${
+                  repeatChannel === 'chat' ? ' is-active' : ''
+                }`}
                 type="button"
-                onClick={() => setChannel('chat')}
+                onClick={() => void saveRepeatSettings({ channel: 'chat' })}
+                disabled={repeatLoading || repeatSaving}
               >
                 <span className="pro-marketing-channel-title">Личные чаты</span>
                 <span className="pro-marketing-channel-meta">
@@ -806,141 +903,23 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               </button>
             </div>
 
-            <div className="pro-marketing-window-row" role="group" aria-label="Пауза">
-              {REMINDER_WINDOWS.map((value) => (
-                <button
-                  key={`reminder-${value}`}
-                  className={`pro-marketing-chip${
-                    value === reminderWindow ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  onClick={() => setReminderWindow(value)}
-                >
-                  {value}+ дней
-                </button>
-              ))}
-            </div>
-            <div className="pro-detail-chip-row">
-              <span className="pro-detail-chip is-ghost">
-                30+ дней: {inactiveCounts.count30}
-              </span>
-              <span className="pro-detail-chip is-ghost">
-                60+ дней: {inactiveCounts.count60}
-              </span>
-            </div>
-
-            <div className="pro-marketing-templates">
-              <p className="pro-marketing-section">Тон сообщения</p>
-              <div className="pro-marketing-tone-grid">
-                {reminderTemplates.map((template) => (
-                  <section
-                    key={template.id}
-                    className={`pro-marketing-tone-card${
-                      template.id === reminderTone ? ' is-active' : ''
-                    }`}
-                  >
-                    <div className="pro-marketing-template-head">
-                      <div>
-                        <h3 className="pro-marketing-template-title">{template.title}</h3>
-                        <p className="pro-marketing-template-desc">
-                          {template.description}
-                        </p>
-                      </div>
-                      <button
-                        className="pro-marketing-template-action"
-                        type="button"
-                        onClick={() => handleInsertReminderTemplate(template)}
-                      >
-                        Вставить
-                      </button>
-                    </div>
-                  </section>
-                ))}
-              </div>
-            </div>
-
-            <div className="pro-marketing-textarea-wrap">
-              <textarea
-                className={`pro-marketing-textarea${isTextTooLong ? ' is-error' : ''}`}
-                value={currentDraft}
-                onChange={(event) => {
-                  setReminderTouched(true)
-                  setCurrentDraft(event.target.value)
-                }}
-                placeholder="Напишите короткое сообщение для клиентов"
-                rows={5}
-              />
-            </div>
-
-            <div className="pro-marketing-template-row">
-              <div className="pro-marketing-template-select" ref={reminderTemplateRef}>
-                <button
-                  className={`pro-marketing-select-trigger${
-                    reminderTemplateOpen ? ' is-open' : ''
-                  }`}
-                  type="button"
-                  onClick={() => {
-                    setReminderTemplateOpen((current) => !current)
-                    setBroadcastTemplateOpen(false)
-                    setAudienceOpen(false)
-                  }}
-                  aria-haspopup="listbox"
-                  aria-expanded={reminderTemplateOpen}
-                >
-                  {reminderTemplateLabel}
-                </button>
-                {reminderTemplateOpen && (
-                  <div
-                    className="pro-marketing-select-menu"
-                    role="listbox"
-                    aria-label="Шаблон напоминания"
-                  >
-                    {reminderTemplates.map((template) => (
-                      <button
-                        key={template.id}
-                        className={`pro-marketing-select-option${
-                          reminderTone === template.id ? ' is-active' : ''
-                        }`}
-                        type="button"
-                        role="option"
-                        aria-selected={reminderTone === template.id}
-                        onClick={() => {
-                          handleInsertReminderTemplate(template)
-                          setReminderTemplateOpen(false)
-                        }}
-                      >
-                        <span className="pro-marketing-select-option-title">
-                          {template.title}
-                        </span>
-                        <span className="pro-marketing-select-option-desc">
-                          {template.description}
-                        </span>
-                      </button>
-                    ))}
+            <div className="pro-marketing-repeat-list">
+              <p className="pro-marketing-section">Сроки по категориям</p>
+              <div className="pro-marketing-repeat-grid">
+                {repeatCategories.map((item) => (
+                  <div className="pro-marketing-repeat-card" key={item.id}>
+                    <span className="pro-marketing-repeat-title">{item.label}</span>
+                    <span className="pro-marketing-repeat-days">
+                      {item.days} дней
+                    </span>
                   </div>
-                )}
-              </div>
-              <span className={`pro-marketing-count${isTextTooLong ? ' is-error' : ''}`}>
-                {payloadLength}/{MARKETING_TEXT_LIMIT}
-              </span>
-            </div>
-
-            <div className="pro-marketing-discount">
-              <span className="pro-marketing-discount-label">Скидка</span>
-              <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
-                {DISCOUNT_OPTIONS.map((value) => (
-                  <button
-                    key={`reminder-discount-${value}`}
-                    className={`pro-marketing-chip${
-                      value === discountPercent ? ' is-active' : ''
-                    }`}
-                    type="button"
-                    onClick={() => setDiscountPercent(value)}
-                  >
-                    {value === 0 ? '— без скидки' : `-${value}%`}
-                  </button>
                 ))}
               </div>
+            </div>
+
+            <div className="pro-marketing-repeat-preview">
+              <p className="pro-marketing-section">Шаблон сообщения</p>
+              <div className="pro-marketing-preview-card">{repeatPreviewText}</div>
             </div>
 
             {!shareConfigured && (
@@ -949,29 +928,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               </p>
             )}
 
-            <div className="pro-detail-actions">
-              <button
-                className="pro-detail-action"
-                type="button"
-                onClick={() => void handleSend()}
-                disabled={!canSend}
-              >
-                {isSending ? 'Отправляем...' : 'Отправить'}
-              </button>
-              <button
-                className="pro-detail-action is-ghost"
-                type="button"
-                onClick={handleClear}
-                disabled={!currentDraft}
-              >
-                Очистить
-              </button>
-            </div>
-            {sendError && (
-              <p className="pro-detail-warning" role="alert">
-                {sendError}
-              </p>
-            )}
+            <p className="pro-marketing-repeat-hint">
+              Проверяем ежедневно и отправляем только если у клиента нет будущей записи.
+            </p>
             {status && (
               <p className="pro-detail-status" role="status">
                 {status}

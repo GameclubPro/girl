@@ -50,6 +50,15 @@ const BOOKING_PRICE_OFFER_HOURS = 12
 const MARKETING_TEXT_LIMIT = 800
 const MARKETING_BROADCAST_CHUNK = 25
 const MARKETING_BROADCAST_MAX = 5000
+const REPEAT_REMINDER_SCAN_INTERVAL_MS = 12 * 60 * 60 * 1000
+const REPEAT_REMINDER_BATCH_LIMIT = 200
+const REPEAT_DEFAULT_INTERVALS = {
+  'beauty-nails': 21,
+  'brows-lashes': 21,
+  hair: 35,
+  'cosmetology-care': 30,
+  default: 30,
+}
 const CHAT_MESSAGE_DEFAULT_LIMIT = 30
 const CHAT_MESSAGE_MAX_LIMIT = 80
 const CHAT_STREAM_PATH = '/api/chats/stream'
@@ -3651,6 +3660,42 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE marketing_campaigns
     ADD COLUMN IF NOT EXISTS audience TEXT;
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marketing_repeat_settings (
+      master_id TEXT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+      enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      channel TEXT NOT NULL DEFAULT 'bot' CHECK (channel IN ('bot', 'chat')),
+      include_link BOOLEAN NOT NULL DEFAULT TRUE,
+      include_unsubscribe BOOLEAN NOT NULL DEFAULT TRUE,
+      intervals JSONB NOT NULL DEFAULT '{}'::jsonb,
+      template TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marketing_repeat_log (
+      id SERIAL PRIMARY KEY,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      client_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      category_id TEXT NOT NULL,
+      last_booking_id INTEGER,
+      last_booking_at TIMESTAMPTZ,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS marketing_repeat_log_master_idx
+    ON marketing_repeat_log (master_id, sent_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS marketing_repeat_log_target_idx
+    ON marketing_repeat_log (master_id, client_id, category_id);
   `)
 
   await pool.query(`
@@ -7376,23 +7421,129 @@ const filterChatTargetsByInactive = async ({ masterId, targets, inactiveDays }) 
   return targets.filter((target) => inactiveSet.has(target.clientId))
 }
 
-const sendMarketingBotBroadcast = async ({
+const normalizeRepeatIntervals = (value) => {
+  if (!value || typeof value !== 'object') return {}
+  const result = {}
+  Object.entries(value).forEach(([key, raw]) => {
+    const parsed = parseOptionalInt(raw)
+    if (parsed && parsed > 0) {
+      result[normalizeText(key)] = parsed
+    }
+  })
+  return result
+}
+
+const resolveRepeatIntervalDays = (categoryId, overrides) => {
+  const normalized = normalizeText(categoryId)
+  if (!normalized) return REPEAT_DEFAULT_INTERVALS.default
+  const custom = overrides?.[normalized]
+  if (custom && custom > 0) return custom
+  return REPEAT_DEFAULT_INTERVALS[normalized] ?? REPEAT_DEFAULT_INTERVALS.default
+}
+
+const getRepeatCategoryLabel = (categoryId) => {
+  const normalized = normalizeText(categoryId)
+  if (!normalized) return 'услуга'
+  const map = {
+    'beauty-nails': 'ногти',
+    'brows-lashes': 'брови и ресницы',
+    hair: 'волосы',
+    'cosmetology-care': 'уход за лицом',
+  }
+  return map[normalized] ?? normalized
+}
+
+const buildRepeatMessage = ({ template, categoryLabel }) => {
+  const base =
+    normalizeText(template) ||
+    `Пора записаться на повторную услугу: ${categoryLabel}. Выберите удобное время по кнопке ниже.`
+  return base.replace(/\{\{\s*category\s*\}\}/gi, categoryLabel)
+}
+
+const fetchRepeatBaseCandidates = async (masterId) => {
+  const result = await pool.query(
+    `
+      WITH last_visits AS (
+        SELECT DISTINCT ON (client_id, category_id)
+          id AS "bookingId",
+          client_id AS "clientId",
+          category_id AS "categoryId",
+          scheduled_at AS "scheduledAt"
+        FROM service_bookings
+        WHERE master_id = $1
+          AND status = 'confirmed'
+          AND scheduled_at < NOW()
+          AND (outcome IS NULL OR outcome IN ('on_time', 'late', 'completed'))
+        ORDER BY client_id, category_id, scheduled_at DESC
+      ),
+      upcoming AS (
+        SELECT DISTINCT client_id, category_id
+        FROM service_bookings
+        WHERE master_id = $1
+          AND status IN ('pending', 'price_pending', 'price_proposed', 'confirmed')
+          AND scheduled_at >= NOW()
+      ),
+      eligible AS (
+        SELECT lv.*
+        FROM last_visits lv
+        LEFT JOIN upcoming up
+          ON up.client_id = lv."clientId"
+          AND up.category_id = lv."categoryId"
+        WHERE up.client_id IS NULL
+      )
+      SELECT
+        e."bookingId",
+        e."clientId",
+        e."categoryId",
+        e."scheduledAt"
+      FROM eligible e
+      JOIN users u ON u.user_id = e."clientId"
+      WHERE COALESCE(u.is_blocked, FALSE) = FALSE
+    `,
+    [masterId]
+  )
+  return result.rows
+}
+
+const fetchRepeatLogMap = async (masterId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        client_id AS "clientId",
+        category_id AS "categoryId",
+        last_booking_id AS "lastBookingId",
+        last_booking_at AS "lastBookingAt",
+        sent_at AS "sentAt"
+      FROM marketing_repeat_log
+      WHERE master_id = $1
+    `,
+    [masterId]
+  )
+  const map = new Map()
+  result.rows.forEach((row) => {
+    const clientId = normalizeText(row.clientId)
+    const categoryId = normalizeText(row.categoryId)
+    if (!clientId || !categoryId) return
+    map.set(`${clientId}:${categoryId}`, row)
+  })
+  return map
+}
+
+const buildMarketingBotPayload = async ({
   masterId,
   text,
   includeLink,
   includeUnsubscribe,
-  inactiveDays,
-  repeatOnly,
-  limit,
+  masterName,
 }) => {
   if (!telegramBotToken) {
     const error = new Error('bot_not_configured')
     error.code = 'bot_not_configured'
     throw error
   }
-  const masterName = await resolveUserDisplayName(masterId)
-  const senderPrefix = masterName
-    ? `Сообщение от мастера ${masterName}.`
+  const resolvedName = masterName ?? (await resolveUserDisplayName(masterId))
+  const senderPrefix = resolvedName
+    ? `Сообщение от мастера ${resolvedName}.`
     : 'Сообщение от мастера.'
   const maxBodyLength = MARKETING_TEXT_LIMIT - senderPrefix.length - 1
   let bodyText = text
@@ -7418,6 +7569,200 @@ const sendMarketingBotBroadcast = async ({
   if (unsubscribeLink) {
     buttons.push({ text: 'Отписаться', webAppUrl: unsubscribeLink })
   }
+
+  return { payloadText, buttons, masterName: resolvedName }
+}
+
+const runRepeatReminderForMaster = async (settings) => {
+  const masterId = normalizeText(settings?.masterId)
+  if (!masterId) return { total: 0, sent: 0, failed: 0 }
+  const enabled = Boolean(settings?.enabled)
+  if (!enabled) return { total: 0, sent: 0, failed: 0 }
+  const channel = normalizeText(settings?.channel) === 'chat' ? 'chat' : 'bot'
+  const includeLink = settings?.includeLink !== false
+  const includeUnsubscribe = settings?.includeUnsubscribe !== false
+  const intervals = normalizeRepeatIntervals(settings?.intervals)
+  const template = normalizeText(settings?.template)
+
+  const candidates = await fetchRepeatBaseCandidates(masterId)
+  if (candidates.length === 0) return { total: 0, sent: 0, failed: 0 }
+  const logMap = await fetchRepeatLogMap(masterId)
+  const now = Date.now()
+  const bestByClient = new Map()
+
+  candidates.forEach((row) => {
+    const clientId = normalizeText(row.clientId)
+    const categoryId = normalizeText(row.categoryId)
+    if (!clientId || !categoryId) return
+    const scheduledMs = new Date(row.scheduledAt).getTime()
+    if (Number.isNaN(scheduledMs)) return
+    const intervalDays = resolveRepeatIntervalDays(categoryId, intervals)
+    const dueAt = scheduledMs + intervalDays * DAY_MS
+    if (now < dueAt) return
+    const logKey = `${clientId}:${categoryId}`
+    const lastLog = logMap.get(logKey)
+    if (lastLog?.lastBookingId && lastLog.lastBookingId === row.bookingId) {
+      return
+    }
+    if (lastLog?.lastBookingAt) {
+      const loggedAt = new Date(lastLog.lastBookingAt).getTime()
+      if (!Number.isNaN(loggedAt) && loggedAt >= scheduledMs) {
+        return
+      }
+    }
+    const current = bestByClient.get(clientId)
+    if (!current || current.dueAt > dueAt) {
+      bestByClient.set(clientId, {
+        clientId,
+        categoryId,
+        bookingId: row.bookingId,
+        scheduledAt: row.scheduledAt,
+        dueAt,
+      })
+    }
+  })
+
+  let targets = Array.from(bestByClient.values())
+  if (targets.length === 0) return { total: 0, sent: 0, failed: 0 }
+  if (targets.length > REPEAT_REMINDER_BATCH_LIMIT) {
+    targets = targets.slice(0, REPEAT_REMINDER_BATCH_LIMIT)
+  }
+
+  let sent = 0
+  let failed = 0
+
+  if (channel === 'bot') {
+    const recipientIds = await fetchMarketingRecipients({ masterId })
+    const recipientSet = new Set(recipientIds)
+    const filteredTargets = targets.filter((target) => recipientSet.has(target.clientId))
+    if (filteredTargets.length === 0) return { total: 0, sent: 0, failed: 0 }
+    const masterName = await resolveUserDisplayName(masterId)
+
+    for (const target of filteredTargets) {
+      const categoryLabel = getRepeatCategoryLabel(target.categoryId)
+      const messageText = buildRepeatMessage({ template, categoryLabel })
+      try {
+        const { payloadText, buttons } = await buildMarketingBotPayload({
+          masterId,
+          text: messageText,
+          includeLink,
+          includeUnsubscribe,
+          masterName,
+        })
+        const ok = await sendTelegramMessage({
+          recipientId: target.clientId,
+          text: payloadText,
+          buttons,
+        })
+        if (ok) {
+          sent += 1
+          await pool.query(
+            `
+              INSERT INTO marketing_repeat_log (
+                master_id,
+                client_id,
+                category_id,
+                last_booking_id,
+                last_booking_at,
+                sent_at
+              )
+              VALUES ($1, $2, $3, $4, $5, NOW())
+            `,
+            [masterId, target.clientId, target.categoryId, target.bookingId, target.scheduledAt]
+          )
+        } else {
+          failed += 1
+        }
+      } catch (error) {
+        if (error?.code === 'bot_not_configured') {
+          throw error
+        }
+        failed += 1
+      }
+    }
+  } else {
+    const chatTargets = await fetchChatBroadcastTargets({ masterId })
+    const chatMap = new Map(
+      chatTargets.map((item) => [normalizeText(item.clientId), item.chatId])
+    )
+    const filteredTargets = targets.filter((target) => chatMap.has(target.clientId))
+    if (filteredTargets.length === 0) return { total: 0, sent: 0, failed: 0 }
+    await ensureUser(masterId)
+
+    for (const target of filteredTargets) {
+      const chatId = chatMap.get(target.clientId)
+      if (!chatId) continue
+      const categoryLabel = getRepeatCategoryLabel(target.categoryId)
+      const messageText = buildRepeatMessage({ template, categoryLabel })
+      try {
+        const messageResult = await insertChatTextMessage({
+          chatId,
+          senderId: masterId,
+          body: messageText,
+          meta: { kind: 'marketing', channel: 'chat', tag: 'repeat' },
+        })
+        const messagePayload = {
+          id: messageResult.id,
+          chatId,
+          senderId: masterId,
+          type: 'text',
+          body: messageText,
+          meta: { kind: 'marketing', channel: 'chat', tag: 'repeat' },
+          attachmentUrl: null,
+          createdAt: messageResult.createdAt,
+        }
+        void notifyChatMembers(chatId, {
+          type: 'message:new',
+          chatId,
+          message: messagePayload,
+        })
+        const preview =
+          messageText.length > 120 ? `${messageText.slice(0, 117)}...` : messageText
+        void sendChatNotification({
+          chatId,
+          senderId: masterId,
+          preview,
+          audience: 'client',
+        })
+        sent += 1
+        await pool.query(
+          `
+            INSERT INTO marketing_repeat_log (
+              master_id,
+              client_id,
+              category_id,
+              last_booking_id,
+              last_booking_at,
+              sent_at
+            )
+            VALUES ($1, $2, $3, $4, $5, NOW())
+          `,
+          [masterId, target.clientId, target.categoryId, target.bookingId, target.scheduledAt]
+        )
+      } catch (error) {
+        failed += 1
+      }
+    }
+  }
+
+  return { total: targets.length, sent, failed }
+}
+
+const sendMarketingBotBroadcast = async ({
+  masterId,
+  text,
+  includeLink,
+  includeUnsubscribe,
+  inactiveDays,
+  repeatOnly,
+  limit,
+}) => {
+  const { payloadText, buttons } = await buildMarketingBotPayload({
+    masterId,
+    text,
+    includeLink,
+    includeUnsubscribe,
+  })
   const recipients = await fetchMarketingRecipients({ masterId, limit })
   let filteredRecipients = recipients
   if (repeatOnly) {
@@ -7643,6 +7988,116 @@ app.get('/api/pro/marketing/summary', async (req, res) => {
     })
   } catch (error) {
     console.error('GET /api/pro/marketing/summary failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/pro/marketing/repeat-settings', async (req, res) => {
+  const masterId = normalizeText(req.query.userId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          enabled,
+          channel,
+          include_link AS "includeLink",
+          include_unsubscribe AS "includeUnsubscribe",
+          intervals,
+          template
+        FROM marketing_repeat_settings
+        WHERE master_id = $1
+      `,
+      [masterId]
+    )
+    const row = result.rows[0]
+    if (!row) {
+      res.json({
+        enabled: false,
+        channel: 'bot',
+        includeLink: true,
+        includeUnsubscribe: true,
+        intervals: {},
+        template: null,
+      })
+      return
+    }
+    res.json({
+      enabled: Boolean(row.enabled),
+      channel: row.channel === 'chat' ? 'chat' : 'bot',
+      includeLink: row.includeLink !== false,
+      includeUnsubscribe: row.includeUnsubscribe !== false,
+      intervals: row.intervals ?? {},
+      template: row.template ?? null,
+    })
+  } catch (error) {
+    console.error('GET /api/pro/marketing/repeat-settings failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/pro/marketing/repeat-settings', async (req, res) => {
+  const masterId = normalizeText(req.body?.userId ?? req.body?.masterId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  const enabled = Boolean(req.body?.enabled)
+  const channel = normalizeText(req.body?.channel) === 'chat' ? 'chat' : 'bot'
+  const includeLink = req.body?.includeLink !== false
+  const includeUnsubscribe = req.body?.includeUnsubscribe !== false
+  const intervals = normalizeRepeatIntervals(req.body?.intervals)
+  const template = normalizeText(req.body?.template) || null
+
+  try {
+    await ensureUser(masterId)
+    const result = await pool.query(
+      `
+        INSERT INTO marketing_repeat_settings (
+          master_id,
+          enabled,
+          channel,
+          include_link,
+          include_unsubscribe,
+          intervals,
+          template,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, NOW())
+        ON CONFLICT (master_id) DO UPDATE
+        SET
+          enabled = EXCLUDED.enabled,
+          channel = EXCLUDED.channel,
+          include_link = EXCLUDED.include_link,
+          include_unsubscribe = EXCLUDED.include_unsubscribe,
+          intervals = EXCLUDED.intervals,
+          template = EXCLUDED.template,
+          updated_at = NOW()
+        RETURNING
+          enabled,
+          channel,
+          include_link AS "includeLink",
+          include_unsubscribe AS "includeUnsubscribe",
+          intervals,
+          template
+      `,
+      [masterId, enabled, channel, includeLink, includeUnsubscribe, intervals, template]
+    )
+    const row = result.rows[0] ?? {}
+    res.json({
+      enabled: Boolean(row.enabled),
+      channel: row.channel === 'chat' ? 'chat' : 'bot',
+      includeLink: row.includeLink !== false,
+      includeUnsubscribe: row.includeUnsubscribe !== false,
+      intervals: row.intervals ?? {},
+      template: row.template ?? null,
+    })
+  } catch (error) {
+    console.error('POST /api/pro/marketing/repeat-settings failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -12851,6 +13306,44 @@ const backfillClientTrustScores = async () => {
   }
 }
 
+let repeatReminderCycleRunning = false
+
+const runRepeatReminderCycle = async () => {
+  if (repeatReminderCycleRunning) return
+  repeatReminderCycleRunning = true
+
+  try {
+    const settingsResult = await pool.query(
+      `
+        SELECT
+          master_id AS "masterId",
+          enabled,
+          channel,
+          include_link AS "includeLink",
+          include_unsubscribe AS "includeUnsubscribe",
+          intervals,
+          template
+        FROM marketing_repeat_settings
+        WHERE enabled = TRUE
+      `
+    )
+    for (const settings of settingsResult.rows) {
+      try {
+        await runRepeatReminderForMaster(settings)
+      } catch (error) {
+        if (error?.code === 'bot_not_configured') {
+          continue
+        }
+        console.error('Repeat reminder master cycle failed:', error)
+      }
+    }
+  } catch (error) {
+    console.error('Repeat reminder cycle failed:', error)
+  } finally {
+    repeatReminderCycleRunning = false
+  }
+}
+
 const start = async () => {
   const normalizedTrustBackfill = normalizeText(process.env.TRUST_BACKFILL)
   const shouldBackfillTrust =
@@ -12928,6 +13421,10 @@ const start = async () => {
   setInterval(() => {
     void runDepositHoldCycle()
   }, DEPOSIT_HOLD_SCAN_INTERVAL_MS)
+  void runRepeatReminderCycle()
+  setInterval(() => {
+    void runRepeatReminderCycle()
+  }, REPEAT_REMINDER_SCAN_INTERVAL_MS)
 }
 
 start().catch((error) => {
