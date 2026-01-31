@@ -106,6 +106,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [reminderTone, setReminderTone] = useState('friendly')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [audienceOpen, setAudienceOpen] = useState(false)
+  const [broadcastTemplateOpen, setBroadcastTemplateOpen] = useState(false)
+  const [reminderTemplateOpen, setReminderTemplateOpen] = useState(false)
+  const [broadcastTemplateId, setBroadcastTemplateId] = useState<string | null>(null)
 
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null)
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([])
@@ -117,6 +120,8 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const statusTimerRef = useRef<number | null>(null)
   const marketingAbortRef = useRef<AbortController | null>(null)
   const audienceRef = useRef<HTMLDivElement | null>(null)
+  const broadcastTemplateRef = useRef<HTMLDivElement | null>(null)
+  const reminderTemplateRef = useRef<HTMLDivElement | null>(null)
 
   const showStatus = useCallback((nextStatus: string, isError = false) => {
     if (statusTimerRef.current) {
@@ -147,15 +152,21 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   }, [])
 
   useEffect(() => {
-    if (!audienceOpen) return
+    if (!audienceOpen && !broadcastTemplateOpen && !reminderTemplateOpen) return
     const handleClick = (event: MouseEvent) => {
-      if (!audienceRef.current) return
-      if (audienceRef.current.contains(event.target as Node)) return
+      const target = event.target as Node
+      if (audienceRef.current?.contains(target)) return
+      if (broadcastTemplateRef.current?.contains(target)) return
+      if (reminderTemplateRef.current?.contains(target)) return
       setAudienceOpen(false)
+      setBroadcastTemplateOpen(false)
+      setReminderTemplateOpen(false)
     }
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setAudienceOpen(false)
+        setBroadcastTemplateOpen(false)
+        setReminderTemplateOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -164,11 +175,15 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       document.removeEventListener('mousedown', handleClick)
       document.removeEventListener('keydown', handleKey)
     }
-  }, [audienceOpen])
+  }, [audienceOpen, broadcastTemplateOpen, reminderTemplateOpen])
 
   useEffect(() => {
     if (activeTab !== 'broadcast') {
       setAudienceOpen(false)
+      setBroadcastTemplateOpen(false)
+    }
+    if (activeTab !== 'reminder') {
+      setReminderTemplateOpen(false)
     }
   }, [activeTab])
 
@@ -269,6 +284,39 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     ]
   }, [discountPercent, masterLabel])
 
+  const broadcastTemplates: Template[] = useMemo(() => {
+    const slotsText = `Привет! ${masterLabel} появились свободные окна на ближайшие дни. Если хотите записаться, выберите время по кнопке ниже.`
+    const promoText =
+      discountPercent > 0
+        ? `Есть приятная новость ${masterLabel}: действует скидка -${discountPercent}% на ближайшую запись. Если интересно, выберите время по кнопке ниже.`
+        : `Есть приятная новость ${masterLabel}: для записи действует небольшой бонус. Если интересно, выберите время по кнопке ниже.`
+    const newsText = `Короткое обновление ${masterLabel}: появились новые работы и свежие идеи. Если хотите записаться, выберите время по кнопке ниже.`
+
+    return [
+      {
+        id: 'slots',
+        title: 'Свободные окна',
+        description: 'Слоты на ближайшие дни и недели.',
+        text: slotsText,
+      },
+      {
+        id: 'promo',
+        title: discountPercent > 0 ? `Акция -${discountPercent}%` : 'Спецпредложение',
+        description:
+          discountPercent > 0
+            ? 'Скидка для быстрой записи.'
+            : 'Небольшой бонус для записи.',
+        text: promoText,
+      },
+      {
+        id: 'news',
+        title: 'Новости',
+        description: 'Новые работы, портфолио и идеи.',
+        text: newsText,
+      },
+    ]
+  }, [discountPercent, masterLabel])
+
   useEffect(() => {
     if (activeTab !== 'reminder') return
     if (reminderTouched || reminderDraft.trim()) return
@@ -329,6 +377,23 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       : 'Сообщение появится в активных чатах с клиентами.'
 
   const reminderHint = `Напомним клиентам, которые не были ${reminderWindow}+ дней.`
+
+  const reminderTemplateLabel =
+    reminderTemplates.find((template) => template.id === reminderTone)?.title ??
+    'Шаблон сообщения'
+  const selectedBroadcastTemplate = broadcastTemplateId
+    ? broadcastTemplates.find((template) => template.id === broadcastTemplateId)
+    : null
+  const broadcastTemplateLabel = selectedBroadcastTemplate?.title ?? 'Шаблон сообщения'
+
+  const handleInsertBroadcastTemplate = useCallback(
+    (template: Template) => {
+      setBroadcastDraft(template.text)
+      setBroadcastTemplateId(template.id)
+      showStatus('Текст вставлен в сообщение.')
+    },
+    [showStatus]
+  )
 
   const handleInsertReminderTemplate = useCallback(
     (template: Template) => {
@@ -427,6 +492,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const handleClear = useCallback(() => {
     if (activeTab === 'broadcast') {
       setBroadcastDraft('')
+      setBroadcastTemplateId(null)
     } else {
       setReminderDraft('')
       setReminderTouched(true)
@@ -508,7 +574,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     audienceOpen ? ' is-open' : ''
                   }`}
                   type="button"
-                  onClick={() => setAudienceOpen((current) => !current)}
+                  onClick={() => {
+                    setAudienceOpen((current) => !current)
+                    setBroadcastTemplateOpen(false)
+                    setReminderTemplateOpen(false)
+                  }}
                   aria-haspopup="listbox"
                   aria-expanded={audienceOpen}
                 >
@@ -591,12 +661,59 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 placeholder="Напишите короткое сообщение для клиентов"
                 rows={5}
               />
-              <div className="pro-marketing-textarea-meta">
-                <span>{audienceLabel}</span>
-                <span className={isTextTooLong ? 'is-error' : ''}>
-                  {payloadLength}/{MARKETING_TEXT_LIMIT}
-                </span>
+            </div>
+
+            <div className="pro-marketing-template-row">
+              <div className="pro-marketing-template-select" ref={broadcastTemplateRef}>
+                <button
+                  className={`pro-marketing-select-trigger${
+                    broadcastTemplateId ? '' : ' is-placeholder'
+                  }${broadcastTemplateOpen ? ' is-open' : ''}`}
+                  type="button"
+                  onClick={() => {
+                    setBroadcastTemplateOpen((current) => !current)
+                    setReminderTemplateOpen(false)
+                    setAudienceOpen(false)
+                  }}
+                  aria-haspopup="listbox"
+                  aria-expanded={broadcastTemplateOpen}
+                >
+                  {broadcastTemplateLabel}
+                </button>
+                {broadcastTemplateOpen && (
+                  <div
+                    className="pro-marketing-select-menu"
+                    role="listbox"
+                    aria-label="Шаблон рассылки"
+                  >
+                    {broadcastTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        className={`pro-marketing-select-option${
+                          broadcastTemplateId === template.id ? ' is-active' : ''
+                        }`}
+                        type="button"
+                        role="option"
+                        aria-selected={broadcastTemplateId === template.id}
+                        onClick={() => {
+                          handleInsertBroadcastTemplate(template)
+                          setBroadcastTemplateOpen(false)
+                        }}
+                      >
+                        <span className="pro-marketing-select-option-title">
+                          {template.title}
+                        </span>
+                        <span className="pro-marketing-select-option-desc">
+                          {template.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+              <span className={`pro-marketing-count${isTextTooLong ? ' is-error' : ''}`}>
+                {payloadLength}/{MARKETING_TEXT_LIMIT}
+              </span>
             </div>
 
             <div className="pro-marketing-discount">
@@ -753,12 +870,59 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 placeholder="Напишите короткое сообщение для клиентов"
                 rows={5}
               />
-              <div className="pro-marketing-textarea-meta">
-                <span>{audienceLabel}</span>
-                <span className={isTextTooLong ? 'is-error' : ''}>
-                  {payloadLength}/{MARKETING_TEXT_LIMIT}
-                </span>
+            </div>
+
+            <div className="pro-marketing-template-row">
+              <div className="pro-marketing-template-select" ref={reminderTemplateRef}>
+                <button
+                  className={`pro-marketing-select-trigger${
+                    reminderTemplateOpen ? ' is-open' : ''
+                  }`}
+                  type="button"
+                  onClick={() => {
+                    setReminderTemplateOpen((current) => !current)
+                    setBroadcastTemplateOpen(false)
+                    setAudienceOpen(false)
+                  }}
+                  aria-haspopup="listbox"
+                  aria-expanded={reminderTemplateOpen}
+                >
+                  {reminderTemplateLabel}
+                </button>
+                {reminderTemplateOpen && (
+                  <div
+                    className="pro-marketing-select-menu"
+                    role="listbox"
+                    aria-label="Шаблон напоминания"
+                  >
+                    {reminderTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        className={`pro-marketing-select-option${
+                          reminderTone === template.id ? ' is-active' : ''
+                        }`}
+                        type="button"
+                        role="option"
+                        aria-selected={reminderTone === template.id}
+                        onClick={() => {
+                          handleInsertReminderTemplate(template)
+                          setReminderTemplateOpen(false)
+                        }}
+                      >
+                        <span className="pro-marketing-select-option-title">
+                          {template.title}
+                        </span>
+                        <span className="pro-marketing-select-option-desc">
+                          {template.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+              <span className={`pro-marketing-count${isTextTooLong ? ' is-error' : ''}`}>
+                {payloadLength}/{MARKETING_TEXT_LIMIT}
+              </span>
             </div>
 
             <div className="pro-marketing-discount">
