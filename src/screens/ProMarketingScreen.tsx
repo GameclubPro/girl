@@ -469,6 +469,23 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           <section className="pro-detail-card pro-marketing-panel animate delay-1">
             <div className="pro-detail-card-head">
               <h2>Рассылка клиентам</h2>
+              <div className="pro-marketing-head-controls">
+                <span className="pro-marketing-head-label">Аудитория</span>
+                <div className="pro-marketing-select">
+                  <select
+                    value={broadcastAudience}
+                    onChange={(event) =>
+                      setBroadcastAudience(event.target.value as 'all' | 'repeat')
+                    }
+                    aria-label="Аудитория рассылки"
+                  >
+                    <option value="all">Все клиенты · {bookingStats.uniqueClients}</option>
+                    <option value="repeat">
+                      Постоянные · {bookingStats.repeatClients}
+                    </option>
+                  </select>
+                </div>
+              </div>
             </div>
             <p className="pro-detail-text">{channelHint}</p>
 
@@ -498,27 +515,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     ? 'Считаем аудиторию...'
                     : `Активных чатов: ${chatAudience ?? 0}`}
                 </span>
-              </button>
-            </div>
-
-            <div className="pro-marketing-window-row" role="group" aria-label="Аудитория">
-              <button
-                className={`pro-marketing-chip${
-                  broadcastAudience === 'all' ? ' is-active' : ''
-                }`}
-                type="button"
-                onClick={() => setBroadcastAudience('all')}
-              >
-                Все клиенты · {bookingStats.uniqueClients}
-              </button>
-              <button
-                className={`pro-marketing-chip${
-                  broadcastAudience === 'repeat' ? ' is-active' : ''
-                }`}
-                type="button"
-                onClick={() => setBroadcastAudience('repeat')}
-              >
-                Постоянные · {bookingStats.repeatClients}
               </button>
             </div>
 
