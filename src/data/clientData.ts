@@ -7,7 +7,7 @@ import popularBrowsLashes from '../assets/popular/brows-lashes.webp'
 import popularCleaning from '../assets/popular/cleaning.webp'
 import popularNanny from '../assets/popular/nanny.webp'
 import collectionBudgetArt from '../assets/collections/collection-budget.webp'
-import collectionExpressArt from '../assets/collections/collection-express.png'
+import collectionExpressArt from '../../ChatGPT Image Feb 1, 2026, 01_26_37 AM (3).webp'
 import collectionStarsArt from '../../ChatGPT Image Feb 1, 2026, 01_24_43 AM (1) (1).webp'
 import collectionVisitArt from '../assets/collections/collection-visit.webp'
 import collectionVerifiedArt from '../assets/collections/collection-verified.webp'
@@ -56,8 +56,8 @@ export const collectionItems = [
     cornerImage: collectionBudgetArt,
     cornerImagePosition: 'bottom-right',
     cornerImageSize: 'clamp(120px, 42vw, 180px)',
-    cornerImageRight: '0px',
-    cornerImageBottom: '0px',
+    cornerImageRight: '6px',
+    cornerImageBottom: '6px',
   },
   {
     id: 'verified',
