@@ -7,6 +7,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type MutableRefObject,
   type ReactElement,
 } from 'react'
 import { ScreenLoader } from './components/ScreenLoader'
@@ -193,6 +194,8 @@ type View =
   | 'pro-stories'
   | 'pro-requests'
 
+type PendingNavPerf = { view: View; id: number }
+
 type BookingReturnView =
   | 'client'
   | 'client-profile'
@@ -208,6 +211,37 @@ type ChatReturnView =
   | 'client'
   | 'client-profile'
   | 'pro-requests'
+
+const ScreenPerfMarker = ({
+  screenView,
+  children,
+  pendingNavPerfRef,
+}: {
+  screenView: View
+  children: ReactElement
+  pendingNavPerfRef: MutableRefObject<PendingNavPerf | null>
+}) => {
+  useEffect(() => {
+    markScreenMount(screenView)
+    const rafId = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const pending = pendingNavPerfRef.current
+        if (pending?.view === screenView) {
+          markNavEnd(screenView, pending.id, { view: screenView })
+          if (pendingNavPerfRef.current?.id === pending.id) {
+            pendingNavPerfRef.current = null
+          }
+        }
+        markScreenPaint(screenView)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(rafId)
+    }
+  }, [pendingNavPerfRef, screenView])
+
+  return children
+}
   | 'pro-cabinet'
 
 type RequestsNavOptions = {
@@ -1436,39 +1470,12 @@ function App() {
     [preloadView]
   )
 
-  const ScreenPerfMarker = ({
-    screenView,
-    children,
-  }: {
-    screenView: View
-    children: ReactElement
-  }) => {
-    useEffect(() => {
-      markScreenMount(screenView)
-      const rafId = window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          const pending = pendingNavPerfRef.current
-          if (pending?.view === screenView) {
-            markNavEnd(screenView, pending.id, { view: screenView })
-            if (pendingNavPerfRef.current?.id === pending.id) {
-              pendingNavPerfRef.current = null
-            }
-          }
-          markScreenPaint(screenView)
-        })
-      })
-      return () => {
-        window.cancelAnimationFrame(rafId)
-      }
-    }, [screenView])
-
-    return children
-  }
-
   const renderScreen = (screenView: View, screen: ReactElement) => (
     <NavPreloadContext.Provider value={navPreloadHandler}>
       <Suspense fallback={<ScreenLoader />}>
-        <ScreenPerfMarker screenView={screenView}>{screen}</ScreenPerfMarker>
+        <ScreenPerfMarker screenView={screenView} pendingNavPerfRef={pendingNavPerfRef}>
+          {screen}
+        </ScreenPerfMarker>
       </Suspense>
     </NavPreloadContext.Provider>
   )
