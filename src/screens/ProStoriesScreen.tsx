@@ -206,19 +206,6 @@ export const ProStoriesScreen = ({
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-stories">
       <div className="pro-detail-shell">
-        <header className="pro-detail-header">
-          <button className="pro-back" type="button" onClick={onBack}>
-            ←
-          </button>
-          <div className="pro-detail-title">
-            <p className="pro-detail-kicker">Истории</p>
-            <h1 className="pro-detail-heading">Story-студия</h1>
-            <p className="pro-detail-subtitle">
-              Делитесь результатами работы и напоминайте о себе подписчикам.
-            </p>
-          </div>
-        </header>
-
         {isLoading && (
           <p className="pro-cabinet-dashboard-status" role="status">
             Обновляем истории...

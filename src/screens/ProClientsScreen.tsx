@@ -39,32 +39,15 @@ export const ProClientsScreen = ({
   onViewChats,
   onEditProfile,
 }: ProClientsScreenProps) => {
-  const { bookingStats, lastUpdated, isLoading, combinedError } =
-    useProCabinetData(apiBase, userId)
-  const lastUpdatedLabel = lastUpdated
-    ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
-    : ''
+  const { bookingStats, isLoading, combinedError } = useProCabinetData(
+    apiBase,
+    userId
+  )
   const hasClients = bookingStats.clientSummaries.length > 0
 
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-clients">
       <div className="pro-detail-shell">
-        <header className="pro-detail-header">
-          <button className="pro-back" type="button" onClick={onBack}>
-            ←
-          </button>
-          <div className="pro-detail-title">
-            <p className="pro-detail-kicker">Клиенты</p>
-            <h1 className="pro-detail-heading">Клиентская база</h1>
-            <p className="pro-detail-subtitle">
-              Отслеживайте повторные визиты и активных клиентов.
-            </p>
-          </div>
-        </header>
-
         {isLoading && (
           <p className="pro-cabinet-dashboard-status" role="status">
             Синхронизируем данные...
@@ -74,9 +57,6 @@ export const ProClientsScreen = ({
           <p className="pro-cabinet-dashboard-status is-error" role="alert">
             {combinedError}
           </p>
-        )}
-        {lastUpdatedLabel && !combinedError && (
-          <p className="pro-detail-meta">{lastUpdatedLabel}</p>
         )}
 
         <section className="pro-detail-card animate delay-1">

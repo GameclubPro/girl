@@ -70,10 +70,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     onViewChats,
     onEditProfile,
   } = props
-  const { bookings, lastUpdated, isLoading, combinedError } = useProCabinetData(
-    apiBase,
-    userId
-  )
+  const { bookings, isLoading, combinedError } = useProCabinetData(apiBase, userId)
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
   const bookingStartParam = useMemo(() => buildBookingStartParam(userId), [userId])
@@ -583,13 +580,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     setRepeatDraftInitialized(true)
   }, [repeatSettings])
 
-  const lastUpdatedLabel = lastUpdated
-    ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
-    : ''
-
   const repeatEligibleBotCount = marketingSummary?.repeatEligibleBotCount
   const repeatEligibleChatCount = marketingSummary?.repeatEligibleChatCount
   const repeatEligibleCount =
@@ -617,19 +607,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-marketing">
       <div className="pro-detail-shell">
-        <header className="pro-detail-header">
-          <button className="pro-back" type="button" onClick={onBack}>
-            ←
-          </button>
-          <div className="pro-detail-title">
-            <p className="pro-detail-kicker">Маркетинг</p>
-            <h1 className="pro-detail-heading">Коммуникации</h1>
-            <p className="pro-detail-subtitle">
-              Два удобных окна: массовая рассылка и повторные записи.
-            </p>
-          </div>
-        </header>
-
         {isLoading && (
           <p className="pro-cabinet-dashboard-status" role="status">
             Синхронизируем данные...
@@ -640,10 +617,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
             {combinedError}
           </p>
         )}
-        {lastUpdatedLabel && !combinedError && (
-          <p className="pro-detail-meta">{lastUpdatedLabel}</p>
-        )}
-
         {marketingError && (
           <p className="pro-detail-warning" role="alert">
             {marketingError}
