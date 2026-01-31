@@ -210,6 +210,7 @@ type ChatReturnView =
   | 'requests'
   | 'client'
   | 'client-profile'
+  | 'pro-cabinet'
   | 'pro-requests'
 
 const ScreenPerfMarker = ({
