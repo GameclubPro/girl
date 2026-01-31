@@ -116,12 +116,6 @@ const ProCabinetScreen = lazy(() =>
     default: module.ProCabinetScreen,
   }))
 )
-const loadProCampaignsScreen = () => import('./screens/ProCampaignsScreen')
-const ProCampaignsScreen = lazy(() =>
-  loadProCampaignsScreen().then((module) => ({
-    default: module.ProCampaignsScreen,
-  }))
-)
 const loadProMarketingScreen = () => import('./screens/ProMarketingScreen')
 const ProMarketingScreen = lazy(() =>
   loadProMarketingScreen().then((module) => ({
@@ -144,12 +138,6 @@ const loadProRequestsScreen = () => import('./screens/ProRequestsScreen')
 const ProRequestsScreen = lazy(() =>
   loadProRequestsScreen().then((module) => ({
     default: module.ProRequestsScreen,
-  }))
-)
-const loadProRemindersScreen = () => import('./screens/ProRemindersScreen')
-const ProRemindersScreen = lazy(() =>
-  loadProRemindersScreen().then((module) => ({
-    default: module.ProRemindersScreen,
   }))
 )
 const loadProStoriesScreen = () => import('./screens/ProStoriesScreen')
@@ -188,9 +176,7 @@ type View =
   | 'pro-profile'
   | 'pro-analytics'
   | 'pro-clients'
-  | 'pro-campaigns'
   | 'pro-marketing'
-  | 'pro-reminders'
   | 'pro-stories'
   | 'pro-requests'
 
@@ -273,12 +259,10 @@ const viewLoaders: Partial<Record<View, () => Promise<unknown>>> = {
   booking: loadBookingScreen,
   'pro-analytics': loadProAnalyticsScreen,
   'pro-cabinet': loadProCabinetScreen,
-  'pro-campaigns': loadProCampaignsScreen,
   'pro-marketing': loadProMarketingScreen,
   'pro-clients': loadProClientsScreen,
   'pro-profile': loadProProfileScreen,
   'pro-requests': loadProRequestsScreen,
-  'pro-reminders': loadProRemindersScreen,
   'pro-stories': loadProStoriesScreen,
   request: loadRequestScreen,
 }
@@ -303,9 +287,7 @@ const proWarmViews: View[] = [
   'pro-requests',
   'pro-analytics',
   'pro-clients',
-  'pro-campaigns',
   'pro-marketing',
-  'pro-reminders',
   'pro-stories',
   'chats',
   'chat-thread',
@@ -1156,9 +1138,7 @@ function App() {
           break
         case 'pro-analytics':
         case 'pro-clients':
-        case 'pro-campaigns':
         case 'pro-marketing':
-        case 'pro-reminders':
         case 'pro-stories':
           goBack('pro-cabinet')
           break
@@ -1889,46 +1869,10 @@ function App() {
     )
   }
 
-  if (view === 'pro-campaigns') {
-    return renderScreen(
-      'pro-campaigns',
-      <ProCampaignsScreen
-        apiBase={apiBase}
-        userId={userId}
-        displayNameFallback={clientName}
-        onBack={() => goBack('pro-cabinet')}
-        onViewRequests={() => openProRequests()}
-        onViewChats={openChatList}
-        onEditProfile={() => {
-          openProProfile()
-        }}
-      />
-    )
-  }
-
   if (view === 'pro-marketing') {
     return renderScreen(
       'pro-marketing',
       <ProMarketingScreen
-        apiBase={apiBase}
-        userId={userId}
-        displayNameFallback={clientName}
-        onBack={() => goBack('pro-cabinet')}
-        onViewRequests={() => openProRequests()}
-        onViewChats={openChatList}
-        onEditProfile={() => {
-          openProProfile()
-        }}
-        onOpenCampaigns={() => navigate('pro-campaigns')}
-        onOpenReminders={() => navigate('pro-reminders')}
-      />
-    )
-  }
-
-  if (view === 'pro-reminders') {
-    return renderScreen(
-      'pro-reminders',
-      <ProRemindersScreen
         apiBase={apiBase}
         userId={userId}
         displayNameFallback={clientName}

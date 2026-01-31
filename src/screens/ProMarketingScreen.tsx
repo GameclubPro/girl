@@ -48,8 +48,6 @@ type ProMarketingScreenProps = {
   onViewRequests: () => void
   onViewChats: () => void
   onEditProfile: () => void
-  onOpenCampaigns: () => void
-  onOpenReminders: () => void
 }
 
 const formatShortDateTime = (value: number) =>
@@ -804,6 +802,14 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                   {value}+ дней
                 </button>
               ))}
+            </div>
+            <div className="pro-detail-chip-row">
+              <span className="pro-detail-chip is-ghost">
+                30+ дней: {inactiveCounts.count30}
+              </span>
+              <span className="pro-detail-chip is-ghost">
+                60+ дней: {inactiveCounts.count60}
+              </span>
             </div>
 
             <div className="pro-marketing-templates">
