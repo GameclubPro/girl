@@ -417,7 +417,7 @@ export const ProCabinetScreen = ({
               </span>
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">Рост</span>
-                <span className="pro-cabinet-nav-title">Маркетинг</span>
+                <span className="pro-cabinet-nav-title">Продвижение</span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
