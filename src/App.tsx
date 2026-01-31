@@ -1531,6 +1531,7 @@ function App() {
       'client-showcase',
       <ClientShowcaseScreen
         apiBase={apiBase}
+        userId={userId}
         activeCategoryId={clientCategoryId}
         onCategoryChange={setClientCategoryId}
         onBack={() => goBack('client')}

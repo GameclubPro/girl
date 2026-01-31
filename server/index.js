@@ -367,6 +367,35 @@ const loadPromotionEligibility = async (masterId) => {
   return { ok: hasAvatar && hasPortfolio, hasAvatar, hasPortfolio }
 }
 
+const buildPromotionAudienceClause = ({
+  viewerIndex,
+  masterAlias = 'mp',
+  promotionAlias = 'promo',
+}) => `
+  AND (
+    ${promotionAlias}.audience = 'all'
+    OR ${promotionAlias}.master_id = $${viewerIndex}
+    OR (
+      ${promotionAlias}.audience = 'followers'
+      AND EXISTS (
+        SELECT 1
+        FROM master_followers mf
+        WHERE mf.master_id = ${masterAlias}.user_id
+          AND mf.follower_id = $${viewerIndex}
+      )
+    )
+    OR (
+      ${promotionAlias}.audience = 'clients'
+      AND EXISTS (
+        SELECT 1
+        FROM service_bookings sb
+        WHERE sb.master_id = ${masterAlias}.user_id
+          AND sb.client_id = $${viewerIndex}
+      )
+    )
+  )
+`
+
 const parseOptionalInt = (value) => {
   if (typeof value === 'number') {
     return Number.isInteger(value) ? value : null
@@ -4207,6 +4236,11 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE INDEX IF NOT EXISTS service_bookings_master_client_idx
+    ON service_bookings (master_id, client_id);
+  `)
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS service_bookings_client_created_idx
     ON service_bookings (client_id, created_at DESC);
   `)
@@ -4810,6 +4844,10 @@ app.get('/api/masters', async (req, res) => {
   const clientLat = parseOptionalFloat(req.query.clientLat)
   const clientLng = parseOptionalFloat(req.query.clientLng)
   const sortMode = normalizeText(req.query.sort)
+  const viewerId = normalizeText(req.query.viewerId ?? req.query.userId)
+  const promotionsOnly = ['1', 'true', 'yes', 'on'].includes(
+    normalizeText(req.query.promotionsOnly ?? req.query.promoOnly)
+  )
   const hasClientLocation = clientLat !== null && clientLng !== null
 
   const conditions = []
@@ -4827,7 +4865,16 @@ app.get('/api/masters', async (req, res) => {
     conditions.push(`$${values.length} = ANY(mp.categories)`)
   }
 
-  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  values.push(viewerId || null)
+  const viewerIndex = values.length
+  const whereParts = []
+  if (conditions.length) {
+    whereParts.push(conditions.join(' AND '))
+  }
+  if (promotionsOnly) {
+    whereParts.push('promo.id IS NOT NULL')
+  }
+  const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
   let limitClause = 'LIMIT 50'
   if (Number.isInteger(limitParam)) {
     if (limitParam > 0) {
@@ -4907,12 +4954,17 @@ app.get('/api/masters', async (req, res) => {
             start_at,
             end_at,
             audience
-          FROM master_promotions
-          WHERE master_id = mp.user_id
-            AND status = 'active'
-            AND start_at <= NOW()
-            AND end_at > NOW()
-          ORDER BY end_at ASC
+          FROM master_promotions mpromo
+          WHERE mpromo.master_id = mp.user_id
+            AND mpromo.status = 'active'
+            AND mpromo.start_at <= NOW()
+            AND mpromo.end_at > NOW()
+            ${buildPromotionAudienceClause({
+              viewerIndex,
+              masterAlias: 'mp',
+              promotionAlias: 'mpromo',
+            })}
+          ORDER BY mpromo.end_at ASC
           LIMIT 1
         ) promo ON TRUE
         ${whereClause}
@@ -5007,7 +5059,7 @@ app.get('/api/masters', async (req, res) => {
 
 app.get('/api/masters/:userId', async (req, res) => {
   const normalizedUserId = normalizeText(req.params.userId)
-  const viewerId = normalizeText(req.query.viewerId)
+  const viewerId = normalizeText(req.query.viewerId ?? req.query.userId)
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
     return
@@ -5095,12 +5147,17 @@ app.get('/api/masters/:userId', async (req, res) => {
             start_at,
             end_at,
             audience
-          FROM master_promotions
-          WHERE master_id = mp.user_id
-            AND status = 'active'
-            AND start_at <= NOW()
-            AND end_at > NOW()
-          ORDER BY end_at ASC
+          FROM master_promotions mpromo
+          WHERE mpromo.master_id = mp.user_id
+            AND mpromo.status = 'active'
+            AND mpromo.start_at <= NOW()
+            AND mpromo.end_at > NOW()
+            ${buildPromotionAudienceClause({
+              viewerIndex: 2,
+              masterAlias: 'mp',
+              promotionAlias: 'mpromo',
+            })}
+          ORDER BY mpromo.end_at ASC
           LIMIT 1
         ) promo ON TRUE
         WHERE mp.user_id = $1
@@ -5163,6 +5220,7 @@ app.get('/api/masters/:userId', async (req, res) => {
 
 app.get('/api/masters/:userId/promotions', async (req, res) => {
   const masterId = normalizeText(req.params.userId)
+  const viewerId = normalizeText(req.query.viewerId ?? req.query.userId)
   if (!masterId) {
     res.status(400).json({ error: 'userId_required' })
     return
@@ -5189,9 +5247,29 @@ app.get('/api/masters/:userId/promotions', async (req, res) => {
           AND status = 'active'
           AND start_at <= NOW()
           AND end_at > NOW()
+          AND (
+            audience = 'all'
+            OR $2::text = $1
+            OR (
+              audience = 'followers'
+              AND EXISTS (
+                SELECT 1
+                FROM master_followers mf
+                WHERE mf.master_id = $1 AND mf.follower_id = $2
+              )
+            )
+            OR (
+              audience = 'clients'
+              AND EXISTS (
+                SELECT 1
+                FROM service_bookings sb
+                WHERE sb.master_id = $1 AND sb.client_id = $2
+              )
+            )
+          )
         ORDER BY end_at ASC
       `,
-      [masterId]
+      [masterId, viewerId || null]
     )
     res.json(result.rows.map(mapPromotionRow))
   } catch (error) {

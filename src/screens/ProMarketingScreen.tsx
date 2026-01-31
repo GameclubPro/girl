@@ -1447,7 +1447,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               !promotionsLoading && (
                 <p className="pro-detail-empty">
                   Пока нет активных акций. Создайте первую — клиенты увидят её в
-                  поиске.
+                  подборке и разделе «Акции».
                 </p>
               )
             )}
