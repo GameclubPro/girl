@@ -107,7 +107,7 @@ type ProCabinetScreenProps = {
   onViewChats: () => void
   onOpenAnalytics: () => void
   onOpenClients: () => void
-  onOpenCampaigns: () => void
+  onOpenMarketing: () => void
   onOpenCalendar: () => void
   onOpenShowcase: () => void
   onOpenStories: () => void
@@ -123,7 +123,7 @@ export const ProCabinetScreen = ({
   onViewChats,
   onOpenAnalytics,
   onOpenClients,
-  onOpenCampaigns,
+  onOpenMarketing,
   onOpenCalendar,
   onOpenShowcase,
   onOpenStories,
@@ -230,12 +230,12 @@ export const ProCabinetScreen = ({
   const repeatShare = totalClients
     ? Math.max(0, Math.min(100, Math.round((repeatClients / totalClients) * 100)))
     : 0
-  const campaignAudience = bookingStats.uniqueClients
-  const campaignRepeatRate = campaignAudience
-    ? bookingStats.repeatClients / campaignAudience
+  const marketingAudience = bookingStats.uniqueClients
+  const marketingRepeatRate = marketingAudience
+    ? bookingStats.repeatClients / marketingAudience
     : 0
-  const campaignMeter = campaignAudience
-    ? Math.min(100, Math.max(12, Math.round(campaignRepeatRate * 100)))
+  const marketingMeter = marketingAudience
+    ? Math.min(100, Math.max(12, Math.round(marketingRepeatRate * 100)))
     : 0
   const showcaseTiles: Array<PortfolioItem | null> =
     showcasePreview.length > 0 ? showcasePreview : [null]
@@ -406,9 +406,9 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-campaigns animate delay-4"
+            className="pro-cabinet-nav-card is-marketing animate delay-4"
             type="button"
-            onClick={onOpenCampaigns}
+            onClick={onOpenMarketing}
           >
             {tapHint}
             <div className="pro-cabinet-nav-head">
@@ -416,15 +416,15 @@ export const ProCabinetScreen = ({
                 <IconChat />
               </span>
               <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Продажи</span>
-                <span className="pro-cabinet-nav-title">Рассылка</span>
+                <span className="pro-cabinet-nav-kicker">Рост</span>
+                <span className="pro-cabinet-nav-title">Маркетинг</span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-meter" aria-hidden="true">
                 <span
                   className="pro-cabinet-nav-meter-fill"
-                  style={{ '--meter': campaignMeter } as CSSProperties}
+                  style={{ '--meter': marketingMeter } as CSSProperties}
                 />
               </div>
               <div className="pro-cabinet-nav-stats">
@@ -432,13 +432,13 @@ export const ProCabinetScreen = ({
                   <span className="pro-cabinet-nav-stat-value">
                     {bookingStats.uniqueClients}
                   </span>
-                  <span className="pro-cabinet-nav-stat-label">Контакты</span>
+                  <span className="pro-cabinet-nav-stat-label">Аудитория</span>
                 </div>
                 <div className="pro-cabinet-nav-stat">
                   <span className="pro-cabinet-nav-stat-value">
                     {bookingStats.repeatClients}
                   </span>
-                  <span className="pro-cabinet-nav-stat-label">Лояльные</span>
+                  <span className="pro-cabinet-nav-stat-label">Повторные</span>
                 </div>
               </div>
             </div>

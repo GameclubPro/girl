@@ -117,6 +117,12 @@ const ProCampaignsScreen = lazy(() =>
     default: module.ProCampaignsScreen,
   }))
 )
+const loadProMarketingScreen = () => import('./screens/ProMarketingScreen')
+const ProMarketingScreen = lazy(() =>
+  loadProMarketingScreen().then((module) => ({
+    default: module.ProMarketingScreen,
+  }))
+)
 const loadProClientsScreen = () => import('./screens/ProClientsScreen')
 const ProClientsScreen = lazy(() =>
   loadProClientsScreen().then((module) => ({
@@ -178,6 +184,7 @@ type View =
   | 'pro-analytics'
   | 'pro-clients'
   | 'pro-campaigns'
+  | 'pro-marketing'
   | 'pro-reminders'
   | 'pro-stories'
   | 'pro-requests'
@@ -229,6 +236,7 @@ const viewLoaders: Partial<Record<View, () => Promise<unknown>>> = {
   'pro-analytics': loadProAnalyticsScreen,
   'pro-cabinet': loadProCabinetScreen,
   'pro-campaigns': loadProCampaignsScreen,
+  'pro-marketing': loadProMarketingScreen,
   'pro-clients': loadProClientsScreen,
   'pro-profile': loadProProfileScreen,
   'pro-requests': loadProRequestsScreen,
@@ -258,6 +266,7 @@ const proWarmViews: View[] = [
   'pro-analytics',
   'pro-clients',
   'pro-campaigns',
+  'pro-marketing',
   'pro-reminders',
   'pro-stories',
   'chats',
@@ -1073,6 +1082,7 @@ function App() {
         case 'pro-analytics':
         case 'pro-clients':
         case 'pro-campaigns':
+        case 'pro-marketing':
         case 'pro-reminders':
         case 'pro-stories':
           goBack('pro-cabinet')
@@ -1822,6 +1832,25 @@ function App() {
     )
   }
 
+  if (view === 'pro-marketing') {
+    return renderScreen(
+      'pro-marketing',
+      <ProMarketingScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        onBack={() => goBack('pro-cabinet')}
+        onViewRequests={() => openProRequests()}
+        onViewChats={openChatList}
+        onEditProfile={() => {
+          openProProfile()
+        }}
+        onOpenCampaigns={() => navigate('pro-campaigns')}
+        onOpenReminders={() => navigate('pro-reminders')}
+      />
+    )
+  }
+
   if (view === 'pro-reminders') {
     return renderScreen(
       'pro-reminders',
@@ -1868,7 +1897,7 @@ function App() {
         onOpenSupport={() => void openSupportChat('pro-cabinet')}
         onOpenAnalytics={() => navigate('pro-analytics')}
         onOpenClients={() => navigate('pro-clients')}
-        onOpenCampaigns={() => navigate('pro-campaigns')}
+        onOpenMarketing={() => navigate('pro-marketing')}
         onOpenCalendar={() => openProRequests('bookings')}
         onOpenShowcase={() =>
           openProProfile({ section: 'portfolio', portfolioView: 'showcase' })
