@@ -985,22 +985,48 @@ const resolveUserDisplayName = async (userId) => {
   return formatUserDisplayName(row.firstName, row.lastName, row.username, '')
 }
 
-const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl }) => {
+const buildTelegramButtons = (buttons) => {
+  if (!Array.isArray(buttons)) return []
+  return buttons
+    .map((button) => {
+      if (!button || typeof button !== 'object') return null
+      const label = normalizeText(button.text)
+      if (!label) return null
+      const webAppUrl = normalizeText(button.webAppUrl)
+      if (webAppUrl) {
+        return { text: label, web_app: { url: webAppUrl } }
+      }
+      const url = normalizeText(button.url)
+      if (url) {
+        return { text: label, url }
+      }
+      return null
+    })
+    .filter(Boolean)
+}
+
+const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl, buttons }) => {
   if (!telegramBotToken) return false
   if (typeof fetch !== 'function') return false
-  const button = webAppUrl
+  const normalizedButtons = buildTelegramButtons(buttons)
+  const fallbackButton = webAppUrl
     ? { text: 'Открыть чат', web_app: { url: webAppUrl } }
     : url
       ? { text: 'Открыть чат', url }
       : null
+  const resolvedButtons = normalizedButtons.length
+    ? normalizedButtons
+    : fallbackButton
+      ? [fallbackButton]
+      : []
   const payload = {
     chat_id: recipientId,
     text,
     disable_web_page_preview: true,
-    ...(button
+    ...(resolvedButtons.length
       ? {
           reply_markup: {
-            inline_keyboard: [[button]],
+            inline_keyboard: resolvedButtons.map((button) => [button]),
           },
         }
       : {}),
@@ -7197,6 +7223,7 @@ const fetchMarketingRecipients = async ({ masterId, limit }) => {
 const sendMarketingBotBroadcast = async ({
   masterId,
   text,
+  includeLink,
   includeUnsubscribe,
   limit,
 }) => {
@@ -7205,13 +7232,22 @@ const sendMarketingBotBroadcast = async ({
     error.code = 'bot_not_configured'
     throw error
   }
+  const bookingLink =
+    includeLink && telegramWebAppUrl
+      ? buildStartAppUrl(telegramWebAppUrl, `book_${masterId}`)
+      : ''
   const unsubscribeLink =
     includeUnsubscribe && telegramWebAppUrl
       ? buildStartAppUrl(telegramWebAppUrl, `unsub_${masterId}`)
       : ''
-  const payloadText = unsubscribeLink
-    ? `${text}\n\nОтписаться: ${unsubscribeLink}`
-    : text
+  const buttons = []
+  if (bookingLink) {
+    buttons.push({ text: 'Записаться', webAppUrl: bookingLink })
+  }
+  if (unsubscribeLink) {
+    buttons.push({ text: 'Отписаться', webAppUrl: unsubscribeLink })
+  }
+  const payloadText = text
   const recipients = await fetchMarketingRecipients({ masterId, limit })
 
   if (recipients.length === 0) {
@@ -7227,6 +7263,7 @@ const sendMarketingBotBroadcast = async ({
         sendTelegramMessage({
           recipientId,
           text: payloadText,
+          buttons,
         })
       )
     )
@@ -7332,6 +7369,7 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
   }
 
   const includeUnsubscribe = Boolean(req.body?.includeUnsubscribe)
+  const includeLink = Boolean(req.body?.includeLink)
   const rawLimit = parseOptionalInt(req.body?.limit)
   const limit =
     rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
@@ -7340,6 +7378,7 @@ app.post('/api/pro/marketing/broadcast', async (req, res) => {
     const result = await sendMarketingBotBroadcast({
       masterId,
       text,
+      includeLink,
       includeUnsubscribe,
       limit,
     })
@@ -7453,6 +7492,7 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
   }
 
   const includeUnsubscribe = Boolean(req.body?.includeUnsubscribe)
+  const includeLink = Boolean(req.body?.includeLink)
   const rawLimit = parseOptionalInt(req.body?.limit)
   const limit =
     rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
@@ -7463,6 +7503,7 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
         ? await sendMarketingBotBroadcast({
             masterId,
             text,
+            includeLink,
             includeUnsubscribe,
             limit,
           })

@@ -279,11 +279,12 @@ export const ProMarketingScreen = ({
   const includeLinkEnabled = includeLink && Boolean(shareLink)
   const payloadText = useMemo(() => {
     if (!sanitizedMessage) return ''
+    if (channel === 'bot') return sanitizedMessage
     if (includeLinkEnabled) {
       return `${sanitizedMessage}\n${shareLink}`
     }
     return sanitizedMessage
-  }, [includeLinkEnabled, sanitizedMessage, shareLink])
+  }, [channel, includeLinkEnabled, sanitizedMessage, shareLink])
 
   const payloadLength = payloadText.length
   const isTextTooLong = payloadLength > MARKETING_TEXT_LIMIT
@@ -337,6 +338,7 @@ export const ProMarketingScreen = ({
           userId,
           channel,
           text: payloadText,
+          includeLink: channel === 'bot' && includeLinkEnabled,
           includeUnsubscribe: channel === 'bot' && includeUnsubscribe,
         }),
       })
