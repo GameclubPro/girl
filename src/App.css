@@ -76,13 +76,14 @@
     rgba(var(--start-raspberry-rgb), 0.38) 94%,
     rgba(var(--start-raspberry-rgb), 0.7) 100%
   );
-  padding: calc(18px + var(--safe-top) + var(--tg-top-offset)) 22px
-    calc(30px + var(--safe-bottom));
+  padding: calc(12px + var(--safe-top) + var(--tg-top-offset)) 20px
+    calc(16px + var(--safe-bottom));
 }
 
 .screen--start .content {
   position: relative;
   z-index: 1;
+  padding-bottom: clamp(64px, 12vw, 96px);
 }
 
 .screen--address {
@@ -17392,7 +17393,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
 .title-block::after {
@@ -17401,7 +17402,7 @@
   height: 3px;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--surface-muted) 0%, var(--surface-muted) 100%);
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .brand-hero {
@@ -17452,7 +17453,7 @@ h1 {
 
 
 h2 {
-  margin: 18px 0 8px;
+  margin: 14px 0 6px;
   font-family: var(--font-title);
   font-size: clamp(20px, 5vw, 26px);
   font-weight: 700;
@@ -17460,11 +17461,11 @@ h2 {
 }
 
 .screen--start h2.animate.delay-2 {
-  margin-top: 68px;
+  margin-top: 36px;
 }
 
 .illustration-wrap {
-  margin: 10px auto 20px;
+  margin: 6px auto 14px;
   width: min(360px, 100%);
 }
 
@@ -17496,8 +17497,8 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: 16px;
-  margin: 12px 0 18px;
+  gap: 12px;
+  margin: 8px 0 12px;
 }
 
 .role-card {
@@ -17621,7 +17622,7 @@ h2 {
 }
 
 .footer-copy {
-  margin: 8px auto 0;
+  margin: 6px auto 0;
   max-width: 260px;
   color: var(--muted);
   font-weight: 600;
