@@ -17641,22 +17641,40 @@ h2 {
   z-index: 0;
 }
 
+.footer-decor::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 36px;
+  width: min(86%, 360px);
+  height: 18px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(var(--shadow-rgb), 0.28) 0%,
+    rgba(var(--shadow-rgb), 0.16) 45%,
+    rgba(var(--shadow-rgb), 0.05) 65%,
+    transparent 75%
+  );
+  filter: blur(6px);
+}
+
 .footer-image {
   width: min(32vw, 150px);
   height: auto;
   display: block;
   object-fit: contain;
+  position: absolute;
+  z-index: 1;
 }
 
 .footer-image--left {
-  position: absolute;
   left: -24px;
   bottom: 0;
   width: min(30vw, 140px);
 }
 
 .footer-image--right {
-  position: absolute;
   right: -14px;
   bottom: 0;
   width: min(30vw, 150px);
