@@ -106,9 +106,9 @@ type PromotionCard = {
   reviewsAverage: number | null
   activePromotion: {
     title: string
-    description?: string | null
-    endAt?: string | null
-  } | null
+    description: string | null
+    endAt: string | null
+  }
 }
 
 const showcaseAreas = ['a', 'b', 'c', 'd']
@@ -804,18 +804,18 @@ export const ClientScreen = ({
   }, [showcaseFallbackWidth, showcaseItems, showcaseQuality])
 
   const promotionCards = useMemo<PromotionCard[]>(() => {
-    return promotionProfiles
-      .map((profile, index) => {
-        const activePromotion = profile.activePromotion
-        if (!activePromotion?.title) return null
-        const categories = Array.isArray(profile.categories) ? profile.categories : []
-        const categoryLabels =
-          categories.length > 0
-            ? categories.map((id) => getCategoryLabel(id))
-            : ['Мастер-универсал']
-        const reviewsAverage =
-          typeof profile.reviewsAverage === 'number' ? profile.reviewsAverage : null
-        return {
+    return promotionProfiles.flatMap((profile, index) => {
+      const activePromotion = profile.activePromotion
+      if (!activePromotion?.title) return []
+      const categories = Array.isArray(profile.categories) ? profile.categories : []
+      const categoryLabels =
+        categories.length > 0
+          ? categories.map((id) => getCategoryLabel(id))
+          : ['Мастер-универсал']
+      const reviewsAverage =
+        typeof profile.reviewsAverage === 'number' ? profile.reviewsAverage : null
+      return [
+        {
           id: profile.userId || `promo-${index}`,
           name: profile.displayName || 'Мастер',
           avatarUrl: profile.avatarUrl ?? null,
@@ -830,9 +830,9 @@ export const ClientScreen = ({
             description: activePromotion.description ?? null,
             endAt: activePromotion.endAt ?? null,
           },
-        }
-      })
-      .filter((item): item is PromotionCard => Boolean(item))
+        },
+      ]
+    })
   }, [promotionProfiles])
 
   const sortedPromotions = useMemo(() => {
