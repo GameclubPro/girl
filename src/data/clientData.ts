@@ -123,7 +123,7 @@ export const collectionItems = [
     categoryId: null,
     cornerImage: collectionStarsArt,
     cornerImagePosition: 'bottom-right',
-    cornerImageSize: 'clamp(90px, 30vw, 140px)',
+    cornerImageSize: 'clamp(100px, 33vw, 150px)',
     cornerImageRight: '0px',
     cornerImageBottom: '0px',
   },
