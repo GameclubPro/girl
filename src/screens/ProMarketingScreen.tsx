@@ -104,6 +104,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [packageVisits, setPackageVisits] = useState(3)
   const [broadcastDraft, setBroadcastDraft] = useState('')
   const [reminderDraft, setReminderDraft] = useState('')
+  const [reminderTouched, setReminderTouched] = useState(false)
   const [broadcastIncludeLink, setBroadcastIncludeLink] = useState(true)
   const [reminderIncludeLink, setReminderIncludeLink] = useState(true)
   const [broadcastIncludeUnsubscribe, setBroadcastIncludeUnsubscribe] = useState(true)
@@ -222,7 +223,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     : 0
 
   const recommendedTemplateId = useMemo(() => {
-    if (!bookingStats.uniqueClients) return 'share'
+    if (!bookingStats.uniqueClients) return 'fill-week'
     if (bookingStats.upcomingWeek < 3) return 'fill-week'
     if (inactiveCounts.count30 >= Math.max(2, Math.ceil(bookingStats.uniqueClients * 0.3))) {
       return 'win-back'
@@ -311,6 +312,16 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     ]
   }, [discountPercent, masterLabel])
 
+  useEffect(() => {
+    if (activeTab !== 'reminder') return
+    if (reminderTouched || reminderDraft.trim()) return
+    const fallback = reminderTemplates.find((template) => template.id === reminderTone)
+    const next = fallback ?? reminderTemplates[0]
+    if (next) {
+      setReminderDraft(next.text)
+    }
+  }, [activeTab, reminderDraft, reminderTemplates, reminderTone, reminderTouched])
+
   const currentDraft = activeTab === 'broadcast' ? broadcastDraft : reminderDraft
   const setCurrentDraft = activeTab === 'broadcast' ? setBroadcastDraft : setReminderDraft
   const includeLinkEnabled =
@@ -368,6 +379,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       } else {
         setReminderDraft(template.text)
         setReminderTone(template.id)
+        setReminderTouched(true)
       }
       showStatus('Текст вставлен в сообщение.')
     },
@@ -469,6 +481,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       setBroadcastDraft('')
     } else {
       setReminderDraft('')
+      setReminderTouched(true)
     }
     showStatus('Черновик очищен.')
   }, [activeTab, showStatus])
@@ -846,7 +859,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               <textarea
                 className={`pro-marketing-textarea${isTextTooLong ? ' is-error' : ''}`}
                 value={currentDraft}
-                onChange={(event) => setCurrentDraft(event.target.value)}
+                onChange={(event) => {
+                  setReminderTouched(true)
+                  setCurrentDraft(event.target.value)
+                }}
                 placeholder="Напишите короткое сообщение для клиентов"
                 rows={5}
               />
