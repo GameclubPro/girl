@@ -24006,8 +24006,8 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: calc(100% + 18px);
-  margin-right: -18px;
+  width: calc(100% + var(--collection-card-content-safe, 0px));
+  margin-right: calc(-1 * var(--collection-card-content-safe, 0px));
   padding: 5px 10px;
   border-radius: 999px;
   background: rgba(var(--paper-rgb), 0.92);
