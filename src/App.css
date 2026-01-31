@@ -4577,14 +4577,14 @@
 
 .pro-marketing-repeat-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .pro-marketing-preview-card {
   border-radius: 14px;
-  border: 1px dashed rgba(var(--accent-rgb), 0.28);
-  background: rgba(var(--paper-rgb), 0.92);
+  border: 1px dashed rgba(var(--accent-rgb), 0.22);
+  background: rgba(var(--paper-rgb), 0.96);
   padding: 10px 12px;
   font-size: 11px;
   font-weight: 600;
@@ -4739,7 +4739,7 @@
 
 .pro-marketing-repeat-note {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--pro-muted);
 }
@@ -4747,12 +4747,12 @@
 .pro-marketing-repeat-surface {
   border-radius: 16px;
   padding: 12px;
-  background: rgba(var(--paper-rgb), 0.85);
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  box-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.08);
+  background: rgba(var(--paper-rgb), 0.92);
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  box-shadow: 0 6px 14px rgba(var(--shadow-rgb), 0.06);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .pro-marketing-segment {
@@ -4838,13 +4838,13 @@
 }
 
 .pro-marketing-interval-card {
-  border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  background: rgba(var(--paper-rgb), 0.95);
-  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.98);
+  padding: 12px 14px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   position: relative;
 }
@@ -4871,16 +4871,16 @@
 .pro-marketing-interval-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .pro-marketing-interval-step {
   appearance: none;
-  border-radius: 10px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.2);
-  background: rgba(var(--paper-rgb), 0.9);
-  width: 28px;
-  height: 28px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.96);
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   font-size: 14px;
@@ -4900,9 +4900,9 @@
 }
 
 .pro-marketing-interval-value {
-  min-width: 70px;
+  min-width: 64px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
 }

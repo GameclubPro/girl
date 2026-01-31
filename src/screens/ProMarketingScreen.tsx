@@ -333,10 +333,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     : repeatSettings?.template ?? ''
   const repeatTemplateLength = repeatTemplateValue.trim().length
   const isRepeatTemplateTooLong = repeatTemplateLength > MARKETING_TEXT_LIMIT
-  const repeatDefaultDays =
-    typeof repeatIntervals.default === 'number' && repeatIntervals.default > 0
-      ? repeatIntervals.default
-      : REPEAT_INTERVALS.default
 
   const resolveRepeatInterval = useCallback(
     (categoryId: string) => {
@@ -565,33 +561,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       if (!(categoryId in prev)) return prev
       const next = { ...prev }
       delete next[categoryId]
-      return next
-    })
-  }, [])
-
-  const handleRepeatDefaultAdjust = useCallback(
-    (delta: number) => {
-      if (repeatLoading || repeatSaving) return
-      setRepeatDraftInitialized(true)
-      const current =
-        typeof repeatIntervals.default === 'number' && repeatIntervals.default > 0
-          ? repeatIntervals.default
-          : REPEAT_INTERVALS.default
-      const nextValue = clampRepeatInterval(current + delta)
-      setRepeatIntervalsDraft((prev) => ({
-        ...prev,
-        default: nextValue,
-      }))
-    },
-    [clampRepeatInterval, repeatIntervals.default, repeatLoading, repeatSaving]
-  )
-
-  const handleRepeatDefaultReset = useCallback(() => {
-    setRepeatDraftInitialized(true)
-    setRepeatIntervalsDraft((prev) => {
-      if (!('default' in prev)) return prev
-      const next = { ...prev }
-      delete next.default
       return next
     })
   }, [])
@@ -862,7 +831,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               <div className="pro-marketing-repeat-heading">
                 <h2>Повтор</h2>
                 <p className="pro-marketing-repeat-subtitle">
-                  Авто-напоминания о повторной записи.
+                  Авто-напоминания
                 </p>
               </div>
               <button
@@ -885,7 +854,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               </button>
             </div>
             <p className="pro-marketing-repeat-note">
-              Проверяем каждые 12 часов и отправляем, если у клиента нет будущей записи.
+              Проверяем каждые 12 часов. Если нет будущей записи — отправим.
             </p>
 
             {repeatLoading && (
@@ -951,7 +920,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               <div className="pro-marketing-repeat-metrics">
                 <div className="pro-marketing-metric-card">
                   <span className="pro-marketing-metric-label">
-                    Ожидают напоминания
+                    Ожидают повтор
                   </span>
                   <span className="pro-marketing-metric-value">
                     {repeatEligibleLabel}
@@ -975,51 +944,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
             </div>
 
             <div className="pro-marketing-repeat-surface">
-              <p className="pro-marketing-section">Сроки</p>
-              <div className="pro-marketing-interval-card">
-                <div className="pro-marketing-interval-meta">
-                  <span className="pro-marketing-interval-title">
-                    Базовый интервал
-                  </span>
-                  <span className="pro-marketing-interval-subtitle">
-                    Для услуг без индивидуальных сроков.
-                  </span>
-                </div>
-                <div className="pro-marketing-interval-actions">
-                  <button
-                    className="pro-marketing-interval-step"
-                    type="button"
-                    onClick={() => handleRepeatDefaultAdjust(-1)}
-                    disabled={repeatLoading || repeatSaving}
-                    aria-label="Уменьшить базовый интервал"
-                  >
-                    −
-                  </button>
-                  <span className="pro-marketing-interval-value">
-                    {repeatDefaultDays} дней
-                  </span>
-                  <button
-                    className="pro-marketing-interval-step"
-                    type="button"
-                    onClick={() => handleRepeatDefaultAdjust(1)}
-                    disabled={repeatLoading || repeatSaving}
-                    aria-label="Увеличить базовый интервал"
-                  >
-                    +
-                  </button>
-                </div>
-                {'default' in repeatIntervalsDraft && (
-                  <button
-                    className="pro-marketing-interval-reset"
-                    type="button"
-                    onClick={handleRepeatDefaultReset}
-                    disabled={repeatLoading || repeatSaving}
-                  >
-                    Сбросить
-                  </button>
-                )}
-              </div>
-
+              <p className="pro-marketing-section">Сроки по услугам</p>
               <div className="pro-marketing-repeat-grid">
                 {repeatCategories.map((item) => {
                   const isCustom = Object.prototype.hasOwnProperty.call(
@@ -1087,7 +1012,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     setRepeatDraftInitialized(true)
                     setRepeatTemplateDraft(event.target.value)
                   }}
-                  placeholder="Напишите шаблон или оставьте пустым для стандартного текста"
+                  placeholder="Шаблон напоминания (необязательно)"
                   rows={4}
                 />
                 <div className="pro-marketing-template-footer">
@@ -1105,9 +1030,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 </div>
               </div>
               <div className="pro-marketing-preview-card">{repeatPreviewText}</div>
-              <p className="pro-marketing-repeat-hint">
-                Кнопка записи добавится автоматически в бот-канале.
-              </p>
+              {repeatChannel === 'bot' && (
+                <p className="pro-marketing-repeat-hint">
+                  В боте добавим кнопку записи.
+                </p>
+              )}
             </div>
 
             {repeatDraftDirty && (
