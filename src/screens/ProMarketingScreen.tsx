@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
-import { categoryItems } from '../data/clientData'
 import { useProCabinetData } from '../hooks/useProCabinetData'
 import type { MarketingSummary, Promotion, RepeatSettings } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
@@ -47,7 +46,6 @@ type PromotionDraft = {
   title: string
   description: string
   durationDays: number
-  categories: string[]
 }
 
 type ProMarketingScreenProps = {
@@ -135,7 +133,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     title: '',
     description: '',
     durationDays: PROMOTION_DURATION_OPTIONS[1],
-    categories: [],
   })
 
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null)
@@ -321,7 +318,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       title: '',
       description: '',
       durationDays: PROMOTION_DURATION_OPTIONS[1],
-      categories: [],
     })
   }, [userId])
 
@@ -683,16 +679,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     return { label: 'Активна', tone: 'is-active', canPause: true, canResume: false, isExpired }
   }, [])
 
-  const handlePromotionCategoryToggle = useCallback((categoryId: string) => {
-    setPromotionDraft((prev) => {
-      const exists = prev.categories.includes(categoryId)
-      const nextCategories = exists
-        ? prev.categories.filter((id) => id !== categoryId)
-        : [...prev.categories, categoryId]
-      return { ...prev, categories: nextCategories }
-    })
-  }, [])
-
   const handlePromotionSave = useCallback(async () => {
     if (!userId) return
     if (isPromotionTitleTooLong) {
@@ -720,7 +706,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           type: promotionDraft.type,
           title: promotionDraft.title.trim(),
           description: promotionDraft.description.trim(),
-          categories: promotionDraft.categories,
           startAt: startAt.toISOString(),
           endAt: endAt.toISOString(),
           status: 'active',
@@ -748,7 +733,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         ...prev,
         title: '',
         description: '',
-        categories: [],
       }))
       showStatus('Акция запущена.')
     } catch (error) {
@@ -1369,9 +1353,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 {(() => {
                   const statusMeta = resolvePromotionStatus(activePromotion)
                   const dateLabel = formatShortDate(activePromotion.endAt)
-                  const categoryLabels = activePromotion.categories
-                    .map((id) => getCategoryLabel(id))
-                    .filter(Boolean)
                   return (
                     <>
                       <div className="pro-marketing-promo-head">
@@ -1397,15 +1378,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                       {dateLabel && (
                         <div className="pro-marketing-promo-meta">
                           <span>до {dateLabel}</span>
-                        </div>
-                      )}
-                      {categoryLabels.length > 0 && (
-                        <div className="pro-detail-chip-row">
-                          {categoryLabels.map((label) => (
-                            <span className="pro-detail-chip" key={label}>
-                              {label}
-                            </span>
-                          ))}
                         </div>
                       )}
                       <div className="pro-detail-actions pro-detail-actions--compact">
@@ -1647,31 +1619,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="pro-marketing-promo-field">
-                <span className="pro-marketing-promo-label">Категории</span>
-                <div className="pro-marketing-promo-chip-row" role="group" aria-label="Категории">
-                  {categoryItems.map((item) => (
-                    <button
-                      key={`promo-category-${item.id}`}
-                      className={`pro-marketing-promo-chip${
-                        promotionDraft.categories.includes(item.id) ? ' is-active' : ''
-                      }`}
-                      type="button"
-                      onClick={() => handlePromotionCategoryToggle(item.id)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="pro-marketing-promo-note">
-                  {promotionDraft.categories.length > 0
-                    ? `Выбрано: ${promotionDraft.categories
-                        .map((id) => getCategoryLabel(id))
-                        .join(', ')}`
-                    : 'Акция будет видна для всех услуг.'}
-                </p>
               </div>
 
               <div className="pro-detail-actions">

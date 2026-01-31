@@ -3756,7 +3756,6 @@ const ensureSchema = async () => {
       type TEXT NOT NULL CHECK (type IN ('discount', 'bonus', 'slots')),
       title TEXT NOT NULL,
       description TEXT,
-      categories TEXT[] NOT NULL DEFAULT '{}'::text[],
       start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       end_at TIMESTAMPTZ NOT NULL,
       status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'archived')),
@@ -3766,6 +3765,11 @@ const ensureSchema = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_promotions
+    DROP COLUMN IF EXISTS categories;
   `)
 
   await pool.query(`
@@ -5172,7 +5176,6 @@ app.get('/api/masters/:userId/promotions', async (req, res) => {
           type,
           title,
           description,
-          categories,
           start_at AS "startAt",
           end_at AS "endAt",
           status,
@@ -7519,7 +7522,6 @@ const mapPromotionRow = (row) => ({
   type: row.type,
   title: row.title,
   description: row.description ?? null,
-  categories: Array.isArray(row.categories) ? row.categories : [],
   startAt: row.startAt ?? row.start_at,
   endAt: row.endAt ?? row.end_at,
   status: row.status ?? 'active',
@@ -8221,7 +8223,6 @@ app.get('/api/pro/marketing/promotions', async (req, res) => {
           type,
           title,
           description,
-          categories,
           start_at AS "startAt",
           end_at AS "endAt",
           status,
@@ -8253,7 +8254,6 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
   const type = normalizePromotionType(req.body?.type)
   const title = normalizePromotionTitle(req.body?.title)
   const description = normalizePromotionDescription(req.body?.description)
-  const categories = normalizeStringArray(req.body?.categories)
   const audience = normalizePromotionAudience(req.body?.audience)
   const status = normalizePromotionStatus(req.body?.status)
   const maxUses = parseOptionalInt(req.body?.maxUses)
@@ -8299,8 +8299,6 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
       const nextTitle = req.body?.title ? title : base.title
       const nextDescription =
         req.body?.description !== undefined ? description : base.description
-      const nextCategories =
-        Array.isArray(req.body?.categories) ? categories : base.categories
       const nextAudience = req.body?.audience ? audience : base.audience
       const nextStatus = req.body?.status ? status : base.status
       const nextMaxUses =
@@ -8350,21 +8348,19 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
             type = $1,
             title = $2,
             description = $3,
-            categories = $4::text[],
-            start_at = $5,
-            end_at = $6,
-            status = $7,
-            audience = $8,
-            max_uses = $9,
+            start_at = $4,
+            end_at = $5,
+            status = $6,
+            audience = $7,
+            max_uses = $8,
             updated_at = NOW()
-          WHERE id = $10 AND master_id = $11
+          WHERE id = $9 AND master_id = $10
           RETURNING
             id,
             master_id AS "masterId",
             type,
             title,
             description,
-            categories,
             start_at AS "startAt",
             end_at AS "endAt",
             status,
@@ -8378,7 +8374,6 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
           nextType,
           nextTitle,
           nextDescription,
-          nextCategories,
           nextStartAt,
           nextEndAt,
           nextStatus,
@@ -8410,7 +8405,6 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
             type,
             title,
             description,
-            categories,
             start_at,
             end_at,
             status,
@@ -8418,14 +8412,13 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
             max_uses,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5::text[], $6, $7, $8, $9, $10, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
           RETURNING
             id,
             master_id AS "masterId",
             type,
             title,
             description,
-            categories,
             start_at AS "startAt",
             end_at AS "endAt",
             status,
@@ -8440,7 +8433,6 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
           type,
           title,
           description,
-          categories,
           startAt,
           endAt,
           status,
@@ -8528,7 +8520,6 @@ app.post('/api/pro/marketing/promotions/:promotionId/action', async (req, res) =
           type,
           title,
           description,
-          categories,
           start_at AS "startAt",
           end_at AS "endAt",
           status,

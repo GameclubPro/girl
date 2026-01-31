@@ -122,7 +122,6 @@ export type Promotion = {
   type: PromotionType
   title: string
   description?: string | null
-  categories: string[]
   startAt: string
   endAt: string
   status: PromotionStatus
