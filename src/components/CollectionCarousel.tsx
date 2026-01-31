@@ -261,7 +261,7 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
           const cardLabel = `Открыть подборку: ${item.title}`
           const cardStyle = item.cornerImage
             ? ({
-                '--collection-card-art-image': `url(${item.cornerImage})`,
+                '--collection-card-art-image': `url("${item.cornerImage}")`,
                 '--collection-card-art-size':
                   item.cornerImageSize ?? 'clamp(120px, 44vw, 190px)',
                 '--collection-card-art-right': item.cornerImageRight ?? '-6px',
