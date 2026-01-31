@@ -3964,7 +3964,34 @@
   pointer-events: none;
 }
 
-.pro-cabinet-nav-mosaic-tile img {
+.pro-cabinet-nav-mosaic-frame {
+  position: absolute;
+  inset: 3px;
+  border-radius: calc(clamp(8px, 2.2vw, 10px) - 2px);
+  padding: 2px;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  background: linear-gradient(
+    150deg,
+    rgba(var(--tile-accent), 0.22),
+    rgba(255, 255, 255, 0.8)
+  );
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 6px 10px rgba(var(--shadow-rgb), 0.12);
+}
+
+.pro-cabinet-nav-mosaic-frame img {
+  width: 100%;
+  height: 100%;
+  border-radius: calc(clamp(8px, 2.2vw, 10px) - 4px);
+  object-fit: cover;
+  display: block;
+  background: rgba(var(--paper-rgb), 0.9);
+  filter: saturate(1.03) contrast(1.02);
+}
+
+.pro-cabinet-nav-mosaic-tile > img {
   width: 100%;
   height: 100%;
   object-fit: cover;
