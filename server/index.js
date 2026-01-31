@@ -50,6 +50,12 @@ const BOOKING_PRICE_OFFER_HOURS = 12
 const MARKETING_TEXT_LIMIT = 800
 const MARKETING_BROADCAST_CHUNK = 25
 const MARKETING_BROADCAST_MAX = 5000
+const PROMOTION_TITLE_LIMIT = 60
+const PROMOTION_DESCRIPTION_LIMIT = 180
+const PROMOTION_MAX_DURATION_DAYS = 14
+const PROMOTION_TYPES = ['discount', 'bonus', 'slots']
+const PROMOTION_AUDIENCES = ['all', 'followers', 'clients']
+const PROMOTION_STATUSES = ['active', 'paused', 'archived']
 const REPEAT_REMINDER_SCAN_INTERVAL_MS = 12 * 60 * 60 * 1000
 const REPEAT_REMINDER_BATCH_LIMIT = 200
 const REPEAT_DEFAULT_INTERVALS = {
@@ -289,6 +295,51 @@ const normalizeStringArray = (value) => {
   return value
     .map((item) => (typeof item === 'string' ? item.trim() : ''))
     .filter(Boolean)
+}
+
+const normalizePromotionType = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (PROMOTION_TYPES.includes(normalized)) return normalized
+  return 'discount'
+}
+
+const normalizePromotionStatus = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (PROMOTION_STATUSES.includes(normalized)) return normalized
+  return 'active'
+}
+
+const normalizePromotionAudience = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (PROMOTION_AUDIENCES.includes(normalized)) return normalized
+  return 'all'
+}
+
+const normalizePromotionTitle = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return ''
+  return normalized.slice(0, PROMOTION_TITLE_LIMIT)
+}
+
+const normalizePromotionDescription = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return null
+  return normalized.slice(0, PROMOTION_DESCRIPTION_LIMIT)
+}
+
+const parseDateTime = (value) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+const ensureDateValue = (value) => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
 }
 
 const parseOptionalInt = (value) => {
@@ -3674,6 +3725,35 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS master_promotions (
+      id SERIAL PRIMARY KEY,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      type TEXT NOT NULL CHECK (type IN ('discount', 'bonus', 'slots')),
+      title TEXT NOT NULL,
+      description TEXT,
+      categories TEXT[] NOT NULL DEFAULT '{}'::text[],
+      start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      end_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'archived')),
+      audience TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all', 'followers', 'clients')),
+      max_uses INTEGER,
+      uses_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_promotions_master_idx
+    ON master_promotions (master_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS master_promotions_status_idx
+    ON master_promotions (status, end_at);
+  `)
+
+  await pool.query(`
     DROP TABLE IF EXISTS marketing_campaigns;
   `)
 
@@ -4760,7 +4840,14 @@ app.get('/api/masters', async (req, res) => {
           mp.updated_at AS "updatedAt",
           ul.lat AS "locationLat",
           ul.lng AS "locationLng",
-          ul.share_to_clients AS "shareToClients"
+          ul.share_to_clients AS "shareToClients",
+          promo.id AS "promotionId",
+          promo.type AS "promotionType",
+          promo.title AS "promotionTitle",
+          promo.description AS "promotionDescription",
+          promo.start_at AS "promotionStartAt",
+          promo.end_at AS "promotionEndAt",
+          promo.audience AS "promotionAudience"
         FROM master_profiles mp
         LEFT JOIN users u ON u.user_id = mp.user_id
         LEFT JOIN cities c ON c.id = mp.city_id
@@ -4782,6 +4869,23 @@ app.get('/api/masters', async (req, res) => {
           FROM master_followers
           GROUP BY master_id
         ) mf ON mf.master_id = mp.user_id
+        LEFT JOIN LATERAL (
+          SELECT
+            id,
+            type,
+            title,
+            description,
+            start_at,
+            end_at,
+            audience
+          FROM master_promotions
+          WHERE master_id = mp.user_id
+            AND status = 'active'
+            AND start_at <= NOW()
+            AND end_at > NOW()
+          ORDER BY end_at ASC
+          LIMIT 1
+        ) promo ON TRUE
         ${whereClause}
         ORDER BY mp.updated_at DESC
         ${limitClause}
@@ -4807,6 +4911,17 @@ app.get('/api/masters', async (req, res) => {
           : null
       const average = Number(row.reviewsAverage)
       const certificates = resolveCertificateUrls(req, row.certificates)
+      const activePromotion = row.promotionId
+        ? {
+            id: Number(row.promotionId),
+            type: row.promotionType,
+            title: row.promotionTitle,
+            description: row.promotionDescription ?? null,
+            startAt: row.promotionStartAt ?? null,
+            endAt: row.promotionEndAt ?? null,
+            audience: row.promotionAudience ?? 'all',
+          }
+        : null
       return {
         userId: row.userId,
         displayName: row.displayName,
@@ -4839,6 +4954,7 @@ app.get('/api/masters', async (req, res) => {
           : 0,
         avatarUrl: buildPublicUrl(req, row.avatarPath),
         coverUrl: buildPublicUrl(req, row.coverPath),
+        activePromotion,
       }
     })
     if (sortMode === 'distance' && hasClientLocation) {
@@ -4907,7 +5023,14 @@ app.get('/api/masters/:userId', async (req, res) => {
           COALESCE(mf.followers_count, 0) AS "followersCount",
           CASE WHEN $2::text IS NULL THEN NULL ELSE (mvu.follower_id IS NOT NULL) END AS "viewerIsFollower",
           CASE WHEN $2::text IS NULL THEN NULL ELSE mms.opt_in END AS "viewerMarketingOptIn",
-          mp.updated_at AS "updatedAt"
+          mp.updated_at AS "updatedAt",
+          promo.id AS "promotionId",
+          promo.type AS "promotionType",
+          promo.title AS "promotionTitle",
+          promo.description AS "promotionDescription",
+          promo.start_at AS "promotionStartAt",
+          promo.end_at AS "promotionEndAt",
+          promo.audience AS "promotionAudience"
         FROM master_profiles mp
         LEFT JOIN users u ON u.user_id = mp.user_id
         LEFT JOIN cities c ON c.id = mp.city_id
@@ -4934,6 +5057,23 @@ app.get('/api/masters/:userId', async (req, res) => {
         LEFT JOIN master_marketing_subscriptions mms
           ON mms.master_id = mp.user_id
           AND mms.subscriber_id = $2
+        LEFT JOIN LATERAL (
+          SELECT
+            id,
+            type,
+            title,
+            description,
+            start_at,
+            end_at,
+            audience
+          FROM master_promotions
+          WHERE master_id = mp.user_id
+            AND status = 'active'
+            AND start_at <= NOW()
+            AND end_at > NOW()
+          ORDER BY end_at ASC
+          LIMIT 1
+        ) promo ON TRUE
         WHERE mp.user_id = $1
       `,
       [normalizedUserId, viewerId || null]
@@ -4955,6 +5095,17 @@ app.get('/api/masters/:userId', async (req, res) => {
       ? Number(row.followersCount)
       : 0
     const certificates = resolveCertificateUrls(req, row.certificates)
+    const activePromotion = row.promotionId
+      ? {
+          id: Number(row.promotionId),
+          type: row.promotionType,
+          title: row.promotionTitle,
+          description: row.promotionDescription ?? null,
+          startAt: row.promotionStartAt ?? null,
+          endAt: row.promotionEndAt ?? null,
+          audience: row.promotionAudience ?? 'all',
+        }
+      : null
     res.json({
       ...row,
       depositQrPath: undefined,
@@ -4972,10 +5123,51 @@ app.get('/api/masters/:userId', async (req, res) => {
       lateCancelFeePercent: 0,
       avatarUrl: buildPublicUrl(req, row.avatarPath),
       coverUrl: buildPublicUrl(req, row.coverPath),
+      activePromotion,
       ...summary,
     })
   } catch (error) {
     console.error('GET /api/masters/:userId failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/masters/:userId/promotions', async (req, res) => {
+  const masterId = normalizeText(req.params.userId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          master_id AS "masterId",
+          type,
+          title,
+          description,
+          categories,
+          start_at AS "startAt",
+          end_at AS "endAt",
+          status,
+          audience,
+          max_uses AS "maxUses",
+          uses_count AS "usesCount",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        FROM master_promotions
+        WHERE master_id = $1
+          AND status = 'active'
+          AND start_at <= NOW()
+          AND end_at > NOW()
+        ORDER BY end_at ASC
+      `,
+      [masterId]
+    )
+    res.json(result.rows.map(mapPromotionRow))
+  } catch (error) {
+    console.error('GET /api/masters/:userId/promotions failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -7296,6 +7488,25 @@ const buildRepeatMessage = ({ template, categoryLabel, masterName }) => {
     .replace(/\{\{\s*master\s*\}\}/gi, resolvedMaster)
 }
 
+const mapPromotionRow = (row) => ({
+  id: Number(row.id),
+  masterId: row.masterId ?? row.master_id,
+  type: row.type,
+  title: row.title,
+  description: row.description ?? null,
+  categories: Array.isArray(row.categories) ? row.categories : [],
+  startAt: row.startAt ?? row.start_at,
+  endAt: row.endAt ?? row.end_at,
+  status: row.status ?? 'active',
+  audience: row.audience ?? 'all',
+  maxUses: row.maxUses ?? row.max_uses ?? null,
+  usesCount: Number.isFinite(Number(row.usesCount ?? row.uses_count))
+    ? Number(row.usesCount ?? row.uses_count)
+    : 0,
+  createdAt: row.createdAt ?? row.created_at ?? null,
+  updatedAt: row.updatedAt ?? row.updated_at ?? null,
+})
+
 const fetchRepeatBaseCandidates = async (masterId) => {
   const result = await pool.query(
     `
@@ -7965,6 +8176,322 @@ app.post('/api/pro/marketing/repeat-settings', async (req, res) => {
     })
   } catch (error) {
     console.error('POST /api/pro/marketing/repeat-settings failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/pro/marketing/promotions', async (req, res) => {
+  const masterId = normalizeText(req.query.userId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          master_id AS "masterId",
+          type,
+          title,
+          description,
+          categories,
+          start_at AS "startAt",
+          end_at AS "endAt",
+          status,
+          audience,
+          max_uses AS "maxUses",
+          uses_count AS "usesCount",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        FROM master_promotions
+        WHERE master_id = $1
+        ORDER BY updated_at DESC, created_at DESC
+      `,
+      [masterId]
+    )
+    res.json(result.rows.map(mapPromotionRow))
+  } catch (error) {
+    console.error('GET /api/pro/marketing/promotions failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/pro/marketing/promotions', async (req, res) => {
+  const masterId = normalizeText(req.body?.userId ?? req.body?.masterId)
+  if (!masterId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  const promotionId = parseOptionalInt(req.body?.promotionId ?? req.body?.id)
+  const type = normalizePromotionType(req.body?.type)
+  const title = normalizePromotionTitle(req.body?.title)
+  const description = normalizePromotionDescription(req.body?.description)
+  const categories = normalizeStringArray(req.body?.categories)
+  const audience = normalizePromotionAudience(req.body?.audience)
+  const status = normalizePromotionStatus(req.body?.status)
+  const maxUses = parseOptionalInt(req.body?.maxUses)
+  const startAt = parseDateTime(req.body?.startAt) ?? new Date()
+  const endAt =
+    parseDateTime(req.body?.endAt) ??
+    new Date(startAt.getTime() + 7 * DAY_MS)
+
+  if (!title) {
+    res.status(400).json({ error: 'title_required' })
+    return
+  }
+  if (endAt.getTime() <= startAt.getTime()) {
+    res.status(400).json({ error: 'date_range_invalid' })
+    return
+  }
+  const durationDays = Math.ceil(
+    (endAt.getTime() - startAt.getTime()) / DAY_MS
+  )
+  if (durationDays > PROMOTION_MAX_DURATION_DAYS) {
+    res.status(400).json({ error: 'duration_too_long' })
+    return
+  }
+
+  try {
+    await ensureUser(masterId)
+    let row
+    if (promotionId) {
+      const existing = await pool.query(
+        `
+          SELECT *
+          FROM master_promotions
+          WHERE id = $1 AND master_id = $2
+        `,
+        [promotionId, masterId]
+      )
+      if (existing.rows.length === 0) {
+        res.status(404).json({ error: 'not_found' })
+        return
+      }
+      const base = existing.rows[0]
+      const nextType = req.body?.type ? type : base.type
+      const nextTitle = req.body?.title ? title : base.title
+      const nextDescription =
+        req.body?.description !== undefined ? description : base.description
+      const nextCategories =
+        Array.isArray(req.body?.categories) ? categories : base.categories
+      const nextAudience = req.body?.audience ? audience : base.audience
+      const nextStatus = req.body?.status ? status : base.status
+      const nextMaxUses =
+        req.body?.maxUses !== undefined ? maxUses : base.max_uses
+      const nextStartAt = req.body?.startAt
+        ? startAt
+        : ensureDateValue(base.start_at)
+      const nextEndAt = req.body?.endAt ? endAt : ensureDateValue(base.end_at)
+
+      if (!nextTitle) {
+        res.status(400).json({ error: 'title_required' })
+        return
+      }
+      if (!nextStartAt || !nextEndAt) {
+        res.status(400).json({ error: 'date_range_invalid' })
+        return
+      }
+      if (nextEndAt.getTime() <= nextStartAt.getTime()) {
+        res.status(400).json({ error: 'date_range_invalid' })
+        return
+      }
+      const nextDurationDays = Math.ceil(
+        (nextEndAt.getTime() - nextStartAt.getTime()) / DAY_MS
+      )
+      if (nextDurationDays > PROMOTION_MAX_DURATION_DAYS) {
+        res.status(400).json({ error: 'duration_too_long' })
+        return
+      }
+
+      const updateResult = await pool.query(
+        `
+          UPDATE master_promotions
+          SET
+            type = $1,
+            title = $2,
+            description = $3,
+            categories = $4::text[],
+            start_at = $5,
+            end_at = $6,
+            status = $7,
+            audience = $8,
+            max_uses = $9,
+            updated_at = NOW()
+          WHERE id = $10 AND master_id = $11
+          RETURNING
+            id,
+            master_id AS "masterId",
+            type,
+            title,
+            description,
+            categories,
+            start_at AS "startAt",
+            end_at AS "endAt",
+            status,
+            audience,
+            max_uses AS "maxUses",
+            uses_count AS "usesCount",
+            created_at AS "createdAt",
+            updated_at AS "updatedAt"
+        `,
+        [
+          nextType,
+          nextTitle,
+          nextDescription,
+          nextCategories,
+          nextStartAt,
+          nextEndAt,
+          nextStatus,
+          nextAudience,
+          nextMaxUses,
+          promotionId,
+          masterId,
+        ]
+      )
+      row = updateResult.rows[0]
+    } else {
+      const insertResult = await pool.query(
+        `
+          INSERT INTO master_promotions (
+            master_id,
+            type,
+            title,
+            description,
+            categories,
+            start_at,
+            end_at,
+            status,
+            audience,
+            max_uses,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5::text[], $6, $7, $8, $9, $10, NOW())
+          RETURNING
+            id,
+            master_id AS "masterId",
+            type,
+            title,
+            description,
+            categories,
+            start_at AS "startAt",
+            end_at AS "endAt",
+            status,
+            audience,
+            max_uses AS "maxUses",
+            uses_count AS "usesCount",
+            created_at AS "createdAt",
+            updated_at AS "updatedAt"
+        `,
+        [
+          masterId,
+          type,
+          title,
+          description,
+          categories,
+          startAt,
+          endAt,
+          status,
+          audience,
+          maxUses,
+        ]
+      )
+      row = insertResult.rows[0]
+    }
+
+    if (row?.status === 'active') {
+      await pool.query(
+        `
+          UPDATE master_promotions
+          SET status = 'paused', updated_at = NOW()
+          WHERE master_id = $1 AND id <> $2 AND status = 'active'
+        `,
+        [masterId, row.id]
+      )
+    }
+
+    res.json(mapPromotionRow(row))
+  } catch (error) {
+    console.error('POST /api/pro/marketing/promotions failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/pro/marketing/promotions/:promotionId/action', async (req, res) => {
+  const masterId = normalizeText(req.body?.userId ?? req.body?.masterId)
+  const promotionId = parseOptionalInt(req.params.promotionId)
+  const action = normalizeText(req.body?.action).toLowerCase()
+  if (!masterId || !promotionId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (!['pause', 'resume', 'archive'].includes(action)) {
+    res.status(400).json({ error: 'action_invalid' })
+    return
+  }
+
+  try {
+    const existing = await pool.query(
+      `
+        SELECT *
+        FROM master_promotions
+        WHERE id = $1 AND master_id = $2
+      `,
+      [promotionId, masterId]
+    )
+    if (existing.rows.length === 0) {
+      res.status(404).json({ error: 'not_found' })
+      return
+    }
+    const row = existing.rows[0]
+    const endAt = ensureDateValue(row.end_at)
+    if (action === 'resume' && endAt && endAt < new Date()) {
+      res.status(400).json({ error: 'promotion_expired' })
+      return
+    }
+    const nextStatus =
+      action === 'pause' ? 'paused' : action === 'resume' ? 'active' : 'archived'
+
+    const updateResult = await pool.query(
+      `
+        UPDATE master_promotions
+        SET status = $1, updated_at = NOW()
+        WHERE id = $2 AND master_id = $3
+        RETURNING
+          id,
+          master_id AS "masterId",
+          type,
+          title,
+          description,
+          categories,
+          start_at AS "startAt",
+          end_at AS "endAt",
+          status,
+          audience,
+          max_uses AS "maxUses",
+          uses_count AS "usesCount",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+      `,
+      [nextStatus, promotionId, masterId]
+    )
+    const updated = updateResult.rows[0]
+
+    if (nextStatus === 'active') {
+      await pool.query(
+        `
+          UPDATE master_promotions
+          SET status = 'paused', updated_at = NOW()
+          WHERE master_id = $1 AND id <> $2 AND status = 'active'
+        `,
+        [masterId, promotionId]
+      )
+    }
+
+    res.json(mapPromotionRow(updated))
+  } catch (error) {
+    console.error('POST /api/pro/marketing/promotions/:promotionId/action failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

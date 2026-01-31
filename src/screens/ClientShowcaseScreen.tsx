@@ -6,7 +6,7 @@ import {
 } from '../components/icons'
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { categoryItems } from '../data/clientData'
-import type { MasterProfile, UserLocation } from '../types/app'
+import type { MasterProfile, PromotionSummary, UserLocation } from '../types/app'
 import { fetchJsonCached, readCache } from '../utils/dataCache'
 import { buildImageSrcSet, buildImageUrl, prefetchImages } from '../utils/media'
 import {
@@ -188,6 +188,7 @@ type MasterCard = {
   portfolioCount: number
   updateLabel: string
   initials: string
+  activePromotion?: PromotionSummary | null
 }
 
 const toSeed = (value: string) =>
@@ -923,6 +924,7 @@ export const ClientShowcaseScreen = ({
         portfolioCount,
         updateLabel,
         initials: getInitials(profile.displayName || 'Мастер'),
+        activePromotion: profile.activePromotion ?? null,
       }
     })
   }, [profiles])
@@ -1304,6 +1306,14 @@ export const ClientShowcaseScreen = ({
                         <p className="client-master-meta">
                           {metaItems.join(' · ')}
                         </p>
+                        {master.activePromotion?.title && (
+                          <p className="client-master-promo">
+                            <span className="client-master-promo-badge">Акция</span>
+                            <span className="client-master-promo-title">
+                              {master.activePromotion.title}
+                            </span>
+                          </p>
+                        )}
                         <div className="client-master-chip-row">
                           {chipItems.map((chip, index) => (
                             <span className="client-master-chip" key={`${chip}-${index}`}>

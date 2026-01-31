@@ -97,6 +97,7 @@ export type MasterProfile = {
   followersCount?: number | null
   viewerIsFollower?: boolean | null
   viewerMarketingOptIn?: boolean | null
+  activePromotion?: PromotionSummary | null
 }
 
 export type MarketingSummary = {
@@ -107,6 +108,39 @@ export type MarketingSummary = {
   repeatEligibleChatCount?: number | null
   repeatLastSentAt?: string | null
   repeatCheckedAt?: string | null
+}
+
+export type PromotionType = 'discount' | 'bonus' | 'slots'
+
+export type PromotionAudience = 'all' | 'followers' | 'clients'
+
+export type PromotionStatus = 'active' | 'paused' | 'archived'
+
+export type Promotion = {
+  id: number
+  masterId: string
+  type: PromotionType
+  title: string
+  description?: string | null
+  categories: string[]
+  startAt: string
+  endAt: string
+  status: PromotionStatus
+  audience: PromotionAudience
+  maxUses?: number | null
+  usesCount?: number | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export type PromotionSummary = {
+  id: number
+  type: PromotionType
+  title: string
+  description?: string | null
+  startAt?: string | null
+  endAt?: string | null
+  audience?: PromotionAudience
 }
 
 export type RepeatSettings = {

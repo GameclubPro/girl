@@ -177,6 +177,16 @@ const formatReviewDate = (value: string) => {
   })
 }
 
+const formatPromotionDeadline = (value?: string | null) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 const buildReviewerName = (review: MasterReview) => {
   const name = [review.reviewerFirstName, review.reviewerLastName]
     .filter(Boolean)
@@ -819,6 +829,8 @@ export const ClientMasterProfileScreen = ({
         ? `Рядом · ${distanceLabel}`
         : locationLabelBase
   const workFormatLabel = buildWorkFormatLabel(profile)
+  const activePromotion = profile?.activePromotion ?? null
+  const promotionDeadline = formatPromotionDeadline(activePromotion?.endAt ?? null)
   const hasLocation = Boolean(
     profile?.cityName || profile?.districtName || distanceLabel
   )
@@ -1204,6 +1216,9 @@ export const ClientMasterProfileScreen = ({
                   >
                     {statusLabel}
                   </span>
+                  {activePromotion && (
+                    <span className="pro-profile-tag is-promo">Акция</span>
+                  )}
                   {previewTags.length > 0 ? (
                     <>
                       {previewTags.map((label, index) => (
@@ -1297,6 +1312,26 @@ export const ClientMasterProfileScreen = ({
                 role="region"
                 aria-labelledby="master-profile-tab-overview"
               >
+                {activePromotion && (
+                  <div className="master-profile-promo">
+                    <div className="master-profile-promo-head">
+                      <span className="master-profile-promo-badge">Акция</span>
+                      {promotionDeadline && (
+                        <span className="master-profile-promo-meta">
+                          до {promotionDeadline}
+                        </span>
+                      )}
+                    </div>
+                    <div className="master-profile-promo-title">
+                      {activePromotion.title}
+                    </div>
+                    {activePromotion.description && (
+                      <div className="master-profile-promo-text">
+                        {activePromotion.description}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="pro-profile-facts-grid">
                   {profileFacts.map((fact) => (
                     <div
