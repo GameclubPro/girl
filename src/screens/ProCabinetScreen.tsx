@@ -504,14 +504,12 @@ export const ProCabinetScreen = ({
                     >
                       {item ? (
                         isImage ? (
-                          <span className="pro-cabinet-nav-mosaic-frame">
-                            <img
-                              src={item.url}
-                              alt=""
-                              loading="lazy"
-                              style={{ objectPosition: focus?.position }}
-                            />
-                          </span>
+                          <img
+                            src={item.url}
+                            alt=""
+                            loading="lazy"
+                            style={{ objectPosition: focus?.position }}
+                          />
                         ) : (
                           <span className="pro-cabinet-nav-mosaic-fallback">
                             LINK
