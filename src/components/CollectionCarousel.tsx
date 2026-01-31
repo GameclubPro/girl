@@ -290,14 +290,13 @@ export const CollectionCarousel = ({ items, onSelect }: CollectionCarouselProps)
                 cardRefs.current[index] = element
               }}
             >
-              <span className="collection-tag">
-                <span className="collection-badge" aria-hidden="true">
-                  {item.badge}
-                </span>
-                {item.label}
-              </span>
               <span className="collection-body">
-                <span className="collection-title">{item.title}</span>
+                <span className="collection-title">
+                  <span className="collection-title-emoji" aria-hidden="true">
+                    {item.badge}
+                  </span>
+                  {item.title}
+                </span>
                 <span className="collection-meta">{item.meta}</span>
               </span>
               <span className="collection-cta" aria-hidden="true">
