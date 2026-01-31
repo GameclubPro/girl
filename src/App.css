@@ -21531,6 +21531,47 @@ h2 {
   gap: 12px;
 }
 
+.screen--client-master-profile .pro-profile-hero-settings {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--cm-glass);
+  border: 1px solid var(--cm-border);
+  color: var(--pro-ink);
+  box-shadow: var(--portfolio-shadow-soft);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  z-index: 2;
+}
+
+.screen--client-master-profile .master-profile-marketing-button {
+  position: relative;
+}
+
+.screen--client-master-profile .master-profile-marketing-button::after {
+  content: 'бот';
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  padding: 2px 6px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: linear-gradient(120deg, #2b6cf6 0%, #5fb8ff 100%);
+  border-radius: 999px;
+  box-shadow: 0 6px 10px rgba(47, 109, 246, 0.28);
+}
+
 .screen--client-master-profile .pro-profile-hero-avatar {
   width: 96px;
   height: 96px;

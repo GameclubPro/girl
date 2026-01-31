@@ -12,6 +12,7 @@ import {
   IconExperience,
   IconFormat,
   IconHomeMaster,
+  IconBell,
   IconPin,
   IconPrice,
 } from '../components/icons'
@@ -1092,6 +1093,16 @@ export const ClientMasterProfileScreen = ({
               </div>
               <div className="pro-profile-hero-card">
                 <div className="pro-profile-hero-identity">
+                  <button
+                    className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings master-profile-marketing-button"
+                    type="button"
+                    aria-label="Мастер может отправлять предложения в боте"
+                    title="Мастер может отправлять предложения в боте"
+                  >
+                    <span className="pro-profile-ig-button-icon" aria-hidden="true">
+                      <IconBell />
+                    </span>
+                  </button>
                   <div className="pro-profile-ig-avatar pro-profile-hero-avatar">
                     {profile.avatarUrl ? (
                       <img src={profile.avatarUrl} alt={`Аватар ${displayName}`} />
