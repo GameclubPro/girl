@@ -24000,7 +24000,11 @@ h2 {
       rgba(255, 255, 255, 0.4) 0%,
       transparent 60%
     ),
+    radial-gradient(rgba(255, 255, 255, 0.28) 0.6px, transparent 0.7px),
     linear-gradient(150deg, rgba(219, 232, 255, 0.95) 0%, rgba(208, 224, 255, 0.9) 100%);
+  background-size: auto, auto, auto, 5px 5px, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat, no-repeat;
+  background-blend-mode: normal, normal, normal, soft-light, normal;
 }
 
 .collection-body {
