@@ -19,9 +19,6 @@ import type { FavoriteMaster } from '../utils/favorites'
 import { normalizeScheduleDay } from '../utils/schedule'
 
 const SHOWCASE_CACHE_TTL_MS = 2 * 60 * 1000
-const PROMOTIONS_CACHE_TTL_MS = 60 * 1000
-const PROMOTIONS_PREVIEW_LIMIT = 8
-const PROMOTIONS_FETCH_LIMIT = 24
 
 type ClientShowcaseScreenProps = {
   apiBase: string
@@ -334,16 +331,6 @@ const formatUpdatedLabel = (value: string | null) => {
     day: 'numeric',
     month: 'short',
   })}`
-}
-
-const formatPromotionDeadline = (value?: string | null) => {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return ''
-  return parsed.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  })
 }
 
 const weekDays = [
@@ -871,9 +858,6 @@ export const ClientShowcaseScreen = ({
   const [profiles, setProfiles] = useState<MasterProfile[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [promotionProfiles, setPromotionProfiles] = useState<MasterProfile[]>([])
-  const [promotionsLoading, setPromotionsLoading] = useState(false)
-  const [promotionsError, setPromotionsError] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [query, setQuery] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -968,155 +952,9 @@ export const ClientShowcaseScreen = ({
     sortMode,
   ])
 
-  useEffect(() => {
-    let cancelled = false
-
-    const loadPromotions = async () => {
-      if (!userId) {
-        setPromotionProfiles([])
-        setPromotionsError('')
-        setPromotionsLoading(false)
-        return
-      }
-      let silent = false
-      try {
-        const params = new URLSearchParams()
-        params.set('viewerId', userId)
-        params.set('promotionsOnly', '1')
-        params.set('limit', String(PROMOTIONS_FETCH_LIMIT))
-        if (activeCategoryId) {
-          params.set('categoryId', activeCategoryId)
-        }
-        if (typeof locationLat === 'number' && typeof locationLng === 'number') {
-          params.set('clientLat', String(locationLat))
-          params.set('clientLng', String(locationLng))
-        }
-        const url = `${apiBase}/api/masters?${params.toString()}`
-        const cached = readCache<MasterProfile[]>(url, {
-          ttlMs: PROMOTIONS_CACHE_TTL_MS,
-        })
-        silent = Boolean(cached?.value)
-        if (cached?.value) {
-          setPromotionProfiles(Array.isArray(cached.value) ? cached.value : [])
-        }
-        if (!silent) {
-          setPromotionsLoading(true)
-          setPromotionsError('')
-        }
-        const { data } = await fetchJsonCached<MasterProfile[]>(url, {
-          ttlMs: PROMOTIONS_CACHE_TTL_MS,
-        })
-        if (!cancelled) {
-          setPromotionProfiles(Array.isArray(data) ? data : [])
-        }
-      } catch (error) {
-        if (!cancelled && !silent) {
-          setPromotionProfiles([])
-          setPromotionsError('Не удалось загрузить акции.')
-        }
-      } finally {
-        if (!cancelled && !silent) {
-          setPromotionsLoading(false)
-        }
-      }
-    }
-
-    void loadPromotions()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiBase, userId, activeCategoryId, locationLat, locationLng])
-
   const masterCards = useMemo<MasterCard[]>(
     () => profiles.map((profile, index) => mapMasterProfileToCard(profile, index)),
     [profiles]
-  )
-
-  const promotionCards = useMemo<MasterCard[]>(
-    () =>
-      promotionProfiles
-        .map((profile, index) => mapMasterProfileToCard(profile, index))
-        .filter((master) => Boolean(master.activePromotion?.title)),
-    [promotionProfiles]
-  )
-
-  const filteredPromotions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    let list = promotionCards
-    if (activeCategoryId) {
-      list = list.filter((master) => master.categories.includes(activeCategoryId))
-    }
-    if (normalizedQuery) {
-      list = list.filter((master) => {
-        const haystack = [
-          master.name,
-          master.primaryCategory,
-          ...master.categoryLabels,
-          ...master.serviceNames,
-          master.about ?? '',
-          master.locationLabel,
-          master.activePromotion?.title ?? '',
-          master.activePromotion?.description ?? '',
-        ]
-          .join(' ')
-          .toLowerCase()
-        return haystack.includes(normalizedQuery)
-      })
-    }
-    if (onlyActive) {
-      list = list.filter((master) => master.isActive)
-    }
-    if (onlyAtClient) {
-      list = list.filter((master) => master.worksAtClient)
-    }
-    if (onlyAtMaster) {
-      list = list.filter((master) => master.worksAtMaster)
-    }
-    if (onlyPromotions) {
-      list = list.filter((master) => Boolean(master.activePromotion?.title))
-    }
-    const sorted = [...list]
-    sorted.sort((a, b) => {
-      const aEnd = a.activePromotion?.endAt
-      const bEnd = b.activePromotion?.endAt
-      const aEndMs = aEnd ? Date.parse(aEnd) : Number.POSITIVE_INFINITY
-      const bEndMs = bEnd ? Date.parse(bEnd) : Number.POSITIVE_INFINITY
-      const safeAEnd = Number.isNaN(aEndMs) ? Number.POSITIVE_INFINITY : aEndMs
-      const safeBEnd = Number.isNaN(bEndMs) ? Number.POSITIVE_INFINITY : bEndMs
-      if (safeAEnd !== safeBEnd) {
-        return safeAEnd - safeBEnd
-      }
-      if (sortMode === 'distance' && hasClientLocation) {
-        const aDistance =
-          typeof a.distanceKm === 'number'
-            ? a.distanceKm
-            : Number.POSITIVE_INFINITY
-        const bDistance =
-          typeof b.distanceKm === 'number'
-            ? b.distanceKm
-            : Number.POSITIVE_INFINITY
-        if (aDistance !== bDistance) {
-          return aDistance - bDistance
-        }
-      }
-      return b.updatedAtTs - a.updatedAtTs
-    })
-    return sorted
-  }, [
-    activeCategoryId,
-    hasClientLocation,
-    onlyActive,
-    onlyAtClient,
-    onlyAtMaster,
-    promotionCards,
-    query,
-    sortMode,
-  ])
-
-  const promotionsPreview = useMemo(
-    () => filteredPromotions.slice(0, PROMOTIONS_PREVIEW_LIMIT),
-    [filteredPromotions]
   )
 
   const filteredMasters = useMemo(() => {
@@ -1148,6 +986,9 @@ export const ClientShowcaseScreen = ({
     }
     if (onlyAtMaster) {
       list = list.filter((master) => master.worksAtMaster)
+    }
+    if (onlyPromotions) {
+      list = list.filter((master) => Boolean(master.activePromotion?.title))
     }
     const sorted = [...list]
     sorted.sort((a, b) => {
@@ -1216,17 +1057,6 @@ export const ClientShowcaseScreen = ({
       setSortMode('recent')
     }
   }
-  const handleShowAllPromotions = () => {
-    setOnlyPromotions(true)
-    setFiltersOpen(false)
-  }
-  const promotionsHasMore =
-    filteredPromotions.length > promotionsPreview.length
-  const promotionsEmptyLabel = query.trim()
-    ? 'Нет акций по запросу.'
-    : activeCategoryId
-      ? 'Пока нет активных акций в этой категории.'
-      : 'Пока нет активных акций.'
 
   return (
     <div className="screen screen--client screen--client-showcase">
@@ -1414,154 +1244,6 @@ export const ClientShowcaseScreen = ({
                 {isLocating ? 'Определяем...' : 'Уточнить'}
               </button>
             </div>
-          )}
-        </section>
-
-        <section className="client-section client-promo-section">
-          <div className="client-promo-head">
-            <div>
-              <p className="client-promo-kicker">Спецпредложения</p>
-              <h3 className="client-promo-title">Акции</h3>
-            </div>
-            <button
-              className="client-promo-all"
-              type="button"
-              onClick={handleShowAllPromotions}
-              disabled={filteredPromotions.length === 0}
-            >
-              Смотреть все
-            </button>
-          </div>
-          {promotionsError && !promotionsLoading && (
-            <p className="client-master-error">{promotionsError}</p>
-          )}
-          {promotionsLoading ? (
-            <div className="client-promo-skeletons" aria-hidden="true">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div className="client-promo-card is-skeleton" key={`promo-skeleton-${index}`}>
-                  <div className="client-master-skeleton-bar is-wide" />
-                  <div className="client-master-skeleton-bar" />
-                  <div className="client-master-skeleton-row">
-                    <span className="client-master-skeleton-chip" />
-                    <span className="client-master-skeleton-chip" />
-                  </div>
-                  <div className="client-master-skeleton-bar is-short" />
-                </div>
-              ))}
-            </div>
-          ) : promotionsPreview.length > 0 ? (
-            <>
-              <div className="client-promo-strip" role="list">
-                {promotionsPreview.map((master) => {
-                  const promotion = master.activePromotion
-                  if (!promotion) return null
-                  const deadline = formatPromotionDeadline(promotion.endAt ?? null)
-                  const ratingLabel =
-                    master.reviewsAverage !== null
-                      ? `${master.reviewsAverage.toFixed(1)} ★`
-                      : 'Новый'
-                  const priceTag =
-                    master.priceFrom !== null || master.priceTo !== null
-                      ? formatPriceRange(master.priceFrom, master.priceTo)
-                      : null
-                  const distanceLabel = buildDistanceLabel(
-                    master.distanceKm,
-                    master.locationLabel
-                  )
-                  const metaItems = [priceTag, distanceLabel].filter(
-                    (item): item is string => Boolean(item)
-                  )
-
-                  return (
-                    <article
-                      className="client-promo-card"
-                      key={`promo-${master.id}`}
-                      role="listitem"
-                    >
-                      <div className="client-promo-card-head">
-                        <span className="client-promo-badge">Акция</span>
-                        {deadline && (
-                          <span className="client-promo-deadline">до {deadline}</span>
-                        )}
-                      </div>
-                      <div className="client-promo-master">
-                        <span className="client-promo-avatar" aria-hidden="true">
-                          {master.avatarUrl ? (
-                            <img
-                              src={master.avatarUrl}
-                              alt=""
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <span className="client-promo-avatar-fallback">
-                              {master.initials}
-                            </span>
-                          )}
-                        </span>
-                        <div className="client-promo-master-main">
-                          <div className="client-promo-master-row">
-                            <span className="client-promo-master-name">
-                              {master.name}
-                            </span>
-                            <span className="client-promo-master-rating">
-                              {ratingLabel}
-                            </span>
-                          </div>
-                          <span className="client-promo-master-category">
-                            {master.primaryCategory}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="client-promo-offer-title">{promotion.title}</div>
-                      {promotion.description && (
-                        <p className="client-promo-text">{promotion.description}</p>
-                      )}
-                      {metaItems.length > 0 && (
-                        <div className="client-promo-meta">
-                          {metaItems.map((item, index) => (
-                            <span className="client-promo-chip" key={`${item}-${index}`}>
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="client-promo-actions">
-                        <button
-                          className="client-promo-cta"
-                          type="button"
-                          onClick={() => onCreateBooking(master.id)}
-                        >
-                          <span className="client-master-action-icon" aria-hidden="true">
-                            <IconCalendar />
-                          </span>
-                          Записаться
-                        </button>
-                        <button
-                          className="client-promo-cta is-ghost"
-                          type="button"
-                          onClick={() => onViewProfile(master.id)}
-                        >
-                          <span className="client-master-action-icon" aria-hidden="true">
-                            <IconUser />
-                          </span>
-                          Профиль
-                        </button>
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-              {promotionsHasMore && (
-                <p className="client-promo-more">
-                  Ещё {filteredPromotions.length - promotionsPreview.length} акций
-                </p>
-              )}
-            </>
-          ) : (
-            !promotionsError && (
-              <div className="client-promo-empty">{promotionsEmptyLabel}</div>
-            )
           )}
         </section>
 
