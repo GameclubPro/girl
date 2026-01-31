@@ -301,6 +301,8 @@ export const ClientMasterProfileScreen = ({
   const [isFollowersLoading, setIsFollowersLoading] = useState(false)
   const [isPortfolioExpanded, setIsPortfolioExpanded] = useState(false)
   const [isCertificatesExpanded, setIsCertificatesExpanded] = useState(false)
+  const [marketingOptIn, setMarketingOptIn] = useState<boolean | null>(null)
+  const [isMarketingBusy, setIsMarketingBusy] = useState(false)
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<
     number | null
   >(null)
@@ -324,6 +326,10 @@ export const ClientMasterProfileScreen = ({
     masterId: '',
     isFavorite: false,
   })
+  const marketingFollowRef = useRef<{ masterId: string; isFavorite: boolean }>({
+    masterId: '',
+    isFavorite: false,
+  })
 
   useEffect(() => {
     if (!masterId) return
@@ -334,13 +340,26 @@ export const ClientMasterProfileScreen = ({
       setLoadError('')
       setProfile(null)
       try {
-        const response = await fetch(`${apiBase}/api/masters/${masterId}`)
+        const profileUrl = new URL(`${apiBase}/api/masters/${masterId}`)
+        if (userId) {
+          profileUrl.searchParams.set('viewerId', userId)
+        }
+        const response = await fetch(profileUrl.toString())
         if (!response.ok) {
           throw new Error('Load profile failed')
         }
         const data = (await response.json()) as MasterProfile
         if (!cancelled) {
           setProfile(data)
+          if (typeof data.viewerMarketingOptIn === 'boolean') {
+            setMarketingOptIn(data.viewerMarketingOptIn)
+          } else if (data.viewerIsFollower) {
+            setMarketingOptIn(true)
+          } else if (data.viewerIsFollower === false) {
+            setMarketingOptIn(false)
+          } else {
+            setMarketingOptIn(null)
+          }
           setFollowersTotal(
             typeof data.followersCount === 'number' &&
               Number.isFinite(data.followersCount)
@@ -365,7 +384,7 @@ export const ClientMasterProfileScreen = ({
     return () => {
       cancelled = true
     }
-  }, [apiBase, masterId])
+  }, [apiBase, masterId, userId])
 
   useEffect(() => {
     if (!masterId || !userId || masterId === userId) return
@@ -542,6 +561,8 @@ export const ClientMasterProfileScreen = ({
     setIsCertificatesExpanded(false)
     setPortfolioLightboxIndex(null)
     setCertificateLightboxIndex(null)
+    setMarketingOptIn(null)
+    setIsMarketingBusy(false)
     setIsScheduleInfoOpen(false)
     setActiveTab('overview')
     setActiveStat(null)
@@ -970,10 +991,66 @@ export const ClientMasterProfileScreen = ({
       Math.max(0, current + (isFavorite ? 1 : -1))
     )
   }, [isFavorite, masterId, profile])
+  useEffect(() => {
+    if (marketingFollowRef.current.masterId !== masterId) {
+      marketingFollowRef.current = { masterId, isFavorite }
+      return
+    }
+    if (marketingFollowRef.current.isFavorite === isFavorite) return
+    marketingFollowRef.current = { masterId, isFavorite }
+    if (!isFavorite) {
+      setMarketingOptIn(false)
+      return
+    }
+    setMarketingOptIn(true)
+  }, [isFavorite, masterId])
   const followActionLabel = isFavorite ? 'Вы подписаны' : 'Подписаться'
   const followAriaLabel = isFavorite
     ? 'Отписаться от мастера'
     : 'Подписаться на мастера'
+  const isViewerFollower =
+    typeof profile?.viewerIsFollower === 'boolean' ? profile.viewerIsFollower : isFavorite
+  const isMarketingEnabled = isViewerFollower && (marketingOptIn ?? true)
+  const marketingHint = !isViewerFollower
+    ? 'Подпишитесь, чтобы получать уведомления'
+    : isMarketingEnabled
+      ? 'Уведомления включены'
+      : 'Уведомления выключены'
+  const handleMarketingToggle = useCallback(async () => {
+    if (!userId || !masterId || !isViewerFollower || isMarketingBusy) return
+    const previousOptIn = marketingOptIn
+    const nextEnabled = !isMarketingEnabled
+    setMarketingOptIn(nextEnabled)
+    setIsMarketingBusy(true)
+    try {
+      const action = nextEnabled ? 'opt-in' : 'opt-out'
+      const response = await fetch(
+        `${apiBase}/api/masters/${masterId}/marketing/${action}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        }
+      )
+      if (!response.ok) {
+        throw new Error('Marketing toggle failed')
+      }
+    } catch (error) {
+      setMarketingOptIn(
+        previousOptIn ?? (isViewerFollower ? true : false)
+      )
+    } finally {
+      setIsMarketingBusy(false)
+    }
+  }, [
+    apiBase,
+    isMarketingBusy,
+    isMarketingEnabled,
+    isViewerFollower,
+    marketingOptIn,
+    masterId,
+    userId,
+  ])
   const favoritePayload = useMemo(
     () => ({
       masterId,
@@ -1094,10 +1171,15 @@ export const ClientMasterProfileScreen = ({
               <div className="pro-profile-hero-card">
                 <div className="pro-profile-hero-identity">
                   <button
-                    className="pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings master-profile-marketing-button"
+                    className={`pro-profile-ig-button pro-profile-ig-button--fab pro-profile-hero-settings master-profile-marketing-button${
+                      isMarketingEnabled ? ' is-active' : ''
+                    }`}
                     type="button"
-                    aria-label="Мастер может отправлять предложения в боте"
-                    title="Мастер может отправлять предложения в боте"
+                    onClick={handleMarketingToggle}
+                    aria-label={marketingHint}
+                    aria-pressed={isMarketingEnabled}
+                    title={marketingHint}
+                    disabled={!isViewerFollower || isMarketingBusy}
                   >
                     <span className="pro-profile-ig-button-icon" aria-hidden="true">
                       <IconBell />

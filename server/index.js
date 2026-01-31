@@ -4680,6 +4680,7 @@ app.get('/api/masters', async (req, res) => {
 
 app.get('/api/masters/:userId', async (req, res) => {
   const normalizedUserId = normalizeText(req.params.userId)
+  const viewerId = normalizeText(req.query.viewerId)
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
     return
@@ -4722,6 +4723,8 @@ app.get('/api/masters/:userId', async (req, res) => {
           COALESCE(mr.reviews_count, 0) AS "reviewsCount",
           COALESCE(mr.reviews_average, 0) AS "reviewsAverage",
           COALESCE(mf.followers_count, 0) AS "followersCount",
+          CASE WHEN $2::text IS NULL THEN NULL ELSE (mvu.follower_id IS NOT NULL) END AS "viewerIsFollower",
+          CASE WHEN $2::text IS NULL THEN NULL ELSE mvu.marketing_opt_in END AS "viewerMarketingOptIn",
           mp.updated_at AS "updatedAt"
         FROM master_profiles mp
         LEFT JOIN users u ON u.user_id = mp.user_id
@@ -4743,9 +4746,12 @@ app.get('/api/masters/:userId', async (req, res) => {
           FROM master_followers
           GROUP BY master_id
         ) mf ON mf.master_id = mp.user_id
+        LEFT JOIN master_followers mvu
+          ON mvu.master_id = mp.user_id
+          AND mvu.follower_id = $2
         WHERE mp.user_id = $1
       `,
-      [normalizedUserId]
+      [normalizedUserId, viewerId || null]
     )
 
     if (result.rows.length === 0) {
@@ -4771,6 +4777,12 @@ app.get('/api/masters/:userId', async (req, res) => {
       reviewsAverage,
       reviewsCount,
       followersCount,
+      viewerIsFollower:
+        typeof row.viewerIsFollower === 'boolean' ? row.viewerIsFollower : null,
+      viewerMarketingOptIn:
+        typeof row.viewerMarketingOptIn === 'boolean'
+          ? row.viewerMarketingOptIn
+          : null,
       depositQrUrl: buildPublicUrl(req, row.depositQrPath),
       lateCancelFeePercent: 0,
       avatarUrl: buildPublicUrl(req, row.avatarPath),
@@ -4908,6 +4920,41 @@ app.post('/api/masters/:userId/marketing/opt-out', async (req, res) => {
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/masters/:userId/marketing/opt-out failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/masters/:userId/marketing/opt-in', async (req, res) => {
+  const masterId = normalizeText(req.params.userId)
+  const followerId = normalizeText(req.body?.userId ?? req.body?.followerId)
+  if (!masterId || !followerId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (masterId === followerId) {
+    res.status(400).json({ error: 'self_opt_in_forbidden' })
+    return
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE master_followers
+        SET marketing_opt_in = TRUE,
+            marketing_opt_in_at = NOW(),
+            marketing_opt_out_at = NULL
+        WHERE master_id = $1 AND follower_id = $2
+        RETURNING master_id
+      `,
+      [masterId, followerId]
+    )
+    if (!result.rows.length) {
+      res.status(404).json({ error: 'follow_not_found' })
+      return
+    }
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('POST /api/masters/:userId/marketing/opt-in failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

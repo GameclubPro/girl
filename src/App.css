@@ -21556,6 +21556,13 @@ h2 {
   position: relative;
 }
 
+.screen--client-master-profile .master-profile-marketing-button.is-active {
+  background: linear-gradient(135deg, #2b6cf6 0%, #9ed0ff 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 16px 24px rgba(47, 109, 246, 0.28);
+}
+
 .screen--client-master-profile .master-profile-marketing-button::after {
   content: 'бот';
   position: absolute;

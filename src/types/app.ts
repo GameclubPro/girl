@@ -95,6 +95,8 @@ export type MasterProfile = {
   reviewsAverage?: number | null
   distanceKm?: number | null
   followersCount?: number | null
+  viewerIsFollower?: boolean | null
+  viewerMarketingOptIn?: boolean | null
 }
 
 export type StoryItem = {
