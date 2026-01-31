@@ -3964,9 +3964,9 @@
 }
 
 .pro-cabinet-nav-meter {
-  height: clamp(6px, 1dvh, 8px);
+  height: clamp(12px, 1.8dvh, 16px);
   border-radius: 999px;
-  background: rgba(var(--shadow-rgb), 0.14);
+  background: rgba(var(--shadow-rgb), 0.08);
   overflow: hidden;
 }
 
@@ -3975,11 +3975,10 @@
   display: block;
   height: 100%;
   width: calc(var(--meter) * 1%);
-  background: linear-gradient(
-    90deg,
-    rgba(var(--tile-accent), 0.9),
-    rgba(var(--tile-accent), 0.35)
-  );
+  color: rgb(var(--tile-accent));
+  background: no-repeat center / 100% 100%
+    url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20120%2020'%20fill%3D'none'%20stroke%3D'currentColor'%20stroke-width%3D'3'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cpolyline%20points%3D'2%2C18%2022%2C12%2040%2C14%2060%2C7%2080%2C9%20100%2C3'%2F%3E%3Cpolyline%20points%3D'96%2C1%20100%2C3%2098%2C7'%2F%3E%3C%2Fsvg%3E");
+  filter: drop-shadow(0 3px 6px rgba(var(--tile-accent), 0.25));
 }
 
 .pro-cabinet-nav-stats {
