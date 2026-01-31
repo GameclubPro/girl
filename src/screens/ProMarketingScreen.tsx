@@ -104,10 +104,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [broadcastDraft, setBroadcastDraft] = useState('')
   const [reminderDraft, setReminderDraft] = useState('')
   const [reminderTouched, setReminderTouched] = useState(false)
-  const [broadcastIncludeLink, setBroadcastIncludeLink] = useState(true)
-  const [reminderIncludeLink, setReminderIncludeLink] = useState(true)
-  const [broadcastIncludeUnsubscribe, setBroadcastIncludeUnsubscribe] = useState(true)
-  const [reminderIncludeUnsubscribe, setReminderIncludeUnsubscribe] = useState(true)
   const [reminderWindow, setReminderWindow] = useState<ReminderWindow>(30)
   const [reminderTone, setReminderTone] = useState('friendly')
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -289,12 +285,8 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
   const currentDraft = activeTab === 'broadcast' ? broadcastDraft : reminderDraft
   const setCurrentDraft = activeTab === 'broadcast' ? setBroadcastDraft : setReminderDraft
-  const includeLinkEnabled =
-    activeTab === 'broadcast' ? broadcastIncludeLink : reminderIncludeLink
-  const includeUnsubscribeEnabled =
-    activeTab === 'broadcast'
-      ? broadcastIncludeUnsubscribe
-      : reminderIncludeUnsubscribe
+  const includeLinkEnabled = Boolean(shareLink)
+  const includeUnsubscribeEnabled = true
 
   const payloadText = useMemo(() => {
     const trimmed = currentDraft.trim()
@@ -454,18 +446,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     showStatus('Черновик очищен.')
   }, [activeTab, showStatus])
 
-  const handleToggleLink = useCallback(() => {
-    if (!shareLink) {
-      showStatus('Ссылка для записи недоступна.', true)
-      return
-    }
-    if (activeTab === 'broadcast') {
-      setBroadcastIncludeLink((current) => !current)
-    } else {
-      setReminderIncludeLink((current) => !current)
-    }
-  }, [activeTab, shareLink, showStatus])
-
   const lastUpdatedLabel = lastUpdated
     ? `Обновлено ${lastUpdated.toLocaleTimeString('ru-RU', {
         hour: '2-digit',
@@ -615,25 +595,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     {template.pill && (
                       <span className="pro-detail-pill is-ghost">{template.pill}</span>
                     )}
-                    {template.isPromo && (
-                      <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
-                        {DISCOUNT_OPTIONS.map((value) => (
-                          <button
-                            key={`discount-${value}`}
-                            className={`pro-marketing-chip${
-                              value === discountPercent ? ' is-active' : ''
-                            }`}
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setDiscountPercent(value)
-                            }}
-                          >
-                            -{value}%
-                          </button>
-                        ))}
-                      </div>
-                    )}
                     <button
                       className="pro-marketing-template-link"
                       type="button"
@@ -662,30 +623,22 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               </div>
             </div>
 
-            <div className="pro-marketing-toggle-row">
-              <label
-                className={`pro-marketing-switch${shareLink ? '' : ' is-disabled'}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={includeLinkEnabled && Boolean(shareLink)}
-                  onChange={handleToggleLink}
-                  disabled={!shareLink}
-                />
-                <span>Добавлять ссылку на запись</span>
-              </label>
-              {channel === 'bot' && (
-                <label className="pro-marketing-switch">
-                  <input
-                    type="checkbox"
-                    checked={includeUnsubscribeEnabled}
-                    onChange={() =>
-                      setBroadcastIncludeUnsubscribe((current) => !current)
-                    }
-                  />
-                  <span>Добавить кнопку «Отписаться»</span>
-                </label>
-              )}
+            <div className="pro-marketing-discount">
+              <span className="pro-marketing-discount-label">Скидка</span>
+              <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
+                {DISCOUNT_OPTIONS.map((value) => (
+                  <button
+                    key={`discount-${value}`}
+                    className={`pro-marketing-chip${
+                      value === discountPercent ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    onClick={() => setDiscountPercent(value)}
+                  >
+                    -{value}%
+                  </button>
+                ))}
+              </div>
             </div>
 
             {!shareConfigured && (
@@ -808,25 +761,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                         Вставить
                       </button>
                     </div>
-                    {template.isPromo && (
-                      <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
-                        {DISCOUNT_OPTIONS.map((value) => (
-                          <button
-                            key={`reminder-discount-${value}`}
-                            className={`pro-marketing-chip${
-                              value === discountPercent ? ' is-active' : ''
-                            }`}
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setDiscountPercent(value)
-                            }}
-                          >
-                            -{value}%
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </section>
                 ))}
               </div>
@@ -851,30 +785,22 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               </div>
             </div>
 
-            <div className="pro-marketing-toggle-row">
-              <label
-                className={`pro-marketing-switch${shareLink ? '' : ' is-disabled'}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={includeLinkEnabled && Boolean(shareLink)}
-                  onChange={handleToggleLink}
-                  disabled={!shareLink}
-                />
-                <span>Добавлять ссылку на запись</span>
-              </label>
-              {channel === 'bot' && (
-                <label className="pro-marketing-switch">
-                  <input
-                    type="checkbox"
-                    checked={includeUnsubscribeEnabled}
-                    onChange={() =>
-                      setReminderIncludeUnsubscribe((current) => !current)
-                    }
-                  />
-                  <span>Добавить кнопку «Отписаться»</span>
-                </label>
-              )}
+            <div className="pro-marketing-discount">
+              <span className="pro-marketing-discount-label">Скидка</span>
+              <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
+                {DISCOUNT_OPTIONS.map((value) => (
+                  <button
+                    key={`reminder-discount-${value}`}
+                    className={`pro-marketing-chip${
+                      value === discountPercent ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    onClick={() => setDiscountPercent(value)}
+                  >
+                    -{value}%
+                  </button>
+                ))}
+              </div>
             </div>
 
             {!shareConfigured && (
