@@ -17405,10 +17405,18 @@
 }
 
 .brand-hero {
-  width: clamp(120px, 40vw, 176px);
+  width: clamp(96px, 30vw, 140px);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 10px 22px rgba(var(--shadow-rgb), 0.18));
+}
+
+.brand-title {
+  font-family: var(--font-title);
+  font-size: clamp(18px, 5vw, 22px);
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  color: var(--ink);
 }
 
 h1 {

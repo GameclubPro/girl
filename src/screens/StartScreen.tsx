@@ -21,10 +21,11 @@ export const StartScreen = ({
           <img
             className="brand-hero"
             src={brandHeroImage}
-            alt="KIVEN GIRL"
+            alt="BEAUTERA"
             loading="eager"
             decoding="async"
           />
+          <span className="brand-title">BEAUTERA</span>
           <p className="subtitle">
             <span className="subtitle-line subtitle-line--wide">
               Создаем новую эру
