@@ -3638,31 +3638,6 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS marketing_campaigns (
-      id SERIAL PRIMARY KEY,
-      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-      channel TEXT NOT NULL CHECK (channel IN ('bot', 'chat')),
-      audience TEXT,
-      body TEXT NOT NULL,
-      include_unsubscribe BOOLEAN NOT NULL DEFAULT FALSE,
-      total INTEGER NOT NULL DEFAULT 0,
-      sent INTEGER NOT NULL DEFAULT 0,
-      failed INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `)
-
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS marketing_campaigns_master_idx
-    ON marketing_campaigns (master_id, created_at DESC);
-  `)
-
-  await pool.query(`
-    ALTER TABLE marketing_campaigns
-    ADD COLUMN IF NOT EXISTS audience TEXT;
-  `)
-
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS marketing_repeat_settings (
       master_id TEXT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
       enabled BOOLEAN NOT NULL DEFAULT FALSE,
@@ -8102,42 +8077,6 @@ app.post('/api/pro/marketing/repeat-settings', async (req, res) => {
   }
 })
 
-app.get('/api/pro/marketing/campaigns', async (req, res) => {
-  const masterId = normalizeText(req.query.userId)
-  if (!masterId) {
-    res.status(400).json({ error: 'userId_required' })
-    return
-  }
-  const rawLimit = parseOptionalInt(req.query.limit)
-  const limit = rawLimit && rawLimit > 0 ? Math.min(rawLimit, 30) : 20
-
-  try {
-    const result = await pool.query(
-      `
-        SELECT
-          id,
-          channel,
-          audience,
-          body,
-          include_unsubscribe AS "includeUnsubscribe",
-          total,
-          sent,
-          failed,
-          created_at AS "createdAt"
-        FROM marketing_campaigns
-        WHERE master_id = $1
-        ORDER BY created_at DESC
-        LIMIT $2
-      `,
-      [masterId, limit]
-    )
-    res.json({ items: result.rows })
-  } catch (error) {
-    console.error('GET /api/pro/marketing/campaigns failed:', error)
-    res.status(500).json({ error: 'server_error' })
-  }
-})
-
 app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
   const masterId = normalizeText(req.body?.userId ?? req.body?.masterId)
   if (!masterId) {
@@ -8191,43 +8130,7 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
             limit,
           })
 
-    const campaignResult = await pool.query(
-      `
-        INSERT INTO marketing_campaigns (
-          master_id,
-          channel,
-          audience,
-          body,
-          include_unsubscribe,
-          total,
-          sent,
-          failed
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING
-          id,
-          channel,
-          audience,
-          body,
-          include_unsubscribe AS "includeUnsubscribe",
-          total,
-          sent,
-          failed,
-          created_at AS "createdAt"
-      `,
-      [
-        masterId,
-        channel,
-        audience.key ?? 'all',
-        text,
-        includeUnsubscribe && channel === 'bot',
-        result.total,
-        result.sent,
-        result.failed,
-      ]
-    )
-    const campaign = campaignResult.rows[0]
-    res.json({ ok: true, campaign, stats: result })
+    res.json({ ok: true, stats: result })
   } catch (error) {
     if (error?.code === 'bot_not_configured') {
       res.status(400).json({ error: 'bot_not_configured' })
