@@ -341,6 +341,7 @@ export const ClientRequestsScreen = ({
   const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
   const pendingRequestFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusIdRef = useRef<number | null>(null)
+  const pendingBookingFocusFilterRef = useRef<'all' | 'action' | 'keep'>('all')
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
   )
@@ -718,11 +719,16 @@ export const ClientRequestsScreen = ({
       const needsRescheduleDecision =
         Boolean(booking.rescheduleProposedTime) &&
         booking.rescheduleProposedBy === 'master'
+      const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
+      const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
+      const needsReview =
+        booking.status === 'confirmed' && isPast && !booking.reviewId
       return (
         needsDeposit ||
         needsPriceDecision ||
         needsConfirmation ||
-        needsRescheduleDecision
+        needsRescheduleDecision ||
+        needsReview
       )
     })
     const resolveHoldMsLeft = (booking: Booking) => {
@@ -798,18 +804,29 @@ export const ClientRequestsScreen = ({
     setCalendarInitialized(true)
   }
 
-  const focusBooking = useCallback((booking: Booking) => {
-    const date = parseDateOnly(booking.scheduledAt)
-    if (!date) return
-    setBookingFilter('all')
-    setSelectedDate(date)
-    setWeekStartDate(startOfWeek(date))
-    setCalendarInitialized(true)
-    setFocusedBookingId(booking.id)
-    requestAnimationFrame(() => {
-      bookingListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }, [])
+  const focusBooking = useCallback(
+    (booking: Booking, options?: { filter?: 'all' | 'action' | 'keep' }) => {
+      const date = parseDateOnly(booking.scheduledAt)
+      if (!date) return
+      const filter = options?.filter ?? 'all'
+      if (filter === 'all') {
+        setBookingFilter('all')
+      } else if (filter === 'action') {
+        setBookingFilter('action')
+      }
+      setSelectedDate(date)
+      setWeekStartDate(startOfWeek(date))
+      setCalendarInitialized(true)
+      setFocusedBookingId(booking.id)
+      requestAnimationFrame(() => {
+        bookingListRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      })
+    },
+    []
+  )
 
   const loadResponses = useCallback(
     async (requestId: number) => {
@@ -859,46 +876,97 @@ export const ClientRequestsScreen = ({
     [expandedRequestId, openResponses]
   )
 
+  const resolveRequestFocus = useCallback(
+    (requestId: number) => {
+      const requestIndex = requests.findIndex((request) => request.id === requestId)
+      if (requestIndex < 0) return
+      setFocusedRequestId(requestId)
+      if (expandedRequestId !== requestId) {
+        openResponses(requestId)
+      }
+      requestAnimationFrame(() => {
+        requestsVirtualRef.current?.scrollToIndex(requestIndex)
+      })
+      onFocusHandled?.()
+    },
+    [expandedRequestId, onFocusHandled, openResponses, requests]
+  )
+
+  const resolveBookingFocus = useCallback(
+    (bookingId: number, options?: { filter?: 'all' | 'action' | 'keep' }) => {
+      const booking = bookingItems.find((item) => item.id === bookingId)
+      if (!booking) return
+      focusBooking(booking, options)
+      onFocusHandled?.()
+    },
+    [bookingItems, focusBooking, onFocusHandled]
+  )
+
+  const handleRequestActionFocus = useCallback(
+    (requestId: number) => {
+      if (activeTab !== 'requests') {
+        pendingRequestFocusIdRef.current = requestId
+        setActiveTab('requests')
+        return
+      }
+      resolveRequestFocus(requestId)
+    },
+    [activeTab, resolveRequestFocus]
+  )
+
+  const handleBookingActionFocus = useCallback(
+    (booking: Booking, actionId?: string | null) => {
+      const nextFilter = activeTab === 'bookings' ? 'keep' : 'action'
+      if (actionId === 'leave_review') {
+        setReviewOpenId(booking.id)
+        setReviewErrors((current) => ({ ...current, [booking.id]: '' }))
+      }
+      if (activeTab !== 'bookings') {
+        pendingBookingFocusIdRef.current = booking.id
+        pendingBookingFocusFilterRef.current = nextFilter
+        setActiveTab('bookings')
+        return
+      }
+      resolveBookingFocus(booking.id, { filter: nextFilter })
+    },
+    [activeTab, resolveBookingFocus]
+  )
+
   useEffect(() => {
     if (typeof focusRequestId !== 'number') return
+    if (activeTab === 'requests') {
+      resolveRequestFocus(focusRequestId)
+      return
+    }
     pendingRequestFocusIdRef.current = focusRequestId
     setActiveTab('requests')
-  }, [focusRequestId])
+  }, [activeTab, focusRequestId, resolveRequestFocus])
 
   useEffect(() => {
     if (typeof focusBookingId !== 'number') return
+    if (activeTab === 'bookings') {
+      resolveBookingFocus(focusBookingId, { filter: 'all' })
+      return
+    }
     pendingBookingFocusIdRef.current = focusBookingId
+    pendingBookingFocusFilterRef.current = 'all'
     setActiveTab('bookings')
-  }, [focusBookingId])
+  }, [activeTab, focusBookingId, resolveBookingFocus])
 
   useEffect(() => {
     const requestId = pendingRequestFocusIdRef.current
     if (!requestId || activeTab !== 'requests') return
-    const item = requests.find((request) => request.id === requestId)
-    if (!item) return
-    const requestIndex = requests.findIndex((request) => request.id === requestId)
     pendingRequestFocusIdRef.current = null
-    setFocusedRequestId(requestId)
-    if (expandedRequestId !== requestId) {
-      openResponses(requestId)
-    }
-    requestAnimationFrame(() => {
-      if (requestIndex >= 0) {
-        requestsVirtualRef.current?.scrollToIndex(requestIndex)
-      }
-    })
-    onFocusHandled?.()
-  }, [activeTab, expandedRequestId, onFocusHandled, openResponses, requests])
+    resolveRequestFocus(requestId)
+  }, [activeTab, resolveRequestFocus])
 
   useEffect(() => {
     const bookingId = pendingBookingFocusIdRef.current
     if (!bookingId || activeTab !== 'bookings') return
-    const booking = bookingItems.find((item) => item.id === bookingId)
-    if (!booking) return
+    const filter = pendingBookingFocusFilterRef.current
     pendingBookingFocusIdRef.current = null
-    focusBooking(booking)
-    onFocusHandled?.()
-  }, [activeTab, bookingItems, focusBooking, onFocusHandled])
+    resolveBookingFocus(bookingId, { filter })
+  }, [activeTab, resolveBookingFocus])
 
   useEffect(() => {
     if (focusedBookingId === null) return
@@ -1728,6 +1796,7 @@ export const ClientRequestsScreen = ({
                           <NextActionPill
                             action={nextAction}
                             className="request-action-pill"
+                            onClick={() => handleRequestActionFocus(item.id)}
                           />
                         )}
                         <div className="request-item-actions">
@@ -2408,6 +2477,9 @@ export const ClientRequestsScreen = ({
                         <NextActionPill
                           action={nextAction}
                           className="booking-action-pill"
+                          onClick={() =>
+                            handleBookingActionFocus(booking, nextAction.id)
+                          }
                         />
                       )}
                       {showActions && (

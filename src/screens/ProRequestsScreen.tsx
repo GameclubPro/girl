@@ -2032,10 +2032,39 @@ export const ProRequestsScreen = ({
     setFocusedBookingId(booking.id)
     requestAnimationFrame(() => {
       document
-        .getElementById(`pro-booking-${booking.id}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      .getElementById(`pro-booking-${booking.id}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }, [])
+
+  const handleRequestActionFocus = useCallback(
+    (requestId: number) => {
+      if (activeTab !== 'requests') {
+        pendingRequestFocusIdRef.current = requestId
+        handleUserTabChange('requests')
+        return
+      }
+      focusRequest(requestId)
+    },
+    [activeTab, focusRequest, handleUserTabChange]
+  )
+
+  const handleBookingActionFocus = useCallback(
+    (booking: Booking) => {
+      const targetTab = booking.status === 'confirmed' ? 'bookings' : 'requests'
+      if (activeTab !== targetTab) {
+        pendingBookingFocusIdRef.current = booking.id
+        handleUserTabChange(targetTab)
+        return
+      }
+      if (targetTab === 'bookings') {
+        focusBookingInCalendar(booking)
+      } else {
+        focusPendingBooking(booking.id)
+      }
+    },
+    [activeTab, focusBookingInCalendar, focusPendingBooking, handleUserTabChange]
+  )
 
   useEffect(() => {
     const requestId = pendingRequestFocusIdRef.current
@@ -2851,7 +2880,11 @@ export const ProRequestsScreen = ({
           </div>
         )}
         {nextAction && !isCompact && (
-          <NextActionPill action={nextAction} className="booking-action-pill" />
+          <NextActionPill
+            action={nextAction}
+            className="booking-action-pill"
+            onClick={() => handleBookingActionFocus(booking)}
+          />
         )}
         {(booking.cityName || booking.districtName) && (
           <div className="booking-item-meta">
@@ -3662,6 +3695,7 @@ export const ProRequestsScreen = ({
                           <NextActionPill
                             action={nextAction}
                             className="request-action-pill"
+                            onClick={() => handleRequestActionFocus(item.id)}
                           />
                         )}
                           {item.responseStatus === 'accepted' && item.chatId && (
