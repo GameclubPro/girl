@@ -12,6 +12,7 @@ const PROMOTION_DISCOUNT_OPTIONS = [5, 10, 15, 20]
 const PROMOTION_DURATION_OPTIONS = [3, 7, 14]
 const BROADCAST_DISCOUNT_DURATION_OPTIONS = [1, 3, 7]
 const PROMOTION_MAX_DURATION_DAYS = 14
+const TEMPLATE_MENU_ESTIMATED_HEIGHT = 240
 const REPEAT_INTERVAL_MIN = 7
 const REPEAT_INTERVAL_MAX = 180
 const REPEAT_INTERVALS = {
@@ -128,6 +129,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [broadcastDraft, setBroadcastDraft] = useState('')
   const [broadcastTemplateOpen, setBroadcastTemplateOpen] = useState(false)
   const [broadcastTemplateId, setBroadcastTemplateId] = useState<string | null>(null)
+  const [broadcastTemplatePlacement, setBroadcastTemplatePlacement] = useState<
+    'down' | 'up'
+  >('down')
   const [broadcastSegment, setBroadcastSegment] =
     useState<BroadcastSegment>('all')
   const [broadcastDiscountEnabled, setBroadcastDiscountEnabled] = useState(false)
@@ -168,6 +172,18 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const marketingAbortRef = useRef<AbortController | null>(null)
   const broadcastTemplateRef = useRef<HTMLDivElement | null>(null)
 
+  const resolveBroadcastTemplatePlacement = useCallback(() => {
+    const wrapper = broadcastTemplateRef.current
+    if (!wrapper) return
+    const rect = wrapper.getBoundingClientRect()
+    const viewportHeight = window.innerHeight || 0
+    const spaceBelow = viewportHeight - rect.bottom
+    const spaceAbove = rect.top
+    const shouldOpenUp =
+      spaceBelow < TEMPLATE_MENU_ESTIMATED_HEIGHT && spaceAbove > spaceBelow
+    setBroadcastTemplatePlacement(shouldOpenUp ? 'up' : 'down')
+  }, [])
+
   const showStatus = useCallback((nextStatus: string, isError = false) => {
     if (statusTimerRef.current) {
       window.clearTimeout(statusTimerRef.current)
@@ -198,6 +214,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
   useEffect(() => {
     if (!broadcastTemplateOpen) return
+    resolveBroadcastTemplatePlacement()
+    const handleViewportChange = () => {
+      resolveBroadcastTemplatePlacement()
+    }
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node
       if (broadcastTemplateRef.current?.contains(target)) return
@@ -210,11 +230,15 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     }
     document.addEventListener('mousedown', handleClick)
     document.addEventListener('keydown', handleKey)
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('scroll', handleViewportChange, true)
     return () => {
       document.removeEventListener('mousedown', handleClick)
       document.removeEventListener('keydown', handleKey)
+      window.removeEventListener('resize', handleViewportChange)
+      window.removeEventListener('scroll', handleViewportChange, true)
     }
-  }, [broadcastTemplateOpen])
+  }, [broadcastTemplateOpen, resolveBroadcastTemplatePlacement])
 
   useEffect(() => {
     if (activeTab !== 'broadcast') {
@@ -1009,42 +1033,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           </p>
         )}
 
-        <section className="pro-detail-card pro-marketing-summary animate delay-1">
-          <div className="pro-marketing-summary-grid">
-            <div className="pro-marketing-summary-item">
-              <span className="pro-marketing-summary-label">Подписчики</span>
-              <span className="pro-marketing-summary-value">
-                {marketingLoading ? '—' : botAudience ?? 0}
-              </span>
-            </div>
-            <div className="pro-marketing-summary-item">
-              <span className="pro-marketing-summary-label">Чаты</span>
-              <span className="pro-marketing-summary-value">
-                {marketingLoading ? '—' : chatAudience ?? 0}
-              </span>
-            </div>
-            <div className="pro-marketing-summary-item">
-              <span className="pro-marketing-summary-label">Повтор</span>
-              <span className="pro-marketing-summary-value">
-                {repeatEligibleLabel}
-              </span>
-            </div>
-          </div>
-          <div className="pro-marketing-summary-meta">
-            <span>
-              Акция:{' '}
-              {activePromotion
-                ? activePromotion.type === 'discount' &&
-                  typeof activePromotion.discountPercent === 'number' &&
-                  activePromotion.discountPercent > 0
-                  ? `Скидка -${activePromotion.discountPercent}%`
-                  : activePromotion.title
-                : 'нет'}
-            </span>
-            <span>Последняя отправка: {repeatLastSentLabel}</span>
-          </div>
-        </section>
-
         <div className="pro-marketing-tabbar" role="tablist">
           <button
             className={`pro-marketing-tab${activeTab === 'broadcast' ? ' is-active' : ''}`}
@@ -1139,21 +1127,24 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
             <div className="pro-marketing-discount">
               <div className="pro-marketing-discount-head">
                 <span className="pro-marketing-promo-label">Скидка в рассылке</span>
-                <button
-                  className={`pro-marketing-auto-toggle${
-                    broadcastDiscountEnabled ? ' is-active' : ''
-                  }`}
-                  type="button"
-                  onClick={() =>
-                    setBroadcastDiscountEnabled((current) => !current)
-                  }
-                  aria-pressed={broadcastDiscountEnabled}
-                  disabled={isSending}
-                >
+                <div className="pro-marketing-toggle">
+                  <button
+                    className={`pro-marketing-auto-toggle${
+                      broadcastDiscountEnabled ? ' is-active' : ''
+                    }`}
+                    type="button"
+                    role="switch"
+                    aria-checked={broadcastDiscountEnabled}
+                    aria-label="Скидка в рассылке"
+                    onClick={() =>
+                      setBroadcastDiscountEnabled((current) => !current)
+                    }
+                    disabled={isSending}
+                  />
                   <span className="pro-marketing-auto-toggle-text">
                     {broadcastDiscountEnabled ? 'Вкл' : 'Выкл'}
                   </span>
-                </button>
+                </div>
               </div>
               {broadcastDiscountEnabled && (
                 <>
@@ -1232,7 +1223,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 </button>
                 {broadcastTemplateOpen && (
                   <div
-                    className="pro-marketing-select-menu"
+                    className={`pro-marketing-select-menu${
+                      broadcastTemplatePlacement === 'up' ? ' is-up' : ''
+                    }`}
                     role="listbox"
                     aria-label="Шаблон рассылки"
                   >
@@ -1310,24 +1303,27 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                   Авто-напоминания
                 </p>
               </div>
-              <button
-                className={`pro-marketing-auto-toggle${
-                  repeatEnabled ? ' is-active' : ''
-                }`}
-                type="button"
-                onClick={() =>
-                  void saveRepeatSettings(
-                    { enabled: !repeatEnabled },
-                    { preserveDraft: true }
-                  )
-                }
-                aria-pressed={repeatEnabled}
-                disabled={repeatLoading || repeatSaving}
-              >
+              <div className="pro-marketing-toggle">
+                <button
+                  className={`pro-marketing-auto-toggle${
+                    repeatEnabled ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  role="switch"
+                  aria-checked={repeatEnabled}
+                  aria-label="Авто-напоминания"
+                  onClick={() =>
+                    void saveRepeatSettings(
+                      { enabled: !repeatEnabled },
+                      { preserveDraft: true }
+                    )
+                  }
+                  disabled={repeatLoading || repeatSaving}
+                />
                 <span className="pro-marketing-auto-toggle-text">
                   {repeatSaving ? '...' : repeatEnabled ? 'Вкл' : 'Выкл'}
                 </span>
-              </button>
+              </div>
             </div>
             <p className="pro-marketing-repeat-note">
               Проверяем каждые 12 часов. Если нет будущей записи — отправим.
