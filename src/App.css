@@ -24485,22 +24485,16 @@ h2 {
   border: 1px solid rgba(170, 198, 255, 0.9);
   background:
     radial-gradient(
-      120% 110% at 50% 45%,
+      140% 120% at 50% 45%,
       #ffffff 0%,
-      #ffffff 62%,
-      #edf4ff 78%,
-      #d7e8ff 100%
+      #ffffff 80%,
+      #eaf3ff 88%,
+      #cfe0ff 100%
     ),
-    radial-gradient(
-      180% 160% at 50% 120%,
-      #cfe0ff 0%,
-      #deecff 55%,
-      #ffffff 82%
-    ),
-    radial-gradient(rgba(255, 255, 255, 0.22) 0.6px, transparent 0.8px);
-  background-size: auto, auto, 6px 6px;
-  background-repeat: no-repeat, no-repeat, repeat;
-  background-blend-mode: normal, normal, soft-light;
+    radial-gradient(rgba(255, 255, 255, 0.18) 0.6px, transparent 0.8px);
+  background-size: auto, 6px 6px;
+  background-repeat: no-repeat, repeat;
+  background-blend-mode: normal, soft-light;
   border-radius: 22px;
   padding: 12px;
   display: flex;
