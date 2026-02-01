@@ -661,6 +661,8 @@ export const ProRequestsScreen = ({
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
   const pendingRequestFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusIdRef = useRef<number | null>(null)
+  const autoSwitchHandledRef = useRef(false)
+  const autoSwitchLockedRef = useRef(false)
   const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const pendingBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const archivedBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
@@ -745,6 +747,11 @@ export const ProRequestsScreen = ({
   )
   const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
 
+  const handleUserTabChange = useCallback((next: 'requests' | 'bookings') => {
+    autoSwitchLockedRef.current = true
+    setActiveTab(next)
+  }, [])
+
   useEffect(() => {
     if (!initialTab) return
     setActiveTab(initialTab)
@@ -776,12 +783,30 @@ export const ProRequestsScreen = ({
     onTabChange?.(activeTab)
   }, [activeTab, onTabChange])
   useEffect(() => {
-    if (activeTab !== 'requests') return
     if (!requestsFetched) return
-    if (typeof focusRequestId === 'number') return
-    if (pendingRequestFocusIdRef.current !== null) return
+    if (autoSwitchHandledRef.current) return
+    if (autoSwitchLockedRef.current) {
+      autoSwitchHandledRef.current = true
+      return
+    }
+    if (activeTab !== 'requests') {
+      autoSwitchHandledRef.current = true
+      return
+    }
+    if (typeof focusRequestId === 'number') {
+      autoSwitchHandledRef.current = true
+      return
+    }
+    if (pendingRequestFocusIdRef.current !== null) {
+      autoSwitchHandledRef.current = true
+      return
+    }
     if (loadError) return
-    if (requests.length > 0) return
+    if (requests.length > 0) {
+      autoSwitchHandledRef.current = true
+      return
+    }
+    autoSwitchHandledRef.current = true
     setActiveTab('bookings')
   }, [activeTab, focusRequestId, loadError, requests.length, requestsFetched])
   useEffect(() => {
@@ -3446,7 +3471,7 @@ export const ProRequestsScreen = ({
             type="button"
             role="tab"
             aria-selected={activeTab === 'requests'}
-            onClick={() => setActiveTab('requests')}
+            onClick={() => handleUserTabChange('requests')}
           >
             Заявки
             <span className="requests-tab-count">
@@ -3458,7 +3483,7 @@ export const ProRequestsScreen = ({
             type="button"
             role="tab"
             aria-selected={activeTab === 'bookings'}
-            onClick={() => setActiveTab('bookings')}
+            onClick={() => handleUserTabChange('bookings')}
           >
             Записи
             <span className="requests-tab-count">
@@ -4700,7 +4725,7 @@ export const ProRequestsScreen = ({
       <ProBottomNav
         active="requests"
         onCabinet={onViewCabinet ?? onBack}
-        onRequests={() => setActiveTab('requests')}
+        onRequests={() => handleUserTabChange('requests')}
         onChats={onViewChats}
         onProfile={() => onEditProfile()}
         allowActiveClick
