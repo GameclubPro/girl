@@ -24481,8 +24481,15 @@ h2 {
 }
 
 .category-overlay-card {
+  --category-card-image: none;
   border: 1px solid rgba(255, 255, 255, 0.7);
   background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(255, 255, 255, 0.18) 45%,
+      rgba(255, 255, 255, 0.55) 100%
+    ),
     radial-gradient(
       120px 90px at 18% 16%,
       rgba(255, 255, 255, 0.95) 0%,
@@ -24502,16 +24509,16 @@ h2 {
       rgba(219, 233, 255, 0.9) 52%,
       rgba(206, 224, 250, 0.92) 100%
     );
-  background-size: auto, auto, 6px 6px, auto;
-  background-repeat: no-repeat, no-repeat, repeat, no-repeat;
-  background-blend-mode: normal, normal, soft-light, normal;
+  background-size: auto, auto, auto, 6px 6px, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat, no-repeat;
+  background-blend-mode: normal, normal, normal, soft-light, normal;
   border-radius: 22px;
-  padding: 8px 10px 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 8px;
   text-align: center;
   cursor: pointer;
   opacity: 0;
@@ -24541,14 +24548,13 @@ h2 {
 .category-overlay-card::before {
   content: '';
   position: absolute;
-  inset: 1px;
-  border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.75) 0%,
-    rgba(255, 255, 255, 0.08) 48%,
-    transparent 70%
-  );
+  inset: 10% 10% 26%;
+  background-image: var(--category-card-image);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.95;
+  filter: drop-shadow(0 16px 24px rgba(15, 23, 42, 0.18));
   pointer-events: none;
   z-index: 0;
 }
@@ -24598,39 +24604,6 @@ h2 {
   outline-offset: 2px;
 }
 
-.category-overlay-card-icon {
-  width: clamp(116px, 36vw, 132px);
-  height: clamp(116px, 36vw, 132px);
-  border-radius: 16px;
-  background:
-    radial-gradient(
-      70px 70px at 30% 25%,
-      rgba(255, 255, 255, 0.9) 0%,
-      rgba(255, 255, 255, 0.35) 60%,
-      transparent 72%
-    ),
-    linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.7) 0%,
-      rgba(255, 255, 255, 0.25) 100%
-    );
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 14px 20px rgba(15, 23, 42, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  transform: translateZ(0);
-  overflow: hidden;
-}
-
-.category-overlay-card-icon img {
-  width: 84%;
-  height: 84%;
-  object-fit: contain;
-}
-
 .category-overlay-card-title {
   font-size: clamp(14px, 3.9vw, 16px);
   font-weight: 700;
@@ -24640,6 +24613,8 @@ h2 {
   transform: none;
   line-height: 1.2;
   letter-spacing: -0.2px;
+  text-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+  margin-top: auto;
 }
 
 .category-overlay-card-arrow {

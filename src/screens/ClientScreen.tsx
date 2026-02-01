@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent,
 } from 'react'
 import { IconUsers } from '../components/icons'
@@ -951,11 +952,13 @@ export const ClientScreen = ({
                       key={item.id}
                       role="listitem"
                       onClick={(event) => handleCategorySelect(item, event)}
-                      style={{ animationDelay: `${index * 45}ms` }}
+                      style={
+                        {
+                          animationDelay: `${index * 45}ms`,
+                          '--category-card-image': `url("${item.icon}")`,
+                        } as CSSProperties
+                      }
                     >
-                      <span className="category-overlay-card-icon" aria-hidden="true">
-                        <img src={item.icon} alt="" loading="lazy" decoding="async" />
-                      </span>
                       <span className="category-overlay-card-title">{label}</span>
                       <span className="category-overlay-card-arrow" aria-hidden="true">
                         &gt;
