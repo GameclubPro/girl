@@ -634,10 +634,18 @@ export const BookingScreen = ({
     depositPercentRaw !== null ? Math.max(0, Math.round(depositPercentRaw)) : null
   const depositFixed =
     depositFixedRaw !== null ? Math.max(0, Math.round(depositFixedRaw)) : null
-  const activeDiscountPercent =
+  const promotionDiscountPercent =
     profile?.activePromotion?.type === 'discount'
       ? Math.max(0, Math.round(profile.activePromotion.discountPercent ?? 0))
       : 0
+  const campaignDiscountPercent =
+    typeof profile?.campaignDiscount?.discountPercent === 'number'
+      ? Math.max(0, Math.round(profile.campaignDiscount.discountPercent))
+      : 0
+  const activeDiscountPercent = Math.max(
+    promotionDiscountPercent,
+    campaignDiscountPercent
+  )
   const baseServicePrice =
     typeof selectedService?.price === 'number' ? selectedService.price : null
   const discountAmount =

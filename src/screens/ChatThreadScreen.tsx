@@ -463,13 +463,42 @@ export const ChatThreadScreen = ({
         : typeof proposedPrice === 'number'
           ? `Предложена цена: ${formatPrice(proposedPrice)}`
           : null
+  const promotionDiscountPercent =
+    typeof bookingSnapshot?.promotionDiscountPercent === 'number'
+      ? Math.max(0, Math.round(bookingSnapshot.promotionDiscountPercent))
+      : 0
+  const campaignDiscountPercent =
+    typeof bookingSnapshot?.campaignDiscountPercent === 'number'
+      ? Math.max(0, Math.round(bookingSnapshot.campaignDiscountPercent))
+      : 0
+  const promotionPriceBefore =
+    typeof bookingSnapshot?.promotionPriceBefore === 'number'
+      ? bookingSnapshot.promotionPriceBefore
+      : null
+  const campaignPriceBefore =
+    typeof bookingSnapshot?.campaignPriceBefore === 'number'
+      ? bookingSnapshot.campaignPriceBefore
+      : null
+  const discountSource = bookingSnapshot?.discountSource ?? null
+  const discountPercent =
+    discountSource === 'campaign'
+      ? campaignDiscountPercent
+      : discountSource === 'promotion'
+        ? promotionDiscountPercent
+        : campaignDiscountPercent > promotionDiscountPercent
+          ? campaignDiscountPercent
+          : promotionDiscountPercent
+  const discountPriceBefore =
+    discountSource === 'campaign'
+      ? campaignPriceBefore
+      : discountSource === 'promotion'
+        ? promotionPriceBefore
+        : campaignDiscountPercent > promotionDiscountPercent
+          ? campaignPriceBefore
+          : promotionPriceBefore
   const promotionDiscountLabel =
-    typeof bookingSnapshot?.promotionDiscountPercent === 'number' &&
-    bookingSnapshot.promotionDiscountPercent > 0 &&
-    typeof bookingSnapshot.promotionPriceBefore === 'number'
-      ? `Скидка -${Math.round(
-          bookingSnapshot.promotionDiscountPercent
-        )}% · было ${formatPrice(bookingSnapshot.promotionPriceBefore)}`
+    discountPercent > 0 && typeof discountPriceBefore === 'number'
+      ? `Скидка -${discountPercent}% · было ${formatPrice(discountPriceBefore)}`
       : null
   const bookingDurationLabel = formatDurationLabel(booking?.serviceDuration)
   const baseRequestDateLabel =

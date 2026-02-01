@@ -2655,14 +2655,39 @@ export const ProRequestsScreen = ({
       typeof booking.promotionDiscountPercent === 'number'
         ? Math.max(0, Math.round(booking.promotionDiscountPercent))
         : 0
+    const campaignDiscountPercent =
+      typeof booking.campaignDiscountPercent === 'number'
+        ? Math.max(0, Math.round(booking.campaignDiscountPercent))
+        : 0
     const promotionPriceBefore =
       typeof booking.promotionPriceBefore === 'number'
         ? booking.promotionPriceBefore
         : null
+    const campaignPriceBefore =
+      typeof booking.campaignPriceBefore === 'number'
+        ? booking.campaignPriceBefore
+        : null
+    const discountSource = booking.discountSource ?? null
+    const discountPercent =
+      discountSource === 'campaign'
+        ? campaignDiscountPercent
+        : discountSource === 'promotion'
+          ? promotionDiscountPercent
+          : campaignDiscountPercent > promotionDiscountPercent
+            ? campaignDiscountPercent
+            : promotionDiscountPercent
+    const discountPriceBefore =
+      discountSource === 'campaign'
+        ? campaignPriceBefore
+        : discountSource === 'promotion'
+          ? promotionPriceBefore
+          : campaignDiscountPercent > promotionDiscountPercent
+            ? campaignPriceBefore
+            : promotionPriceBefore
     const promotionLabel =
-      promotionDiscountPercent > 0 && typeof promotionPriceBefore === 'number'
-        ? `Скидка -${promotionDiscountPercent}% · было ${formatPrice(
-            promotionPriceBefore
+      discountPercent > 0 && typeof discountPriceBefore === 'number'
+        ? `Скидка -${discountPercent}% · было ${formatPrice(
+            discountPriceBefore
           )}`
         : ''
     const canAccept = booking.status === 'pending' && hasServicePrice

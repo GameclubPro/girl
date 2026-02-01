@@ -50,12 +50,14 @@ const BOOKING_PRICE_OFFER_HOURS = 12
 const MARKETING_TEXT_LIMIT = 800
 const MARKETING_BROADCAST_CHUNK = 25
 const MARKETING_BROADCAST_MAX = 5000
+const MARKETING_CAMPAIGN_MAX_DURATION_DAYS = 7
+const MARKETING_CAMPAIGN_SEGMENTS = ['all', 'new', 'regular']
 const PROMOTION_TITLE_LIMIT = 60
 const PROMOTION_DESCRIPTION_LIMIT = 180
 const PROMOTION_MAX_DURATION_DAYS = 14
 const PROMOTION_MAX_DISCOUNT = 60
 const PROMOTION_TYPES = ['discount', 'bonus', 'slots']
-const PROMOTION_AUDIENCES = ['all', 'followers', 'clients', 'subscribers']
+const PROMOTION_AUDIENCES = ['all', 'followers', 'clients']
 const PROMOTION_STATUSES = ['active', 'paused', 'archived']
 const REPEAT_REMINDER_SCAN_INTERVAL_MS = 12 * 60 * 60 * 1000
 const REPEAT_REMINDER_BATCH_LIMIT = 200
@@ -316,6 +318,12 @@ const normalizePromotionAudience = (value) => {
   return 'all'
 }
 
+const normalizeCampaignSegment = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (MARKETING_CAMPAIGN_SEGMENTS.includes(normalized)) return normalized
+  return 'all'
+}
+
 const normalizePromotionTitle = (value) => {
   const normalized = normalizeText(value)
   if (!normalized) return ''
@@ -400,16 +408,6 @@ const buildPromotionAudienceClause = ({
           AND sb.client_id = $${viewerIndex}
       )
     )
-    OR (
-      ${promotionAlias}.audience = 'subscribers'
-      AND EXISTS (
-        SELECT 1
-        FROM master_marketing_subscriptions mms
-        WHERE mms.master_id = ${masterAlias}.user_id
-          AND mms.subscriber_id = $${viewerIndex}
-          AND mms.opt_in = TRUE
-      )
-    )
   )
 `
 
@@ -454,16 +452,6 @@ const loadActivePromotionForViewer = async ({ masterId, viewerId }) => {
                 AND sb.client_id = $2
             )
           )
-          OR (
-            mpromo.audience = 'subscribers'
-            AND EXISTS (
-              SELECT 1
-              FROM master_marketing_subscriptions mms
-              WHERE mms.master_id = mpromo.master_id
-                AND mms.subscriber_id = $2
-                AND mms.opt_in = TRUE
-            )
-          )
         )
       ORDER BY mpromo.end_at ASC
       LIMIT 1
@@ -486,25 +474,127 @@ const loadActivePromotionForViewer = async ({ masterId, viewerId }) => {
   }
 }
 
-const resolveBookingPromotion = async ({
+const loadActiveCampaignDiscountForViewer = async ({ masterId, viewerId }) => {
+  if (!masterId || !viewerId) return null
+  const result = await pool.query(
+    `
+      SELECT
+        c.id,
+        c.master_id AS "masterId",
+        c.discount_percent AS "discountPercent",
+        c.start_at AS "startAt",
+        c.end_at AS "endAt",
+        c.channel,
+        c.segment
+      FROM marketing_campaigns c
+      JOIN marketing_campaign_recipients r
+        ON r.campaign_id = c.id
+      WHERE c.master_id = $1
+        AND r.client_id = $2
+        AND c.status = 'active'
+        AND c.start_at <= NOW()
+        AND c.end_at > NOW()
+      ORDER BY c.discount_percent DESC, c.end_at ASC
+      LIMIT 1
+    `,
+    [masterId, viewerId]
+  )
+  const row = result.rows[0]
+  if (!row) return null
+  const percent = normalizePromotionDiscount(row.discountPercent)
+  if (percent <= 0) return null
+  return {
+    id: Number(row.id),
+    masterId: row.masterId ?? masterId,
+    discountPercent: percent,
+    startAt: row.startAt ?? null,
+    endAt: row.endAt ?? null,
+    channel: row.channel ?? null,
+    segment: row.segment ?? null,
+  }
+}
+
+const resolveBookingDiscount = async ({
   masterId,
   clientId,
   promotionId,
   promotionDiscountPercent,
+  campaignId,
+  campaignDiscountPercent,
 }) => {
-  const storedPercent = normalizePromotionDiscount(promotionDiscountPercent)
-  const storedPromotionId = parseOptionalInt(promotionId)
-  if (storedPercent > 0) {
-    return { id: storedPromotionId ?? null, discountPercent: storedPercent }
+  const storedPromotionPercent = normalizePromotionDiscount(promotionDiscountPercent)
+  const storedCampaignPercent = normalizePromotionDiscount(campaignDiscountPercent)
+  const hasStored =
+    storedPromotionPercent > 0 || storedCampaignPercent > 0
+
+  if (hasStored) {
+    if (storedCampaignPercent > storedPromotionPercent) {
+      return {
+        source: 'campaign',
+        discountPercent: storedCampaignPercent,
+        promotion: null,
+        campaign: {
+          id: parseOptionalInt(campaignId),
+          discountPercent: storedCampaignPercent,
+        },
+      }
+    }
+    if (storedPromotionPercent > 0) {
+      return {
+        source: 'promotion',
+        discountPercent: storedPromotionPercent,
+        promotion: {
+          id: parseOptionalInt(promotionId),
+          discountPercent: storedPromotionPercent,
+        },
+        campaign: null,
+      }
+    }
   }
-  const activePromotion = await loadActivePromotionForViewer({
-    masterId,
-    viewerId: clientId,
-  })
-  if (!activePromotion || activePromotion.type !== 'discount') return null
-  const activePercent = normalizePromotionDiscount(activePromotion.discountPercent)
-  if (activePercent <= 0) return null
-  return { id: activePromotion.id, discountPercent: activePercent }
+
+  const [activePromotion, activeCampaign] = await Promise.all([
+    loadActivePromotionForViewer({ masterId, viewerId: clientId }),
+    loadActiveCampaignDiscountForViewer({ masterId, viewerId: clientId }),
+  ])
+  const promotionPercent =
+    activePromotion?.type === 'discount'
+      ? normalizePromotionDiscount(activePromotion.discountPercent)
+      : 0
+  const campaignPercent = normalizePromotionDiscount(
+    activeCampaign?.discountPercent
+  )
+
+  if (campaignPercent > promotionPercent) {
+    return {
+      source: 'campaign',
+      discountPercent: campaignPercent,
+      promotion: null,
+      campaign: activeCampaign
+        ? { id: activeCampaign.id, discountPercent: campaignPercent }
+        : null,
+    }
+  }
+  if (promotionPercent > 0) {
+    return {
+      source: 'promotion',
+      discountPercent: promotionPercent,
+      promotion: activePromotion
+        ? { id: activePromotion.id, discountPercent: promotionPercent }
+        : null,
+      campaign: null,
+    }
+  }
+  if (campaignPercent > 0) {
+    return {
+      source: 'campaign',
+      discountPercent: campaignPercent,
+      promotion: null,
+      campaign: activeCampaign
+        ? { id: activeCampaign.id, discountPercent: campaignPercent }
+        : null,
+    }
+  }
+  return null
 }
 
 const buildPromotionDiscount = (basePrice, discountPercent) => {
@@ -3937,7 +4027,7 @@ const ensureSchema = async () => {
       start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       end_at TIMESTAMPTZ NOT NULL,
       status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'archived')),
-      audience TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all', 'followers', 'clients', 'subscribers')),
+      audience TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all', 'followers', 'clients')),
       discount_percent INTEGER NOT NULL DEFAULT 0,
       max_uses INTEGER,
       uses_count INTEGER NOT NULL DEFAULT 0,
@@ -3954,6 +4044,14 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE master_promotions
     ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0;
+  `)
+
+  await pool.query(`
+    UPDATE master_promotions
+    SET status = 'archived',
+        audience = 'all',
+        updated_at = NOW()
+    WHERE audience = 'subscribers';
   `)
 
   await pool.query(`
@@ -3977,7 +4075,7 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE master_promotions
     ADD CONSTRAINT master_promotions_audience_check
-    CHECK (audience IN ('all', 'followers', 'clients', 'subscribers'));
+    CHECK (audience IN ('all', 'followers', 'clients'));
   `)
 
   await pool.query(`
@@ -3991,7 +4089,50 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
-    DROP TABLE IF EXISTS marketing_campaigns;
+    CREATE TABLE IF NOT EXISTS marketing_campaigns (
+      id SERIAL PRIMARY KEY,
+      master_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      channel TEXT NOT NULL CHECK (channel IN ('bot', 'chat')),
+      segment TEXT NOT NULL CHECK (segment IN ('all', 'new', 'regular')),
+      discount_percent INTEGER NOT NULL DEFAULT 0,
+      text_preview TEXT,
+      start_at TIMESTAMPTZ NOT NULL,
+      end_at TIMESTAMPTZ NOT NULL,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marketing_campaign_recipients (
+      campaign_id INTEGER NOT NULL REFERENCES marketing_campaigns(id) ON DELETE CASCADE,
+      client_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      channel TEXT NOT NULL CHECK (channel IN ('bot', 'chat')),
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (campaign_id, client_id)
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS marketing_campaigns_master_idx
+    ON marketing_campaigns (master_id, sent_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS marketing_campaigns_active_idx
+    ON marketing_campaigns (master_id, end_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS marketing_campaign_recipients_client_idx
+    ON marketing_campaign_recipients (client_id);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS marketing_campaign_recipients_campaign_idx
+    ON marketing_campaign_recipients (campaign_id);
   `)
 
   await pool.query(`
@@ -4182,6 +4323,12 @@ const ensureSchema = async () => {
       promotion_discount_amount INTEGER,
       promotion_price_before INTEGER,
       promotion_price_after INTEGER,
+      campaign_id INTEGER REFERENCES marketing_campaigns(id),
+      campaign_discount_percent INTEGER,
+      campaign_discount_amount INTEGER,
+      campaign_price_before INTEGER,
+      campaign_price_after INTEGER,
+      discount_source TEXT,
       client_comment TEXT,
       cancelled_by TEXT,
       cancelled_at TIMESTAMPTZ,
@@ -4287,6 +4434,36 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS promotion_price_after INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS campaign_id INTEGER REFERENCES marketing_campaigns(id);
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS campaign_discount_percent INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS campaign_discount_amount INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS campaign_price_before INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS campaign_price_after INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS discount_source TEXT;
   `)
 
   await pool.query(`
@@ -5406,11 +5583,18 @@ app.get('/api/masters/:userId', async (req, res) => {
           title: row.promotionTitle,
           description: row.promotionDescription ?? null,
           startAt: row.promotionStartAt ?? null,
-            endAt: row.promotionEndAt ?? null,
-            audience: row.promotionAudience ?? 'all',
-            discountPercent: normalizePromotionDiscount(row.promotionDiscountPercent),
-          }
+          endAt: row.promotionEndAt ?? null,
+          audience: row.promotionAudience ?? 'all',
+          discountPercent: normalizePromotionDiscount(row.promotionDiscountPercent),
+        }
       : null
+    const campaignDiscount =
+      viewerId && normalizedUserId
+        ? await loadActiveCampaignDiscountForViewer({
+            masterId: normalizedUserId,
+            viewerId,
+          })
+        : null
     res.json({
       ...row,
       depositQrPath: undefined,
@@ -5431,6 +5615,7 @@ app.get('/api/masters/:userId', async (req, res) => {
       avatarUrl: buildPublicUrl(req, row.avatarPath),
       coverUrl: buildPublicUrl(req, row.coverPath),
       activePromotion,
+      campaignDiscount,
       ...summary,
     })
   } catch (error) {
@@ -5486,16 +5671,6 @@ app.get('/api/masters/:userId/promotions', async (req, res) => {
                 SELECT 1
                 FROM service_bookings sb
                 WHERE sb.master_id = $1 AND sb.client_id = $2
-              )
-            )
-            OR (
-              audience = 'subscribers'
-              AND EXISTS (
-                SELECT 1
-                FROM master_marketing_subscriptions mms
-                WHERE mms.master_id = $1
-                  AND mms.subscriber_id = $2
-                  AND mms.opt_in = TRUE
               )
             )
           )
@@ -7158,6 +7333,12 @@ app.get('/api/bookings', async (req, res) => {
           b.promotion_discount_amount AS "promotionDiscountAmount",
           b.promotion_price_before AS "promotionPriceBefore",
           b.promotion_price_after AS "promotionPriceAfter",
+          b.campaign_id AS "campaignId",
+          b.campaign_discount_percent AS "campaignDiscountPercent",
+          b.campaign_discount_amount AS "campaignDiscountAmount",
+          b.campaign_price_before AS "campaignPriceBefore",
+          b.campaign_price_after AS "campaignPriceAfter",
+          b.discount_source AS "discountSource",
           b.client_comment AS "comment",
           b.outcome,
           b.attendance_at AS "attendanceAt",
@@ -7269,6 +7450,12 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.promotion_discount_amount AS "promotionDiscountAmount",
           b.promotion_price_before AS "promotionPriceBefore",
           b.promotion_price_after AS "promotionPriceAfter",
+          b.campaign_id AS "campaignId",
+          b.campaign_discount_percent AS "campaignDiscountPercent",
+          b.campaign_discount_amount AS "campaignDiscountAmount",
+          b.campaign_price_before AS "campaignPriceBefore",
+          b.campaign_price_after AS "campaignPriceAfter",
+          b.discount_source AS "discountSource",
           b.client_comment AS "comment",
           b.outcome,
           b.attendance_at AS "attendanceAt",
@@ -7770,17 +7957,39 @@ app.get('/api/pro/analytics', async (req, res) => {
   }
 })
 
-const fetchMarketingRecipients = async ({ masterId, limit }) => {
+const buildCampaignSegmentClause = (segment, statsAlias = 'stats') => {
+  if (segment === 'new') {
+    return `AND COALESCE(${statsAlias}.confirmed_count, 0) = 0`
+  }
+  if (segment === 'regular') {
+    return `AND (COALESCE(${statsAlias}.confirmed_count, 0) >= 2 OR (${statsAlias}.last_confirmed_at IS NOT NULL AND ${statsAlias}.last_confirmed_at >= NOW() - INTERVAL '${LEAD_CONVERSION_WINDOW_DAYS} days'))`
+  }
+  return ''
+}
+
+const fetchMarketingRecipients = async ({ masterId, limit, segment = 'all' }) => {
+  const normalizedSegment = normalizeCampaignSegment(segment)
   const values = limit ? [masterId, limit] : [masterId]
   const limitClause = limit ? 'LIMIT $2' : ''
+  const segmentClause = buildCampaignSegmentClause(normalizedSegment)
   const result = await pool.query(
     `
       SELECT mms.subscriber_id AS "userId"
       FROM master_marketing_subscriptions mms
       JOIN users u ON u.user_id = mms.subscriber_id
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int AS confirmed_count,
+          MAX(scheduled_at) AS last_confirmed_at
+        FROM service_bookings sb
+        WHERE sb.master_id = $1
+          AND sb.client_id = mms.subscriber_id
+          AND sb.status = 'confirmed'
+      ) stats ON TRUE
       WHERE mms.master_id = $1
         AND mms.opt_in = TRUE
         AND COALESCE(u.is_blocked, FALSE) = FALSE
+        ${segmentClause}
       ORDER BY mms.created_at DESC
       ${limitClause}
     `,
@@ -8221,6 +8430,8 @@ const sendMarketingBotBroadcast = async ({
   includeLink,
   includeUnsubscribe,
   limit,
+  segment = 'all',
+  collectRecipients = false,
 }) => {
   const { payloadText, buttons } = await buildMarketingBotPayload({
     masterId,
@@ -8228,13 +8439,14 @@ const sendMarketingBotBroadcast = async ({
     includeLink,
     includeUnsubscribe,
   })
-  const recipients = await fetchMarketingRecipients({ masterId, limit })
+  const recipients = await fetchMarketingRecipients({ masterId, limit, segment })
   if (recipients.length === 0) {
-    return { total: 0, sent: 0, failed: 0 }
+    return { total: 0, sent: 0, failed: 0, deliveredIds: collectRecipients ? [] : null }
   }
 
   let sent = 0
   let failed = 0
+  const deliveredIds = collectRecipients ? [] : null
   for (let index = 0; index < recipients.length; index += MARKETING_BROADCAST_CHUNK) {
     const chunk = recipients.slice(index, index + MARKETING_BROADCAST_CHUNK)
     const results = await Promise.all(
@@ -8246,31 +8458,48 @@ const sendMarketingBotBroadcast = async ({
         })
       )
     )
-    results.forEach((ok) => {
+    results.forEach((ok, idx) => {
       if (ok) {
         sent += 1
+        if (deliveredIds) {
+          deliveredIds.push(chunk[idx])
+        }
       } else {
         failed += 1
       }
     })
   }
 
-  return { total: recipients.length, sent, failed }
+  return { total: recipients.length, sent, failed, deliveredIds }
 }
 
-const fetchChatBroadcastTargets = async ({ masterId, limit }) => {
+const fetchChatBroadcastTargets = async ({ masterId, limit, segment = 'all' }) => {
+  const normalizedSegment = normalizeCampaignSegment(segment)
   const values = limit ? [masterId, limit] : [masterId]
   const limitClause = limit ? 'LIMIT $2' : ''
+  const segmentClause = buildCampaignSegmentClause(normalizedSegment)
   const result = await pool.query(
     `
-      SELECT c.id AS "chatId", c.client_id AS "clientId"
+      SELECT DISTINCT ON (c.client_id)
+        c.id AS "chatId",
+        c.client_id AS "clientId"
       FROM chats c
       JOIN users u ON u.user_id = c.client_id
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int AS confirmed_count,
+          MAX(scheduled_at) AS last_confirmed_at
+        FROM service_bookings sb
+        WHERE sb.master_id = $1
+          AND sb.client_id = c.client_id
+          AND sb.status = 'confirmed'
+      ) stats ON TRUE
       WHERE c.master_id = $1
         AND c.status = 'active'
         AND c.context_type <> 'support'
         AND COALESCE(u.is_blocked, FALSE) = FALSE
-      ORDER BY c.updated_at DESC
+        ${segmentClause}
+      ORDER BY c.client_id, c.updated_at DESC
       ${limitClause}
     `,
     values
@@ -8287,15 +8516,18 @@ const sendMarketingChatBroadcast = async ({
   masterId,
   text,
   limit,
+  segment = 'all',
+  collectRecipients = false,
 }) => {
-  const targets = await fetchChatBroadcastTargets({ masterId, limit })
+  const targets = await fetchChatBroadcastTargets({ masterId, limit, segment })
   if (targets.length === 0) {
-    return { total: 0, sent: 0, failed: 0 }
+    return { total: 0, sent: 0, failed: 0, deliveredIds: collectRecipients ? [] : null }
   }
   await ensureUser(masterId)
 
   let sent = 0
   let failed = 0
+  const deliveredIds = collectRecipients ? [] : null
   for (const target of targets) {
     try {
       const messageResult = await insertChatTextMessage({
@@ -8327,12 +8559,93 @@ const sendMarketingChatBroadcast = async ({
         audience: 'client',
       })
       sent += 1
+      if (deliveredIds) {
+        deliveredIds.push(target.clientId)
+      }
     } catch (error) {
       failed += 1
     }
   }
 
-  return { total: targets.length, sent, failed }
+  return { total: targets.length, sent, failed, deliveredIds }
+}
+
+const buildCampaignTextPreview = (text) => {
+  const normalized = normalizeText(text)
+  if (!normalized) return null
+  if (normalized.length <= 160) return normalized
+  return `${normalized.slice(0, 157).trimEnd()}...`
+}
+
+const createMarketingCampaign = async ({
+  masterId,
+  channel,
+  segment,
+  discountPercent,
+  durationDays,
+  deliveredIds,
+  text,
+}) => {
+  const startAt = new Date()
+  const endAt = new Date(startAt.getTime() + durationDays * DAY_MS)
+  const textPreview = buildCampaignTextPreview(text)
+  const insertResult = await pool.query(
+    `
+      INSERT INTO marketing_campaigns (
+        master_id,
+        channel,
+        segment,
+        discount_percent,
+        text_preview,
+        start_at,
+        end_at,
+        sent_at,
+        status,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), 'active', NOW())
+      RETURNING
+        id,
+        master_id AS "masterId",
+        channel,
+        segment,
+        discount_percent AS "discountPercent",
+        text_preview AS "textPreview",
+        start_at AS "startAt",
+        end_at AS "endAt",
+        sent_at AS "sentAt",
+        status,
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+    `,
+    [
+      masterId,
+      channel,
+      segment,
+      discountPercent,
+      textPreview,
+      startAt,
+      endAt,
+    ]
+  )
+  const campaign = insertResult.rows[0] ?? null
+  const ids = Array.from(new Set(deliveredIds)).filter(Boolean)
+  if (campaign?.id && ids.length > 0) {
+    await pool.query(
+      `
+        INSERT INTO marketing_campaign_recipients (
+          campaign_id,
+          client_id,
+          channel,
+          sent_at
+        )
+        SELECT $1, unnest($2::text[]), $3, NOW()
+        ON CONFLICT DO NOTHING
+      `,
+      [campaign.id, ids, channel]
+    )
+  }
+  return campaign
 }
 
 app.post('/api/pro/marketing/broadcast', async (req, res) => {
@@ -8926,136 +9239,52 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
   const rawLimit = parseOptionalInt(req.body?.limit)
   const limit =
     rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
-  const promotionPayload = req.body?.promotion ?? null
-  const promotionEnabled = Boolean(
-    promotionPayload &&
-      (promotionPayload.enabled === undefined || promotionPayload.enabled === true)
+  const segment = normalizeCampaignSegment(req.body?.segment)
+  const discountPayload = req.body?.discount ?? req.body?.promotion ?? null
+  const discountEnabled = Boolean(
+    discountPayload &&
+      (discountPayload.enabled === undefined || discountPayload.enabled === true)
   )
-  let promotionRow = null
-  let promotionId = null
 
-  const pausePromotion = async () => {
-    if (!promotionId) return
-    try {
-      await pool.query(
-        `
-          UPDATE master_promotions
-          SET status = 'paused', updated_at = NOW()
-          WHERE id = $1 AND master_id = $2
-        `,
-        [promotionId, masterId]
-      )
-    } catch (pauseError) {
-      console.error('Failed to pause promotion after broadcast error:', pauseError)
+  let discountPercent = 0
+  let durationDays = 0
+  if (discountEnabled) {
+    const rawDiscount =
+      discountPayload?.discountPercent ??
+      discountPayload?.discount ??
+      discountPayload?.percent
+    discountPercent = normalizePromotionDiscount(rawDiscount)
+    if (rawDiscount === undefined || rawDiscount === null || discountPercent <= 0) {
+      res.status(400).json({ error: 'campaign_discount_invalid' })
+      return
+    }
+    const rawDuration = parseOptionalInt(
+      discountPayload?.durationDays ?? discountPayload?.duration
+    )
+    if (rawDuration !== null && rawDuration <= 0) {
+      res.status(400).json({ error: 'campaign_duration_invalid' })
+      return
+    }
+    durationDays = rawDuration ?? 7
+    if (durationDays > MARKETING_CAMPAIGN_MAX_DURATION_DAYS) {
+      res.status(400).json({ error: 'campaign_duration_invalid' })
+      return
+    }
+
+    const eligibility = await loadPromotionEligibility(masterId)
+    if (!eligibility.ok) {
+      res.status(400).json({
+        error: 'promotion_requirements',
+        missing: {
+          avatar: !eligibility.hasAvatar,
+          portfolio: !eligibility.hasPortfolio,
+        },
+      })
+      return
     }
   }
 
   try {
-    if (promotionEnabled) {
-      const rawDiscount =
-        promotionPayload?.discountPercent ??
-        promotionPayload?.discount ??
-        promotionPayload?.percent
-      const discountPercent = normalizePromotionDiscount(rawDiscount)
-      if (rawDiscount === undefined || rawDiscount === null || discountPercent <= 0) {
-        res.status(400).json({ error: 'promotion_discount_invalid' })
-        return
-      }
-      const rawDuration = parseOptionalInt(
-        promotionPayload?.durationDays ?? promotionPayload?.duration
-      )
-      if (rawDuration !== null && rawDuration <= 0) {
-        res.status(400).json({ error: 'promotion_duration_invalid' })
-        return
-      }
-      const durationDays = rawDuration ?? 7
-      if (durationDays > PROMOTION_MAX_DURATION_DAYS) {
-        res.status(400).json({ error: 'promotion_duration_invalid' })
-        return
-      }
-
-      const eligibility = await loadPromotionEligibility(masterId)
-      if (!eligibility.ok) {
-        res.status(400).json({
-          error: 'promotion_requirements',
-          missing: {
-            avatar: !eligibility.hasAvatar,
-            portfolio: !eligibility.hasPortfolio,
-          },
-        })
-        return
-      }
-
-      const promotionAudience = channel === 'bot' ? 'subscribers' : 'clients'
-      const audienceLabel =
-        promotionAudience === 'subscribers' ? 'подписчиков' : 'клиентов'
-      const promotionTitle = normalizePromotionTitle(
-        `Скидка -${discountPercent}% для ${audienceLabel}`
-      )
-      const startAt = new Date()
-      const endAt = new Date(startAt.getTime() + durationDays * DAY_MS)
-
-      await ensureUser(masterId)
-      const insertResult = await pool.query(
-        `
-          INSERT INTO master_promotions (
-            master_id,
-            type,
-            title,
-            description,
-            start_at,
-            end_at,
-            status,
-            audience,
-            discount_percent,
-            max_uses,
-            updated_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
-          RETURNING
-            id,
-            master_id AS "masterId",
-            type,
-            title,
-            description,
-            start_at AS "startAt",
-            end_at AS "endAt",
-            status,
-            audience,
-            discount_percent AS "discountPercent",
-            max_uses AS "maxUses",
-            uses_count AS "usesCount",
-            created_at AS "createdAt",
-            updated_at AS "updatedAt"
-        `,
-        [
-          masterId,
-          'discount',
-          promotionTitle,
-          null,
-          startAt,
-          endAt,
-          'active',
-          promotionAudience,
-          discountPercent,
-          null,
-        ]
-      )
-      promotionRow = insertResult.rows[0] ?? null
-      promotionId = promotionRow?.id ? Number(promotionRow.id) : null
-
-      if (promotionRow?.status === 'active') {
-        await pool.query(
-          `
-            UPDATE master_promotions
-            SET status = 'paused', updated_at = NOW()
-            WHERE master_id = $1 AND id <> $2 AND status = 'active'
-          `,
-          [masterId, promotionRow.id]
-        )
-      }
-    }
-
     const result =
       channel === 'bot'
         ? await sendMarketingBotBroadcast({
@@ -9064,28 +9293,48 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
             includeLink,
             includeUnsubscribe,
             limit,
+            segment,
+            collectRecipients: discountEnabled,
           })
         : await sendMarketingChatBroadcast({
             masterId,
             text,
             limit,
+            segment,
+            collectRecipients: discountEnabled,
           })
 
-    if (promotionRow && result.total === 0) {
-      await pausePromotion()
+    if (result.total === 0) {
       res.status(400).json({ error: 'audience_empty' })
       return
+    }
+
+    let campaign = null
+    if (discountEnabled) {
+      const deliveredIds = Array.isArray(result.deliveredIds)
+        ? result.deliveredIds.filter(Boolean)
+        : []
+      if (deliveredIds.length === 0) {
+        res.status(400).json({ error: 'audience_empty' })
+        return
+      }
+      campaign = await createMarketingCampaign({
+        masterId,
+        channel,
+        segment,
+        discountPercent,
+        durationDays,
+        deliveredIds,
+        text,
+      })
     }
 
     res.json({
       ok: true,
       stats: result,
-      promotion: promotionRow ? mapPromotionRow(promotionRow) : null,
+      campaign,
     })
   } catch (error) {
-    if (promotionRow) {
-      await pausePromotion()
-    }
     if (error?.code === 'bot_not_configured') {
       res.status(400).json({ error: 'bot_not_configured' })
       return
@@ -9188,30 +9437,26 @@ app.post('/api/bookings', async (req, res) => {
     )
     const baseServicePrice =
       typeof matchedService.price === 'number' ? matchedService.price : null
-    const activePromotion = await loadActivePromotionForViewer({
+    const discountChoice = await resolveBookingDiscount({
       masterId: normalizedMasterId,
-      viewerId: normalizedUserId,
+      clientId: normalizedUserId,
+      promotionId: null,
+      promotionDiscountPercent: null,
+      campaignId: null,
+      campaignDiscountPercent: null,
     })
-    const promotionPayload =
-      activePromotion && activePromotion.type === 'discount'
-        ? {
-            id: activePromotion.id,
-            discountPercent: normalizePromotionDiscount(
-              activePromotion.discountPercent
-            ),
-          }
-        : null
-    const promotionDiscount =
-      promotionPayload && promotionPayload.discountPercent > 0
-        ? promotionPayload
-        : null
     const discountData =
-      promotionDiscount && baseServicePrice !== null
-        ? buildPromotionDiscount(baseServicePrice, promotionDiscount.discountPercent)
+      discountChoice && baseServicePrice !== null
+        ? buildPromotionDiscount(baseServicePrice, discountChoice.discountPercent)
         : null
     const effectiveServicePrice = discountData
       ? discountData.after
       : baseServicePrice
+    const appliedPromotion =
+      discountChoice?.source === 'promotion' ? discountChoice.promotion : null
+    const appliedCampaign =
+      discountChoice?.source === 'campaign' ? discountChoice.campaign : null
+    const discountSource = discountChoice?.source ?? null
     const depositAmount = calculateDepositAmount(profile, effectiveServicePrice)
     const depositStatus = depositAmount > 0 ? 'pending' : 'not_required'
     const depositHoldExpiresAt =
@@ -9418,9 +9663,15 @@ app.post('/api/bookings', async (req, res) => {
           promotion_discount_amount,
           promotion_price_before,
           promotion_price_after,
+          campaign_id,
+          campaign_discount_percent,
+          campaign_discount_amount,
+          campaign_price_before,
+          campaign_price_after,
+          discount_source,
           client_comment
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NULL, $19, $20, $21, $22, $23, $24)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NULL, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
         RETURNING id, created_at AS "createdAt"
       `,
       [
@@ -9442,11 +9693,21 @@ app.post('/api/bookings', async (req, res) => {
         depositAmount,
         depositStatus,
         depositHoldExpiresAt,
-        promotionDiscount?.id ?? null,
-        discountData?.percent ?? (promotionDiscount?.discountPercent ?? null),
-        discountData?.amount ?? null,
-        discountData?.before ?? null,
-        discountData?.after ?? null,
+        appliedPromotion?.id ?? null,
+        discountSource === 'promotion'
+          ? discountData?.percent ?? appliedPromotion?.discountPercent ?? null
+          : null,
+        discountSource === 'promotion' ? discountData?.amount ?? null : null,
+        discountSource === 'promotion' ? discountData?.before ?? null : null,
+        discountSource === 'promotion' ? discountData?.after ?? null : null,
+        appliedCampaign?.id ?? null,
+        discountSource === 'campaign'
+          ? discountData?.percent ?? appliedCampaign?.discountPercent ?? null
+          : null,
+        discountSource === 'campaign' ? discountData?.amount ?? null : null,
+        discountSource === 'campaign' ? discountData?.before ?? null : null,
+        discountSource === 'campaign' ? discountData?.after ?? null : null,
+        discountSource,
         normalizedComment || null,
       ]
     )
@@ -9535,6 +9796,12 @@ app.patch('/api/bookings/:id', async (req, res) => {
           promotion_discount_amount AS "promotionDiscountAmount",
           promotion_price_before AS "promotionPriceBefore",
           promotion_price_after AS "promotionPriceAfter",
+          campaign_id AS "campaignId",
+          campaign_discount_percent AS "campaignDiscountPercent",
+          campaign_discount_amount AS "campaignDiscountAmount",
+          campaign_price_before AS "campaignPriceBefore",
+          campaign_price_after AS "campaignPriceAfter",
+          discount_source AS "discountSource",
           outcome
         FROM service_bookings
         WHERE id = $1
@@ -9812,16 +10079,27 @@ app.patch('/api/bookings/:id', async (req, res) => {
         0,
         100
       )
-      const promotion = await resolveBookingPromotion({
+      const discountChoice = await resolveBookingDiscount({
         masterId: booking.masterId,
         clientId: booking.clientId,
         promotionId: booking.promotionId,
         promotionDiscountPercent: booking.promotionDiscountPercent,
+        campaignId: booking.campaignId,
+        campaignDiscountPercent: booking.campaignDiscountPercent,
       })
-      const discountData = promotion
-        ? buildPromotionDiscount(parsedPrice, promotion.discountPercent)
+      const discountData = discountChoice
+        ? buildPromotionDiscount(parsedPrice, discountChoice.discountPercent)
         : null
       const effectivePrice = discountData ? discountData.after : parsedPrice
+      const appliedPromotion =
+        discountChoice?.source === 'promotion'
+          ? discountChoice.promotion
+          : null
+      const appliedCampaign =
+        discountChoice?.source === 'campaign'
+          ? discountChoice.campaign
+          : null
+      const discountSource = discountChoice?.source ?? null
       let nextDepositAmount =
         typeof booking.depositAmount === 'number' ? booking.depositAmount : null
       let nextDepositStatus = booking.depositStatus ?? null
@@ -9855,6 +10133,12 @@ app.patch('/api/bookings/:id', async (req, res) => {
               promotion_discount_amount = $8,
               promotion_price_before = $9,
               promotion_price_after = $10,
+              campaign_id = $11,
+              campaign_discount_percent = $12,
+              campaign_discount_amount = $13,
+              campaign_price_before = $14,
+              campaign_price_after = $15,
+              discount_source = $16,
               updated_at = NOW()
           WHERE id = $1
         `,
@@ -9864,11 +10148,21 @@ app.patch('/api/bookings/:id', async (req, res) => {
           nextDepositAmount,
           nextDepositStatus,
           nextDepositHoldExpiresAt,
-          promotion?.id ?? null,
-          discountData?.percent ?? (promotion?.discountPercent ?? null),
-          discountData?.amount ?? null,
-          discountData?.before ?? null,
-          discountData?.after ?? null,
+          appliedPromotion?.id ?? null,
+          discountSource === 'promotion'
+            ? discountData?.percent ?? appliedPromotion?.discountPercent ?? null
+            : null,
+          discountSource === 'promotion' ? discountData?.amount ?? null : null,
+          discountSource === 'promotion' ? discountData?.before ?? null : null,
+          discountSource === 'promotion' ? discountData?.after ?? null : null,
+          appliedCampaign?.id ?? null,
+          discountSource === 'campaign'
+            ? discountData?.percent ?? appliedCampaign?.discountPercent ?? null
+            : null,
+          discountSource === 'campaign' ? discountData?.amount ?? null : null,
+          discountSource === 'campaign' ? discountData?.before ?? null : null,
+          discountSource === 'campaign' ? discountData?.after ?? null : null,
+          discountSource,
         ]
       )
 
@@ -9926,12 +10220,29 @@ app.patch('/api/bookings/:id', async (req, res) => {
             bookingId,
             serviceName: booking.serviceName ?? null,
             proposedPrice: effectivePrice,
-            promotionId: promotion?.id ?? null,
+            promotionId: appliedPromotion?.id ?? null,
             promotionDiscountPercent:
-              discountData?.percent ?? (promotion?.discountPercent ?? null),
-            promotionDiscountAmount: discountData?.amount ?? null,
-            promotionPriceBefore: discountData?.before ?? null,
-            promotionPriceAfter: discountData?.after ?? null,
+              discountSource === 'promotion'
+                ? discountData?.percent ?? appliedPromotion?.discountPercent ?? null
+                : null,
+            promotionDiscountAmount:
+              discountSource === 'promotion' ? discountData?.amount ?? null : null,
+            promotionPriceBefore:
+              discountSource === 'promotion' ? discountData?.before ?? null : null,
+            promotionPriceAfter:
+              discountSource === 'promotion' ? discountData?.after ?? null : null,
+            campaignId: appliedCampaign?.id ?? null,
+            campaignDiscountPercent:
+              discountSource === 'campaign'
+                ? discountData?.percent ?? appliedCampaign?.discountPercent ?? null
+                : null,
+            campaignDiscountAmount:
+              discountSource === 'campaign' ? discountData?.amount ?? null : null,
+            campaignPriceBefore:
+              discountSource === 'campaign' ? discountData?.before ?? null : null,
+            campaignPriceAfter:
+              discountSource === 'campaign' ? discountData?.after ?? null : null,
+            discountSource,
             depositAmount: nextDepositAmount ?? null,
             depositStatus: nextDepositStatus ?? null,
             depositHoldExpiresAt: nextDepositHoldExpiresAt ?? null,
@@ -12517,29 +12828,29 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             res.status(409).json({ error: 'price_required' })
             return
           }
-          const activePromotion = await loadActivePromotionForViewer({
+          const discountChoice = await resolveBookingDiscount({
             masterId: response.masterId,
-            viewerId: request.userId,
+            clientId: request.userId,
+            promotionId: null,
+            promotionDiscountPercent: null,
+            campaignId: null,
+            campaignDiscountPercent: null,
           })
-          const promotionPayload =
-            activePromotion && activePromotion.type === 'discount'
-              ? {
-                  id: activePromotion.id,
-                  discountPercent: normalizePromotionDiscount(
-                    activePromotion.discountPercent
-                  ),
-                }
-              : null
-          const promotionDiscount =
-            promotionPayload && promotionPayload.discountPercent > 0
-              ? promotionPayload
-              : null
-          const discountData = promotionDiscount
-            ? buildPromotionDiscount(servicePrice, promotionDiscount.discountPercent)
+          const discountData = discountChoice
+            ? buildPromotionDiscount(servicePrice, discountChoice.discountPercent)
             : null
           const effectiveServicePrice = discountData
             ? discountData.after
             : servicePrice
+          const appliedPromotion =
+            discountChoice?.source === 'promotion'
+              ? discountChoice.promotion
+              : null
+          const appliedCampaign =
+            discountChoice?.source === 'campaign'
+              ? discountChoice.campaign
+              : null
+          const discountSource = discountChoice?.source ?? null
           const depositAmount = calculateDepositAmount(
             profile,
             effectiveServicePrice
@@ -12590,9 +12901,15 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
                 promotion_discount_amount,
                 promotion_price_before,
                 promotion_price_after,
+                campaign_id,
+                campaign_discount_percent,
+                campaign_discount_amount,
+                campaign_price_before,
+                campaign_price_after,
+                discount_source,
                 client_comment
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'confirmed', $15, $16, $17, $18, $19, NULL, $20, $21, $22, $23, $24, $25)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'confirmed', $15, $16, $17, $18, $19, NULL, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
               RETURNING id, created_at AS "createdAt"
             `,
             [
@@ -12615,11 +12932,21 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
               depositAmount,
               depositStatus,
               depositHoldExpiresAt,
-              promotionDiscount?.id ?? null,
-              discountData?.percent ?? (promotionDiscount?.discountPercent ?? null),
-              discountData?.amount ?? null,
-              discountData?.before ?? null,
-              discountData?.after ?? null,
+              appliedPromotion?.id ?? null,
+              discountSource === 'promotion'
+                ? discountData?.percent ?? appliedPromotion?.discountPercent ?? null
+                : null,
+              discountSource === 'promotion' ? discountData?.amount ?? null : null,
+              discountSource === 'promotion' ? discountData?.before ?? null : null,
+              discountSource === 'promotion' ? discountData?.after ?? null : null,
+              appliedCampaign?.id ?? null,
+              discountSource === 'campaign'
+                ? discountData?.percent ?? appliedCampaign?.discountPercent ?? null
+                : null,
+              discountSource === 'campaign' ? discountData?.amount ?? null : null,
+              discountSource === 'campaign' ? discountData?.before ?? null : null,
+              discountSource === 'campaign' ? discountData?.after ?? null : null,
+              discountSource,
               requestComment,
             ]
           )

@@ -98,6 +98,7 @@ export type MasterProfile = {
   viewerIsFollower?: boolean | null
   viewerMarketingOptIn?: boolean | null
   activePromotion?: PromotionSummary | null
+  campaignDiscount?: CampaignDiscountSummary | null
 }
 
 export type MarketingSummary = {
@@ -112,7 +113,7 @@ export type MarketingSummary = {
 
 export type PromotionType = 'discount' | 'bonus' | 'slots'
 
-export type PromotionAudience = 'all' | 'followers' | 'clients' | 'subscribers'
+export type PromotionAudience = 'all' | 'followers' | 'clients'
 
 export type PromotionStatus = 'active' | 'paused' | 'archived'
 
@@ -142,6 +143,17 @@ export type PromotionSummary = {
   startAt?: string | null
   endAt?: string | null
   audience?: PromotionAudience
+}
+
+export type CampaignSegment = 'all' | 'new' | 'regular'
+
+export type CampaignDiscountSummary = {
+  id: number
+  discountPercent: number
+  startAt?: string | null
+  endAt?: string | null
+  channel?: 'bot' | 'chat' | null
+  segment?: CampaignSegment | null
 }
 
 export type RepeatSettings = {
@@ -297,6 +309,12 @@ export type Booking = {
   promotionDiscountAmount?: number | null
   promotionPriceBefore?: number | null
   promotionPriceAfter?: number | null
+  campaignId?: number | null
+  campaignDiscountPercent?: number | null
+  campaignDiscountAmount?: number | null
+  campaignPriceBefore?: number | null
+  campaignPriceAfter?: number | null
+  discountSource?: 'promotion' | 'campaign' | null
   status: BookingStatus
   outcome?: string | null
   attendanceAt?: string | null

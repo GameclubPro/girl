@@ -830,13 +830,31 @@ export const ClientMasterProfileScreen = ({
         : locationLabelBase
   const workFormatLabel = buildWorkFormatLabel(profile)
   const activePromotion = profile?.activePromotion ?? null
+  const campaignDiscount = profile?.campaignDiscount ?? null
   const promotionDeadline = formatPromotionDeadline(activePromotion?.endAt ?? null)
-  const promotionDiscountLabel =
+  const campaignDeadline = formatPromotionDeadline(campaignDiscount?.endAt ?? null)
+  const promotionDiscountPercent =
     activePromotion?.type === 'discount' &&
-    typeof activePromotion.discountPercent === 'number' &&
-    activePromotion.discountPercent > 0
-      ? `Скидка -${activePromotion.discountPercent}%`
+    typeof activePromotion.discountPercent === 'number'
+      ? Math.max(0, Math.round(activePromotion.discountPercent))
+      : 0
+  const campaignDiscountPercent =
+    typeof campaignDiscount?.discountPercent === 'number'
+      ? Math.max(0, Math.round(campaignDiscount.discountPercent))
+      : 0
+  const bestDiscountPercent = Math.max(
+    promotionDiscountPercent,
+    campaignDiscountPercent
+  )
+  const discountSourceLabel =
+    campaignDiscountPercent > promotionDiscountPercent ? ' · по рассылке' : ''
+  const promotionDiscountLabel =
+    bestDiscountPercent > 0
+      ? `Скидка -${bestDiscountPercent}%${discountSourceLabel}`
       : ''
+  const promoDeadline = promotionDeadline || campaignDeadline
+  const promoTitle = activePromotion?.title ?? 'Скидка по рассылке'
+  const showPromoCard = Boolean(activePromotion || campaignDiscountPercent > 0)
   const hasLocation = Boolean(
     profile?.cityName || profile?.districtName || distanceLabel
   )
@@ -1318,27 +1336,34 @@ export const ClientMasterProfileScreen = ({
                 role="region"
                 aria-labelledby="master-profile-tab-overview"
               >
-                {activePromotion && (
+                {showPromoCard && (
                   <div className="master-profile-promo">
                     <div className="master-profile-promo-head">
-                      <span className="master-profile-promo-badge">Акция</span>
-                      {promotionDeadline && (
+                      <span className="master-profile-promo-badge">
+                        {activePromotion ? 'Акция' : 'Скидка'}
+                      </span>
+                      {promoDeadline && (
                         <span className="master-profile-promo-meta">
-                          до {promotionDeadline}
+                          до {promoDeadline}
                         </span>
                       )}
                     </div>
                     <div className="master-profile-promo-title">
-                      {activePromotion.title}
+                      {promoTitle}
                     </div>
                     {promotionDiscountLabel && (
                       <div className="master-profile-promo-discount">
                         {promotionDiscountLabel}
                       </div>
                     )}
-                    {activePromotion.description && (
+                    {activePromotion?.description && (
                       <div className="master-profile-promo-text">
                         {activePromotion.description}
+                      </div>
+                    )}
+                    {!activePromotion && campaignDiscountPercent > 0 && (
+                      <div className="master-profile-promo-text">
+                        Действует для получателей рассылки.
                       </div>
                     )}
                   </div>
