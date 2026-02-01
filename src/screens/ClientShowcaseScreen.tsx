@@ -1346,6 +1346,11 @@ export const ClientShowcaseScreen = ({
                     role="listitem"
                     style={cardStyle}
                   >
+                    {isFeatured && (
+                      <span className="client-master-featured" aria-label="Рекомендуем">
+                        Рекомендуем
+                      </span>
+                    )}
                     <div className="client-master-overview">
                       <div className="client-master-avatar-block">
                         <span className="client-master-avatar" aria-hidden="true">
@@ -1468,7 +1473,7 @@ export const ClientShowcaseScreen = ({
                         Записаться
                       </button>
                       <button
-                        className="client-master-cta"
+                        className="client-master-cta client-master-cta--ghost"
                         type="button"
                         onClick={() => onViewProfile(master.id)}
                       >
