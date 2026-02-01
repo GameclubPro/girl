@@ -640,6 +640,7 @@ export const ProRequestsScreen = ({
     () => initialTab ?? 'requests'
   )
   const [requests, setRequests] = useState<ProRequest[]>([])
+  const [requestsFetched, setRequestsFetched] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [submitError, setSubmitError] = useState<Record<number, string>>({})
@@ -775,6 +776,15 @@ export const ProRequestsScreen = ({
     onTabChange?.(activeTab)
   }, [activeTab, onTabChange])
   useEffect(() => {
+    if (activeTab !== 'requests') return
+    if (!requestsFetched) return
+    if (typeof focusRequestId === 'number') return
+    if (pendingRequestFocusIdRef.current !== null) return
+    if (loadError) return
+    if (requests.length > 0) return
+    setActiveTab('bookings')
+  }, [activeTab, focusRequestId, loadError, requests.length, requestsFetched])
+  useEffect(() => {
     if (!userId || typeof window === 'undefined') return
     const scheduleKey = buildSlotScheduleKey(userId)
     try {
@@ -834,6 +844,7 @@ export const ProRequestsScreen = ({
     async (options?: { silent?: boolean; force?: boolean }) => {
       if (!userId) return
       const requestId = (requestsRequestIdRef.current += 1)
+      setRequestsFetched(false)
       const silent = options?.silent ?? false
       if (!silent) {
         setIsLoading(true)
@@ -867,8 +878,11 @@ export const ProRequestsScreen = ({
           setLoadError('Не удалось загрузить заявки.')
         }
       } finally {
-        if (requestsRequestIdRef.current === requestId && !silent) {
-          setIsLoading(false)
+        if (requestsRequestIdRef.current === requestId) {
+          setRequestsFetched(true)
+          if (!silent) {
+            setIsLoading(false)
+          }
         }
       }
     },
