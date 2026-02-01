@@ -12178,6 +12178,7 @@
 .pro-profile-portfolio-grid.is-collapsed .pro-profile-portfolio-item {
   aspect-ratio: 3 / 4;
   border-radius: 14px;
+  box-shadow: none;
   scroll-snap-align: start;
 }
 
