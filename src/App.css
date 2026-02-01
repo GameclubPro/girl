@@ -23391,6 +23391,16 @@ h2 {
   padding: 14px;
 }
 
+.screen--client-master-profile .pro-profile-portfolio-grid.is-collapsed {
+  padding-left: 0;
+  scroll-padding-left: 0;
+}
+
+.screen--client-master-profile .pro-profile-portfolio-grid.is-collapsed.is-single {
+  padding-left: calc(var(--portfolio-grid-gap) / 2);
+  scroll-padding-left: calc(var(--portfolio-grid-gap) / 2);
+}
+
 .screen--client-master-profile .pro-profile-portfolio-panel-head {
   margin-bottom: 6px;
 }

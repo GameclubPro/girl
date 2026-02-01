@@ -1081,6 +1081,10 @@ export const ClientMasterProfileScreen = ({
     [masterId, profile]
   )
   const visiblePortfolioItems = portfolioGridItems
+  const isSinglePortfolioItem = portfolioGridItems.length === 1
+  const portfolioGridClassName = `pro-profile-portfolio-grid${
+    isPortfolioCollapsed ? ' is-collapsed' : ''
+  }${isSinglePortfolioItem ? ' is-single' : ''}`
   const portfolioCountLabel =
     portfolioGridItems.length > 0 ? `${portfolioGridItems.length} фото` : 'Нет фото'
   const masterTabs: { id: MasterProfileTabId; label: string; badge?: number }[] = [
@@ -1514,13 +1518,7 @@ export const ClientMasterProfileScreen = ({
                     )}
                   </div>
                 </div>
-                <div
-                  className={`pro-profile-portfolio-grid${
-                    isPortfolioCollapsed ? ' is-collapsed' : ''
-                  }`}
-                  role="list"
-                  aria-label="Портфолио"
-                >
+                <div className={portfolioGridClassName} role="list" aria-label="Портфолио">
                   {visiblePortfolioItems.length > 0 ? (
                     visiblePortfolioItems.map(({ item, index }) => {
                       const focus = resolvePortfolioFocus(item)
