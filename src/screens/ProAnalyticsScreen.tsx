@@ -268,6 +268,7 @@ type ProAnalyticsScreenProps = {
   apiBase: string
   userId: string
   onBack: () => void
+  onViewCabinet?: () => void
   onViewRequests: () => void
   onViewChats: () => void
   onEditProfile: () => void
@@ -277,6 +278,7 @@ export const ProAnalyticsScreen = ({
   apiBase,
   userId,
   onBack,
+  onViewCabinet,
   onViewRequests,
   onViewChats,
   onEditProfile,
@@ -1397,7 +1399,7 @@ export const ProAnalyticsScreen = ({
 
       <ProBottomNav
         active="cabinet"
-        onCabinet={onBack}
+        onCabinet={onViewCabinet ?? onBack}
         onRequests={onViewRequests}
         onChats={onViewChats}
         onProfile={onEditProfile}

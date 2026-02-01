@@ -35,6 +35,7 @@ type ProStoriesScreenProps = {
   userId: string
   displayNameFallback: string
   onBack: () => void
+  onViewCabinet?: () => void
   onViewRequests: () => void
   onViewChats: () => void
   onViewProfile: () => void
@@ -46,6 +47,7 @@ export const ProStoriesScreen = ({
   userId,
   displayNameFallback,
   onBack,
+  onViewCabinet,
   onViewRequests,
   onViewChats,
   onViewProfile,
@@ -399,7 +401,7 @@ export const ProStoriesScreen = ({
 
       <ProBottomNav
         active={activeNav}
-        onCabinet={onBack}
+        onCabinet={onViewCabinet ?? onBack}
         onRequests={onViewRequests}
         onChats={onViewChats}
         onProfile={onViewProfile}

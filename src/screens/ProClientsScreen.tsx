@@ -6,6 +6,7 @@ type ProClientsScreenProps = {
   apiBase: string
   userId: string
   onBack: () => void
+  onViewCabinet?: () => void
   onViewRequests: () => void
   onViewChats: () => void
   onEditProfile: () => void
@@ -35,6 +36,7 @@ export const ProClientsScreen = ({
   apiBase,
   userId,
   onBack,
+  onViewCabinet,
   onViewRequests,
   onViewChats,
   onEditProfile,
@@ -141,7 +143,7 @@ export const ProClientsScreen = ({
 
       <ProBottomNav
         active="cabinet"
-        onCabinet={onBack}
+        onCabinet={onViewCabinet ?? onBack}
         onRequests={onViewRequests}
         onChats={onViewChats}
         onProfile={onEditProfile}

@@ -53,6 +53,7 @@ type ProMarketingScreenProps = {
   userId: string
   displayNameFallback: string
   onBack: () => void
+  onViewCabinet?: () => void
   onViewRequests: () => void
   onViewChats: () => void
   onEditProfile: () => void
@@ -94,6 +95,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     userId,
     displayNameFallback,
     onBack,
+    onViewCabinet,
     onViewRequests,
     onViewChats,
     onEditProfile,
@@ -1644,7 +1646,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
       <ProBottomNav
         active="cabinet"
-        onCabinet={onBack}
+        onCabinet={onViewCabinet ?? onBack}
         onRequests={onViewRequests}
         onChats={onViewChats}
         onProfile={onEditProfile}

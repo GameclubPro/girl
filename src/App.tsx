@@ -1812,6 +1812,7 @@ function App() {
           goBack(proProfileReturnView)
           setProProfileReturnView('pro-cabinet')
         }}
+        onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onViewStories={() => openProStories('pro-profile')}
@@ -1854,6 +1855,7 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         onBack={() => goBack('pro-cabinet')}
+        onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
@@ -1870,6 +1872,7 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         onBack={() => goBack('pro-cabinet')}
+        onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
@@ -1887,6 +1890,7 @@ function App() {
         userId={userId}
         displayNameFallback={clientName}
         onBack={() => goBack('pro-cabinet')}
+        onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onEditProfile={() => {
@@ -1904,6 +1908,7 @@ function App() {
         userId={userId}
         displayNameFallback={clientName}
         onBack={() => navigate(proStoriesReturnView, { replace: true })}
+        onViewCabinet={() => navigate('pro-cabinet', { reset: true })}
         onViewRequests={() => openProRequests()}
         onViewChats={openChatList}
         onViewProfile={() => openProProfile()}

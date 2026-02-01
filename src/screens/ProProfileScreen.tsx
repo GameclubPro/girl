@@ -54,6 +54,7 @@ type ProProfileScreenProps = {
   telegramAvatarUrl?: string | null
   returnView?: 'pro-cabinet' | 'pro-requests'
   onBack: () => void
+  onViewCabinet?: () => void
   onViewRequests: () => void
   onViewChats: () => void
   onViewStories: () => void
@@ -346,6 +347,7 @@ export const ProProfileScreen = ({
   telegramAvatarUrl,
   returnView = 'pro-cabinet',
   onBack,
+  onViewCabinet,
   onViewRequests,
   onViewChats,
   onViewStories,
@@ -4711,7 +4713,7 @@ export const ProProfileScreen = ({
             allowActiveClick
             onCabinet={() => {
               closeSettings()
-              onBack()
+              ;(onViewCabinet ?? onBack)()
             }}
             onRequests={() => {
               closeSettings()
@@ -6121,7 +6123,7 @@ export const ProProfileScreen = ({
       {!editingSection && !isSettingsOpen && (
         <ProBottomNav
           active="profile"
-          onCabinet={onBack}
+          onCabinet={onViewCabinet ?? onBack}
           onRequests={onViewRequests}
           onChats={onViewChats}
           onProfile={() => {}}
