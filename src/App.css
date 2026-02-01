@@ -24482,22 +24482,22 @@ h2 {
 
 .category-overlay-card {
   --category-card-image: none;
-  border: 1px solid rgba(170, 198, 255, 0.7);
+  border: 1px solid rgba(170, 198, 255, 0.9);
   background:
     radial-gradient(
-      140% 120% at 50% 40%,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(255, 255, 255, 0.94) 48%,
-      rgba(231, 241, 255, 0.9) 72%,
-      rgba(206, 224, 255, 0.96) 100%
+      120% 110% at 50% 45%,
+      #ffffff 0%,
+      #ffffff 62%,
+      #edf4ff 78%,
+      #d7e8ff 100%
     ),
     radial-gradient(
       180% 160% at 50% 120%,
-      rgba(160, 190, 255, 0.35) 0%,
-      rgba(180, 206, 255, 0.18) 50%,
-      transparent 70%
+      #cfe0ff 0%,
+      #deecff 55%,
+      #ffffff 82%
     ),
-    radial-gradient(rgba(255, 255, 255, 0.28) 0.6px, transparent 0.8px);
+    radial-gradient(rgba(255, 255, 255, 0.22) 0.6px, transparent 0.8px);
   background-size: auto, auto, 6px 6px;
   background-repeat: no-repeat, no-repeat, repeat;
   background-blend-mode: normal, normal, soft-light;
