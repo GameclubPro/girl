@@ -4866,36 +4866,100 @@
   color: var(--danger);
 }
 
+.pro-marketing-tabbar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pro-marketing-tabbar-caption {
+  margin: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
 .pro-marketing-tabbar {
   display: flex;
   gap: 6px;
-  padding: 4px;
-  border-radius: 16px;
-  background: rgba(var(--paper-rgb), 0.7);
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  padding: 6px;
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--paper-rgb), 0.95),
+    rgba(var(--paper-rgb), 0.75)
+  );
+  border: 1px solid rgba(var(--accent-rgb), 0.14);
+  box-shadow: 0 12px 22px rgba(var(--shadow-rgb), 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .pro-marketing-tab {
   flex: 1;
   border: none;
   background: transparent;
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: 14px;
+  padding: 9px 10px 11px;
   font: inherit;
   font-size: 11px;
   font-weight: 700;
   color: var(--pro-muted);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pro-marketing-tab::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
 }
 
 .pro-marketing-tab.is-active {
   background: rgba(var(--accent-rgb), 0.18);
   color: var(--accent-strong);
+  box-shadow: 0 10px 18px rgba(var(--accent-rgb), 0.18);
+}
+
+.pro-marketing-tab.is-active::after {
+  background: rgba(var(--accent-rgb), 0.6);
+  opacity: 1;
 }
 
 .pro-marketing-tab:active {
   transform: translateY(1px);
+}
+
+.pro-marketing-tab:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.pro-marketing-tab-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.pro-marketing-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(var(--accent-rgb), 0.65);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
 }
 
 .pro-marketing-panel {

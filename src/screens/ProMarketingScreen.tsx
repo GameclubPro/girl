@@ -1014,6 +1014,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     [activePromotion?.id, promotions]
   )
 
+  const broadcastTabAttention =
+    Boolean(broadcastDraft.trim()) || broadcastDiscountEnabled
+  const repeatTabAttention = repeatEnabled || repeatDraftDirty
+  const promotionsTabAttention = Boolean(activePromotion)
+
   return (
     <div className="screen screen--pro screen--pro-detail screen--pro-marketing">
       <div className="pro-detail-shell">
@@ -1033,34 +1038,46 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           </p>
         )}
 
-        <div className="pro-marketing-tabbar" role="tablist">
-          <button
-            className={`pro-marketing-tab${activeTab === 'broadcast' ? ' is-active' : ''}`}
-            type="button"
-            onClick={() => setActiveTab('broadcast')}
-            role="tab"
-            aria-selected={activeTab === 'broadcast'}
-          >
-            Рассылка
-          </button>
-          <button
-            className={`pro-marketing-tab${activeTab === 'repeat' ? ' is-active' : ''}`}
-            type="button"
-            onClick={() => setActiveTab('repeat')}
-            role="tab"
-            aria-selected={activeTab === 'repeat'}
-          >
-            Повтор
-          </button>
-          <button
-            className={`pro-marketing-tab${activeTab === 'promotions' ? ' is-active' : ''}`}
-            type="button"
-            onClick={() => setActiveTab('promotions')}
-            role="tab"
-            aria-selected={activeTab === 'promotions'}
-          >
-            Акции
-          </button>
+        <div className="pro-marketing-tabbar-wrap">
+          <p className="pro-marketing-tabbar-caption">Сценарии продвижения</p>
+          <div className="pro-marketing-tabbar" role="tablist">
+            <button
+              className={`pro-marketing-tab${activeTab === 'broadcast' ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => setActiveTab('broadcast')}
+              role="tab"
+              aria-selected={activeTab === 'broadcast'}
+            >
+              <span className="pro-marketing-tab-label">Рассылка</span>
+              {broadcastTabAttention && (
+                <span className="pro-marketing-tab-dot" aria-hidden="true" />
+              )}
+            </button>
+            <button
+              className={`pro-marketing-tab${activeTab === 'repeat' ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => setActiveTab('repeat')}
+              role="tab"
+              aria-selected={activeTab === 'repeat'}
+            >
+              <span className="pro-marketing-tab-label">Повтор</span>
+              {repeatTabAttention && (
+                <span className="pro-marketing-tab-dot" aria-hidden="true" />
+              )}
+            </button>
+            <button
+              className={`pro-marketing-tab${activeTab === 'promotions' ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => setActiveTab('promotions')}
+              role="tab"
+              aria-selected={activeTab === 'promotions'}
+            >
+              <span className="pro-marketing-tab-label">Акции</span>
+              {promotionsTabAttention && (
+                <span className="pro-marketing-tab-dot" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
 
         {activeTab === 'broadcast' ? (
