@@ -20816,7 +20816,7 @@ h2 {
     linear-gradient(150deg, rgba(var(--paper-rgb), 0.98), rgba(var(--surface-muted-rgb), 0.9));
   border: 1px solid rgba(var(--paper-rgb), 0.85);
   box-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.18);
-  overflow: visible;
+  overflow: hidden;
 }
 
 .client-showcase-card::before {
@@ -20851,7 +20851,6 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  grid-column: 1 / -1;
 }
 
 .client-showcase-badge {
@@ -20905,10 +20904,7 @@ h2 {
 .client-showcase-gallery {
   position: relative;
   z-index: 1;
-  grid-column: 1 / -1;
-  grid-row: 2;
-  width: 100vw;
-  margin: 8px calc(50% - 50vw) 0;
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
@@ -20916,7 +20912,8 @@ h2 {
     'a b'
     'c d';
   gap: 4px;
-  aspect-ratio: 4 / 3;
+  align-self: center;
+  height: clamp(190px, 52vw, 260px);
   padding: 6px;
   border-radius: 22px;
   background:
@@ -25095,9 +25092,7 @@ h2 {
   }
 
   .client-showcase-gallery {
-    width: 100vw;
-    margin: 8px calc(50% - 50vw) 0;
-    aspect-ratio: 3 / 2;
+    height: clamp(200px, 60vw, 280px);
   }
 
   .client-master-search {
