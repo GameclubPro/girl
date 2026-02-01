@@ -24482,8 +24482,10 @@ h2 {
 
 .category-overlay-card {
   --category-card-image: none;
-  border: 1px solid #e4e7ef;
-  background: #ffffff;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(135deg, #c9dbff 0%, #ffffff 50%, #c9dbff 100%) border-box;
   border-radius: 22px;
   padding: 12px;
   display: flex;
