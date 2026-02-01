@@ -1346,6 +1346,150 @@ export const ClientShowcaseScreen = ({
                   index,
                 }))
 
+                const overviewBlock = (
+                  <div className="client-master-overview">
+                    <div className="client-master-avatar-block">
+                      <span className="client-master-avatar" aria-hidden="true">
+                        {master.avatarUrl ? (
+                          <img
+                            src={master.avatarUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <span className="client-master-avatar-fallback">
+                            {master.initials}
+                          </span>
+                        )}
+                      </span>
+                      <span className="client-master-status">{recencyLabel}</span>
+                    </div>
+                    <div className="client-master-overview-main">
+                      <div className="client-master-name-row">
+                        <h2 className="client-master-name">{master.name}</h2>
+                        <span className="client-master-score">{ratingLabel}</span>
+                        {isFeatured && (
+                          <span
+                            className="client-master-featured"
+                            aria-label="Рекомендуем"
+                          >
+                            Рекомендуем
+                          </span>
+                        )}
+                      </div>
+                      <p className="client-master-meta">{metaItems.join(' · ')}</p>
+                      {master.activePromotion?.title && (
+                        <p className="client-master-promo">
+                          <span className="client-master-promo-badge">Акция</span>
+                          <span className="client-master-promo-title">
+                            {master.activePromotion.title}
+                          </span>
+                          {master.activePromotion.type === 'discount' &&
+                            typeof master.activePromotion.discountPercent === 'number' &&
+                            master.activePromotion.discountPercent > 0 && (
+                              <span className="client-master-promo-discount">
+                                -{master.activePromotion.discountPercent}%
+                              </span>
+                            )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+
+                const chipsBlock = (
+                  <div className="client-master-chip-row">
+                    {chipItems.map((chip, index) => (
+                      <span className="client-master-chip" key={`${chip}-${index}`}>
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                )
+
+                const availabilityBlock = (
+                  <div className="client-master-availability">
+                    <span className="client-master-availability-label">
+                      График
+                    </span>
+                    <div
+                      className="client-master-week"
+                      role="list"
+                      aria-label="Дни работы"
+                    >
+                      {weekDays.map((day) => {
+                        const isActive = scheduleSet.has(day.id)
+                        return (
+                          <span
+                            className={`client-master-weekday${
+                              isActive ? ' is-active' : ''
+                            }`}
+                            key={day.id}
+                            role="listitem"
+                            aria-label={`${day.label} ${
+                              isActive ? 'работает' : 'выходной'
+                            }`}
+                          >
+                            {day.label}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+
+                const thumbsBlock = (
+                  <div className="client-master-thumbs" role="list">
+                    {thumbSlots.map(({ item, index }) => (
+                      <span
+                        className={`client-master-thumb${item ? '' : ' is-empty'}`}
+                        key={item?.url ?? `thumb-${master.id}-${index}`}
+                        role="listitem"
+                      >
+                        {item ? (
+                          <img
+                            src={item.url}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            style={{ objectPosition: item.focus }}
+                          />
+                        ) : (
+                          <span className="client-master-thumb-fallback">
+                            {master.initials}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )
+
+                const actionsBlock = (
+                  <div className="client-master-actions">
+                    <button
+                      className="client-master-cta"
+                      type="button"
+                      onClick={() => onCreateBooking(master.id)}
+                    >
+                      <span className="client-master-action-icon" aria-hidden="true">
+                        <IconCalendar />
+                      </span>
+                      Записаться
+                    </button>
+                    <button
+                      className="client-master-cta client-master-cta--ghost"
+                      type="button"
+                      onClick={() => onViewProfile(master.id)}
+                    >
+                      <span className="client-master-action-icon" aria-hidden="true">
+                        <IconUser />
+                      </span>
+                      Профиль
+                    </button>
+                  </div>
+                )
+
                 return (
                   <article
                     className={cardClassName}
@@ -1353,142 +1497,27 @@ export const ClientShowcaseScreen = ({
                     role="listitem"
                     style={cardStyle}
                   >
-                    {isFeatured && (
-                      <span className="client-master-featured" aria-label="Рекомендуем">
-                        Рекомендуем
-                      </span>
-                    )}
-                    <div className="client-master-overview">
-                      <div className="client-master-avatar-block">
-                        <span className="client-master-avatar" aria-hidden="true">
-                          {master.avatarUrl ? (
-                            <img
-                              src={master.avatarUrl}
-                              alt=""
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <span className="client-master-avatar-fallback">
-                              {master.initials}
-                            </span>
-                          )}
-                        </span>
-                        <span className="client-master-status">{recencyLabel}</span>
-                      </div>
-                      <div className="client-master-overview-main">
-                        <div className="client-master-name-row">
-                          <h2 className="client-master-name">{master.name}</h2>
-                          <span className="client-master-score">
-                            {ratingLabel}
-                          </span>
+                    {isFeatured ? (
+                      <div className="client-master-featured-layout">
+                        <div className="client-master-featured-main">
+                          {overviewBlock}
+                          {chipsBlock}
+                          {availabilityBlock}
                         </div>
-                        <p className="client-master-meta">
-                          {metaItems.join(' · ')}
-                        </p>
-                        {master.activePromotion?.title && (
-                          <p className="client-master-promo">
-                            <span className="client-master-promo-badge">Акция</span>
-                            <span className="client-master-promo-title">
-                              {master.activePromotion.title}
-                            </span>
-                            {master.activePromotion.type === 'discount' &&
-                              typeof master.activePromotion.discountPercent === 'number' &&
-                              master.activePromotion.discountPercent > 0 && (
-                                <span className="client-master-promo-discount">
-                                  -{master.activePromotion.discountPercent}%
-                                </span>
-                              )}
-                          </p>
-                        )}
+                        <div className="client-master-featured-side">
+                          {thumbsBlock}
+                          {actionsBlock}
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="client-master-chip-row">
-                      {chipItems.map((chip, index) => (
-                        <span className="client-master-chip" key={`${chip}-${index}`}>
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="client-master-availability">
-                      <span className="client-master-availability-label">
-                        График
-                      </span>
-                      <div
-                        className="client-master-week"
-                        role="list"
-                        aria-label="Дни работы"
-                      >
-                        {weekDays.map((day) => {
-                          const isActive = scheduleSet.has(day.id)
-                          return (
-                            <span
-                              className={`client-master-weekday${
-                                isActive ? ' is-active' : ''
-                              }`}
-                              key={day.id}
-                              role="listitem"
-                              aria-label={`${day.label} ${
-                                isActive ? 'работает' : 'выходной'
-                              }`}
-                            >
-                              {day.label}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="client-master-thumbs" role="list">
-                      {thumbSlots.map(({ item, index }) => (
-                        <span
-                          className={`client-master-thumb${
-                            item ? '' : ' is-empty'
-                          }`}
-                          key={item?.url ?? `thumb-${master.id}-${index}`}
-                          role="listitem"
-                        >
-                          {item ? (
-                            <img
-                              src={item.url}
-                              alt=""
-                              loading="lazy"
-                              decoding="async"
-                              style={{ objectPosition: item.focus }}
-                            />
-                          ) : (
-                            <span className="client-master-thumb-fallback">
-                              {master.initials}
-                            </span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="client-master-actions">
-                      <button
-                        className="client-master-cta"
-                        type="button"
-                        onClick={() => onCreateBooking(master.id)}
-                      >
-                        <span className="client-master-action-icon" aria-hidden="true">
-                          <IconCalendar />
-                        </span>
-                        Записаться
-                      </button>
-                      <button
-                        className="client-master-cta client-master-cta--ghost"
-                        type="button"
-                        onClick={() => onViewProfile(master.id)}
-                      >
-                        <span className="client-master-action-icon" aria-hidden="true">
-                          <IconUser />
-                        </span>
-                        Профиль
-                      </button>
-                    </div>
+                    ) : (
+                      <>
+                        {overviewBlock}
+                        {chipsBlock}
+                        {availabilityBlock}
+                        {thumbsBlock}
+                        {actionsBlock}
+                      </>
+                    )}
                   </article>
                 )
               })}
