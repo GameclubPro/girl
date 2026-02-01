@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStack'
+import { NextActionPill } from '../components/NextActionPill'
 import {
   IconCalendar,
   IconChevron,
@@ -2785,6 +2786,7 @@ export const ProRequestsScreen = ({
       ? 'booking-item-meta--warning'
       : 'booking-item-meta--highlight'
     const isCompact = Boolean(options?.compact)
+    const nextAction = booking.nextAction ?? null
 
     return (
       <div
@@ -2847,6 +2849,9 @@ export const ProRequestsScreen = ({
           <div className={`booking-item-meta ${rescheduleMetaTone}`}>
             {rescheduleMetaLabel}
           </div>
+        )}
+        {nextAction && !isCompact && (
+          <NextActionPill action={nextAction} className="booking-action-pill" />
         )}
         {(booking.cityName || booking.districtName) && (
           <div className="booking-item-meta">
@@ -3190,6 +3195,7 @@ export const ProRequestsScreen = ({
           if (typeof data?.chatId === 'number') {
             next.chatId = data.chatId
           }
+          next.nextAction = null
           return next
         })
       )
@@ -3410,6 +3416,7 @@ export const ProRequestsScreen = ({
                   data?.proposedSlotAt ??
                   (hasProposedSlot ? new Date(proposedSlotRaw).toISOString() : null),
                 responseHoldExpiresAt: data?.holdExpiresAt ?? null,
+                nextAction: null,
               }
             : item
         )
@@ -3571,6 +3578,7 @@ export const ProRequestsScreen = ({
                     const isFinalResponse = ['accepted', 'rejected', 'expired'].includes(
                       item.responseStatus ?? ''
                     )
+                    const nextAction = item.nextAction ?? null
                     const draft = drafts[item.id] ?? {
                       price: '',
                       comment: '',
@@ -3649,6 +3657,12 @@ export const ProRequestsScreen = ({
                           <div className="request-item-meta">
                             Ваш отклик: {responseStatusLabel}
                           </div>
+                        )}
+                        {nextAction && (
+                          <NextActionPill
+                            action={nextAction}
+                            className="request-action-pill"
+                          />
                         )}
                           {item.responseStatus === 'accepted' && item.chatId && (
                             <button

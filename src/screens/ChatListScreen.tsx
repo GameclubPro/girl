@@ -4,6 +4,7 @@ import { ClientBottomNav } from '../components/ClientBottomNav'
 import { TrustBadge } from '../components/TrustBadge'
 import { ProBottomNav } from '../components/ProBottomNav'
 import { VirtualStack } from '../components/VirtualStack'
+import { NextActionPill } from '../components/NextActionPill'
 import type { ChatMessage, ChatSummary, RequestTimeWindow } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
@@ -310,6 +311,7 @@ export const ChatListScreen = ({
     const needsAttention = (chat: ChatSummary) => {
       if (chat.contextType === 'support') return false
       if ((chat.unreadCount ?? 0) > 0) return true
+      if (chat.nextAction && chat.nextAction.tone !== 'neutral') return true
       const context = getLatestContext(chat)
       if (!context) return false
       if (role === 'pro') {
@@ -649,6 +651,7 @@ export const ChatListScreen = ({
     const lastLabel = getMessagePreview(lastMessage) || 'Откройте чат'
     const lastTime = formatChatTimestamp(lastMessage?.createdAt ?? null)
     const unreadCount = chat.unreadCount ?? 0
+    const nextAction = chat.nextAction ?? null
     const showTrust =
       role === 'pro' && counterpart.role === 'client' && !isSupportChat
 
@@ -725,8 +728,14 @@ export const ChatListScreen = ({
           <span className="chat-card-preview">{lastLabel}</span>
         </span>
         <span className="chat-card-meta">
-          {isAttention && (
-            <span className="chat-card-flag">Нужно действие</span>
+          {nextAction ? (
+            <NextActionPill
+              action={nextAction}
+              compact
+              className="chat-card-action"
+            />
+          ) : (
+            isAttention && <span className="chat-card-flag">Нужно действие</span>
           )}
           {unreadCount > 0 && (
             <span className="chat-unread">{unreadCount}</span>

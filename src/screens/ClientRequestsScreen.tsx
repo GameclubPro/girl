@@ -10,6 +10,7 @@ import {
   IconTrash,
 } from '../components/icons'
 import { ClientBottomNav } from '../components/ClientBottomNav'
+import { NextActionPill } from '../components/NextActionPill'
 import { RescheduleSheet } from '../components/RescheduleSheet'
 import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStack'
 import { categoryItems } from '../data/clientData'
@@ -1095,6 +1096,7 @@ export const ClientRequestsScreen = ({
           if (typeof data?.chatId === 'number') {
             next.chatId = data.chatId
           }
+          next.nextAction = null
           return next
         })
       })
@@ -1172,6 +1174,7 @@ export const ClientRequestsScreen = ({
                 rescheduleProposedBy: data?.rescheduleProposedBy ?? 'client',
                 rescheduleProposedTime: data?.rescheduleProposedTime ?? payload.proposedAt,
                 rescheduleNote: data?.rescheduleNote ?? payload.note ?? null,
+                nextAction: null,
               }
             : booking
         )
@@ -1229,6 +1232,7 @@ export const ClientRequestsScreen = ({
           if (action === 'reschedule-accept' && data?.scheduledAt) {
             next.scheduledAt = data.scheduledAt
           }
+          next.nextAction = null
           return next
         })
       )
@@ -1309,7 +1313,11 @@ export const ClientRequestsScreen = ({
       setBookings((current) =>
         current.map((item) =>
           item.id === booking.id
-            ? { ...item, reviewId: data?.reviewId ?? item.reviewId ?? null }
+            ? {
+                ...item,
+                reviewId: data?.reviewId ?? item.reviewId ?? null,
+                nextAction: null,
+              }
             : item
         )
       )
@@ -1417,6 +1425,7 @@ export const ClientRequestsScreen = ({
                   ...request,
                   status: 'closed',
                   chatId: nextChatId ?? request.chatId ?? null,
+                  nextAction: null,
                 }
               : request
           )
@@ -1676,6 +1685,7 @@ export const ClientRequestsScreen = ({
                       item.status === 'open' && responseCount === 0
                     const responses = responsesByRequestId[item.id] ?? []
                     const isResponsesOpen = expandedRequestId === item.id
+                    const nextAction = item.nextAction ?? null
 
                     return (
                       <div
@@ -1713,6 +1723,12 @@ export const ClientRequestsScreen = ({
                               ? `Осталось ${dispatchTimeLeft} до расширения поиска`
                               : 'Поиск расширяется, подбираем больше мастеров'}
                           </div>
+                        )}
+                        {nextAction && (
+                          <NextActionPill
+                            action={nextAction}
+                            className="request-action-pill"
+                          />
                         )}
                         <div className="request-item-actions">
                           <button
@@ -2329,6 +2345,7 @@ export const ClientRequestsScreen = ({
                     hasExtraDetails ||
                     reschedulePending ||
                     actionVariant !== null
+                  const nextAction = booking.nextAction ?? null
 
                   return (
                     <div
@@ -2386,6 +2403,12 @@ export const ClientRequestsScreen = ({
                         <div className={`booking-item-meta ${rescheduleMetaTone}`}>
                           {rescheduleMetaLabel}
                         </div>
+                      )}
+                      {nextAction && (
+                        <NextActionPill
+                          action={nextAction}
+                          className="booking-action-pill"
+                        />
                       )}
                       {showActions && (
                         <div className="booking-item-actions">

@@ -10,6 +10,7 @@ import {
 import { IconClock, IconPhoto, IconPin } from '../components/icons'
 import { TrustBadge } from '../components/TrustBadge'
 import { RescheduleSheet } from '../components/RescheduleSheet'
+import { NextActionPill } from '../components/NextActionPill'
 import type { Booking, ChatDetail, ChatMessage, RequestTimeWindow } from '../types/app'
 import type { ChatStreamStatus } from '../utils/chatStream'
 import { getChatStream } from '../utils/chatStream'
@@ -558,6 +559,7 @@ export const ChatThreadScreen = ({
     : request?.status === 'closed'
       ? 'is-confirmed'
       : 'is-waiting'
+  const detailNextAction = detail?.nextAction ?? null
   const detailsMetaItems = useMemo(() => {
     const items: string[] = []
     if (isBookingChat && booking) {
@@ -675,6 +677,7 @@ export const ChatThreadScreen = ({
             outcome,
             lateMinutes,
           },
+          nextAction: null,
         }
         setCachedChatDetail(apiBase, userId, chatId, next)
         return next
@@ -1851,6 +1854,10 @@ export const ChatThreadScreen = ({
         return
       }
       closeQuickMode()
+      if (isBookingChat && isProViewer) {
+        await runBookingAction('master-propose-price', { price: parsed })
+        return
+      }
       await handleSendMessage({
         type: 'offer_price',
         body: `Цена: ${formatPrice(parsed)}`,
@@ -1879,6 +1886,7 @@ export const ChatThreadScreen = ({
         | 'client-decline-price'
         | 'master-accept'
         | 'master-decline'
+        | 'master-propose-price'
         | 'master-deposit-confirm'
         | 'master-deposit-reject',
       payload?: Record<string, unknown>
@@ -1896,6 +1904,7 @@ export const ChatThreadScreen = ({
           | {
               status?: Booking['status']
               servicePrice?: number | null
+              proposedPrice?: number | null
               depositStatus?: Booking['depositStatus']
               depositAmount?: number | null
             }
@@ -1913,7 +1922,9 @@ export const ChatThreadScreen = ({
               ? 'cancelled'
               : action === 'master-decline'
                 ? 'declined'
-                : bookingStatus ?? null)
+                : action === 'master-propose-price'
+                  ? 'price_proposed'
+                  : bookingStatus ?? null)
 
         setDetail((current) => {
           if (!current?.booking || current.booking.id !== booking.id) return current
@@ -1928,7 +1939,7 @@ export const ChatThreadScreen = ({
                 : bookingSnapshot?.proposedPrice ?? nextBooking.servicePrice ?? null
             nextBooking.servicePrice = acceptedPrice
           }
-          return { ...current, booking: nextBooking }
+          return { ...current, booking: nextBooking, nextAction: null }
         })
 
         setBookingSnapshot((current) => {
@@ -1944,6 +1955,17 @@ export const ChatThreadScreen = ({
                 : bookingSnapshot?.proposedPrice ?? next.servicePrice ?? null
             next.servicePrice = acceptedPrice
             next.proposedPrice = null
+          }
+          if (action === 'master-propose-price') {
+            const proposed =
+              typeof data?.proposedPrice === 'number'
+                ? data.proposedPrice
+                : typeof payload?.price === 'number'
+                  ? payload.price
+                  : null
+            if (typeof proposed === 'number') {
+              next.proposedPrice = proposed
+            }
           }
           if (data?.depositStatus) {
             next.depositStatus = data.depositStatus
@@ -2024,6 +2046,7 @@ export const ChatThreadScreen = ({
               rescheduleProposedTime: data?.rescheduleProposedTime ?? payload.proposedAt,
               rescheduleNote: data?.rescheduleNote ?? payload.note ?? null,
             },
+            nextAction: null,
           }
         })
         setBookingSnapshot((current) => {
@@ -2082,7 +2105,7 @@ export const ChatThreadScreen = ({
           if (action === 'reschedule-accept' && data?.scheduledAt) {
             nextBooking.scheduledAt = data.scheduledAt
           }
-          return { ...current, booking: nextBooking }
+          return { ...current, booking: nextBooking, nextAction: null }
         })
 
         setBookingSnapshot((current) => {
@@ -3408,6 +3431,12 @@ export const ChatThreadScreen = ({
                       ))}
                     </div>
                   </div>
+                )}
+                {detailNextAction && (
+                  <NextActionPill
+                    action={detailNextAction}
+                    className="chat-detail-action"
+                  />
                 )}
                 <div className="pro-slot-details-body">
                   <section className="chat-active-card chat-active-card--sheet">

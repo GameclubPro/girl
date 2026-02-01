@@ -2966,6 +2966,179 @@ const formatPriceLabel = (value) => {
   return `${Math.round(value).toLocaleString('ru-RU')} ₽`
 }
 
+const buildNextAction = ({ id, title, subtitle, tone, deadlineAt }) => {
+  if (!id || !title) return null
+  return {
+    id,
+    title,
+    subtitle: subtitle || null,
+    tone: tone || null,
+    deadlineAt: deadlineAt || null,
+  }
+}
+
+const buildBookingNextAction = (booking, viewerRole) => {
+  if (!booking || !booking.status) return null
+  const status = normalizeText(booking.status)
+  if (!status || ['cancelled', 'declined'].includes(status)) return null
+  const role = viewerRole === 'master' ? 'master' : 'client'
+  const rescheduleTime = booking.rescheduleProposedTime
+  const rescheduleBy = normalizeText(booking.rescheduleProposedBy)
+  if (rescheduleTime && rescheduleBy && rescheduleBy !== role) {
+    return buildNextAction({
+      id: 'reschedule_confirm',
+      title: 'Подтвердить перенос',
+      tone: 'alert',
+    })
+  }
+
+  const basePrice =
+    typeof booking.servicePrice === 'number'
+      ? booking.servicePrice
+      : typeof booking.proposedPrice === 'number'
+        ? booking.proposedPrice
+        : null
+  const depositPercent =
+    typeof booking.depositPercent === 'number'
+      ? Math.max(0, Math.round(booking.depositPercent))
+      : 0
+  const resolvedDepositAmount =
+    typeof booking.depositAmount === 'number'
+      ? booking.depositAmount
+      : basePrice && depositPercent > 0
+        ? Math.round((basePrice * depositPercent) / 100)
+        : 0
+  const depositAmount =
+    typeof resolvedDepositAmount === 'number' ? resolvedDepositAmount : 0
+  const depositStatus =
+    booking.depositStatus ?? (depositAmount > 0 ? 'pending' : 'not_required')
+
+  if (role === 'client') {
+    if (status === 'price_proposed') {
+      const priceLabel = formatPriceLabel(
+        typeof booking.proposedPrice === 'number'
+          ? booking.proposedPrice
+          : typeof booking.servicePrice === 'number'
+            ? booking.servicePrice
+            : null
+      )
+      return buildNextAction({
+        id: 'confirm_price',
+        title: 'Подтвердить цену',
+        subtitle: priceLabel ? `Предложение: ${priceLabel}` : null,
+        tone: 'alert',
+      })
+    }
+    if (depositAmount > 0 && ['pending', 'rejected'].includes(depositStatus)) {
+      const amountLabel = formatPriceLabel(depositAmount)
+      return buildNextAction({
+        id: 'pay_deposit',
+        title: 'Оплатить депозит',
+        subtitle: amountLabel ? `Сумма: ${amountLabel}` : null,
+        tone: 'alert',
+        deadlineAt: booking.depositHoldExpiresAt ?? null,
+      })
+    }
+    const hasReviewField =
+      Object.prototype.hasOwnProperty.call(booking, 'reviewId')
+    if (status === 'confirmed' && hasReviewField && !booking.reviewId) {
+      const scheduledAt = booking.scheduledAt
+        ? new Date(booking.scheduledAt).getTime()
+        : NaN
+      if (Number.isFinite(scheduledAt) && scheduledAt <= Date.now()) {
+        return buildNextAction({
+          id: 'leave_review',
+          title: 'Оставить отзыв',
+          tone: 'neutral',
+        })
+      }
+    }
+    return null
+  }
+
+  if (status === 'pending') {
+    const hasPrice =
+      typeof booking.servicePrice === 'number' ||
+      typeof booking.proposedPrice === 'number'
+    return buildNextAction({
+      id: hasPrice ? 'confirm_booking' : 'send_price',
+      title: hasPrice ? 'Подтвердить запись' : 'Предложить цену',
+      tone: 'alert',
+    })
+  }
+  if (status === 'price_pending') {
+    return buildNextAction({
+      id: 'send_price',
+      title: 'Предложить цену',
+      tone: 'alert',
+    })
+  }
+  if (depositStatus === 'submitted') {
+    const amountLabel = formatPriceLabel(depositAmount)
+    return buildNextAction({
+      id: 'check_deposit',
+      title: 'Проверить депозит',
+      subtitle: amountLabel ? `Сумма: ${amountLabel}` : null,
+      tone: 'alert',
+    })
+  }
+  if (status === 'confirmed' && !booking.outcome) {
+    const scheduledAt = booking.scheduledAt
+      ? new Date(booking.scheduledAt)
+      : null
+    if (scheduledAt && !Number.isNaN(scheduledAt.getTime())) {
+      const durationMinutes =
+        typeof booking.serviceDuration === 'number' && booking.serviceDuration > 0
+          ? booking.serviceDuration
+          : BOOKING_DURATION_FALLBACK_MINUTES
+      if (scheduledAt.getTime() + durationMinutes * 60 * 1000 <= Date.now()) {
+        return buildNextAction({
+          id: 'mark_outcome',
+          title: 'Отметить визит',
+          tone: 'neutral',
+        })
+      }
+    }
+  }
+  return null
+}
+
+const buildClientRequestNextAction = (request) => {
+  if (!request || request.status !== 'open') return null
+  const responsesCount = Number(request.responsesCount) || 0
+  if (responsesCount <= 0) return null
+  return buildNextAction({
+    id: 'select_master',
+    title: 'Выберите мастера',
+    subtitle: `Отклики: ${responsesCount}`,
+    tone: 'alert',
+  })
+}
+
+const buildProRequestNextAction = (request, options = {}) => {
+  if (!request || request.status !== 'open') return null
+  const isActive = options.isActive === true
+  const missingFields = Array.isArray(options.missingFields)
+    ? options.missingFields.filter(Boolean)
+    : []
+  if (!isActive || missingFields.length > 0) return null
+  const responseStatus = normalizeText(request.responseStatus)
+  const isFinal = ['accepted', 'rejected', 'expired'].includes(responseStatus)
+  if (isFinal) return null
+  const expiresAt = request.dispatchExpiresAt
+  const hasWindow =
+    expiresAt && new Date(expiresAt).getTime() > Date.now()
+  const canRespond = responseStatus === 'sent' || hasWindow
+  if (!canRespond) return null
+  const isUpdate = responseStatus === 'sent'
+  return buildNextAction({
+    id: isUpdate ? 'update_response' : 'send_response',
+    title: isUpdate ? 'Обновить отклик' : 'Откликнуться',
+    tone: 'alert',
+    deadlineAt: hasWindow ? expiresAt : null,
+  })
+}
+
 const isDuplicateSystemEvent = async ({ chatId, event, bookingId }, options = {}) => {
   if (!chatId || !event || !bookingId) return false
   const db = options.client ?? pool
@@ -7232,7 +7405,7 @@ app.get('/api/pro/requests', async (req, res) => {
               )
             )
           : null
-      return {
+      const request = {
         ...row,
         clientName,
         distanceKm,
@@ -7247,6 +7420,13 @@ app.get('/api/pro/requests', async (req, res) => {
         clientTrustScore: undefined,
         clientTrustConfidence: undefined,
         clientTrustUpdatedAt: undefined,
+      }
+      return {
+        ...request,
+        nextAction: buildProRequestNextAction(request, {
+          isActive: profile.isActive,
+          missingFields: summary.missingFields,
+        }),
       }
     })
     const scored = payload
@@ -7380,16 +7560,22 @@ app.get('/api/bookings', async (req, res) => {
       [normalizedUserId]
     )
 
-    const payload = result.rows.map((row) => ({
-      ...row,
-      masterName: row.masterName || 'Мастер',
-      masterAvatarUrl: buildPublicUrl(req, row.masterAvatarPath),
-      depositProofPath: undefined,
-      depositQrPath: undefined,
-      depositProofUrl: buildPublicUrl(req, row.depositProofPath),
-      depositQrUrl: buildPublicUrl(req, row.depositQrPath),
-      lateCancelFeePercent: 0,
-    }))
+    const payload = result.rows.map((row) => {
+      const booking = {
+        ...row,
+        masterName: row.masterName || 'Мастер',
+        masterAvatarUrl: buildPublicUrl(req, row.masterAvatarPath),
+        depositProofPath: undefined,
+        depositQrPath: undefined,
+        depositProofUrl: buildPublicUrl(req, row.depositProofPath),
+        depositQrUrl: buildPublicUrl(req, row.depositQrPath),
+        lateCancelFeePercent: 0,
+      }
+      return {
+        ...booking,
+        nextAction: buildBookingNextAction(booking, 'client'),
+      }
+    })
 
     res.json(payload)
   } catch (error) {
@@ -7505,7 +7691,8 @@ app.get('/api/pro/bookings', async (req, res) => {
         .filter(Boolean)
         .join(' ')
         .trim()
-      const clientName = nameParts || (row.clientUsername ? `@${row.clientUsername}` : 'Клиент')
+      const clientName =
+        nameParts || (row.clientUsername ? `@${row.clientUsername}` : 'Клиент')
       const clientTrust = buildTrustPayload(row, {
         scoreKey: 'clientTrustScore',
         confidenceKey: 'clientTrustConfidence',
@@ -7527,7 +7714,7 @@ app.get('/api/pro/bookings', async (req, res) => {
               )
             )
           : null
-      return {
+      const booking = {
         ...row,
         clientName,
         distanceKm,
@@ -7541,6 +7728,10 @@ app.get('/api/pro/bookings', async (req, res) => {
         clientTrustConfidence: undefined,
         clientTrustUpdatedAt: undefined,
         lateCancelFeePercent: 0,
+      }
+      return {
+        ...booking,
+        nextAction: buildBookingNextAction(booking, 'master'),
       }
     })
 
@@ -12002,11 +12193,15 @@ app.get('/api/requests', async (req, res) => {
         displayName: item.displayName ?? null,
         avatarUrl: resolvePublicUrl(req, item.avatarPath),
       }))
-      return {
+      const request = {
         ...row,
         chatId: row.chatId ?? null,
         responsePreview,
         timeWindows: normalizeTimeWindows(row.timeWindows),
+      }
+      return {
+        ...request,
+        nextAction: buildClientRequestNextAction(request),
       }
     })
 
@@ -13307,6 +13502,11 @@ app.get('/api/chats', async (req, res) => {
           sb.scheduled_at AS "bookingScheduledAt",
           sb.service_duration AS "bookingServiceDuration",
           sb.service_price AS "bookingServicePrice",
+          sb.proposed_price AS "bookingProposedPrice",
+          sb.deposit_percent AS "bookingDepositPercent",
+          sb.deposit_amount AS "bookingDepositAmount",
+          sb.deposit_status AS "bookingDepositStatus",
+          sb.deposit_hold_expires_at AS "bookingDepositHoldExpiresAt",
           sb.reschedule_proposed_at AS "bookingRescheduleProposedAt",
           sb.reschedule_proposed_by AS "bookingRescheduleProposedBy",
           sb.reschedule_proposed_time AS "bookingRescheduleProposedTime",
@@ -13422,6 +13622,11 @@ app.get('/api/chats', async (req, res) => {
               scheduledAt: row.bookingScheduledAt,
               serviceDuration: row.bookingServiceDuration,
               servicePrice: row.bookingServicePrice,
+              proposedPrice: row.bookingProposedPrice,
+              depositPercent: row.bookingDepositPercent,
+              depositAmount: row.bookingDepositAmount,
+              depositStatus: row.bookingDepositStatus,
+              depositHoldExpiresAt: row.bookingDepositHoldExpiresAt,
               rescheduleProposedAt: row.bookingRescheduleProposedAt,
               rescheduleProposedBy: row.bookingRescheduleProposedBy,
               rescheduleProposedTime: row.bookingRescheduleProposedTime,
@@ -13431,6 +13636,9 @@ app.get('/api/chats', async (req, res) => {
               createdAt: row.bookingCreatedAt,
             }
           : null
+      const nextAction = activeBooking
+        ? buildBookingNextAction(activeBooking, isClient ? 'client' : 'master')
+        : null
 
       return {
         id: row.id,
@@ -13441,6 +13649,7 @@ app.get('/api/chats', async (req, res) => {
         status: row.status,
         unreadCount: Number(row.unreadCount) || 0,
         lastReadMessageId: row.lastReadMessageId ?? null,
+        nextAction,
         lastMessage: row.lastMessageId
           ? {
               id: row.lastMessageId,
@@ -13654,6 +13863,11 @@ app.get('/api/chats/:id', async (req, res) => {
           sb.scheduled_at AS "bookingScheduledAt",
           sb.service_duration AS "bookingServiceDuration",
           sb.service_price AS "bookingServicePrice",
+          sb.proposed_price AS "bookingProposedPrice",
+          sb.deposit_percent AS "bookingDepositPercent",
+          sb.deposit_amount AS "bookingDepositAmount",
+          sb.deposit_status AS "bookingDepositStatus",
+          sb.deposit_hold_expires_at AS "bookingDepositHoldExpiresAt",
           sb.status AS "bookingStatus",
           sb.reschedule_proposed_at AS "bookingRescheduleProposedAt",
           sb.reschedule_proposed_by AS "bookingRescheduleProposedBy",
@@ -13817,6 +14031,53 @@ app.get('/api/chats/:id', async (req, res) => {
       }
     }
 
+    const requestPayload =
+      row.contextType === 'request' && row.requestId
+        ? {
+            id: row.requestId,
+            serviceName: row.serviceName,
+            categoryId: row.categoryId,
+            locationType: row.locationType,
+            dateOption: row.dateOption,
+            dateTime: row.dateTime,
+            timeWindows: normalizeTimeWindows(row.timeWindows),
+            budget: row.budget,
+            details: row.details,
+            photoUrls: Array.isArray(row.photoUrls) ? row.photoUrls : [],
+            status: row.requestStatus,
+            createdAt: row.requestCreatedAt,
+          }
+        : null
+    const bookingPayload =
+      row.contextType === 'booking' && row.bookingId
+        ? {
+            id: row.bookingId,
+            serviceName: row.bookingServiceName,
+            categoryId: row.bookingCategoryId,
+            locationType: row.bookingLocationType,
+            scheduledAt: row.bookingScheduledAt,
+            serviceDuration: row.bookingServiceDuration,
+            servicePrice: row.bookingServicePrice,
+            proposedPrice: row.bookingProposedPrice,
+            depositPercent: row.bookingDepositPercent,
+            depositAmount: row.bookingDepositAmount,
+            depositStatus: row.bookingDepositStatus,
+            depositHoldExpiresAt: row.bookingDepositHoldExpiresAt,
+            status: row.bookingStatus,
+            rescheduleProposedAt: row.bookingRescheduleProposedAt,
+            rescheduleProposedBy: row.bookingRescheduleProposedBy,
+            rescheduleProposedTime: row.bookingRescheduleProposedTime,
+            rescheduleNote: row.bookingRescheduleNote,
+            outcome: row.bookingOutcome,
+            lateMinutes: row.bookingLateMinutes,
+            attendanceAt: row.bookingAttendanceAt,
+            createdAt: row.bookingCreatedAt,
+          }
+        : null
+    const nextAction = bookingPayload
+      ? buildBookingNextAction(bookingPayload, isClient ? 'client' : 'master')
+      : null
+
     res.json({
       chat: {
         id: row.id,
@@ -13842,45 +14103,10 @@ app.get('/api/chats/:id', async (req, res) => {
             : buildPublicUrl(req, row.masterAvatarPath),
         trust: counterpartTrust ?? undefined,
       },
-      request:
-        row.contextType === 'request' && row.requestId
-          ? {
-              id: row.requestId,
-              serviceName: row.serviceName,
-              categoryId: row.categoryId,
-              locationType: row.locationType,
-              dateOption: row.dateOption,
-              dateTime: row.dateTime,
-              timeWindows: normalizeTimeWindows(row.timeWindows),
-              budget: row.budget,
-              details: row.details,
-              photoUrls: Array.isArray(row.photoUrls) ? row.photoUrls : [],
-              status: row.requestStatus,
-              createdAt: row.requestCreatedAt,
-            }
-          : null,
-      booking:
-        row.contextType === 'booking' && row.bookingId
-          ? {
-              id: row.bookingId,
-              serviceName: row.bookingServiceName,
-              categoryId: row.bookingCategoryId,
-              locationType: row.bookingLocationType,
-              scheduledAt: row.bookingScheduledAt,
-              serviceDuration: row.bookingServiceDuration,
-              servicePrice: row.bookingServicePrice,
-              status: row.bookingStatus,
-              rescheduleProposedAt: row.bookingRescheduleProposedAt,
-              rescheduleProposedBy: row.bookingRescheduleProposedBy,
-              rescheduleProposedTime: row.bookingRescheduleProposedTime,
-              rescheduleNote: row.bookingRescheduleNote,
-              outcome: row.bookingOutcome,
-              lateMinutes: row.bookingLateMinutes,
-              attendanceAt: row.bookingAttendanceAt,
-              createdAt: row.bookingCreatedAt,
-            }
-          : null,
+      request: requestPayload,
+      booking: bookingPayload,
       contexts,
+      nextAction,
     })
   } catch (error) {
     console.error('GET /api/chats/:id failed:', error)

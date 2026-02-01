@@ -36,6 +36,16 @@ export type ClientTrust = {
   } | null
 }
 
+export type NextActionTone = 'neutral' | 'alert' | 'primary'
+
+export type NextAction = {
+  id: string
+  title: string
+  subtitle?: string | null
+  tone?: NextActionTone | null
+  deadlineAt?: string | null
+}
+
 export type Role = 'client' | 'pro'
 
 export type ProfileStatus = 'draft' | 'ready' | 'complete'
@@ -234,6 +244,7 @@ export type ServiceRequest = {
   details?: string | null
   photoUrls: string[]
   status: 'open' | 'closed'
+  nextAction?: NextAction | null
   createdAt: string
   responsesCount?: number
   distanceKm?: number | null
@@ -316,6 +327,7 @@ export type Booking = {
   campaignPriceAfter?: number | null
   discountSource?: 'promotion' | 'campaign' | null
   status: BookingStatus
+  nextAction?: NextAction | null
   outcome?: string | null
   attendanceAt?: string | null
   lateMinutes?: number | null
@@ -398,6 +410,7 @@ export type ChatSummary = {
   requestId?: number | null
   bookingId?: number | null
   status: string
+  nextAction?: NextAction | null
   unreadCount: number
   lastReadMessageId?: number | null
   lastMessage?: {
@@ -438,6 +451,11 @@ export type ChatSummary = {
     rescheduleNote?: string | null
     serviceDuration?: number | null
     servicePrice?: number | null
+    proposedPrice?: number | null
+    depositPercent?: number | null
+    depositAmount?: number | null
+    depositStatus?: DepositStatus | null
+    depositHoldExpiresAt?: string | null
     outcome?: string | null
     lateMinutes?: number | null
     createdAt?: string | null
@@ -493,6 +511,11 @@ export type ChatDetail = {
     rescheduleNote?: string | null
     serviceDuration?: number | null
     servicePrice?: number | null
+    proposedPrice?: number | null
+    depositPercent?: number | null
+    depositAmount?: number | null
+    depositStatus?: DepositStatus | null
+    depositHoldExpiresAt?: string | null
     status?: string | null
     outcome?: string | null
     lateMinutes?: number | null
@@ -500,4 +523,5 @@ export type ChatDetail = {
     createdAt?: string | null
   } | null
   contexts?: ChatContextSummary[]
+  nextAction?: NextAction | null
 }
