@@ -1353,13 +1353,16 @@ export const ClientShowcaseScreen = ({
                     role="listitem"
                     style={cardStyle}
                   >
-                    {isFeatured && (
-                      <span className="client-master-featured" aria-label="Рекомендуем">
-                        Рекомендуем
-                      </span>
-                    )}
                     <div className="client-master-overview">
                       <div className="client-master-avatar-block">
+                        {isFeatured && (
+                          <span
+                            className="client-master-featured"
+                            aria-label="Рекомендуем"
+                          >
+                            Рекомендуем
+                          </span>
+                        )}
                         <span className="client-master-avatar" aria-hidden="true">
                           {master.avatarUrl ? (
                             <img
