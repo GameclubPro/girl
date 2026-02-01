@@ -1318,21 +1318,28 @@ export const ClientShowcaseScreen = ({
                     ? `${master.reviewsAverage.toFixed(1)} ★`
                     : 'Новый'
                 const seed = toSeed(master.id)
-                const distanceFallback = isNearby ? 'Гео не задано' : 'Рядом'
+                const distanceFallback = isNearby ? 'Гео не задано' : null
                 const distanceLabel = buildDistanceLabel(
                   master.distanceKm,
                   distanceFallback
                 )
                 const responseLabel = buildResponseLabel(seed)
                 const recencyLabel = formatRecencyChip(master.updatedAtTs)
+                const formatLabel =
+                  master.worksAtClient && master.worksAtMaster
+                    ? 'Выезд и у мастера'
+                    : master.worksAtClient
+                      ? 'Выезд'
+                      : master.worksAtMaster
+                        ? 'У мастера'
+                        : null
                 const scheduleSet = new Set(
                   master.scheduleDays.map((day) => normalizeScheduleDay(day))
                 )
                 const chipItems = [
                   distanceLabel,
                   responseLabel,
-                  master.worksAtClient ? 'Выезд' : null,
-                  master.worksAtMaster ? 'У мастера' : null,
+                  formatLabel,
                 ].filter(Boolean) as string[]
                 const thumbSlots = Array.from({ length: 3 }, (_, index) => ({
                   item: master.thumbItems[index] ?? null,
@@ -1367,9 +1374,7 @@ export const ClientShowcaseScreen = ({
                             </span>
                           )}
                         </span>
-                        <span className="client-master-chip client-master-chip--status is-accent">
-                          {recencyLabel}
-                        </span>
+                        <span className="client-master-status">{recencyLabel}</span>
                       </div>
                       <div className="client-master-overview-main">
                         <div className="client-master-name-row">
