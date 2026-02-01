@@ -22520,6 +22520,8 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  position: relative;
+  z-index: 1;
 }
 
 .client-master-chip {
@@ -22559,7 +22561,7 @@ h2 {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
 }
 
 .client-master-overview-main {

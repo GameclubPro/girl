@@ -1401,14 +1401,15 @@ export const ClientShowcaseScreen = ({
                               )}
                           </p>
                         )}
-                        <div className="client-master-chip-row">
-                          {chipItems.map((chip, index) => (
-                            <span className="client-master-chip" key={`${chip}-${index}`}>
-                              {chip}
-                            </span>
-                          ))}
-                        </div>
                       </div>
+                    </div>
+
+                    <div className="client-master-chip-row">
+                      {chipItems.map((chip, index) => (
+                        <span className="client-master-chip" key={`${chip}-${index}`}>
+                          {chip}
+                        </span>
+                      ))}
                     </div>
 
                     <div className="client-master-availability">
