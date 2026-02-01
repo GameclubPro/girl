@@ -1000,8 +1000,7 @@ export const ProProfileScreen = ({
   const hasPortfolioOverflow = portfolioGridItems.length > PORTFOLIO_ROW_LIMIT
   const isPortfolioCollapsed = !isPortfolioExpanded
   const visiblePortfolioItems = portfolioGridItems
-  const isPortfolioSparse =
-    visiblePortfolioItems.length > 0 ? visiblePortfolioItems.length < 3 : false
+  const isPortfolioSparse = visiblePortfolioItems.length === 1
   const previewTagSource =
     serviceNames.length > 0 ? serviceNames : categoryLabels
   const previewTags = previewTagSource.slice(0, 3)
