@@ -53,6 +53,7 @@ const MARKETING_BROADCAST_MAX = 5000
 const PROMOTION_TITLE_LIMIT = 60
 const PROMOTION_DESCRIPTION_LIMIT = 180
 const PROMOTION_MAX_DURATION_DAYS = 14
+const PROMOTION_MAX_DISCOUNT = 60
 const PROMOTION_TYPES = ['discount', 'bonus', 'slots']
 const PROMOTION_AUDIENCES = ['all', 'followers', 'clients']
 const PROMOTION_STATUSES = ['active', 'paused', 'archived']
@@ -327,6 +328,12 @@ const normalizePromotionDescription = (value) => {
   return normalized.slice(0, PROMOTION_DESCRIPTION_LIMIT)
 }
 
+const normalizePromotionDiscount = (value) => {
+  const parsed = parseOptionalInt(value)
+  if (parsed === null) return 0
+  return clampValue(parsed, 0, PROMOTION_MAX_DISCOUNT)
+}
+
 const parseDateTime = (value) => {
   if (!value) return null
   const parsed = new Date(value)
@@ -395,6 +402,105 @@ const buildPromotionAudienceClause = ({
     )
   )
 `
+
+const loadActivePromotionForViewer = async ({ masterId, viewerId }) => {
+  if (!masterId || !viewerId) return null
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        master_id AS "masterId",
+        type,
+        title,
+        description,
+        start_at AS "startAt",
+        end_at AS "endAt",
+        status,
+        audience,
+        discount_percent AS "discountPercent"
+      FROM master_promotions mpromo
+      WHERE mpromo.master_id = $1
+        AND mpromo.status = 'active'
+        AND mpromo.start_at <= NOW()
+        AND mpromo.end_at > NOW()
+        AND (
+          mpromo.audience = 'all'
+          OR mpromo.master_id = $2
+          OR (
+            mpromo.audience = 'followers'
+            AND EXISTS (
+              SELECT 1
+              FROM master_followers mf
+              WHERE mf.master_id = mpromo.master_id
+                AND mf.follower_id = $2
+            )
+          )
+          OR (
+            mpromo.audience = 'clients'
+            AND EXISTS (
+              SELECT 1
+              FROM service_bookings sb
+              WHERE sb.master_id = mpromo.master_id
+                AND sb.client_id = $2
+            )
+          )
+        )
+      ORDER BY mpromo.end_at ASC
+      LIMIT 1
+    `,
+    [masterId, viewerId]
+  )
+  const row = result.rows[0]
+  if (!row) return null
+  return {
+    id: Number(row.id),
+    masterId: row.masterId ?? masterId,
+    type: row.type,
+    title: row.title,
+    description: row.description ?? null,
+    startAt: row.startAt ?? null,
+    endAt: row.endAt ?? null,
+    status: row.status ?? 'active',
+    audience: row.audience ?? 'all',
+    discountPercent: normalizePromotionDiscount(row.discountPercent),
+  }
+}
+
+const resolveBookingPromotion = async ({
+  masterId,
+  clientId,
+  promotionId,
+  promotionDiscountPercent,
+}) => {
+  const storedPercent = normalizePromotionDiscount(promotionDiscountPercent)
+  const storedPromotionId = parseOptionalInt(promotionId)
+  if (storedPercent > 0) {
+    return { id: storedPromotionId ?? null, discountPercent: storedPercent }
+  }
+  const activePromotion = await loadActivePromotionForViewer({
+    masterId,
+    viewerId: clientId,
+  })
+  if (!activePromotion || activePromotion.type !== 'discount') return null
+  const activePercent = normalizePromotionDiscount(activePromotion.discountPercent)
+  if (activePercent <= 0) return null
+  return { id: activePromotion.id, discountPercent: activePercent }
+}
+
+const buildPromotionDiscount = (basePrice, discountPercent) => {
+  if (typeof basePrice !== 'number' || !Number.isFinite(basePrice)) return null
+  const safePercent = normalizePromotionDiscount(discountPercent)
+  if (safePercent <= 0) return null
+  const amount = Math.max(0, Math.round((basePrice * safePercent) / 100))
+  const after = Math.max(0, basePrice - amount)
+  if (amount <= 0 || after <= 0) return null
+  return {
+    percent: safePercent,
+    amount,
+    before: basePrice,
+    after,
+  }
+}
 
 const parseOptionalInt = (value) => {
   if (typeof value === 'number') {
@@ -3812,6 +3918,7 @@ const ensureSchema = async () => {
       end_at TIMESTAMPTZ NOT NULL,
       status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'archived')),
       audience TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all', 'followers', 'clients')),
+      discount_percent INTEGER NOT NULL DEFAULT 0,
       max_uses INTEGER,
       uses_count INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -3822,6 +3929,11 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE master_promotions
     DROP COLUMN IF EXISTS categories;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_promotions
+    ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0;
   `)
 
   await pool.query(`
@@ -4021,6 +4133,11 @@ const ensureSchema = async () => {
       deposit_paid_at TIMESTAMPTZ,
       deposit_proof_path TEXT,
       proposed_price INTEGER,
+      promotion_id INTEGER REFERENCES master_promotions(id),
+      promotion_discount_percent INTEGER,
+      promotion_discount_amount INTEGER,
+      promotion_price_before INTEGER,
+      promotion_price_after INTEGER,
       client_comment TEXT,
       cancelled_by TEXT,
       cancelled_at TIMESTAMPTZ,
@@ -4101,6 +4218,31 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE service_bookings
     ADD COLUMN IF NOT EXISTS deposit_proof_path TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS promotion_id INTEGER REFERENCES master_promotions(id);
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS promotion_discount_percent INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS promotion_discount_amount INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS promotion_price_before INTEGER;
+  `)
+
+  await pool.query(`
+    ALTER TABLE service_bookings
+    ADD COLUMN IF NOT EXISTS promotion_price_after INTEGER;
   `)
 
   await pool.query(`
@@ -4946,7 +5088,8 @@ app.get('/api/masters', async (req, res) => {
           promo.description AS "promotionDescription",
           promo.start_at AS "promotionStartAt",
           promo.end_at AS "promotionEndAt",
-          promo.audience AS "promotionAudience"
+          promo.audience AS "promotionAudience",
+          promo.discount_percent AS "promotionDiscountPercent"
         FROM master_profiles mp
         LEFT JOIN users u ON u.user_id = mp.user_id
         LEFT JOIN cities c ON c.id = mp.city_id
@@ -4976,7 +5119,8 @@ app.get('/api/masters', async (req, res) => {
             description,
             start_at,
             end_at,
-            audience
+            audience,
+            discount_percent
           FROM master_promotions mpromo
           WHERE mpromo.master_id = mp.user_id
             AND mpromo.status = 'active'
@@ -5026,6 +5170,7 @@ app.get('/api/masters', async (req, res) => {
             startAt: row.promotionStartAt ?? null,
             endAt: row.promotionEndAt ?? null,
             audience: row.promotionAudience ?? 'all',
+            discountPercent: normalizePromotionDiscount(row.promotionDiscountPercent),
           }
         : null
       return {
@@ -5136,7 +5281,8 @@ app.get('/api/masters/:userId', async (req, res) => {
           promo.description AS "promotionDescription",
           promo.start_at AS "promotionStartAt",
           promo.end_at AS "promotionEndAt",
-          promo.audience AS "promotionAudience"
+          promo.audience AS "promotionAudience",
+          promo.discount_percent AS "promotionDiscountPercent"
         FROM master_profiles mp
         LEFT JOIN users u ON u.user_id = mp.user_id
         LEFT JOIN cities c ON c.id = mp.city_id
@@ -5171,7 +5317,8 @@ app.get('/api/masters/:userId', async (req, res) => {
             description,
             start_at,
             end_at,
-            audience
+            audience,
+            discount_percent
           FROM master_promotions mpromo
           WHERE mpromo.master_id = mp.user_id
             AND mpromo.status = 'active'
@@ -5215,9 +5362,10 @@ app.get('/api/masters/:userId', async (req, res) => {
           title: row.promotionTitle,
           description: row.promotionDescription ?? null,
           startAt: row.promotionStartAt ?? null,
-          endAt: row.promotionEndAt ?? null,
-          audience: row.promotionAudience ?? 'all',
-        }
+            endAt: row.promotionEndAt ?? null,
+            audience: row.promotionAudience ?? 'all',
+            discountPercent: normalizePromotionDiscount(row.promotionDiscountPercent),
+          }
       : null
     res.json({
       ...row,
@@ -5267,6 +5415,7 @@ app.get('/api/masters/:userId/promotions', async (req, res) => {
           end_at AS "endAt",
           status,
           audience,
+          discount_percent AS "discountPercent",
           max_uses AS "maxUses",
           uses_count AS "usesCount",
           created_at AS "createdAt",
@@ -6950,6 +7099,11 @@ app.get('/api/bookings', async (req, res) => {
           b.deposit_paid_at AS "depositPaidAt",
           b.deposit_proof_path AS "depositProofPath",
           b.proposed_price AS "proposedPrice",
+          b.promotion_id AS "promotionId",
+          b.promotion_discount_percent AS "promotionDiscountPercent",
+          b.promotion_discount_amount AS "promotionDiscountAmount",
+          b.promotion_price_before AS "promotionPriceBefore",
+          b.promotion_price_after AS "promotionPriceAfter",
           b.client_comment AS "comment",
           b.outcome,
           b.attendance_at AS "attendanceAt",
@@ -7056,6 +7210,11 @@ app.get('/api/pro/bookings', async (req, res) => {
           b.deposit_paid_at AS "depositPaidAt",
           b.deposit_proof_path AS "depositProofPath",
           b.proposed_price AS "proposedPrice",
+          b.promotion_id AS "promotionId",
+          b.promotion_discount_percent AS "promotionDiscountPercent",
+          b.promotion_discount_amount AS "promotionDiscountAmount",
+          b.promotion_price_before AS "promotionPriceBefore",
+          b.promotion_price_after AS "promotionPriceAfter",
           b.client_comment AS "comment",
           b.outcome,
           b.attendance_at AS "attendanceAt",
@@ -7633,6 +7792,9 @@ const mapPromotionRow = (row) => ({
   endAt: row.endAt ?? row.end_at,
   status: row.status ?? 'active',
   audience: row.audience ?? 'all',
+  discountPercent: normalizePromotionDiscount(
+    row.discountPercent ?? row.discount_percent
+  ),
   maxUses: row.maxUses ?? row.max_uses ?? null,
   usesCount: Number.isFinite(Number(row.usesCount ?? row.uses_count))
     ? Number(row.usesCount ?? row.uses_count)
@@ -8334,6 +8496,7 @@ app.get('/api/pro/marketing/promotions', async (req, res) => {
           end_at AS "endAt",
           status,
           audience,
+          discount_percent AS "discountPercent",
           max_uses AS "maxUses",
           uses_count AS "usesCount",
           created_at AS "createdAt",
@@ -8364,6 +8527,8 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
   const audience = normalizePromotionAudience(req.body?.audience)
   const status = normalizePromotionStatus(req.body?.status)
   const maxUses = parseOptionalInt(req.body?.maxUses)
+  const rawDiscountPercent = req.body?.discountPercent ?? req.body?.discount_percent
+  const discountPercent = normalizePromotionDiscount(rawDiscountPercent)
   const startAt = parseDateTime(req.body?.startAt) ?? new Date()
   const endAt =
     parseDateTime(req.body?.endAt) ??
@@ -8382,6 +8547,10 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
   )
   if (durationDays > PROMOTION_MAX_DURATION_DAYS) {
     res.status(400).json({ error: 'duration_too_long' })
+    return
+  }
+  if (!promotionId && type === 'discount' && discountPercent <= 0) {
+    res.status(400).json({ error: 'discount_required' })
     return
   }
 
@@ -8410,6 +8579,13 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
       const nextStatus = req.body?.status ? status : base.status
       const nextMaxUses =
         req.body?.maxUses !== undefined ? maxUses : base.max_uses
+      const hasDiscountOverride = rawDiscountPercent !== undefined
+      const nextDiscountPercent =
+        nextType === 'discount'
+          ? hasDiscountOverride
+            ? discountPercent
+            : normalizePromotionDiscount(base.discount_percent)
+          : 0
       const nextStartAt = req.body?.startAt
         ? startAt
         : ensureDateValue(base.start_at)
@@ -8432,6 +8608,10 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
       )
       if (nextDurationDays > PROMOTION_MAX_DURATION_DAYS) {
         res.status(400).json({ error: 'duration_too_long' })
+        return
+      }
+      if (nextType === 'discount' && nextDiscountPercent <= 0) {
+        res.status(400).json({ error: 'discount_required' })
         return
       }
       if (nextStatus === 'active') {
@@ -8459,9 +8639,10 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
             end_at = $5,
             status = $6,
             audience = $7,
-            max_uses = $8,
+            discount_percent = $8,
+            max_uses = $9,
             updated_at = NOW()
-          WHERE id = $9 AND master_id = $10
+          WHERE id = $10 AND master_id = $11
           RETURNING
             id,
             master_id AS "masterId",
@@ -8472,6 +8653,7 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
             end_at AS "endAt",
             status,
             audience,
+            discount_percent AS "discountPercent",
             max_uses AS "maxUses",
             uses_count AS "usesCount",
             created_at AS "createdAt",
@@ -8485,6 +8667,7 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
           nextEndAt,
           nextStatus,
           nextAudience,
+          nextDiscountPercent,
           nextMaxUses,
           promotionId,
           masterId,
@@ -8505,6 +8688,7 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
           return
         }
       }
+      const nextDiscountPercent = type === 'discount' ? discountPercent : 0
       const insertResult = await pool.query(
         `
           INSERT INTO master_promotions (
@@ -8516,10 +8700,11 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
             end_at,
             status,
             audience,
+            discount_percent,
             max_uses,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
           RETURNING
             id,
             master_id AS "masterId",
@@ -8530,6 +8715,7 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
             end_at AS "endAt",
             status,
             audience,
+            discount_percent AS "discountPercent",
             max_uses AS "maxUses",
             uses_count AS "usesCount",
             created_at AS "createdAt",
@@ -8544,6 +8730,7 @@ app.post('/api/pro/marketing/promotions', async (req, res) => {
           endAt,
           status,
           audience,
+          nextDiscountPercent,
           maxUses,
         ]
       )
@@ -8631,6 +8818,7 @@ app.post('/api/pro/marketing/promotions/:promotionId/action', async (req, res) =
           end_at AS "endAt",
           status,
           audience,
+          discount_percent AS "discountPercent",
           max_uses AS "maxUses",
           uses_count AS "usesCount",
           created_at AS "createdAt",
@@ -8803,10 +8991,33 @@ app.post('/api/bookings', async (req, res) => {
       0,
       100
     )
-    const depositAmount = calculateDepositAmount(
-      profile,
-      matchedService.price ?? null
-    )
+    const baseServicePrice =
+      typeof matchedService.price === 'number' ? matchedService.price : null
+    const activePromotion = await loadActivePromotionForViewer({
+      masterId: normalizedMasterId,
+      viewerId: normalizedUserId,
+    })
+    const promotionPayload =
+      activePromotion && activePromotion.type === 'discount'
+        ? {
+            id: activePromotion.id,
+            discountPercent: normalizePromotionDiscount(
+              activePromotion.discountPercent
+            ),
+          }
+        : null
+    const promotionDiscount =
+      promotionPayload && promotionPayload.discountPercent > 0
+        ? promotionPayload
+        : null
+    const discountData =
+      promotionDiscount && baseServicePrice !== null
+        ? buildPromotionDiscount(baseServicePrice, promotionDiscount.discountPercent)
+        : null
+    const effectiveServicePrice = discountData
+      ? discountData.after
+      : baseServicePrice
+    const depositAmount = calculateDepositAmount(profile, effectiveServicePrice)
     const depositStatus = depositAmount > 0 ? 'pending' : 'not_required'
     const depositHoldExpiresAt =
       depositStatus === 'pending' ? buildDepositHoldExpiresAt() : null
@@ -9007,9 +9218,14 @@ app.post('/api/bookings', async (req, res) => {
           deposit_status,
           deposit_hold_expires_at,
           proposed_price,
+          promotion_id,
+          promotion_discount_percent,
+          promotion_discount_amount,
+          promotion_price_before,
+          promotion_price_after,
           client_comment
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NULL, $19)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NULL, $19, $20, $21, $22, $23, $24)
         RETURNING id, created_at AS "createdAt"
       `,
       [
@@ -9020,7 +9236,7 @@ app.post('/api/bookings', async (req, res) => {
         normalizedAddress || null,
         normalizedCategoryId,
         normalizedServiceName,
-        matchedService.price ?? null,
+        effectiveServicePrice,
         serviceDuration,
         normalizedLocationType,
         scheduledDate.toISOString(),
@@ -9031,6 +9247,11 @@ app.post('/api/bookings', async (req, res) => {
         depositAmount,
         depositStatus,
         depositHoldExpiresAt,
+        promotionDiscount?.id ?? null,
+        discountData?.percent ?? (promotionDiscount?.discountPercent ?? null),
+        discountData?.amount ?? null,
+        discountData?.before ?? null,
+        discountData?.after ?? null,
         normalizedComment || null,
       ]
     )
@@ -9114,6 +9335,11 @@ app.patch('/api/bookings/:id', async (req, res) => {
           reschedule_proposed_by AS "rescheduleProposedBy",
           reschedule_proposed_time AS "rescheduleProposedTime",
           reschedule_note AS "rescheduleNote",
+          promotion_id AS "promotionId",
+          promotion_discount_percent AS "promotionDiscountPercent",
+          promotion_discount_amount AS "promotionDiscountAmount",
+          promotion_price_before AS "promotionPriceBefore",
+          promotion_price_after AS "promotionPriceAfter",
           outcome
         FROM service_bookings
         WHERE id = $1
@@ -9391,12 +9617,22 @@ app.patch('/api/bookings/:id', async (req, res) => {
         0,
         100
       )
+      const promotion = await resolveBookingPromotion({
+        masterId: booking.masterId,
+        clientId: booking.clientId,
+        promotionId: booking.promotionId,
+        promotionDiscountPercent: booking.promotionDiscountPercent,
+      })
+      const discountData = promotion
+        ? buildPromotionDiscount(parsedPrice, promotion.discountPercent)
+        : null
+      const effectivePrice = discountData ? discountData.after : parsedPrice
       let nextDepositAmount =
         typeof booking.depositAmount === 'number' ? booking.depositAmount : null
       let nextDepositStatus = booking.depositStatus ?? null
       let nextDepositHoldExpiresAt = booking.depositHoldExpiresAt ?? null
-      if (depositPercentValue > 0 && (!nextDepositAmount || nextDepositAmount <= 0)) {
-        nextDepositAmount = Math.round((parsedPrice * depositPercentValue) / 100)
+      if (depositPercentValue > 0) {
+        nextDepositAmount = Math.round((effectivePrice * depositPercentValue) / 100)
         if (
           nextDepositAmount > 0 &&
           (!nextDepositStatus || nextDepositStatus === 'not_required')
@@ -9419,10 +9655,26 @@ app.patch('/api/bookings/:id', async (req, res) => {
               deposit_amount = $3,
               deposit_status = $4,
               deposit_hold_expires_at = $5,
+              promotion_id = $6,
+              promotion_discount_percent = $7,
+              promotion_discount_amount = $8,
+              promotion_price_before = $9,
+              promotion_price_after = $10,
               updated_at = NOW()
           WHERE id = $1
         `,
-        [bookingId, parsedPrice, nextDepositAmount, nextDepositStatus, nextDepositHoldExpiresAt]
+        [
+          bookingId,
+          effectivePrice,
+          nextDepositAmount,
+          nextDepositStatus,
+          nextDepositHoldExpiresAt,
+          promotion?.id ?? null,
+          discountData?.percent ?? (promotion?.discountPercent ?? null),
+          discountData?.amount ?? null,
+          discountData?.before ?? null,
+          discountData?.after ?? null,
+        ]
       )
 
       let chatPayload = null
@@ -9459,15 +9711,32 @@ app.patch('/api/bookings/:id', async (req, res) => {
           bookingId,
         })
         if (!isDuplicate) {
-          const priceLabel = formatPriceLabel(parsedPrice)
-          const body = priceLabel
-            ? `Мастер предложил цену: ${priceLabel}. Подтвердите запись.`
+          const baseLabel = formatPriceLabel(parsedPrice)
+          const finalLabel = formatPriceLabel(effectivePrice)
+          const discountLabel =
+            discountData && baseLabel && finalLabel
+              ? `Скидка -${discountData.percent}%: ${finalLabel} вместо ${baseLabel}.`
+              : ''
+          const body = finalLabel
+            ? [
+                `Мастер предложил цену: ${finalLabel}.`,
+                discountLabel,
+                'Подтвердите запись.',
+              ]
+                .filter(Boolean)
+                .join(' ')
             : 'Мастер предложил цену. Подтвердите запись.'
           const meta = {
             event: 'booking_price_proposed',
             bookingId,
             serviceName: booking.serviceName ?? null,
-            proposedPrice: parsedPrice,
+            proposedPrice: effectivePrice,
+            promotionId: promotion?.id ?? null,
+            promotionDiscountPercent:
+              discountData?.percent ?? (promotion?.discountPercent ?? null),
+            promotionDiscountAmount: discountData?.amount ?? null,
+            promotionPriceBefore: discountData?.before ?? null,
+            promotionPriceAfter: discountData?.after ?? null,
             depositAmount: nextDepositAmount ?? null,
             depositStatus: nextDepositStatus ?? null,
             depositHoldExpiresAt: nextDepositHoldExpiresAt ?? null,
@@ -12053,7 +12322,33 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
             res.status(409).json({ error: 'price_required' })
             return
           }
-          const depositAmount = calculateDepositAmount(profile, servicePrice)
+          const activePromotion = await loadActivePromotionForViewer({
+            masterId: response.masterId,
+            viewerId: request.userId,
+          })
+          const promotionPayload =
+            activePromotion && activePromotion.type === 'discount'
+              ? {
+                  id: activePromotion.id,
+                  discountPercent: normalizePromotionDiscount(
+                    activePromotion.discountPercent
+                  ),
+                }
+              : null
+          const promotionDiscount =
+            promotionPayload && promotionPayload.discountPercent > 0
+              ? promotionPayload
+              : null
+          const discountData = promotionDiscount
+            ? buildPromotionDiscount(servicePrice, promotionDiscount.discountPercent)
+            : null
+          const effectiveServicePrice = discountData
+            ? discountData.after
+            : servicePrice
+          const depositAmount = calculateDepositAmount(
+            profile,
+            effectiveServicePrice
+          )
           const depositStatus = depositAmount > 0 ? 'pending' : 'not_required'
           const depositHoldExpiresAt =
             depositStatus === 'pending' ? buildDepositHoldExpiresAt() : null
@@ -12095,9 +12390,14 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
                 deposit_status,
                 deposit_hold_expires_at,
                 proposed_price,
+                promotion_id,
+                promotion_discount_percent,
+                promotion_discount_amount,
+                promotion_price_before,
+                promotion_price_after,
                 client_comment
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'confirmed', $15, $16, $17, $18, $19, NULL, $20)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'confirmed', $15, $16, $17, $18, $19, NULL, $20, $21, $22, $23, $24, $25)
               RETURNING id, created_at AS "createdAt"
             `,
             [
@@ -12110,7 +12410,7 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
               request.address ?? null,
               request.categoryId,
               request.serviceName,
-              servicePrice,
+              effectiveServicePrice,
               serviceDuration,
               resolvedLocationType,
               scheduledDate.toISOString(),
@@ -12120,6 +12420,11 @@ app.patch('/api/requests/:id/responses/:responseId', async (req, res) => {
               depositAmount,
               depositStatus,
               depositHoldExpiresAt,
+              promotionDiscount?.id ?? null,
+              discountData?.percent ?? (promotionDiscount?.discountPercent ?? null),
+              discountData?.amount ?? null,
+              discountData?.before ?? null,
+              discountData?.after ?? null,
               requestComment,
             ]
           )

@@ -2651,6 +2651,20 @@ export const ProRequestsScreen = ({
       : typeof booking.proposedPrice === 'number'
         ? `Предложенная цена: ${formatPrice(booking.proposedPrice)}`
         : 'Цена не указана'
+    const promotionDiscountPercent =
+      typeof booking.promotionDiscountPercent === 'number'
+        ? Math.max(0, Math.round(booking.promotionDiscountPercent))
+        : 0
+    const promotionPriceBefore =
+      typeof booking.promotionPriceBefore === 'number'
+        ? booking.promotionPriceBefore
+        : null
+    const promotionLabel =
+      promotionDiscountPercent > 0 && typeof promotionPriceBefore === 'number'
+        ? `Скидка -${promotionDiscountPercent}% · было ${formatPrice(
+            promotionPriceBefore
+          )}`
+        : ''
     const canAccept = booking.status === 'pending' && hasServicePrice
     const canPropose =
       !hasServicePrice &&
@@ -2798,6 +2812,11 @@ export const ProRequestsScreen = ({
           </div>
         )}
         <div className="booking-item-price">{priceLabel}</div>
+        {promotionLabel && (
+          <div className="booking-item-meta booking-item-meta--highlight">
+            {promotionLabel}
+          </div>
+        )}
         {booking.status === 'price_proposed' && priceOfferTimeLeft && (
           <div className="booking-item-meta booking-item-meta--highlight">
             Ожидание клиента: {priceOfferTimeLeft}

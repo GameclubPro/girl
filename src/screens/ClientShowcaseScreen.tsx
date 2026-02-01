@@ -1382,6 +1382,13 @@ export const ClientShowcaseScreen = ({
                             <span className="client-master-promo-title">
                               {master.activePromotion.title}
                             </span>
+                            {master.activePromotion.type === 'discount' &&
+                              typeof master.activePromotion.discountPercent === 'number' &&
+                              master.activePromotion.discountPercent > 0 && (
+                                <span className="client-master-promo-discount">
+                                  -{master.activePromotion.discountPercent}%
+                                </span>
+                              )}
                           </p>
                         )}
                         <div className="client-master-chip-row">

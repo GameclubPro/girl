@@ -122,6 +122,7 @@ export type Promotion = {
   type: PromotionType
   title: string
   description?: string | null
+  discountPercent?: number | null
   startAt: string
   endAt: string
   status: PromotionStatus
@@ -137,6 +138,7 @@ export type PromotionSummary = {
   type: PromotionType
   title: string
   description?: string | null
+  discountPercent?: number | null
   startAt?: string | null
   endAt?: string | null
   audience?: PromotionAudience
@@ -290,6 +292,11 @@ export type Booking = {
   depositProofUrl?: string | null
   depositDetails?: string | null
   depositQrUrl?: string | null
+  promotionId?: number | null
+  promotionDiscountPercent?: number | null
+  promotionDiscountAmount?: number | null
+  promotionPriceBefore?: number | null
+  promotionPriceAfter?: number | null
   status: BookingStatus
   outcome?: string | null
   attendanceAt?: string | null

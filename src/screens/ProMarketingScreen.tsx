@@ -8,7 +8,7 @@ import { buildShareLink } from '../utils/telegramShare'
 const MARKETING_TEXT_LIMIT = 800
 const PROMOTION_TITLE_LIMIT = 60
 const PROMOTION_DESCRIPTION_LIMIT = 180
-const DISCOUNT_OPTIONS = [0, 5, 10, 15]
+const PROMOTION_DISCOUNT_OPTIONS = [5, 10, 15, 20]
 const PROMOTION_DURATION_OPTIONS = [3, 7, 14]
 const PROMOTION_MAX_DURATION_DAYS = 14
 const REPEAT_INTERVAL_MIN = 7
@@ -46,6 +46,7 @@ type PromotionDraft = {
   title: string
   description: string
   durationDays: number
+  discountPercent: number
 }
 
 type ProMarketingScreenProps = {
@@ -115,7 +116,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     'broadcast' | 'repeat' | 'promotions'
   >('broadcast')
   const [broadcastChannel, setBroadcastChannel] = useState<'bot' | 'chat'>('bot')
-  const [discountPercent, setDiscountPercent] = useState(10)
   const [broadcastDraft, setBroadcastDraft] = useState('')
   const [broadcastTemplateOpen, setBroadcastTemplateOpen] = useState(false)
   const [broadcastTemplateId, setBroadcastTemplateId] = useState<string | null>(null)
@@ -130,11 +130,14 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [promotionsLoading, setPromotionsLoading] = useState(true)
   const [promotionsError, setPromotionsError] = useState('')
   const [promotionsSaving, setPromotionsSaving] = useState(false)
+  const [repeatAdvancedOpen, setRepeatAdvancedOpen] = useState(false)
+  const [promotionHistoryOpen, setPromotionHistoryOpen] = useState(false)
   const [promotionDraft, setPromotionDraft] = useState<PromotionDraft>({
     type: 'discount',
     title: '',
     description: '',
     durationDays: PROMOTION_DURATION_OPTIONS[1],
+    discountPercent: PROMOTION_DISCOUNT_OPTIONS[1],
   })
 
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null)
@@ -320,15 +323,31 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       title: '',
       description: '',
       durationDays: PROMOTION_DURATION_OPTIONS[1],
+      discountPercent: PROMOTION_DISCOUNT_OPTIONS[1],
     })
   }, [userId])
+
+  const activeDiscountPercent = useMemo(() => {
+    const now = Date.now()
+    const activeDiscount = promotions.find((promotion) => {
+      if (promotion.type !== 'discount') return false
+      if (promotion.status !== 'active') return false
+      const startMs = Date.parse(promotion.startAt)
+      const endMs = Date.parse(promotion.endAt)
+      if (Number.isFinite(startMs) && startMs > now) return false
+      if (Number.isFinite(endMs) && endMs <= now) return false
+      return true
+    })
+    const value = activeDiscount?.discountPercent ?? 0
+    return typeof value === 'number' && value > 0 ? Math.round(value) : 0
+  }, [promotions])
 
   const broadcastTemplates: Template[] = useMemo(() => {
     const slotsText = `Привет! ${masterLabel} появились свободные окна на ближайшие дни. Если хотите записаться, выберите время по кнопке ниже.`
     const promoText =
-      discountPercent > 0
-        ? `Есть приятная новость ${masterLabel}: действует скидка -${discountPercent}% на ближайшую запись. Если интересно, выберите время по кнопке ниже.`
-        : `Есть приятная новость ${masterLabel}: для записи действует небольшой бонус. Если интересно, выберите время по кнопке ниже.`
+      activeDiscountPercent > 0
+        ? `Есть приятная новость ${masterLabel}: действует скидка -${activeDiscountPercent}% на ближайшую запись. Если интересно, выберите время по кнопке ниже.`
+        : `Есть приятная новость ${masterLabel}: действует спецпредложение для записи. Если интересно, выберите время по кнопке ниже.`
     const newsText = `Короткое обновление ${masterLabel}: появились новые работы и свежие идеи. Если хотите записаться, выберите время по кнопке ниже.`
 
     return [
@@ -340,11 +359,14 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       },
       {
         id: 'promo',
-        title: discountPercent > 0 ? `Акция -${discountPercent}%` : 'Спецпредложение',
+        title:
+          activeDiscountPercent > 0
+            ? `Акция -${activeDiscountPercent}%`
+            : 'Спецпредложение',
         description:
-          discountPercent > 0
-            ? 'Скидка для быстрой записи.'
-            : 'Небольшой бонус для записи.',
+          activeDiscountPercent > 0
+            ? 'Скидка по активной акции.'
+            : 'Короткое предложение для записи.',
         text: promoText,
       },
       {
@@ -354,7 +376,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         text: newsText,
       },
     ]
-  }, [discountPercent, masterLabel])
+  }, [activeDiscountPercent, masterLabel])
 
   const includeLinkEnabled = Boolean(shareLink)
   const includeUnsubscribeEnabled = true
@@ -458,6 +480,24 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       setRepeatDraftInitialized(true)
     }
   }, [repeatDraftDirty, repeatDraftInitialized, repeatSettings])
+
+  useEffect(() => {
+    if (repeatDraftDirty) {
+      setRepeatAdvancedOpen(true)
+    }
+  }, [repeatDraftDirty])
+
+  useEffect(() => {
+    if (!repeatSettings) return
+    const hasCustomIntervals =
+      repeatSettings.intervals &&
+      typeof repeatSettings.intervals === 'object' &&
+      Object.keys(repeatSettings.intervals).length > 0
+    const hasTemplate = Boolean(repeatSettings.template?.trim())
+    if (hasCustomIntervals || hasTemplate) {
+      setRepeatAdvancedOpen(true)
+    }
+  }, [repeatSettings])
 
   const handleInsertBroadcastTemplate = useCallback(
     (template: Template) => {
@@ -653,10 +693,13 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const isPromotionTitleTooLong = promotionTitleLength > PROMOTION_TITLE_LIMIT
   const isPromotionDescriptionTooLong =
     promotionDescriptionLength > PROMOTION_DESCRIPTION_LIMIT
+  const isPromotionDiscountInvalid =
+    promotionDraft.type === 'discount' && promotionDraft.discountPercent <= 0
   const canSavePromotion =
     promotionTitleLength > 0 &&
     !isPromotionTitleTooLong &&
     !isPromotionDescriptionTooLong &&
+    !isPromotionDiscountInvalid &&
     !promotionsSaving
 
   const resolvePromotionTypeLabel = useCallback(
@@ -695,6 +738,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       showStatus('Заполните название акции.', true)
       return
     }
+    if (isPromotionDiscountInvalid) {
+      showStatus('Укажите размер скидки.', true)
+      return
+    }
     setPromotionsSaving(true)
     setPromotionsError('')
     const startAt = new Date()
@@ -708,6 +755,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           type: promotionDraft.type,
           title: promotionDraft.title.trim(),
           description: promotionDraft.description.trim(),
+          discountPercent:
+            promotionDraft.type === 'discount'
+              ? promotionDraft.discountPercent
+              : 0,
           startAt: startAt.toISOString(),
           endAt: endAt.toISOString(),
           status: 'active',
@@ -722,6 +773,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         }
         if (errorCode === 'duration_too_long') {
           showStatus('Максимальный срок акции — 14 дней.', true)
+          return
+        }
+        if (errorCode === 'discount_required') {
+          showStatus('Укажите размер скидки.', true)
           return
         }
         throw new Error(errorCode || 'promotion_save_failed')
@@ -744,6 +799,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     }
   }, [
     apiBase,
+    isPromotionDiscountInvalid,
     isPromotionDescriptionTooLong,
     isPromotionTitleTooLong,
     promotionDraft,
@@ -907,6 +963,42 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           </p>
         )}
 
+        <section className="pro-detail-card pro-marketing-summary animate delay-1">
+          <div className="pro-marketing-summary-grid">
+            <div className="pro-marketing-summary-item">
+              <span className="pro-marketing-summary-label">Подписчики</span>
+              <span className="pro-marketing-summary-value">
+                {marketingLoading ? '—' : botAudience ?? 0}
+              </span>
+            </div>
+            <div className="pro-marketing-summary-item">
+              <span className="pro-marketing-summary-label">Чаты</span>
+              <span className="pro-marketing-summary-value">
+                {marketingLoading ? '—' : chatAudience ?? 0}
+              </span>
+            </div>
+            <div className="pro-marketing-summary-item">
+              <span className="pro-marketing-summary-label">Повтор</span>
+              <span className="pro-marketing-summary-value">
+                {repeatEligibleLabel}
+              </span>
+            </div>
+          </div>
+          <div className="pro-marketing-summary-meta">
+            <span>
+              Акция:{' '}
+              {activePromotion
+                ? activePromotion.type === 'discount' &&
+                  typeof activePromotion.discountPercent === 'number' &&
+                  activePromotion.discountPercent > 0
+                  ? `Скидка -${activePromotion.discountPercent}%`
+                  : activePromotion.title
+                : 'нет'}
+            </span>
+            <span>Последняя отправка: {repeatLastSentLabel}</span>
+          </div>
+        </section>
+
         <div className="pro-marketing-tabbar" role="tablist">
           <button
             className={`pro-marketing-tab${activeTab === 'broadcast' ? ' is-active' : ''}`}
@@ -943,6 +1035,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               <h2>Рассылка клиентам</h2>
             </div>
             <p className="pro-detail-text">{channelHint}</p>
+            {activeDiscountPercent > 0 && (
+              <p className="pro-detail-text is-muted">
+                Активная скидка -{activeDiscountPercent}% добавится в шаблон «Акция».
+              </p>
+            )}
 
             <div
               className="pro-marketing-channel-grid"
@@ -1036,24 +1133,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               <span className={`pro-marketing-count${isTextTooLong ? ' is-error' : ''}`}>
                 {payloadLength}/{MARKETING_TEXT_LIMIT}
               </span>
-            </div>
-
-            <div className="pro-marketing-discount">
-              <span className="pro-marketing-discount-label">Скидка</span>
-              <div className="pro-marketing-chip-row" role="group" aria-label="Скидка">
-                {DISCOUNT_OPTIONS.map((value) => (
-                  <button
-                    key={`discount-${value}`}
-                    className={`pro-marketing-chip${
-                      value === discountPercent ? ' is-active' : ''
-                    }`}
-                    type="button"
-                    onClick={() => setDiscountPercent(value)}
-                  >
-                    {value === 0 ? '— без скидки' : `-${value}%`}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {!shareConfigured && (
@@ -1209,99 +1288,119 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               )}
             </div>
 
-            <div className="pro-marketing-repeat-surface">
-              <p className="pro-marketing-section">Сроки по услугам</p>
-              <div className="pro-marketing-repeat-grid">
-                {repeatCategories.map((item) => {
-                  const isCustom = Object.prototype.hasOwnProperty.call(
-                    repeatIntervalsDraft,
-                    item.id
-                  )
-                  return (
-                    <div className="pro-marketing-interval-card" key={item.id}>
-                      <div className="pro-marketing-interval-meta">
-                        <span className="pro-marketing-interval-title">
-                          {item.label}
-                        </span>
-                        <span className="pro-marketing-interval-subtitle">
-                          {isCustom ? 'Свои сроки' : 'По умолчанию'}
-                        </span>
-                      </div>
-                      <div className="pro-marketing-interval-actions">
-                        <button
-                          className="pro-marketing-interval-step"
-                          type="button"
-                          onClick={() => handleRepeatIntervalAdjust(item.id, -1)}
-                          disabled={repeatLoading || repeatSaving}
-                          aria-label={`Уменьшить срок для ${item.label}`}
-                        >
-                          −
-                        </button>
-                        <span className="pro-marketing-interval-value">
-                          {item.days} дней
-                        </span>
-                        <button
-                          className="pro-marketing-interval-step"
-                          type="button"
-                          onClick={() => handleRepeatIntervalAdjust(item.id, 1)}
-                          disabled={repeatLoading || repeatSaving}
-                          aria-label={`Увеличить срок для ${item.label}`}
-                        >
-                          +
-                        </button>
-                      </div>
-                      {isCustom && (
-                        <button
-                          className="pro-marketing-interval-reset"
-                          type="button"
-                          onClick={() => handleRepeatIntervalReset(item.id)}
-                          disabled={repeatLoading || repeatSaving}
-                        >
-                          Сбросить
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <button
+              className={`pro-marketing-disclosure${
+                repeatAdvancedOpen ? ' is-open' : ''
+              }`}
+              type="button"
+              onClick={() => setRepeatAdvancedOpen((current) => !current)}
+            >
+              Настроить сроки и текст
+            </button>
 
-            <div className="pro-marketing-repeat-surface">
-              <p className="pro-marketing-section">Сообщение</p>
-              <div className="pro-marketing-template-editor">
-                <textarea
-                  className={`pro-marketing-textarea pro-marketing-textarea--compact${
-                    isRepeatTemplateTooLong ? ' is-error' : ''
-                  }`}
-                  value={repeatTemplateValue}
-                  onChange={(event) => {
-                    setRepeatDraftInitialized(true)
-                    setRepeatTemplateDraft(event.target.value)
-                  }}
-                  placeholder="Шаблон напоминания (необязательно)"
-                  rows={4}
-                />
-                <div className="pro-marketing-template-footer">
-                  <span
-                    className={`pro-marketing-count${
-                      isRepeatTemplateTooLong ? ' is-error' : ''
-                    }`}
-                  >
-                    {repeatTemplateLength}/{MARKETING_TEXT_LIMIT}
-                  </span>
-                  <div className="pro-marketing-token-row">
-                    <span className="pro-marketing-token">{'{{category}}'}</span>
-                    <span className="pro-marketing-token">{'{{master}}'}</span>
+            {repeatAdvancedOpen && (
+              <>
+                <div className="pro-marketing-repeat-surface">
+                  <p className="pro-marketing-section">Сроки по услугам</p>
+                  <div className="pro-marketing-repeat-grid">
+                    {repeatCategories.map((item) => {
+                      const isCustom = Object.prototype.hasOwnProperty.call(
+                        repeatIntervalsDraft,
+                        item.id
+                      )
+                      return (
+                        <div className="pro-marketing-interval-card" key={item.id}>
+                          <div className="pro-marketing-interval-meta">
+                            <span className="pro-marketing-interval-title">
+                              {item.label}
+                            </span>
+                            <span className="pro-marketing-interval-subtitle">
+                              {isCustom ? 'Свои сроки' : 'По умолчанию'}
+                            </span>
+                          </div>
+                          <div className="pro-marketing-interval-actions">
+                            <button
+                              className="pro-marketing-interval-step"
+                              type="button"
+                              onClick={() =>
+                                handleRepeatIntervalAdjust(item.id, -1)
+                              }
+                              disabled={repeatLoading || repeatSaving}
+                              aria-label={`Уменьшить срок для ${item.label}`}
+                            >
+                              −
+                            </button>
+                            <span className="pro-marketing-interval-value">
+                              {item.days} дней
+                            </span>
+                            <button
+                              className="pro-marketing-interval-step"
+                              type="button"
+                              onClick={() =>
+                                handleRepeatIntervalAdjust(item.id, 1)
+                              }
+                              disabled={repeatLoading || repeatSaving}
+                              aria-label={`Увеличить срок для ${item.label}`}
+                            >
+                              +
+                            </button>
+                          </div>
+                          {isCustom && (
+                            <button
+                              className="pro-marketing-interval-reset"
+                              type="button"
+                              onClick={() => handleRepeatIntervalReset(item.id)}
+                              disabled={repeatLoading || repeatSaving}
+                            >
+                              Сбросить
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-              </div>
-              <div className="pro-marketing-preview-card">{repeatPreviewText}</div>
-              {repeatChannel === 'bot' && (
-                <p className="pro-marketing-repeat-hint">
-                  В боте добавим кнопку записи.
-                </p>
-              )}
-            </div>
+
+                <div className="pro-marketing-repeat-surface">
+                  <p className="pro-marketing-section">Сообщение</p>
+                  <div className="pro-marketing-template-editor">
+                    <textarea
+                      className={`pro-marketing-textarea pro-marketing-textarea--compact${
+                        isRepeatTemplateTooLong ? ' is-error' : ''
+                      }`}
+                      value={repeatTemplateValue}
+                      onChange={(event) => {
+                        setRepeatDraftInitialized(true)
+                        setRepeatTemplateDraft(event.target.value)
+                      }}
+                      placeholder="Шаблон напоминания (необязательно)"
+                      rows={4}
+                    />
+                    <div className="pro-marketing-template-footer">
+                      <span
+                        className={`pro-marketing-count${
+                          isRepeatTemplateTooLong ? ' is-error' : ''
+                        }`}
+                      >
+                        {repeatTemplateLength}/{MARKETING_TEXT_LIMIT}
+                      </span>
+                      <div className="pro-marketing-token-row">
+                        <span className="pro-marketing-token">{'{{category}}'}</span>
+                        <span className="pro-marketing-token">{'{{master}}'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pro-marketing-preview-card">
+                    {repeatPreviewText}
+                  </div>
+                  {repeatChannel === 'bot' && (
+                    <p className="pro-marketing-repeat-hint">
+                      В боте добавим кнопку записи.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             {repeatDraftDirty && (
               <div className="pro-detail-actions pro-detail-actions--compact">
@@ -1355,6 +1454,12 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                 {(() => {
                   const statusMeta = resolvePromotionStatus(activePromotion)
                   const dateLabel = formatShortDate(activePromotion.endAt)
+                  const discountLabel =
+                    activePromotion.type === 'discount' &&
+                    typeof activePromotion.discountPercent === 'number' &&
+                    activePromotion.discountPercent > 0
+                      ? `Скидка -${activePromotion.discountPercent}%`
+                      : ''
                   return (
                     <>
                       <div className="pro-marketing-promo-head">
@@ -1377,9 +1482,10 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                           {activePromotion.description}
                         </p>
                       )}
-                      {dateLabel && (
+                      {(dateLabel || discountLabel) && (
                         <div className="pro-marketing-promo-meta">
-                          <span>до {dateLabel}</span>
+                          {discountLabel && <span>{discountLabel}</span>}
+                          {dateLabel && <span>до {dateLabel}</span>}
                         </div>
                       )}
                       <div className="pro-detail-actions pro-detail-actions--compact">
@@ -1456,73 +1562,95 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
             {promotionHistory.length > 0 && (
               <div className="pro-marketing-promo-history">
-                <p className="pro-marketing-section">История</p>
-                <div className="pro-marketing-promo-list">
-                  {promotionHistory.map((promotion) => {
-                    const statusMeta = resolvePromotionStatus(promotion)
-                    const dateLabel = formatShortDate(promotion.endAt)
-                    return (
-                      <div className="pro-marketing-promo-card is-compact" key={promotion.id}>
-                        <div className="pro-marketing-promo-head">
-                          <div className="pro-marketing-promo-title-wrap">
-                            <span
-                              className={`pro-marketing-promo-status ${statusMeta.tone}`}
-                            >
-                              {statusMeta.label}
-                            </span>
-                            <span className="pro-marketing-promo-title">
-                              {promotion.title}
+                <button
+                  className={`pro-marketing-disclosure${
+                    promotionHistoryOpen ? ' is-open' : ''
+                  }`}
+                  type="button"
+                  onClick={() => setPromotionHistoryOpen((current) => !current)}
+                >
+                  История
+                </button>
+                {promotionHistoryOpen && (
+                  <div className="pro-marketing-promo-list">
+                    {promotionHistory.map((promotion) => {
+                      const statusMeta = resolvePromotionStatus(promotion)
+                      const dateLabel = formatShortDate(promotion.endAt)
+                      const discountLabel =
+                        promotion.type === 'discount' &&
+                        typeof promotion.discountPercent === 'number' &&
+                        promotion.discountPercent > 0
+                          ? `Скидка -${promotion.discountPercent}%`
+                          : ''
+                      return (
+                        <div
+                          className="pro-marketing-promo-card is-compact"
+                          key={promotion.id}
+                        >
+                          <div className="pro-marketing-promo-head">
+                            <div className="pro-marketing-promo-title-wrap">
+                              <span
+                                className={`pro-marketing-promo-status ${statusMeta.tone}`}
+                              >
+                                {statusMeta.label}
+                              </span>
+                              <span className="pro-marketing-promo-title">
+                                {promotion.title}
+                              </span>
+                            </div>
+                            <span className="pro-marketing-promo-type">
+                              {resolvePromotionTypeLabel(promotion.type)}
                             </span>
                           </div>
-                          <span className="pro-marketing-promo-type">
-                            {resolvePromotionTypeLabel(promotion.type)}
-                          </span>
-                        </div>
-                        <div className="pro-marketing-promo-meta">
-                          {dateLabel && <span>до {dateLabel}</span>}
-                        </div>
-                        <div className="pro-detail-actions pro-detail-actions--compact">
-                          {statusMeta.canResume && (
-                            <button
-                              className="pro-detail-action"
-                              type="button"
-                              onClick={() =>
-                                void handlePromotionAction(promotion.id, 'resume')
-                              }
-                              disabled={promotionsSaving}
-                            >
-                              Возобновить
-                            </button>
+                          {(dateLabel || discountLabel) && (
+                            <div className="pro-marketing-promo-meta">
+                              {discountLabel && <span>{discountLabel}</span>}
+                              {dateLabel && <span>до {dateLabel}</span>}
+                            </div>
                           )}
-                          {statusMeta.canPause && (
-                            <button
-                              className="pro-detail-action is-ghost"
-                              type="button"
-                              onClick={() =>
-                                void handlePromotionAction(promotion.id, 'pause')
-                              }
-                              disabled={promotionsSaving}
-                            >
-                              Пауза
-                            </button>
-                          )}
-                          {statusMeta.tone !== 'is-ended' && (
-                            <button
-                              className="pro-detail-action is-ghost"
-                              type="button"
-                              onClick={() =>
-                                void handlePromotionAction(promotion.id, 'archive')
-                              }
-                              disabled={promotionsSaving}
-                            >
-                              В архив
-                            </button>
-                          )}
+                          <div className="pro-detail-actions pro-detail-actions--compact">
+                            {statusMeta.canResume && (
+                              <button
+                                className="pro-detail-action"
+                                type="button"
+                                onClick={() =>
+                                  void handlePromotionAction(promotion.id, 'resume')
+                                }
+                                disabled={promotionsSaving}
+                              >
+                                Возобновить
+                              </button>
+                            )}
+                            {statusMeta.canPause && (
+                              <button
+                                className="pro-detail-action is-ghost"
+                                type="button"
+                                onClick={() =>
+                                  void handlePromotionAction(promotion.id, 'pause')
+                                }
+                                disabled={promotionsSaving}
+                              >
+                                Пауза
+                              </button>
+                            )}
+                            {statusMeta.tone !== 'is-ended' && (
+                              <button
+                                className="pro-detail-action is-ghost"
+                                type="button"
+                                onClick={() =>
+                                  void handlePromotionAction(promotion.id, 'archive')
+                                }
+                                disabled={promotionsSaving}
+                              >
+                                В архив
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1553,6 +1681,34 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                   ))}
                 </div>
               </div>
+              {promotionDraft.type === 'discount' && (
+                <div className="pro-marketing-promo-field">
+                  <span className="pro-marketing-promo-label">Скидка</span>
+                  <div
+                    className="pro-marketing-promo-chip-row"
+                    role="group"
+                    aria-label="Размер скидки"
+                  >
+                    {PROMOTION_DISCOUNT_OPTIONS.map((value) => (
+                      <button
+                        key={`promo-discount-${value}`}
+                        className={`pro-marketing-promo-chip${
+                          promotionDraft.discountPercent === value ? ' is-active' : ''
+                        }`}
+                        type="button"
+                        onClick={() =>
+                          setPromotionDraft((prev) => ({
+                            ...prev,
+                            discountPercent: value,
+                          }))
+                        }
+                      >
+                        -{value}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="pro-marketing-promo-field">
                 <span className="pro-marketing-promo-label">Название</span>

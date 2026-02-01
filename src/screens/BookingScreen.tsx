@@ -238,7 +238,11 @@ export const BookingScreen = ({
       setIsLoading(true)
       setLoadError('')
       try {
-        const response = await fetch(`${apiBase}/api/masters/${masterId}`)
+        const response = await fetch(
+          `${apiBase}/api/masters/${masterId}?userId=${encodeURIComponent(
+            userId
+          )}`
+        )
         if (!response.ok) {
           throw new Error('Load master failed')
         }
@@ -630,6 +634,20 @@ export const BookingScreen = ({
     depositPercentRaw !== null ? Math.max(0, Math.round(depositPercentRaw)) : null
   const depositFixed =
     depositFixedRaw !== null ? Math.max(0, Math.round(depositFixedRaw)) : null
+  const activeDiscountPercent =
+    profile?.activePromotion?.type === 'discount'
+      ? Math.max(0, Math.round(profile.activePromotion.discountPercent ?? 0))
+      : 0
+  const baseServicePrice =
+    typeof selectedService?.price === 'number' ? selectedService.price : null
+  const discountAmount =
+    baseServicePrice !== null && activeDiscountPercent > 0
+      ? Math.round((baseServicePrice * activeDiscountPercent) / 100)
+      : 0
+  const discountedServicePrice =
+    baseServicePrice !== null
+      ? Math.max(0, baseServicePrice - discountAmount)
+      : null
   const depositType =
     profile?.depositType === 'fixed' || profile?.depositType === 'percent'
       ? profile.depositType
@@ -640,12 +658,16 @@ export const BookingScreen = ({
           : 'none'
   const depositDetails = profile?.depositDetails?.trim() || ''
   const depositQrUrl = profile?.depositQrUrl ?? null
+  const priceForDeposit =
+    typeof discountedServicePrice === 'number'
+      ? discountedServicePrice
+      : baseServicePrice
   const depositAmount =
     depositType === 'fixed'
       ? depositFixed ?? 0
       : depositType === 'percent'
-        ? typeof selectedService?.price === 'number'
-          ? Math.round((selectedService.price * (depositPercent ?? 0)) / 100)
+        ? typeof priceForDeposit === 'number'
+          ? Math.round((priceForDeposit * (depositPercent ?? 0)) / 100)
           : depositFixed ?? 0
         : 0
   const depositAmountLabel =
@@ -701,9 +723,15 @@ export const BookingScreen = ({
   }, [safeStep])
 
   const priceLabel =
-    selectedService?.price !== null && selectedService?.price !== undefined
-      ? formatPrice(selectedService.price)
-      : null
+    typeof discountedServicePrice === 'number'
+      ? formatPrice(discountedServicePrice)
+      : typeof baseServicePrice === 'number'
+        ? formatPrice(baseServicePrice)
+        : null
+  const priceBaseLabel =
+    typeof baseServicePrice === 'number' && discountAmount > 0
+      ? formatPrice(baseServicePrice)
+      : ''
   const hasServices = serviceOptions.length > 0
   const hasCategoryChoice = availableCategoryIds.length > 1
   const hasServiceChoice = serviceOptions.length > 1
@@ -1347,6 +1375,11 @@ export const BookingScreen = ({
                       ) : (
                         <p className="booking-price is-muted">
                           Цена согласуется с мастером.
+                        </p>
+                      )}
+                      {discountAmount > 0 && priceBaseLabel && (
+                        <p className="booking-price-note">
+                          Скидка -{activeDiscountPercent}% · было {priceBaseLabel}
                         </p>
                       )}
                     </>

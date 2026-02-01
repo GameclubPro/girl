@@ -463,6 +463,14 @@ export const ChatThreadScreen = ({
         : typeof proposedPrice === 'number'
           ? `Предложена цена: ${formatPrice(proposedPrice)}`
           : null
+  const promotionDiscountLabel =
+    typeof bookingSnapshot?.promotionDiscountPercent === 'number' &&
+    bookingSnapshot.promotionDiscountPercent > 0 &&
+    typeof bookingSnapshot.promotionPriceBefore === 'number'
+      ? `Скидка -${Math.round(
+          bookingSnapshot.promotionDiscountPercent
+        )}% · было ${formatPrice(bookingSnapshot.promotionPriceBefore)}`
+      : null
   const bookingDurationLabel = formatDurationLabel(booking?.serviceDuration)
   const baseRequestDateLabel =
     request?.dateOption === 'choose'
@@ -3393,6 +3401,11 @@ export const ChatThreadScreen = ({
                             <span>Длительность: {bookingDurationLabel}</span>
                           )}
                           {bookingPriceLabel && <span>{bookingPriceLabel}</span>}
+                          {promotionDiscountLabel && (
+                            <span className="chat-active-discount">
+                              {promotionDiscountLabel}
+                            </span>
+                          )}
                         </>
                       ) : request ? (
                         <>

@@ -831,6 +831,12 @@ export const ClientMasterProfileScreen = ({
   const workFormatLabel = buildWorkFormatLabel(profile)
   const activePromotion = profile?.activePromotion ?? null
   const promotionDeadline = formatPromotionDeadline(activePromotion?.endAt ?? null)
+  const promotionDiscountLabel =
+    activePromotion?.type === 'discount' &&
+    typeof activePromotion.discountPercent === 'number' &&
+    activePromotion.discountPercent > 0
+      ? `Скидка -${activePromotion.discountPercent}%`
+      : ''
   const hasLocation = Boolean(
     profile?.cityName || profile?.districtName || distanceLabel
   )
@@ -1325,6 +1331,11 @@ export const ClientMasterProfileScreen = ({
                     <div className="master-profile-promo-title">
                       {activePromotion.title}
                     </div>
+                    {promotionDiscountLabel && (
+                      <div className="master-profile-promo-discount">
+                        {promotionDiscountLabel}
+                      </div>
+                    )}
                     {activePromotion.description && (
                       <div className="master-profile-promo-text">
                         {activePromotion.description}
