@@ -55,7 +55,7 @@ const PROMOTION_DESCRIPTION_LIMIT = 180
 const PROMOTION_MAX_DURATION_DAYS = 14
 const PROMOTION_MAX_DISCOUNT = 60
 const PROMOTION_TYPES = ['discount', 'bonus', 'slots']
-const PROMOTION_AUDIENCES = ['all', 'followers', 'clients']
+const PROMOTION_AUDIENCES = ['all', 'followers', 'clients', 'subscribers']
 const PROMOTION_STATUSES = ['active', 'paused', 'archived']
 const REPEAT_REMINDER_SCAN_INTERVAL_MS = 12 * 60 * 60 * 1000
 const REPEAT_REMINDER_BATCH_LIMIT = 200
@@ -400,6 +400,16 @@ const buildPromotionAudienceClause = ({
           AND sb.client_id = $${viewerIndex}
       )
     )
+    OR (
+      ${promotionAlias}.audience = 'subscribers'
+      AND EXISTS (
+        SELECT 1
+        FROM master_marketing_subscriptions mms
+        WHERE mms.master_id = ${masterAlias}.user_id
+          AND mms.subscriber_id = $${viewerIndex}
+          AND mms.opt_in = TRUE
+      )
+    )
   )
 `
 
@@ -442,6 +452,16 @@ const loadActivePromotionForViewer = async ({ masterId, viewerId }) => {
               FROM service_bookings sb
               WHERE sb.master_id = mpromo.master_id
                 AND sb.client_id = $2
+            )
+          )
+          OR (
+            mpromo.audience = 'subscribers'
+            AND EXISTS (
+              SELECT 1
+              FROM master_marketing_subscriptions mms
+              WHERE mms.master_id = mpromo.master_id
+                AND mms.subscriber_id = $2
+                AND mms.opt_in = TRUE
             )
           )
         )
@@ -3917,7 +3937,7 @@ const ensureSchema = async () => {
       start_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       end_at TIMESTAMPTZ NOT NULL,
       status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'archived')),
-      audience TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all', 'followers', 'clients')),
+      audience TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all', 'followers', 'clients', 'subscribers')),
       discount_percent INTEGER NOT NULL DEFAULT 0,
       max_uses INTEGER,
       uses_count INTEGER NOT NULL DEFAULT 0,
@@ -3934,6 +3954,30 @@ const ensureSchema = async () => {
   await pool.query(`
     ALTER TABLE master_promotions
     ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0;
+  `)
+
+  await pool.query(`
+    DO $$
+    DECLARE
+      constraint_name TEXT;
+    BEGIN
+      FOR constraint_name IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        WHERE t.relname = 'master_promotions'
+          AND c.contype = 'c'
+          AND pg_get_constraintdef(c.oid) ILIKE '%audience%'
+      LOOP
+        EXECUTE format('ALTER TABLE master_promotions DROP CONSTRAINT %I', constraint_name);
+      END LOOP;
+    END$$;
+  `)
+
+  await pool.query(`
+    ALTER TABLE master_promotions
+    ADD CONSTRAINT master_promotions_audience_check
+    CHECK (audience IN ('all', 'followers', 'clients', 'subscribers'));
   `)
 
   await pool.query(`
@@ -5442,6 +5486,16 @@ app.get('/api/masters/:userId/promotions', async (req, res) => {
                 SELECT 1
                 FROM service_bookings sb
                 WHERE sb.master_id = $1 AND sb.client_id = $2
+              )
+            )
+            OR (
+              audience = 'subscribers'
+              AND EXISTS (
+                SELECT 1
+                FROM master_marketing_subscriptions mms
+                WHERE mms.master_id = $1
+                  AND mms.subscriber_id = $2
+                  AND mms.opt_in = TRUE
               )
             )
           )
@@ -8872,8 +8926,136 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
   const rawLimit = parseOptionalInt(req.body?.limit)
   const limit =
     rawLimit && rawLimit > 0 ? Math.min(rawLimit, MARKETING_BROADCAST_MAX) : null
+  const promotionPayload = req.body?.promotion ?? null
+  const promotionEnabled = Boolean(
+    promotionPayload &&
+      (promotionPayload.enabled === undefined || promotionPayload.enabled === true)
+  )
+  let promotionRow = null
+  let promotionId = null
+
+  const pausePromotion = async () => {
+    if (!promotionId) return
+    try {
+      await pool.query(
+        `
+          UPDATE master_promotions
+          SET status = 'paused', updated_at = NOW()
+          WHERE id = $1 AND master_id = $2
+        `,
+        [promotionId, masterId]
+      )
+    } catch (pauseError) {
+      console.error('Failed to pause promotion after broadcast error:', pauseError)
+    }
+  }
 
   try {
+    if (promotionEnabled) {
+      const rawDiscount =
+        promotionPayload?.discountPercent ??
+        promotionPayload?.discount ??
+        promotionPayload?.percent
+      const discountPercent = normalizePromotionDiscount(rawDiscount)
+      if (rawDiscount === undefined || rawDiscount === null || discountPercent <= 0) {
+        res.status(400).json({ error: 'promotion_discount_invalid' })
+        return
+      }
+      const rawDuration = parseOptionalInt(
+        promotionPayload?.durationDays ?? promotionPayload?.duration
+      )
+      if (rawDuration !== null && rawDuration <= 0) {
+        res.status(400).json({ error: 'promotion_duration_invalid' })
+        return
+      }
+      const durationDays = rawDuration ?? 7
+      if (durationDays > PROMOTION_MAX_DURATION_DAYS) {
+        res.status(400).json({ error: 'promotion_duration_invalid' })
+        return
+      }
+
+      const eligibility = await loadPromotionEligibility(masterId)
+      if (!eligibility.ok) {
+        res.status(400).json({
+          error: 'promotion_requirements',
+          missing: {
+            avatar: !eligibility.hasAvatar,
+            portfolio: !eligibility.hasPortfolio,
+          },
+        })
+        return
+      }
+
+      const promotionAudience = channel === 'bot' ? 'subscribers' : 'clients'
+      const audienceLabel =
+        promotionAudience === 'subscribers' ? 'подписчиков' : 'клиентов'
+      const promotionTitle = normalizePromotionTitle(
+        `Скидка -${discountPercent}% для ${audienceLabel}`
+      )
+      const startAt = new Date()
+      const endAt = new Date(startAt.getTime() + durationDays * DAY_MS)
+
+      await ensureUser(masterId)
+      const insertResult = await pool.query(
+        `
+          INSERT INTO master_promotions (
+            master_id,
+            type,
+            title,
+            description,
+            start_at,
+            end_at,
+            status,
+            audience,
+            discount_percent,
+            max_uses,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          RETURNING
+            id,
+            master_id AS "masterId",
+            type,
+            title,
+            description,
+            start_at AS "startAt",
+            end_at AS "endAt",
+            status,
+            audience,
+            discount_percent AS "discountPercent",
+            max_uses AS "maxUses",
+            uses_count AS "usesCount",
+            created_at AS "createdAt",
+            updated_at AS "updatedAt"
+        `,
+        [
+          masterId,
+          'discount',
+          promotionTitle,
+          null,
+          startAt,
+          endAt,
+          'active',
+          promotionAudience,
+          discountPercent,
+          null,
+        ]
+      )
+      promotionRow = insertResult.rows[0] ?? null
+      promotionId = promotionRow?.id ? Number(promotionRow.id) : null
+
+      if (promotionRow?.status === 'active') {
+        await pool.query(
+          `
+            UPDATE master_promotions
+            SET status = 'paused', updated_at = NOW()
+            WHERE master_id = $1 AND id <> $2 AND status = 'active'
+          `,
+          [masterId, promotionRow.id]
+        )
+      }
+    }
+
     const result =
       channel === 'bot'
         ? await sendMarketingBotBroadcast({
@@ -8889,8 +9071,21 @@ app.post('/api/pro/marketing/campaigns/send', async (req, res) => {
             limit,
           })
 
-    res.json({ ok: true, stats: result })
+    if (promotionRow && result.total === 0) {
+      await pausePromotion()
+      res.status(400).json({ error: 'audience_empty' })
+      return
+    }
+
+    res.json({
+      ok: true,
+      stats: result,
+      promotion: promotionRow ? mapPromotionRow(promotionRow) : null,
+    })
   } catch (error) {
+    if (promotionRow) {
+      await pausePromotion()
+    }
     if (error?.code === 'bot_not_configured') {
       res.status(400).json({ error: 'bot_not_configured' })
       return

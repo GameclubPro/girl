@@ -112,7 +112,7 @@ export type MarketingSummary = {
 
 export type PromotionType = 'discount' | 'bonus' | 'slots'
 
-export type PromotionAudience = 'all' | 'followers' | 'clients'
+export type PromotionAudience = 'all' | 'followers' | 'clients' | 'subscribers'
 
 export type PromotionStatus = 'active' | 'paused' | 'archived'
 

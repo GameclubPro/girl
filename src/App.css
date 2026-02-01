@@ -4508,6 +4508,13 @@
   gap: 6px;
 }
 
+.pro-marketing-discount-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .pro-marketing-discount-label {
   font-size: 10px;
   font-weight: 700;

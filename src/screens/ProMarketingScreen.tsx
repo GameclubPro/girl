@@ -119,6 +119,13 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const [broadcastDraft, setBroadcastDraft] = useState('')
   const [broadcastTemplateOpen, setBroadcastTemplateOpen] = useState(false)
   const [broadcastTemplateId, setBroadcastTemplateId] = useState<string | null>(null)
+  const [broadcastDiscountEnabled, setBroadcastDiscountEnabled] = useState(false)
+  const [broadcastDiscountPercent, setBroadcastDiscountPercent] = useState(
+    PROMOTION_DISCOUNT_OPTIONS[1]
+  )
+  const [broadcastDiscountDuration, setBroadcastDiscountDuration] = useState(
+    PROMOTION_DURATION_OPTIONS[1]
+  )
   const [repeatSettings, setRepeatSettings] = useState<RepeatSettings | null>(null)
   const [repeatLoading, setRepeatLoading] = useState(true)
   const [repeatError, setRepeatError] = useState('')
@@ -325,6 +332,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       durationDays: PROMOTION_DURATION_OPTIONS[1],
       discountPercent: PROMOTION_DISCOUNT_OPTIONS[1],
     })
+    setBroadcastDiscountEnabled(false)
+    setBroadcastDiscountPercent(PROMOTION_DISCOUNT_OPTIONS[1])
+    setBroadcastDiscountDuration(PROMOTION_DURATION_OPTIONS[1])
   }, [userId])
 
   const activeDiscountPercent = useMemo(() => {
@@ -342,11 +352,15 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     return typeof value === 'number' && value > 0 ? Math.round(value) : 0
   }, [promotions])
 
+  const templateDiscountPercent = broadcastDiscountEnabled
+    ? broadcastDiscountPercent
+    : activeDiscountPercent
+
   const broadcastTemplates: Template[] = useMemo(() => {
     const slotsText = `Привет! ${masterLabel} появились свободные окна на ближайшие дни. Если хотите записаться, выберите время по кнопке ниже.`
     const promoText =
-      activeDiscountPercent > 0
-        ? `Есть приятная новость ${masterLabel}: действует скидка -${activeDiscountPercent}% на ближайшую запись. Если интересно, выберите время по кнопке ниже.`
+      templateDiscountPercent > 0
+        ? `Есть приятная новость ${masterLabel}: действует скидка -${templateDiscountPercent}% на ближайшую запись. Если интересно, выберите время по кнопке ниже.`
         : `Есть приятная новость ${masterLabel}: действует спецпредложение для записи. Если интересно, выберите время по кнопке ниже.`
     const newsText = `Короткое обновление ${masterLabel}: появились новые работы и свежие идеи. Если хотите записаться, выберите время по кнопке ниже.`
 
@@ -360,11 +374,11 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       {
         id: 'promo',
         title:
-          activeDiscountPercent > 0
-            ? `Акция -${activeDiscountPercent}%`
+          templateDiscountPercent > 0
+            ? `Акция -${templateDiscountPercent}%`
             : 'Спецпредложение',
         description:
-          activeDiscountPercent > 0
+          templateDiscountPercent > 0
             ? 'Скидка по активной акции.'
             : 'Короткое предложение для записи.',
         text: promoText,
@@ -376,7 +390,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
         text: newsText,
       },
     ]
-  }, [activeDiscountPercent, masterLabel])
+  }, [masterLabel, templateDiscountPercent])
 
   const includeLinkEnabled = Boolean(shareLink)
   const includeUnsubscribeEnabled = true
@@ -399,12 +413,26 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   const broadcastChannelCount = broadcastChannel === 'bot' ? botAudience : chatAudience
   const broadcastHasAudience =
     typeof broadcastChannelCount !== 'number' || broadcastChannelCount > 0
-  const canSend = Boolean(payloadText) && !isTextTooLong && !isSending && broadcastHasAudience
+  const isBroadcastDiscountInvalid =
+    broadcastDiscountEnabled && broadcastDiscountPercent <= 0
+  const canSend =
+    Boolean(payloadText) &&
+    !isTextTooLong &&
+    !isSending &&
+    broadcastHasAudience &&
+    !isBroadcastDiscountInvalid
 
   const channelHint =
     broadcastChannel === 'bot'
       ? 'Сообщение уйдет подписчикам рассылки через бот.'
       : 'Сообщение появится в активных чатах с клиентами.'
+  const broadcastAudienceLabel =
+    broadcastChannel === 'bot' ? 'подписчиков' : 'клиентов'
+  const broadcastDiscountNote = broadcastDiscountEnabled
+    ? `Скидка -${broadcastDiscountPercent}% для ${broadcastAudienceLabel} на ${broadcastDiscountDuration} дн.`
+    : activeDiscountPercent > 0
+      ? `Активная скидка -${activeDiscountPercent}% добавится в шаблон «Акция».`
+      : ''
 
   const selectedBroadcastTemplate = broadcastTemplateId
     ? broadcastTemplates.find((template) => template.id === broadcastTemplateId)
@@ -597,6 +625,12 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           text: payloadText,
           includeLink: broadcastChannel === 'bot' && includeLinkEnabled,
           includeUnsubscribe: broadcastChannel === 'bot' && includeUnsubscribeEnabled,
+          promotion: broadcastDiscountEnabled
+            ? {
+                discountPercent: broadcastDiscountPercent,
+                durationDays: broadcastDiscountDuration,
+              }
+            : null,
         }),
       })
 
@@ -610,6 +644,22 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
           showStatus('Текст длиннее лимита.', true)
           return
         }
+        if (data?.error === 'promotion_requirements') {
+          showStatus('Нужны аватар и минимум 1 работа в портфолио.', true)
+          return
+        }
+        if (data?.error === 'promotion_discount_invalid') {
+          showStatus('Укажите корректную скидку.', true)
+          return
+        }
+        if (data?.error === 'promotion_duration_invalid') {
+          showStatus('Срок скидки должен быть от 1 до 14 дней.', true)
+          return
+        }
+        if (data?.error === 'audience_empty') {
+          showStatus('Нет получателей для рассылки.', true)
+          return
+        }
         showStatus('Не удалось отправить рассылку.', true)
         return
       }
@@ -617,6 +667,19 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
       const sent = Number(data?.stats?.sent) || 0
       const total = Number(data?.stats?.total) || 0
       showStatus(`Рассылка отправлена: ${sent}/${total}.`)
+      const createdPromotion = data?.promotion as Promotion | null
+      if (createdPromotion?.id) {
+        setPromotions((prev) => {
+          const rest = prev
+            .filter((item) => item.id !== createdPromotion.id)
+            .map((item) =>
+              createdPromotion.status === 'active' && item.status === 'active'
+                ? { ...item, status: 'paused' as const }
+                : item
+            )
+          return [createdPromotion, ...rest]
+        })
+      }
     } catch (error) {
       showStatus('Не удалось отправить рассылку.', true)
     } finally {
@@ -625,6 +688,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
   }, [
     apiBase,
     broadcastChannel,
+    broadcastDiscountDuration,
+    broadcastDiscountEnabled,
+    broadcastDiscountPercent,
     includeLinkEnabled,
     includeUnsubscribeEnabled,
     isTextTooLong,
@@ -1035,12 +1101,6 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
               <h2>Рассылка клиентам</h2>
             </div>
             <p className="pro-detail-text">{channelHint}</p>
-            {activeDiscountPercent > 0 && (
-              <p className="pro-detail-text is-muted">
-                Активная скидка -{activeDiscountPercent}% добавится в шаблон «Акция».
-              </p>
-            )}
-
             <div
               className="pro-marketing-channel-grid"
               role="group"
@@ -1072,6 +1132,75 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
                     : `Активных чатов: ${chatAudience ?? 0}`}
                 </span>
               </button>
+            </div>
+
+            <div className="pro-marketing-discount">
+              <div className="pro-marketing-discount-head">
+                <span className="pro-marketing-promo-label">Скидка в рассылке</span>
+                <button
+                  className={`pro-marketing-auto-toggle${
+                    broadcastDiscountEnabled ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  onClick={() =>
+                    setBroadcastDiscountEnabled((current) => !current)
+                  }
+                  aria-pressed={broadcastDiscountEnabled}
+                  disabled={isSending}
+                >
+                  <span className="pro-marketing-auto-toggle-text">
+                    {broadcastDiscountEnabled ? 'Вкл' : 'Выкл'}
+                  </span>
+                </button>
+              </div>
+              {broadcastDiscountEnabled && (
+                <>
+                  <div
+                    className="pro-marketing-promo-chip-row"
+                    role="group"
+                    aria-label="Размер скидки"
+                  >
+                    {PROMOTION_DISCOUNT_OPTIONS.map((value) => (
+                      <button
+                        key={`broadcast-discount-${value}`}
+                        className={`pro-marketing-promo-chip${
+                          broadcastDiscountPercent === value ? ' is-active' : ''
+                        }`}
+                        type="button"
+                        onClick={() => setBroadcastDiscountPercent(value)}
+                      >
+                        -{value}%
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    className="pro-marketing-promo-chip-row"
+                    role="group"
+                    aria-label="Срок скидки"
+                  >
+                    {PROMOTION_DURATION_OPTIONS.map((value) => (
+                      <button
+                        key={`broadcast-discount-duration-${value}`}
+                        className={`pro-marketing-promo-chip${
+                          broadcastDiscountDuration === value ? ' is-active' : ''
+                        }`}
+                        type="button"
+                        onClick={() => setBroadcastDiscountDuration(value)}
+                      >
+                        {value} дн.
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {broadcastDiscountNote && (
+                <p className="pro-detail-text is-muted">{broadcastDiscountNote}</p>
+              )}
+              {broadcastDiscountEnabled && activePromotion && (
+                <p className="pro-detail-text is-muted">
+                  Новая скидка поставит текущую акцию на паузу.
+                </p>
+              )}
             </div>
 
             <div className="pro-marketing-textarea-wrap">
