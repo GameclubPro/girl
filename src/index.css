@@ -6,6 +6,7 @@
   --font-popular: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
   --ink: #1a1f2b;
   --ink-rgb: 26, 31, 43;
+  --ink-deep: #0b0f19;
   --muted: #5c6370;
   --muted-rgb: 92, 99, 112;
   --cream: #f5f7fa;
@@ -18,6 +19,16 @@
   --accent: #2b66f6;
   --accent-rgb: 43, 102, 246;
   --accent-strong: #2356d1;
+  --accent-2: color-mix(in srgb, var(--accent) 72%, var(--paper));
+  --accent-3: color-mix(in srgb, var(--accent) 38%, var(--paper));
+  --accent-tint-04: color-mix(in srgb, var(--accent) 4%, var(--paper));
+  --accent-tint-06: color-mix(in srgb, var(--accent) 6%, var(--paper));
+  --accent-tint-08: color-mix(in srgb, var(--accent) 8%, var(--paper));
+  --accent-tint-10: color-mix(in srgb, var(--accent) 10%, var(--paper));
+  --accent-tint-12: color-mix(in srgb, var(--accent) 12%, var(--paper));
+  --accent-tint-16: color-mix(in srgb, var(--accent) 16%, var(--paper));
+  --accent-tint-24: color-mix(in srgb, var(--accent) 24%, var(--paper));
+  --accent-tint-28: color-mix(in srgb, var(--accent) 28%, var(--paper));
   --accent-soft: rgba(var(--accent-rgb), 0.18);
   --lavender: var(--ink);
   --sun: var(--ink);
@@ -26,6 +37,9 @@
   --sapphire-soft: var(--accent-soft);
   --raspberry: #21b3a6;
   --raspberry-rgb: 33, 179, 166;
+  --raspberry-tint-08: color-mix(in srgb, var(--raspberry) 8%, var(--paper));
+  --raspberry-tint-12: color-mix(in srgb, var(--raspberry) 12%, var(--paper));
+  --raspberry-tint-16: color-mix(in srgb, var(--raspberry) 16%, var(--paper));
   --raspberry-soft: rgba(var(--raspberry-rgb), 0.12);
   --border: #e6e9ef;
   --shadow-rgb: 26, 31, 43;
@@ -35,33 +49,39 @@
   --warning-rgb: 216, 139, 44;
   --danger: #d94b4b;
   --danger-rgb: 217, 75, 75;
+  --danger-tint-20: color-mix(in srgb, var(--danger) 20%, var(--paper));
   --metal-bg: linear-gradient(
     135deg,
-    #ffffff 0%,
-    #e9edf4 45%,
-    #f7f9fc 70%,
-    #dde3ee 100%
+    var(--paper) 0%,
+    var(--surface-muted) 45%,
+    var(--accent-tint-04) 70%,
+    var(--border) 100%
   );
   --metal-border: rgba(var(--ink-rgb), 0.18);
   --metal-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.16);
-  --metal-inset: inset 0 1px 0 rgba(255, 255, 255, 0.85),
+  --metal-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.85),
     inset 0 -1px 0 rgba(0, 0, 0, 0.06);
   --metal-text: var(--ink);
   --metal-active-bg: linear-gradient(
     135deg,
-    #f0f4ff 0%,
-    #dfe8ff 50%,
-    #edf2ff 100%
+    var(--accent-tint-08) 0%,
+    var(--accent-tint-16) 50%,
+    var(--accent-tint-12) 100%
   );
   --metal-active-border: rgba(var(--accent-rgb), 0.4);
   --metal-active-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.85);
   --metal-active-text: var(--accent-strong);
-  --metal-primary-bg: linear-gradient(135deg, #2356d1 0%, #5c86ff 50%, #2b66f6 100%);
+  --metal-primary-bg: linear-gradient(
+    135deg,
+    var(--accent-strong) 0%,
+    var(--accent-2) 50%,
+    var(--accent) 100%
+  );
   --metal-primary-border: rgba(var(--accent-rgb), 0.6);
   --metal-primary-shadow: 0 14px 24px rgba(var(--accent-rgb), 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  --metal-primary-text: #ffffff;
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.35);
+  --metal-primary-text: var(--paper);
   --safe-top: max(
     env(safe-area-inset-top, 0px),
     var(--tg-safe-area-inset-top, 0px),
