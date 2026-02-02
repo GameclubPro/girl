@@ -4,60 +4,60 @@
   font-family: 'Manrope', 'Segoe UI', sans-serif;
   --font-title: 'Sora', 'Segoe UI', sans-serif;
   --font-popular: 'Sora', 'Manrope', 'Segoe UI', sans-serif;
-  --ink: #0f172a;
-  --ink-rgb: 15, 23, 42;
-  --muted: #4c5a73;
-  --muted-rgb: 76, 90, 115;
-  --cream: #eef1f6;
+  --ink: #1a1f2b;
+  --ink-rgb: 26, 31, 43;
+  --muted: #5c6370;
+  --muted-rgb: 92, 99, 112;
+  --cream: #f5f7fa;
   --paper: #ffffff;
   --paper-rgb: 255, 255, 255;
-  --surface: #f4f6fb;
-  --surface-rgb: 244, 246, 251;
-  --surface-muted: #eef2f8;
-  --surface-muted-rgb: 238, 242, 248;
-  --accent: #0777d7;
-  --accent-rgb: 7, 119, 215;
-  --accent-strong: #0463b2;
+  --surface: #ffffff;
+  --surface-rgb: 255, 255, 255;
+  --surface-muted: #f0f2f6;
+  --surface-muted-rgb: 240, 242, 246;
+  --accent: #2b66f6;
+  --accent-rgb: 43, 102, 246;
+  --accent-strong: #2356d1;
   --accent-soft: rgba(var(--accent-rgb), 0.18);
   --lavender: var(--ink);
   --sun: var(--ink);
   --sapphire: var(--accent);
   --sapphire-dark: var(--accent-strong);
   --sapphire-soft: var(--accent-soft);
-  --raspberry: #4fa0e6;
-  --raspberry-rgb: 79, 160, 230;
+  --raspberry: #21b3a6;
+  --raspberry-rgb: 33, 179, 166;
   --raspberry-soft: rgba(var(--raspberry-rgb), 0.12);
-  --border: rgba(15, 23, 42, 0.12);
-  --shadow-rgb: 15, 23, 42;
-  --success: #1f7a4d;
-  --success-rgb: 31, 122, 77;
-  --warning: #b86a00;
-  --warning-rgb: 184, 106, 0;
-  --danger: #b44b4b;
-  --danger-rgb: 180, 75, 75;
+  --border: #e6e9ef;
+  --shadow-rgb: 26, 31, 43;
+  --success: #1f9d6a;
+  --success-rgb: 31, 157, 106;
+  --warning: #d88b2c;
+  --warning-rgb: 216, 139, 44;
+  --danger: #d94b4b;
+  --danger-rgb: 217, 75, 75;
   --metal-bg: linear-gradient(
     135deg,
-    #fefefe 0%,
-    #d6dde7 45%,
+    #ffffff 0%,
+    #e9edf4 45%,
     #f7f9fc 70%,
-    #cfd6e2 100%
+    #dde3ee 100%
   );
-  --metal-border: rgba(var(--ink-rgb), 0.22);
+  --metal-border: rgba(var(--ink-rgb), 0.18);
   --metal-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.16);
   --metal-inset: inset 0 1px 0 rgba(255, 255, 255, 0.85),
     inset 0 -1px 0 rgba(0, 0, 0, 0.06);
   --metal-text: var(--ink);
   --metal-active-bg: linear-gradient(
     135deg,
-    #f4f9ff 0%,
-    #d7e4f4 50%,
-    #f0f6ff 100%
+    #f0f4ff 0%,
+    #dfe8ff 50%,
+    #edf2ff 100%
   );
-  --metal-active-border: rgba(var(--accent-rgb), 0.45);
+  --metal-active-border: rgba(var(--accent-rgb), 0.4);
   --metal-active-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
   --metal-active-text: var(--accent-strong);
-  --metal-primary-bg: linear-gradient(135deg, #0b66b5 0%, #5aa9ef 50%, #0b66b5 100%);
+  --metal-primary-bg: linear-gradient(135deg, #2356d1 0%, #5c86ff 50%, #2b66f6 100%);
   --metal-primary-border: rgba(var(--accent-rgb), 0.6);
   --metal-primary-shadow: 0 14px 24px rgba(var(--accent-rgb), 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.35);

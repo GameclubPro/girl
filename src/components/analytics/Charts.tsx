@@ -260,7 +260,13 @@ export const BarChart = ({ data, height = 160 }: BarChartProps) => {
           width="180%"
           height="180%"
         >
-          <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#0b1220" floodOpacity="0.12" />
+          <feDropShadow
+            dx="0"
+            dy="6"
+            stdDeviation="6"
+            floodColor="rgb(var(--shadow-rgb))"
+            floodOpacity="0.12"
+          />
         </filter>
       </defs>
       <g className="chart-grid">
@@ -347,7 +353,13 @@ export const DonutChart = ({
           width="180%"
           height="180%"
         >
-          <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#0b1220" floodOpacity="0.16" />
+          <feDropShadow
+            dx="0"
+            dy="3"
+            stdDeviation="4"
+            floodColor="rgb(var(--shadow-rgb))"
+            floodOpacity="0.16"
+          />
         </filter>
         <radialGradient id={`${chartId}-donut-center`} cx="50%" cy="35%" r="70%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.98" />
@@ -455,7 +467,13 @@ export const BubbleChart = ({ data, height = 170 }: BubbleChartProps) => {
           width="180%"
           height="180%"
         >
-          <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#0b1220" floodOpacity="0.16" />
+          <feDropShadow
+            dx="0"
+            dy="6"
+            stdDeviation="6"
+            floodColor="rgb(var(--shadow-rgb))"
+            floodOpacity="0.16"
+          />
         </filter>
       </defs>
       <g className="chart-grid">
@@ -581,7 +599,13 @@ export const WaterfallChart = ({ data, height = 170 }: WaterfallChartProps) => {
           width="180%"
           height="180%"
         >
-          <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#0b1220" floodOpacity="0.12" />
+          <feDropShadow
+            dx="0"
+            dy="6"
+            stdDeviation="6"
+            floodColor="rgb(var(--shadow-rgb))"
+            floodOpacity="0.12"
+          />
         </filter>
       </defs>
       <g className="chart-grid">
