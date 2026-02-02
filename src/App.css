@@ -16600,7 +16600,7 @@
 
 .pro-slots-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   padding-right: 0;
 }
@@ -16695,6 +16695,10 @@
   text-align: left;
   color: inherit;
   font: inherit;
+}
+
+.pro-slot-toggle.is-static {
+  cursor: default;
 }
 
 .pro-slot-toggle:focus-visible {

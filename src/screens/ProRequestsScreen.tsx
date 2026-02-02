@@ -721,7 +721,6 @@ export const ProRequestsScreen = ({
   const [rescheduleBookingId, setRescheduleBookingId] = useState<number | null>(
     null
   )
-  const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null)
   const [slotDetailsId, setSlotDetailsId] = useState<string | null>(null)
   const [isPasteSlotsOpen, setIsPasteSlotsOpen] = useState(false)
   const [pasteInput, setPasteInput] = useState('')
@@ -1963,7 +1962,6 @@ export const ProRequestsScreen = ({
     setSelectedDate(date)
     setCalendarInitialized(true)
     setSlotConfirm(null)
-    setExpandedSlotId(null)
     setSlotDetailsId(null)
     if (options?.scroll === false) return
     scrollToSlots()
@@ -1974,7 +1972,6 @@ export const ProRequestsScreen = ({
     setSelectedDate((current) => addDays(current, direction * CALENDAR_RANGE_DAYS))
     setCalendarInitialized(true)
     setSlotConfirm(null)
-    setExpandedSlotId(null)
     setSlotDetailsId(null)
   }
 
@@ -1992,18 +1989,12 @@ export const ProRequestsScreen = ({
   )
 
   const toggleSlotExpand = (slot: SlotView) => {
-    if (slot.booking) {
-      setExpandedSlotId(null)
-      setSlotConfirm(null)
-      setSlotDetailsId((current) => (current === slot.id ? null : slot.id))
-      if (slotDetailsId !== slot.id) {
-        hapticSelection()
-      }
-      return
-    }
-    setSlotDetailsId(null)
-    setExpandedSlotId((current) => (current === slot.id ? null : slot.id))
+    if (!slot.booking) return
     setSlotConfirm(null)
+    setSlotDetailsId((current) => (current === slot.id ? null : slot.id))
+    if (slotDetailsId !== slot.id) {
+      hapticSelection()
+    }
   }
 
   const focusPendingBooking = useCallback(
@@ -2027,7 +2018,6 @@ export const ProRequestsScreen = ({
     setWeekStartDate(startOfWeek(date))
     setCalendarInitialized(true)
     setSlotConfirm(null)
-    setExpandedSlotId(null)
     setSlotDetailsId(`booking-${booking.id}`)
     setFocusedBookingId(booking.id)
     requestAnimationFrame(() => {
@@ -4205,19 +4195,14 @@ export const ProRequestsScreen = ({
                         const isSlotConfirmTarget =
                           slotConfirm?.type !== 'cancel-booking' &&
                           slotConfirm?.slotId === slot.id
-                        const isDetailsOpen = Boolean(booking) && slotDetails?.id === slot.id
-                        const isExpanded = booking
-                          ? isDetailsOpen
-                          : expandedSlotId === slot.id || isSlotConfirmTarget
-                        const isWide = isSlotConfirmTarget || (!booking && isExpanded)
-                        const detailsId = booking ? 'pro-slot-details-sheet' : undefined
-                        const toggleLabel = booking
-                          ? isDetailsOpen
-                            ? 'Скрыть карточку записи'
-                            : 'Открыть карточку записи'
-                          : isExpanded
-                            ? 'Скрыть действия'
-                            : 'Показать действия'
+                        const isBookingSlot = Boolean(booking)
+                        const isDetailsOpen = isBookingSlot && slotDetails?.id === slot.id
+                        const isExpanded = isDetailsOpen
+                        const isWide = isSlotConfirmTarget
+                        const detailsId = isBookingSlot ? 'pro-slot-details-sheet' : undefined
+                        const toggleLabel = isDetailsOpen
+                          ? 'Скрыть карточку записи'
+                          : 'Открыть карточку записи'
                         return (
                           <div
                             className={`pro-slot-card${
@@ -4228,30 +4213,43 @@ export const ProRequestsScreen = ({
                             <div className="pro-slot-row">
                               <div className="pro-slot-body">
                                 <div className="pro-slot-top">
-                                  <button
-                                    className="pro-slot-toggle"
-                                    type="button"
-                                    aria-expanded={isExpanded}
-                                    aria-controls={detailsId}
-                                    aria-label={toggleLabel}
-                                    onClick={() => toggleSlotExpand(slot)}
-                                  >
-                                    <span className="pro-slot-time">{timeLabel}</span>
-                                    <span
-                                      className={`pro-slot-status is-${slot.status}`}
-                                      aria-label={statusLabelFull}
-                                      title={statusLabelFull}
+                                  {isBookingSlot ? (
+                                    <button
+                                      className="pro-slot-toggle"
+                                      type="button"
+                                      aria-expanded={isExpanded}
+                                      aria-controls={detailsId}
+                                      aria-label={toggleLabel}
+                                      onClick={() => toggleSlotExpand(slot)}
                                     >
-                                      {statusLabel}
-                                    </span>
-                                    <span
-                                      className="pro-slot-toggle-icon"
-                                      aria-hidden="true"
-                                    >
-                                      <IconChevron />
-                                    </span>
-                                  </button>
-                                  {isExpanded && !isSlotConfirmTarget && !booking && (
+                                      <span className="pro-slot-time">{timeLabel}</span>
+                                      <span
+                                        className={`pro-slot-status is-${slot.status}`}
+                                        aria-label={statusLabelFull}
+                                        title={statusLabelFull}
+                                      >
+                                        {statusLabel}
+                                      </span>
+                                      <span
+                                        className="pro-slot-toggle-icon"
+                                        aria-hidden="true"
+                                      >
+                                        <IconChevron />
+                                      </span>
+                                    </button>
+                                  ) : (
+                                    <div className="pro-slot-toggle is-static">
+                                      <span className="pro-slot-time">{timeLabel}</span>
+                                      <span
+                                        className={`pro-slot-status is-${slot.status}`}
+                                        aria-label={statusLabelFull}
+                                        title={statusLabelFull}
+                                      >
+                                        {statusLabel}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {!isSlotConfirmTarget && !isBookingSlot && (
                                     <div className="pro-slot-actions">
                                       {slot.status === 'free' && (
                                         <>
