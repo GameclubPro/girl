@@ -4131,14 +4131,6 @@ export const ProRequestsScreen = ({
                       ['booked', 'Занятые'],
                       ['closed', 'Закрытые'],
                     ] as const).map(([value, label]) => {
-                      const indexValue =
-                        value === 'free'
-                          ? slotStats.free
-                          : value === 'booked'
-                            ? slotStats.booked
-                            : value === 'closed'
-                              ? slotStats.closed
-                              : null
                       return (
                         <button
                           key={value}
@@ -4151,9 +4143,6 @@ export const ProRequestsScreen = ({
                           onClick={() => setSlotFilter(value)}
                         >
                           <span className="pro-slots-filter-label">{label}</span>
-                          {value !== 'all' && indexValue !== null && (
-                            <span className="sr-only">{indexValue}</span>
-                          )}
                         </button>
                       )
                     })}
