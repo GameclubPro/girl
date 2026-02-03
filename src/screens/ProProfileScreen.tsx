@@ -3117,7 +3117,7 @@ export const ProProfileScreen = ({
 
   return (
     <div className="screen screen--pro screen--pro-profile">
-      <div className="pro-shell pro-shell--ig pro-shell--cabinet">
+      <div className="pro-shell pro-shell--ig">
         <section className="pro-profile-hero animate delay-1">
           <div
             className={`pro-profile-ig-cover pro-profile-hero-cover is-editable${
