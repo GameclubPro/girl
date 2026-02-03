@@ -465,8 +465,11 @@
   gap: 6px;
   padding: 4px;
   border-radius: 16px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.2);
-  background: var(--surface-muted);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .request-segment-button {
@@ -493,8 +496,11 @@
   flex-wrap: wrap;
   padding: 12px;
   border-radius: 16px;
-  border: 1px dashed rgba(var(--shadow-rgb), 0.28);
-  background: var(--surface-muted);
+  border: 1px dashed var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .request-upload-input {
@@ -531,8 +537,9 @@
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  background: var(--surface-muted);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.12);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-shadow-soft);
 }
 
 .request-upload-thumb img {
@@ -577,8 +584,9 @@
   width: 54px;
   height: 54px;
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.16);
-  background: var(--surface-muted);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   color: var(--muted);
   display: inline-flex;
   align-items: center;
@@ -788,9 +796,7 @@
   --booking-accent: var(--ink);
   --booking-soft: rgba(var(--accent-rgb), 0.08);
   --request-pad-x: 16px;
-  background:
-    radial-gradient(120% 120% at 8% -10%, rgba(var(--accent-rgb), 0.12), transparent 55%),
-    linear-gradient(180deg, var(--accent-tint-08) 0%, var(--paper) 45%, var(--paper) 100%);
+  background: var(--app-bg);
 }
 
 .booking-shell {
@@ -813,15 +819,18 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--sapphire-dark);
-  background: rgba(var(--accent-rgb), 0.16);
-  border: 1px solid rgba(var(--accent-rgb), 0.28);
+  color: var(--accent-strong);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   white-space: nowrap;
 }
 
 .screen--booking .request-progress {
   height: 6px;
-  background: rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--shadow-rgb), 0.14);
 }
 
 .screen--booking .request-progress-bar {
@@ -834,9 +843,11 @@
 }
 
 .screen--booking .request-summary {
-  border-color: rgba(var(--accent-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.92);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.1);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--booking .request-summary-label {
@@ -844,24 +855,18 @@
 }
 
 .booking-card {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.98) 0%,
-    rgba(var(--paper-rgb), 0.94) 100%
-  );
-  border-color: rgba(var(--shadow-rgb), 0.12);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.1);
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
   position: relative;
   overflow: hidden;
 }
 
 .booking-master-card {
-  border-color: rgba(var(--accent-rgb), 0.18);
-  background: linear-gradient(
-    140deg,
-    rgba(var(--paper-rgb), 0.98) 0%,
-    rgba(var(--accent-rgb), 0.12) 100%
-  );
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
 }
 
 .booking-master-preview {
@@ -878,13 +883,11 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb), 0.2),
-    rgba(var(--accent-rgb), 0.4)
-  );
-  border: 2px solid rgba(var(--accent-rgb), 0.35);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.18);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   flex-shrink: 0;
 }
 
@@ -932,8 +935,8 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: rgb(var(--warning-rgb));
-  background: rgba(var(--warning-rgb), 0.14);
-  border: 1px solid rgba(var(--warning-rgb), 0.32);
+  background: rgba(var(--warning-rgb), 0.12);
+  border: 1px solid rgba(var(--warning-rgb), 0.3);
   padding: 4px 8px;
   border-radius: 999px;
   white-space: nowrap;
@@ -950,28 +953,32 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--ink);
-  background: rgba(var(--accent-rgb), 0.12);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
   padding: 4px 8px;
   border-radius: 999px;
+  box-shadow: var(--glass-inset);
 }
 
 .booking-master-rating.is-muted {
   color: var(--request-muted);
-  background: rgba(var(--shadow-rgb), 0.18);
+  background: var(--glass-bg-soft);
 }
 
 .booking-master-reviews-count {
   font-size: 11px;
   font-weight: 700;
   color: var(--ink);
-  background: rgba(var(--accent-rgb), 0.12);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
   padding: 4px 8px;
   border-radius: 999px;
+  box-shadow: var(--glass-inset);
 }
 
 .booking-master-reviews-count.is-muted {
   color: var(--request-muted);
-  background: rgba(var(--shadow-rgb), 0.18);
+  background: var(--glass-bg-soft);
 }
 
 .booking-master-meta {
@@ -1031,9 +1038,11 @@
 
 .booking-review-card {
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  background: rgba(var(--surface-rgb), 0.95);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   padding: 8px 10px;
   display: grid;
   gap: 4px;
@@ -1055,10 +1064,12 @@
 .booking-review-rating {
   font-size: 11px;
   font-weight: 700;
-  color: var(--sapphire-dark);
-  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
   padding: 2px 6px;
   border-radius: 999px;
+  box-shadow: var(--glass-inset);
 }
 
 .booking-review-text {
@@ -1086,8 +1097,11 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 16px;
-  border: 1px dashed rgba(var(--shadow-rgb), 0.22);
-  background: rgba(var(--surface-muted-rgb), 0.85);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .booking-summary-label {
@@ -1135,9 +1149,11 @@
 .booking-policy-item {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(var(--accent-rgb), 0.08);
-  border: 1px solid rgba(var(--accent-rgb), 0.18);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1164,8 +1180,9 @@
   color: var(--muted);
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(var(--accent-rgb), 0.16);
-  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
 }
 
 .booking-step-hint {
@@ -1182,11 +1199,14 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.2);
-  background: rgba(var(--surface-rgb), 0.6);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
   font-size: 12px;
   font-weight: 700;
   color: var(--request-ink);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .booking-consent input {
@@ -1200,8 +1220,11 @@
   gap: 10px;
   padding: 12px;
   border-radius: 16px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: rgba(var(--surface-muted-rgb), 0.72);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .booking-deposit-row {
@@ -1222,10 +1245,11 @@
   padding: 6px 12px;
   font-size: 11px;
   font-weight: 700;
-  border: 1px solid rgba(var(--shadow-rgb), 0.16);
-  background: rgba(var(--paper-rgb), 0.9);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
   color: var(--request-ink);
   cursor: pointer;
+  box-shadow: var(--glass-inset);
 }
 
 .booking-deposit-details {
@@ -1276,8 +1300,8 @@
 .booking-deposit-qr img {
   width: min(200px, 100%);
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: var(--paper);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
   padding: 6px;
 }
 
@@ -1289,8 +1313,8 @@
 .booking-deposit-proof img {
   width: min(220px, 100%);
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: var(--paper);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
   padding: 6px;
 }
 
@@ -1318,8 +1342,8 @@
 }
 
 .booking-day {
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.96);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
   border-radius: 18px;
   padding: 12px 14px;
   text-align: left;
@@ -1329,6 +1353,9 @@
   min-height: 64px;
   scroll-snap-align: start;
   cursor: pointer;
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .booking-day-title {
@@ -1344,11 +1371,11 @@
 }
 
 .booking-day.is-active {
-  border-color: rgba(var(--accent-rgb), 0.55);
+  border-color: rgba(var(--accent-rgb), 0.45);
   background: linear-gradient(
     135deg,
-    rgba(var(--accent-rgb), 0.9),
-    rgba(var(--accent-rgb), 0.55)
+    rgba(var(--accent-rgb), 0.95),
+    rgba(var(--accent-rgb), 0.65)
   );
   box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.24);
 }
@@ -1370,8 +1397,8 @@
 }
 
 .booking-slot {
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
-  background: rgba(var(--paper-rgb), 0.98);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
   border-radius: 999px;
   padding: 10px 8px;
   font-size: 13px;
@@ -1380,6 +1407,9 @@
   cursor: pointer;
   text-align: center;
   min-height: 40px;
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .booking-slot.is-active {
@@ -1403,8 +1433,11 @@
 .booking-photo {
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
-  background: var(--surface-muted);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   aspect-ratio: 1 / 1;
 }
 
@@ -1458,9 +1491,11 @@
 .booking-calendar-card {
   border-radius: 22px;
   padding: 12px;
-  background: rgba(var(--paper-rgb), 0.92);
-  border: 1px solid rgba(var(--paper-rgb), 0.78);
-  box-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.14);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -1473,9 +1508,9 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 120% at 0% 0%, rgba(var(--surface-muted-rgb), 0.5), transparent 55%),
-    radial-gradient(120% 120% at 100% 0%, rgba(var(--accent-rgb), 0.4), transparent 58%);
-  opacity: 0.75;
+    radial-gradient(120% 120% at 0% 0%, rgba(var(--paper-rgb), 0.55), transparent 55%),
+    radial-gradient(120% 120% at 100% 0%, rgba(var(--accent-rgb), 0.18), transparent 60%);
+  opacity: 0.7;
   pointer-events: none;
 }
 
@@ -1549,8 +1584,11 @@
 
 .booking-calendar-day {
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.1);
-  background: rgba(var(--paper-rgb), 0.96);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   padding: 6px 4px 5px;
   display: flex;
   flex-direction: column;
@@ -1576,7 +1614,7 @@
   gap: 1px;
 }
 
-.booking-calendar-day.is-today {
+.booking-calendar-day.is-today:not(.is-selected) {
   border-color: var(--metal-active-border);
   box-shadow: var(--metal-active-shadow);
 }
@@ -1664,9 +1702,12 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: rgba(var(--paper-rgb), 0.95);
-  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
   color: var(--ink);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .booking-calendar-summary-date {
@@ -1725,6 +1766,8 @@
   min-height: 28px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease,
     color 0.2s ease;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .booking-filter-chip.is-active {
@@ -1754,8 +1797,11 @@
 
 .booking-empty {
   border-radius: 16px;
-  border: 1px dashed rgba(var(--shadow-rgb), 0.16);
-  background: rgba(var(--paper-rgb), 0.92);
+  border: 1px dashed var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   padding: 12px;
   display: flex;
   flex-direction: column;

@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
 } from 'react'
-import { IconClock, IconPin, IconPhoto, IconTrash } from '../components/icons'
+import { IconPin, IconPhoto, IconTrash } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import { requestServiceCatalog } from '../data/requestData'
 import { useTelegramMainButton } from '../hooks/useTelegramMainButton'
@@ -740,6 +740,7 @@ export const BookingScreen = ({
     typeof baseServicePrice === 'number' && discountAmount > 0
       ? formatPrice(baseServicePrice)
       : ''
+  const priceSummary = priceLabel ?? 'По договоренности'
   const hasServices = serviceOptions.length > 0
   const hasCategoryChoice = availableCategoryIds.length > 1
   const hasServiceChoice = serviceOptions.length > 1
@@ -773,8 +774,15 @@ export const BookingScreen = ({
 
   const selectedCategoryLabel =
     categoryItems.find((item) => item.id === categoryId)?.label ?? 'Категория'
+  const serviceDuration =
+    typeof selectedService?.duration === 'number' && selectedService.duration > 0
+      ? selectedService.duration
+      : null
+  const serviceDurationLabel = serviceDuration ? `${serviceDuration} мин` : ''
   const serviceSummary = serviceName
-    ? `${selectedCategoryLabel} · ${serviceName}`
+    ? `${selectedCategoryLabel} · ${serviceName}${
+        serviceDurationLabel ? ` · ${serviceDurationLabel}` : ''
+      }`
     : 'Услуга не выбрана'
   const locationLabel =
     locationOptions.find((option) => option.value === locationType)?.label ??
@@ -1282,6 +1290,10 @@ export const BookingScreen = ({
                   <span className="request-summary-value">{serviceSummary}</span>
                 </div>
                 <div className="request-summary-item">
+                  <span className="request-summary-label">Стоимость</span>
+                  <span className="request-summary-value">{priceSummary}</span>
+                </div>
+                <div className="request-summary-item">
                   <span className="request-summary-label">Локация</span>
                   <span className="request-summary-value">{locationSummary}</span>
                 </div>
@@ -1465,6 +1477,11 @@ export const BookingScreen = ({
             {safeStep === 1 && (
               <section className="request-card booking-card animate delay-2">
                 <h2 className="request-card-title">Когда</h2>
+                {serviceDurationLabel && (
+                  <span className="booking-step-hint">
+                    Длительность услуги: {serviceDurationLabel}
+                  </span>
+                )}
                 {bookingError && <p className="request-helper">{bookingError}</p>}
                 {isBookingLoading && (
                   <p className="request-helper">Загружаем свободное время...</p>
@@ -1513,13 +1530,11 @@ export const BookingScreen = ({
                   </>
                 ) : (
                   !isBookingLoading && (
-                    <div className="request-select request-select--icon request-select--static">
-                      <span className="request-select-main">
-                        <span className="request-select-icon" aria-hidden="true">
-                          <IconClock />
-                        </span>
-                        Нет свободного времени
-                      </span>
+                    <div className="booking-empty">
+                      <p className="booking-empty-title">Нет свободного времени</p>
+                      <p className="booking-empty-hint">
+                        Попросите мастера открыть дополнительные слоты в чате.
+                      </p>
                     </div>
                   )
                 )}
