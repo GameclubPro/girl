@@ -16659,11 +16659,11 @@
 }
 
 .pro-slot-time {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--pro-ink);
   min-width: 0;
-  line-height: 1.1;
+  line-height: 1.2;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
@@ -16725,8 +16725,8 @@
 }
 
 .pro-slot-toggle-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -16736,8 +16736,8 @@
 }
 
 .pro-slot-toggle-icon svg {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
   transition: transform 0.2s ease, color 0.2s ease;
 }
 
@@ -16755,8 +16755,8 @@
   gap: 5px;
   border-radius: 999px;
   padding: 0 8px;
-  height: 20px;
-  font-size: 8px;
+  height: 24px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -16769,7 +16769,7 @@
 }
 
 .pro-slots-list .pro-slot-status {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.04em;
   padding: 0 8px;
   white-space: nowrap;
@@ -16856,8 +16856,8 @@
 }
 
 .pro-slot-action--icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 6px;
   display: inline-flex;
@@ -16868,8 +16868,8 @@
 }
 
 .pro-slot-action--icon svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   transition: transform 0.2s ease, filter 0.2s ease;
 }
 
