@@ -3005,23 +3005,25 @@
   --shadow-rgb: 26, 31, 43;
   --glass-bg: linear-gradient(
     160deg,
-    rgba(var(--paper-rgb), 0.78),
-    rgba(var(--paper-rgb), 0.62)
+    rgba(var(--paper-rgb), 0.86) 0%,
+    rgba(var(--paper-rgb), 0.68) 55%,
+    rgba(var(--accent-rgb), 0.08) 100%
   );
   --glass-bg-strong: linear-gradient(
     160deg,
-    rgba(var(--paper-rgb), 0.88),
-    rgba(var(--paper-rgb), 0.74)
+    rgba(var(--paper-rgb), 0.92) 0%,
+    rgba(var(--paper-rgb), 0.78) 55%,
+    rgba(var(--accent-rgb), 0.1) 100%
   );
   --glass-bg-soft: linear-gradient(
     160deg,
-    rgba(var(--paper-rgb), 0.64),
-    rgba(var(--paper-rgb), 0.5)
+    rgba(var(--paper-rgb), 0.72),
+    rgba(var(--paper-rgb), 0.56)
   );
-  --glass-border: rgba(15, 23, 42, 0.1);
-  --glass-stroke: rgba(var(--paper-rgb), 0.6);
-  --glass-shadow: 0 20px 32px rgba(15, 23, 42, 0.14);
-  --glass-shadow-soft: 0 12px 20px rgba(15, 23, 42, 0.1);
+  --glass-border: rgba(15, 23, 42, 0.16);
+  --glass-stroke: rgba(var(--paper-rgb), 0.75);
+  --glass-shadow: 0 20px 34px rgba(15, 23, 42, 0.18);
+  --glass-shadow-soft: 0 12px 22px rgba(15, 23, 42, 0.14);
   --glass-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.7),
     inset 0 -1px 0 rgba(var(--paper-rgb), 0.35);
   --glass-blur: 12px;
@@ -3037,21 +3039,21 @@
   --portfolio-muted-surface: rgba(var(--surface-muted-rgb), 0.68);
   background:
     radial-gradient(
-      160% 140% at 12% -12%,
-      rgba(var(--accent-rgb), 0.18),
+      150% 140% at 10% -12%,
+      rgba(var(--accent-rgb), 0.28),
+      transparent 58%
+    ),
+    radial-gradient(
+      160% 130% at 100% 0%,
+      rgba(var(--raspberry-rgb), 0.2),
       transparent 60%
     ),
     radial-gradient(
-      120% 120% at 90% 0%,
-      rgba(var(--paper-rgb), 0.8),
-      transparent 55%
+      140% 140% at 50% 120%,
+      rgba(var(--paper-rgb), 0.85),
+      transparent 60%
     ),
-    radial-gradient(
-      140% 140% at 80% 90%,
-      rgba(var(--accent-rgb), 0.12),
-      transparent 65%
-    ),
-    linear-gradient(180deg, var(--surface) 0%, #eef2f8 55%, #f9fbff 100%);
+    linear-gradient(180deg, #eef3fb 0%, #f7f9ff 60%, #ffffff 100%);
 }
 
 .screen--pro::before {
@@ -3060,6 +3062,25 @@
   inset: 0;
   background-image: none;
   opacity: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.screen--pro-profile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(120% 120% at 12% 10%, rgba(var(--paper-rgb), 0.6), transparent 55%),
+    radial-gradient(120% 120% at 88% 12%, rgba(var(--paper-rgb), 0.5), transparent 55%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(var(--paper-rgb), 0.32) 0px,
+      rgba(var(--paper-rgb), 0.32) 1px,
+      rgba(var(--paper-rgb), 0) 1px,
+      rgba(var(--paper-rgb), 0) 4px
+    );
+  opacity: 0.35;
   z-index: 0;
   pointer-events: none;
 }
@@ -29983,7 +30004,7 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-fact-card {
-  background: rgba(var(--paper-rgb), 0.7);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
   backdrop-filter: var(--glass-frost-soft);
@@ -30010,7 +30031,7 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-certificate-card {
-  background: rgba(var(--paper-rgb), 0.72);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
   backdrop-filter: var(--glass-frost-soft);
@@ -30036,14 +30057,14 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel-count {
-  background: rgba(var(--paper-rgb), 0.75);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
   color: var(--pro-muted);
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel-nav {
-  background: rgba(var(--paper-rgb), 0.62);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
 }
@@ -30055,7 +30076,7 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-portfolio-item {
-  background: rgba(var(--paper-rgb), 0.68);
+  background: var(--glass-bg-soft);
   border: 1px solid rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
   backdrop-filter: var(--glass-frost-soft);
@@ -30088,7 +30109,7 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-schedule-info {
-  background: rgba(var(--paper-rgb), 0.72);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   color: var(--pro-ink);
   box-shadow: var(--glass-inset);
@@ -30147,13 +30168,13 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-reviews-count-pill {
-  background: rgba(var(--paper-rgb), 0.75);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
 }
 
 .screen--pro-profile .pro-profile-reviews-summary {
-  background: rgba(var(--paper-rgb), 0.78);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
   backdrop-filter: var(--glass-frost-soft);
@@ -30165,7 +30186,7 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-review-card {
-  background: rgba(var(--paper-rgb), 0.7);
+  background: var(--glass-bg-soft);
   border-color: rgba(var(--shadow-rgb), 0.08);
   box-shadow: var(--glass-inset);
   backdrop-filter: var(--glass-frost-soft);
