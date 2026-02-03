@@ -9739,6 +9739,10 @@
   --pro-shell-frame-opacity: 0;
 }
 
+.pro-shell--ig::before {
+  content: none;
+}
+
 .pro-shell--hybrid {
   --pro-shell-frame-opacity: 0;
 }
