@@ -3003,29 +3003,39 @@
   --paper-rgb: 255, 255, 255;
   --raspberry-rgb: 33, 179, 166;
   --shadow-rgb: 26, 31, 43;
-  --glass-bg: linear-gradient(
-    160deg,
-    rgba(var(--paper-rgb), 0.86) 0%,
-    rgba(var(--paper-rgb), 0.68) 55%,
-    rgba(var(--accent-rgb), 0.08) 100%
-  );
-  --glass-bg-strong: linear-gradient(
-    160deg,
-    rgba(var(--paper-rgb), 0.92) 0%,
-    rgba(var(--paper-rgb), 0.78) 55%,
-    rgba(var(--accent-rgb), 0.1) 100%
-  );
-  --glass-bg-soft: linear-gradient(
-    160deg,
-    rgba(var(--paper-rgb), 0.72),
-    rgba(var(--paper-rgb), 0.56)
-  );
-  --glass-border: rgba(15, 23, 42, 0.16);
-  --glass-stroke: rgba(var(--paper-rgb), 0.75);
-  --glass-shadow: 0 20px 34px rgba(15, 23, 42, 0.18);
-  --glass-shadow-soft: 0 12px 22px rgba(15, 23, 42, 0.14);
+  --glass-bg: var(--glass-specular),
+    linear-gradient(
+      160deg,
+      rgba(var(--paper-rgb), 0.86) 0%,
+      rgba(var(--paper-rgb), 0.68) 55%,
+      rgba(var(--accent-rgb), 0.08) 100%
+    );
+  --glass-bg-strong: var(--glass-specular),
+    linear-gradient(
+      160deg,
+      rgba(var(--paper-rgb), 0.92) 0%,
+      rgba(var(--paper-rgb), 0.78) 55%,
+      rgba(var(--accent-rgb), 0.1) 100%
+    );
+  --glass-bg-soft: var(--glass-specular),
+    linear-gradient(
+      160deg,
+      rgba(var(--paper-rgb), 0.72),
+      rgba(var(--paper-rgb), 0.56)
+    );
+  --glass-border: rgba(15, 23, 42, 0.18);
+  --glass-stroke: rgba(var(--paper-rgb), 0.8);
+  --glass-shadow: 0 22px 36px rgba(15, 23, 42, 0.2);
+  --glass-shadow-soft: 0 14px 24px rgba(15, 23, 42, 0.16);
   --glass-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.7),
-    inset 0 -1px 0 rgba(var(--paper-rgb), 0.35);
+    inset 0 -1px 0 rgba(var(--paper-rgb), 0.35),
+    inset 0 0 0 1px rgba(var(--paper-rgb), 0.35);
+  --glass-specular: linear-gradient(
+    120deg,
+    rgba(var(--paper-rgb), 0.7) 0%,
+    rgba(var(--paper-rgb), 0.15) 45%,
+    rgba(var(--paper-rgb), 0.5) 100%
+  );
   --glass-blur: 12px;
   --glass-frost: blur(12px) saturate(1.08);
   --glass-frost-soft: blur(8px) saturate(1.04);
@@ -29731,7 +29741,7 @@ h2 {
   border-radius: 24px;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
 }
@@ -29828,7 +29838,7 @@ h2 {
 .screen--pro-profile .pro-profile-ig-stats {
   background: var(--glass-bg);
   border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow-soft);
+  box-shadow: var(--glass-shadow-soft), var(--glass-inset);
   backdrop-filter: var(--glass-frost-soft);
   -webkit-backdrop-filter: var(--glass-frost-soft);
 }
@@ -29985,7 +29995,7 @@ h2 {
 .screen--pro-profile .pro-profile-status-card {
   background: var(--glass-bg-strong);
   border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
 }
@@ -30029,7 +30039,7 @@ h2 {
 .screen--pro-profile .pro-profile-certificates {
   background: var(--glass-bg-strong);
   border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
 }
@@ -30050,14 +30060,15 @@ h2 {
 .screen--pro-profile .pro-profile-portfolio-panel {
   background: var(--glass-bg-strong);
   border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
   border-radius: 24px;
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel::before {
-  opacity: 0;
+  background: var(--glass-specular);
+  opacity: 0.35;
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel-count {
@@ -30100,7 +30111,7 @@ h2 {
 .screen--pro-profile .pro-profile-schedule-panel {
   background: var(--glass-bg-strong);
   border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
 }
@@ -30166,7 +30177,7 @@ h2 {
 .screen--pro-profile .pro-profile-reviews {
   background: var(--glass-bg-strong);
   border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
 }
