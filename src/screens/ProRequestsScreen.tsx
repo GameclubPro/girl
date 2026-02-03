@@ -4212,8 +4212,12 @@ export const ProRequestsScreen = ({
                           >
                             <div className="pro-slot-row">
                               <div className="pro-slot-body">
-                                <div className="pro-slot-top">
-                                  {isBookingSlot ? (
+                                <div
+                                  className={`pro-slot-top${
+                                    isBookingSlot ? ' is-booking' : ''
+                                  }`}
+                                >
+                                  {isBookingSlot && (
                                     <button
                                       className="pro-slot-toggle"
                                       type="button"
@@ -4221,36 +4225,29 @@ export const ProRequestsScreen = ({
                                       aria-controls={detailsId}
                                       aria-label={toggleLabel}
                                       onClick={() => toggleSlotExpand(slot)}
-                                    >
-                                      <span className="pro-slot-time">{timeLabel}</span>
-                                      <span
-                                        className={`pro-slot-status is-${slot.status}`}
-                                        aria-label={statusLabelFull}
-                                        title={statusLabelFull}
-                                      >
-                                        {statusLabel}
-                                      </span>
-                                      <span
-                                        className="pro-slot-toggle-icon"
-                                        aria-hidden="true"
-                                      >
-                                        <IconChevron />
-                                      </span>
-                                    </button>
-                                  ) : (
-                                    <div className="pro-slot-toggle is-static">
-                                      <span className="pro-slot-time">{timeLabel}</span>
-                                      <span
-                                        className={`pro-slot-status is-${slot.status}`}
-                                        aria-label={statusLabelFull}
-                                        title={statusLabelFull}
-                                      >
-                                        {statusLabel}
-                                      </span>
-                                    </div>
+                                    />
                                   )}
-                                  {!isSlotConfirmTarget && !isBookingSlot && (
-                                    <div className="pro-slot-actions">
+                                  <span className="pro-slot-time">{timeLabel}</span>
+                                  <span
+                                    className={`pro-slot-status is-${slot.status}`}
+                                    aria-label={statusLabelFull}
+                                    title={statusLabelFull}
+                                  >
+                                    {statusLabel}
+                                  </span>
+                                  {isBookingSlot ? (
+                                    <span
+                                      className="pro-slot-toggle-icon"
+                                      aria-hidden="true"
+                                    >
+                                      <IconChevron />
+                                    </span>
+                                  ) : (
+                                    <div
+                                      className={`pro-slot-actions${
+                                        isSlotConfirmTarget ? ' is-hidden' : ''
+                                      }`}
+                                    >
                                       {slot.status === 'free' && (
                                         <>
                                           <button
