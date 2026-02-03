@@ -16798,6 +16798,7 @@
 .pro-slot-status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   border-radius: 999px;
   padding: 0 8px;
@@ -16812,6 +16813,7 @@
   line-height: 1;
   color: var(--paper);
   justify-self: center;
+  text-align: center;
 }
 
 .pro-slots-list .pro-slot-status {
@@ -16824,12 +16826,14 @@
 
 .pro-slot-status.is-free {
   background: var(--paper);
-  color: var(--pro-ink);
-  border-color: rgba(var(--shadow-rgb), 0.18);
+  color: var(--ink);
+  border-color: rgba(var(--shadow-rgb), 0.2);
 }
 
 .pro-slot-status.is-booked {
-  background: rgba(var(--ink-rgb), 0.78);
+  background: var(--metal-primary-bg);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  color: var(--paper);
 }
 
 .pro-slot-status.is-pending {
