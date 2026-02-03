@@ -16658,29 +16658,28 @@
 }
 
 .pro-slot-time {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
   min-width: 0;
-  line-height: 1;
+  line-height: 1.1;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 999px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  background: rgba(var(--paper-rgb), 0.92);
-  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .pro-slot-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   flex: 1;
   min-width: 0;
   justify-content: center;
@@ -16700,9 +16699,11 @@
   background: transparent;
   padding: 0;
   margin: 0;
-  display: inline-flex;
+  display: grid;
   align-items: center;
-  gap: 6px;
+  column-gap: 8px;
+  row-gap: 0;
+  grid-template-columns: auto 1fr auto;
   flex: 1 1 auto;
   min-width: 0;
   cursor: pointer;
@@ -16711,6 +16712,7 @@
   font: inherit;
   flex-wrap: nowrap;
   align-items: center;
+  width: 100%;
 }
 
 .pro-slot-toggle.is-static {
@@ -16724,7 +16726,6 @@
 }
 
 .pro-slot-toggle-icon {
-  margin-left: auto;
   width: 16px;
   height: 16px;
   display: inline-flex;
@@ -16732,6 +16733,7 @@
   justify-content: center;
   color: var(--pro-muted);
   flex: 0 0 auto;
+  justify-self: end;
 }
 
 .pro-slot-toggle-icon svg {
@@ -16764,6 +16766,7 @@
   flex: 0 0 auto;
   line-height: 1;
   color: var(--paper);
+  justify-self: center;
 }
 
 .pro-slots-list .pro-slot-status {
@@ -16909,6 +16912,7 @@
 }
 
 .pro-slot-action--icon.is-danger {
+  border-color: rgba(var(--shadow-rgb), 0.14);
   background: transparent;
   box-shadow: none;
 }
