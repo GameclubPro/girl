@@ -422,7 +422,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .request-chip.is-boosted {
@@ -16779,7 +16779,7 @@
   gap: 3px;
   box-shadow: var(--glass-shadow-soft);
   min-height: 40px;
-  width: min(100%, 320px);
+  width: 100%;
   position: relative;
   overflow: hidden;
   backdrop-filter: var(--glass-frost-soft);
@@ -16789,6 +16789,14 @@
 .pro-slot-card:not(.is-open) {
   min-height: 36px;
   justify-content: center;
+}
+
+.pro-slot-card.is-free {
+  padding: 7px 12px;
+}
+
+.pro-slot-card.is-free:not(.is-open) {
+  min-height: 48px;
 }
 
 .pro-slot-row {
@@ -16916,6 +16924,15 @@
   text-align: center;
 }
 
+.pro-slot-card.is-free .pro-slot-time {
+  font-size: 15px;
+}
+
+.pro-slot-card.is-free .pro-slot-status {
+  height: 26px;
+  font-size: 10px;
+}
+
 .pro-slots-list .pro-slot-status {
   font-size: 9px;
   letter-spacing: 0.04em;
@@ -16963,6 +16980,25 @@
   justify-self: end;
   align-self: center;
   margin-left: auto;
+}
+
+.pro-slot-card.is-free .pro-slot-actions {
+  gap: 8px;
+}
+
+.pro-slot-card.is-free .pro-slot-action--icon {
+  width: 28px;
+  height: 28px;
+}
+
+.pro-slot-card.is-free .pro-slot-action--icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pro-slot-card.is-free .pro-slot-action--icon img {
+  width: 16px;
+  height: 16px;
 }
 
 .pro-slot-actions.is-hidden {

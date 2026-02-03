@@ -4238,7 +4238,7 @@ export const ProRequestsScreen = ({
                           : 'Открыть карточку записи'
                         return (
                           <div
-                            className={`pro-slot-card${
+                            className={`pro-slot-card is-${slot.status}${
                               isWide ? ' is-expanded' : ''
                             }${isExpanded ? ' is-open' : ''}`}
                             key={`${slot.id}-${timeLabel}`}
