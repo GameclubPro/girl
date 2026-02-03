@@ -1495,17 +1495,6 @@ export const ProRequestsScreen = ({
     if (!slotDetailsId) return null
     return selectedSlotViews.find((slot) => slot.id === slotDetailsId) ?? null
   }, [selectedSlotViews, slotDetailsId])
-  const slotStats = useMemo(() => {
-    let free = 0
-    let booked = 0
-    let closed = 0
-    selectedSlotViews.forEach((slot) => {
-      if (slot.status === 'free') free += 1
-      if (slot.status === 'booked' || slot.status === 'pending') booked += 1
-      if (slot.status === 'closed') closed += 1
-    })
-    return { free, booked, closed }
-  }, [selectedSlotViews])
   const slotConfirmContent = useMemo(() => {
     if (!slotConfirm) return null
     if (slotConfirm.type === 'delete') {
