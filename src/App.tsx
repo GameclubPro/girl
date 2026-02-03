@@ -883,10 +883,26 @@ function App() {
     const webApp = window.Telegram?.WebApp
     if (!webApp) return
 
-    webApp.ready()
-    webApp.expand()
-    webApp.requestFullscreen?.()
-    webApp.disableVerticalSwipes?.()
+    try {
+      webApp.ready()
+    } catch (error) {
+      console.warn('Telegram WebApp ready failed:', error)
+    }
+    try {
+      webApp.expand()
+    } catch (error) {
+      console.warn('Telegram WebApp expand failed:', error)
+    }
+    try {
+      webApp.requestFullscreen?.()
+    } catch (error) {
+      console.warn('Telegram WebApp fullscreen failed:', error)
+    }
+    try {
+      webApp.disableVerticalSwipes?.()
+    } catch (error) {
+      console.warn('Telegram WebApp disable swipes failed:', error)
+    }
   }, [view])
 
   useEffect(() => {
