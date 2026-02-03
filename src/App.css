@@ -16454,68 +16454,6 @@
   scroll-margin-top: calc(16px + var(--safe-top));
 }
 
-.pro-bookings-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.pro-bookings-summary-card {
-  border-radius: 18px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-bg-soft);
-  box-shadow: var(--glass-inset);
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.pro-bookings-summary-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
-}
-
-.pro-bookings-summary-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--pro-muted);
-}
-
-.pro-bookings-summary-value {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--pro-ink);
-}
-
-.pro-bookings-summary-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.pro-bookings-summary-pill {
-  border-radius: 999px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-bg-soft);
-  padding: 4px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--pro-ink);
-  box-shadow: var(--glass-inset);
-}
-
-.pro-bookings-summary-pill.is-warning {
-  border-color: rgba(var(--warning-rgb), 0.35);
-  background: rgba(var(--warning-rgb), 0.12);
-  color: var(--warning);
-}
 
 .pro-slots-sheet {
   width: min(520px, 100%);
@@ -16696,7 +16634,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  flex-direction: column;
+  gap: 2px;
   position: relative;
   overflow: visible;
   text-align: center;
@@ -16758,8 +16697,20 @@
   white-space: nowrap;
 }
 
+.pro-slots-filter-count {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pro-muted);
+  line-height: 1.1;
+}
+
 .pro-slots-filter.is-active {
   transform: none;
+}
+
+.pro-slots-filter.is-active .pro-slots-filter-count {
+  color: var(--accent-strong);
 }
 
 

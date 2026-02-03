@@ -1506,6 +1506,14 @@ export const ProRequestsScreen = ({
     })
     return stats
   }, [selectedSlotViews])
+  const slotFilterCounts = useMemo(
+    () => ({
+      all: selectedSlotViews.length,
+      free: slotStats.free,
+      booked: slotStats.booked + slotStats.pending,
+    }),
+    [selectedSlotViews.length, slotStats.booked, slotStats.free, slotStats.pending]
+  )
   const slotDetails = useMemo(() => {
     if (!slotDetailsId) return null
     return selectedSlotViews.find((slot) => slot.id === slotDetailsId) ?? null
@@ -4106,43 +4114,6 @@ export const ProRequestsScreen = ({
                 </div>
               </section>
 
-              <div className="pro-bookings-summary" aria-label="Сводка по дню">
-                <div className="pro-bookings-summary-card">
-                  <div className="pro-bookings-summary-item">
-                    <span className="pro-bookings-summary-label">Записей</span>
-                    <span className="pro-bookings-summary-value">
-                      {selectedBookings.length}
-                    </span>
-                  </div>
-                  <div className="pro-bookings-summary-item">
-                    <span className="pro-bookings-summary-label">Свободно</span>
-                    <span className="pro-bookings-summary-value">
-                      {slotStats.free}
-                    </span>
-                  </div>
-                  <div className="pro-bookings-summary-item">
-                    <span className="pro-bookings-summary-label">Закрыто</span>
-                    <span className="pro-bookings-summary-value">
-                      {slotStats.closed}
-                    </span>
-                  </div>
-                </div>
-                {(slotStats.pending > 0 || slotStats.booked > 0) && (
-                  <div className="pro-bookings-summary-pills">
-                    {slotStats.booked > 0 && (
-                      <span className="pro-bookings-summary-pill">
-                        Занято: {slotStats.booked}
-                      </span>
-                    )}
-                    {slotStats.pending > 0 && (
-                      <span className="pro-bookings-summary-pill is-warning">
-                        Переносов: {slotStats.pending}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
               <section
                 className="pro-slots-inline"
                 ref={slotsSectionRef}
@@ -4168,10 +4139,15 @@ export const ProRequestsScreen = ({
                   <div className="pro-slots-filters" role="tablist">
                     {([
                       ['all', 'Все'],
-                      ['free', 'Свободные'],
-                      ['booked', 'Занятые'],
-                      ['closed', 'Закрытые'],
+                      ['free', 'Свободно'],
+                      ['booked', 'Записи'],
                     ] as const).map(([value, label]) => {
+                      const count =
+                        value === 'all'
+                          ? slotFilterCounts.all
+                          : value === 'free'
+                            ? slotFilterCounts.free
+                            : slotFilterCounts.booked
                       return (
                         <button
                           key={value}
@@ -4184,6 +4160,7 @@ export const ProRequestsScreen = ({
                           onClick={() => setSlotFilter(value)}
                         >
                           <span className="pro-slots-filter-label">{label}</span>
+                          <span className="pro-slots-filter-count">{count}</span>
                         </button>
                       )
                     })}
