@@ -4151,15 +4151,8 @@ export const ProRequestsScreen = ({
                           onClick={() => setSlotFilter(value)}
                         >
                           <span className="pro-slots-filter-label">{label}</span>
-                          {value !== 'all' && (
-                            <span
-                              className={`pro-slots-filter-index${
-                                value === 'booked' ? ' is-danger' : ''
-                              }`}
-                              aria-hidden="true"
-                            >
-                              {indexValue ?? 0}
-                            </span>
+                          {value !== 'all' && indexValue !== null && (
+                            <span className="sr-only">{indexValue}</span>
                           )}
                         </button>
                       )
