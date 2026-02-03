@@ -50,27 +50,80 @@
   --danger: #d94b4b;
   --danger-rgb: 217, 75, 75;
   --danger-tint-20: color-mix(in srgb, var(--danger) 20%, var(--paper));
-  --metal-bg: linear-gradient(
-    135deg,
-    var(--paper) 0%,
-    var(--surface-muted) 45%,
-    var(--accent-tint-04) 70%,
-    var(--border) 100%
+  --app-bg: radial-gradient(
+      150% 140% at 10% -12%,
+      rgba(var(--accent-rgb), 0.28),
+      transparent 58%
+    ),
+    radial-gradient(
+      160% 130% at 100% 0%,
+      rgba(var(--raspberry-rgb), 0.2),
+      transparent 60%
+    ),
+    radial-gradient(
+      140% 140% at 50% 120%,
+      rgba(var(--paper-rgb), 0.85),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #eef3fb 0%, #f7f9ff 60%, #ffffff 100%);
+  --app-bg-soft: radial-gradient(
+      140% 120% at 10% -12%,
+      rgba(var(--accent-rgb), 0.18),
+      transparent 60%
+    ),
+    radial-gradient(
+      140% 120% at 100% 0%,
+      rgba(var(--raspberry-rgb), 0.14),
+      transparent 62%
+    ),
+    linear-gradient(180deg, #f2f6fc 0%, #f9fbff 100%);
+  --glass-specular: linear-gradient(
+    120deg,
+    rgba(var(--paper-rgb), 0.7) 0%,
+    rgba(var(--paper-rgb), 0.15) 45%,
+    rgba(var(--paper-rgb), 0.5) 100%
   );
-  --metal-border: rgba(var(--ink-rgb), 0.18);
-  --metal-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.16);
-  --metal-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.85),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  --glass-bg: var(--glass-specular),
+    linear-gradient(
+      160deg,
+      rgba(var(--paper-rgb), 0.86) 0%,
+      rgba(var(--paper-rgb), 0.68) 55%,
+      rgba(var(--accent-rgb), 0.08) 100%
+    );
+  --glass-bg-strong: var(--glass-specular),
+    linear-gradient(
+      160deg,
+      rgba(var(--paper-rgb), 0.92) 0%,
+      rgba(var(--paper-rgb), 0.78) 55%,
+      rgba(var(--accent-rgb), 0.1) 100%
+    );
+  --glass-bg-soft: var(--glass-specular),
+    linear-gradient(
+      160deg,
+      rgba(var(--paper-rgb), 0.72),
+      rgba(var(--paper-rgb), 0.56)
+    );
+  --glass-border: rgba(15, 23, 42, 0.18);
+  --glass-shadow: 0 22px 36px rgba(15, 23, 42, 0.2);
+  --glass-shadow-soft: 0 14px 24px rgba(15, 23, 42, 0.16);
+  --glass-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.7),
+    inset 0 -1px 0 rgba(var(--paper-rgb), 0.35),
+    inset 0 0 0 1px rgba(var(--paper-rgb), 0.35);
+  --glass-frost: blur(12px) saturate(1.08);
+  --glass-frost-soft: blur(8px) saturate(1.04);
+  --metal-bg: var(--glass-bg-soft);
+  --metal-border: var(--glass-border);
+  --metal-shadow: var(--glass-shadow-soft);
+  --metal-inset: var(--glass-inset);
   --metal-text: var(--ink);
   --metal-active-bg: linear-gradient(
     135deg,
-    var(--accent-tint-08) 0%,
-    var(--accent-tint-16) 50%,
-    var(--accent-tint-12) 100%
+    rgba(var(--accent-rgb), 0.28) 0%,
+    rgba(var(--accent-rgb), 0.18) 100%
   );
-  --metal-active-border: rgba(var(--accent-rgb), 0.4);
-  --metal-active-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.85);
+  --metal-active-border: rgba(var(--accent-rgb), 0.45);
+  --metal-active-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.22),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.65);
   --metal-active-text: var(--accent-strong);
   --metal-primary-bg: linear-gradient(
     135deg,
@@ -117,7 +170,7 @@
 body {
   margin: 0;
   min-height: 100dvh;
-  background-color: var(--cream);
+  background: var(--app-bg);
   color: var(--ink);
 }
 
