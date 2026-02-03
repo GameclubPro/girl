@@ -2983,74 +2983,75 @@
 }
 
 .screen--pro-profile {
-  --pro-ink: var(--ink);
-  --pro-muted: var(--muted);
-  --pro-border: rgba(var(--shadow-rgb), 0.12);
-  --pro-surface: rgba(var(--paper-rgb), 0.94);
-  --pro-surface-strong: rgba(var(--paper-rgb), 0.98);
+  --pro-ink: #141826;
+  --pro-muted: #4b5565;
+  --pro-border: rgba(15, 23, 42, 0.12);
+  --pro-surface: rgba(var(--paper-rgb), 0.86);
+  --pro-surface-strong: rgba(var(--paper-rgb), 0.92);
   --pro-accent: var(--accent);
   --pro-accent-2: var(--accent-2);
   --pro-accent-3: var(--accent-3);
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
-  --ink-rgb: 26, 31, 43;
-  --muted-rgb: 92, 99, 112;
+  --ink-rgb: 20, 24, 38;
+  --muted-rgb: 75, 85, 101;
   --accent-rgb: 43, 102, 246;
   --accent-soft: rgba(var(--accent-rgb), 0.16);
-  --surface: var(--cream);
-  --surface-rgb: 245, 247, 250;
-  --surface-muted-rgb: 240, 242, 246;
+  --surface: #f7f9fd;
+  --surface-rgb: 247, 249, 253;
+  --surface-muted-rgb: 238, 242, 248;
   --paper-rgb: 255, 255, 255;
   --raspberry-rgb: 33, 179, 166;
   --shadow-rgb: 26, 31, 43;
   --glass-bg: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.9),
-    rgba(var(--paper-rgb), 0.92)
+    160deg,
+    rgba(var(--paper-rgb), 0.78),
+    rgba(var(--paper-rgb), 0.62)
   );
   --glass-bg-strong: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.96),
-    rgba(var(--paper-rgb), 0.98)
+    160deg,
+    rgba(var(--paper-rgb), 0.88),
+    rgba(var(--paper-rgb), 0.74)
   );
   --glass-bg-soft: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.7),
-    rgba(var(--paper-rgb), 0.78)
+    160deg,
+    rgba(var(--paper-rgb), 0.64),
+    rgba(var(--paper-rgb), 0.5)
   );
-  --glass-border: rgba(var(--shadow-rgb), 0.08);
-  --glass-stroke: rgba(var(--shadow-rgb), 0.06);
-  --glass-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.12);
-  --glass-shadow-soft: 0 10px 18px rgba(var(--shadow-rgb), 0.08);
-  --glass-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
-  --glass-blur: 10px;
-  --glass-frost: blur(8px) saturate(1);
-  --glass-frost-soft: blur(6px) saturate(1);
-  --portfolio-overlay: rgba(12, 20, 36, 0.36);
+  --glass-border: rgba(15, 23, 42, 0.1);
+  --glass-stroke: rgba(var(--paper-rgb), 0.6);
+  --glass-shadow: 0 20px 32px rgba(15, 23, 42, 0.14);
+  --glass-shadow-soft: 0 12px 20px rgba(15, 23, 42, 0.1);
+  --glass-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.7),
+    inset 0 -1px 0 rgba(var(--paper-rgb), 0.35);
+  --glass-blur: 12px;
+  --glass-frost: blur(12px) saturate(1.08);
+  --glass-frost-soft: blur(8px) saturate(1.04);
+  --portfolio-overlay: rgba(12, 20, 36, 0.3);
   --portfolio-surface: var(--glass-bg-strong);
   --portfolio-border: var(--glass-border);
   --portfolio-shadow: var(--glass-shadow);
   --portfolio-shadow-soft: var(--glass-shadow-soft);
   --portfolio-frost: var(--glass-frost);
   --portfolio-frost-soft: var(--glass-frost-soft);
-  --portfolio-muted-surface: rgba(var(--surface-muted-rgb), 0.72);
+  --portfolio-muted-surface: rgba(var(--surface-muted-rgb), 0.68);
   background:
     radial-gradient(
-      120% 120% at 10% -10%,
+      160% 140% at 12% -12%,
       rgba(var(--accent-rgb), 0.18),
       transparent 60%
     ),
     radial-gradient(
-      140% 120% at 100% 0%,
-      rgba(var(--raspberry-rgb), 0.14),
-      transparent 62%
+      120% 120% at 90% 0%,
+      rgba(var(--paper-rgb), 0.8),
+      transparent 55%
     ),
     radial-gradient(
       140% 140% at 80% 90%,
-      rgba(var(--accent-rgb), 0.6),
+      rgba(var(--accent-rgb), 0.12),
       transparent 65%
     ),
-    linear-gradient(180deg, var(--cream) 0%, var(--accent-tint-04) 55%, var(--paper) 100%);
+    linear-gradient(180deg, var(--surface) 0%, #eef2f8 55%, #f9fbff 100%);
 }
 
 .screen--pro::before {
@@ -29611,10 +29612,12 @@ h2 {
   width: 100%;
 }
 
-/* Calm Premium Minimalism — Master Profile rebrand */
+/* Frosted Glass Light — Master Profile */
 .screen--pro-profile .pro-shell {
   --pro-shell-width: min(430px, 100%);
   --pro-shell-gap: 14px;
+  --pro-shell-frame-opacity: 0.6;
+  --pro-shell-frame-shadow: 0 20px 34px rgba(var(--shadow-rgb), 0.14);
 }
 
 .screen--pro-profile .pro-profile-hero {
@@ -29625,11 +29628,12 @@ h2 {
   height: clamp(152px, 42vw, 184px);
   border-radius: 0 0 26px 26px;
   background:
-    radial-gradient(120% 120% at 18% 0%, rgba(var(--paper-rgb), 0.5), transparent 60%),
-    linear-gradient(135deg, var(--accent-tint-10) 0%, var(--accent-tint-16) 52%, var(--accent-tint-24) 100%);
+    radial-gradient(140% 120% at 18% 0%, rgba(var(--paper-rgb), 0.7), transparent 60%),
+    linear-gradient(140deg, rgba(var(--paper-rgb), 0.65) 0%, rgba(var(--paper-rgb), 0.35) 100%);
   border: 1px solid var(--glass-border);
-  box-shadow: 0 18px 26px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: none;
+  box-shadow: 0 18px 30px rgba(var(--shadow-rgb), 0.14);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-ig-cover::before {
@@ -29638,48 +29642,33 @@ h2 {
   inset: -20% -10% auto;
   height: 170%;
   background-image:
-    radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), 0.32), transparent 44%),
-    radial-gradient(circle at 88% 22%, rgba(var(--accent-rgb), 0.28), transparent 46%),
-    radial-gradient(circle at 40% 85%, rgba(var(--paper-rgb), 0.6), transparent 48%),
-    repeating-linear-gradient(
-      135deg,
-      rgba(var(--paper-rgb), 0.5) 0px,
-      rgba(var(--paper-rgb), 0.5) 5px,
-      rgba(var(--paper-rgb), 0) 5px,
-      rgba(var(--paper-rgb), 0) 16px
-    ),
-    conic-gradient(
-      from 210deg at 20% 20%,
-      rgba(var(--paper-rgb), 0.6),
-      rgba(var(--accent-rgb), 0.28),
-      rgba(var(--paper-rgb), 0.4),
-      rgba(var(--accent-rgb), 0.24),
-      rgba(var(--paper-rgb), 0.6)
-    );
-  opacity: 0.82;
+    radial-gradient(circle at 14% 16%, rgba(var(--paper-rgb), 0.7), transparent 55%),
+    radial-gradient(circle at 86% 20%, rgba(var(--accent-rgb), 0.24), transparent 60%),
+    linear-gradient(160deg, rgba(var(--paper-rgb), 0.45), rgba(var(--paper-rgb), 0));
+  opacity: 0.7;
   mix-blend-mode: normal;
   pointer-events: none;
 }
 
 .screen--pro-profile .pro-profile-ig-cover.has-image::before {
-  opacity: 0.2;
+  opacity: 0.35;
 }
 
 .screen--pro-profile .pro-profile-ig-cover::after {
   background: linear-gradient(
     180deg,
-    rgba(var(--shadow-rgb), 0.18) 0%,
-    rgba(var(--shadow-rgb), 0.06) 40%,
+    rgba(var(--shadow-rgb), 0.2) 0%,
+    rgba(var(--shadow-rgb), 0.06) 50%,
     rgba(var(--paper-rgb), 0) 100%
   );
 }
 
 .screen--pro-profile .pro-profile-ig-cover-glow {
-  opacity: 0.35;
+  opacity: 0.25;
   background-image:
-    radial-gradient(circle at 18% 12%, rgba(var(--paper-rgb), 0.4), transparent 55%),
-    radial-gradient(circle at 82% 14%, rgba(var(--accent-rgb), 0.38), transparent 60%),
-    radial-gradient(circle at 78% 80%, rgba(var(--accent-rgb), 0.28), transparent 60%);
+    radial-gradient(circle at 18% 12%, rgba(var(--paper-rgb), 0.5), transparent 55%),
+    radial-gradient(circle at 82% 14%, rgba(var(--accent-rgb), 0.26), transparent 60%),
+    radial-gradient(circle at 78% 80%, rgba(var(--accent-rgb), 0.2), transparent 60%);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -29702,12 +29691,12 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-hero-settings {
-  background: rgba(var(--paper-rgb), 0.9);
-  border-color: var(--pro-border);
+  background: rgba(var(--paper-rgb), 0.72);
+  border-color: var(--glass-border);
   color: var(--pro-ink);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.1);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-hero-card {
@@ -29716,20 +29705,24 @@ h2 {
   padding: var(--hero-card-pad);
   border-radius: 24px;
   background: var(--glass-bg-strong);
-  border: 1px solid var(--pro-border);
-  box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-hero-avatar {
   width: 88px;
   height: 88px;
   border-radius: 26px;
-  background: linear-gradient(135deg, var(--accent-tint-16), var(--accent-tint-28));
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--accent-rgb), 0.7),
+    rgba(var(--accent-rgb), 0.45)
+  );
+  border: 1px solid rgba(var(--paper-rgb), 0.8);
   color: var(--pro-ink);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.14);
+  box-shadow: 0 14px 22px rgba(var(--shadow-rgb), 0.18);
 }
 
 .screen--pro-profile .pro-profile-ig-avatar::before {
@@ -29748,67 +29741,71 @@ h2 {
 
 .screen--pro-profile .pro-profile-hero-about {
   font-weight: 500;
-  color: var(--pro-muted);
+  color: var(--pro-ink);
 }
 
 .screen--pro-profile .pro-profile-ig-status {
-  background: rgba(var(--paper-rgb), 0.92);
-  border-color: var(--pro-border);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(var(--paper-rgb), 0.74);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-ig-status.is-paused {
-  background: rgba(var(--shadow-rgb), 0.04);
+  background: rgba(var(--paper-rgb), 0.55);
   border-color: rgba(var(--shadow-rgb), 0.12);
   color: var(--pro-muted);
-  box-shadow: none;
+  box-shadow: var(--glass-shadow-soft);
 }
 
 .screen--pro-profile .pro-profile-ig-status-toggle {
-  background: rgba(var(--accent-rgb), 0.18);
-  border-color: rgba(var(--accent-rgb), 0.3);
+  background: rgba(var(--accent-rgb), 0.2);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 
 .screen--pro-profile .pro-profile-ig-status.is-paused .pro-profile-ig-status-toggle {
-  background: rgba(var(--shadow-rgb), 0.12);
-  border-color: rgba(var(--shadow-rgb), 0.2);
+  background: rgba(var(--shadow-rgb), 0.1);
+  border-color: rgba(var(--shadow-rgb), 0.18);
 }
 
 .screen--pro-profile .pro-profile-ig-status-knob {
   background: var(--paper);
-  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.2);
+  box-shadow: 0 4px 8px rgba(var(--shadow-rgb), 0.16);
 }
 
 .screen--pro-profile .pro-profile-ig-tags {
-  background: rgba(var(--paper-rgb), 0.8);
-  border-color: var(--pro-border);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.06);
+  background: var(--glass-bg-soft);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-ig-tags .pro-profile-tag {
-  background: var(--paper);
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.7);
+  border: 1px solid rgba(var(--shadow-rgb), 0.08);
   color: var(--pro-ink);
-  box-shadow: none;
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-profile .pro-profile-ig-tags .pro-profile-tag.is-muted {
-  background: rgba(var(--shadow-rgb), 0.04);
+  background: rgba(var(--paper-rgb), 0.45);
   color: var(--pro-muted);
 }
 
 .screen--pro-profile .pro-profile-ig-tags .pro-profile-tag.is-review {
-  background: rgba(var(--accent-rgb), 0.16);
-  border-color: rgba(var(--accent-rgb), 0.28);
+  background: rgba(var(--accent-rgb), 0.2);
+  border-color: rgba(var(--accent-rgb), 0.32);
   color: var(--pro-ink);
 }
 
 .screen--pro-profile .pro-profile-ig-stats {
-  background: rgba(var(--paper-rgb), 0.9);
-  border-color: var(--pro-border);
-  box-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.08);
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-ig-stats::before,
@@ -29817,8 +29814,8 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-ig-stat-button.is-active {
-  background: rgba(var(--accent-rgb), 0.12);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.2);
+  background: rgba(var(--accent-rgb), 0.16);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.22);
 }
 
 .screen--pro-profile .pro-profile-hero-actions {
@@ -29869,7 +29866,7 @@ h2 {
   border-radius: 12px;
 }
 
-/* Metallic button treatment */
+/* Glassy button treatment */
 .screen--pro-profile .pro-profile-hero-action,
 .screen--pro-profile .pro-profile-ig-button,
 .screen--pro-profile .pro-profile-ig-button--fab,
@@ -29879,13 +29876,14 @@ h2 {
 .pro-profile-editor-screen .pro-profile-editor-save {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--paper) 0%, var(--accent-tint-06) 55%, var(--surface-muted) 100%);
-  border: 1px solid rgba(var(--shadow-rgb), 0.18);
+  background: rgba(var(--paper-rgb), 0.72);
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
   color: var(--pro-ink);
   box-shadow:
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.9),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.08),
-    0 10px 16px rgba(var(--shadow-rgb), 0.12);
+    0 10px 18px rgba(var(--shadow-rgb), 0.12),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.8);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-hero-action::after,
@@ -29900,11 +29898,11 @@ h2 {
   inset: 0;
   background: linear-gradient(
     120deg,
-    rgba(var(--paper-rgb), 0.65) 0%,
-    rgba(var(--paper-rgb), 0.1) 35%,
-    rgba(var(--paper-rgb), 0.35) 100%
+    rgba(var(--paper-rgb), 0.7) 0%,
+    rgba(var(--paper-rgb), 0.15) 40%,
+    rgba(var(--paper-rgb), 0.45) 100%
   );
-  opacity: 0.45;
+  opacity: 0.25;
   pointer-events: none;
 }
 
@@ -29913,23 +29911,23 @@ h2 {
 .screen--pro-profile .pro-profile-ig-button--primary,
 .screen--pro-profile .pro-profile-certificates-action:not(.is-toggle),
 .pro-profile-editor-screen .pro-profile-editor-save {
-  background: linear-gradient(180deg, var(--accent-2) 0%, var(--accent) 52%, var(--accent-strong) 100%);
-  border-color: rgba(var(--paper-rgb), 0.2);
+  background: linear-gradient(
+    135deg,
+    rgba(var(--accent-rgb), 0.98) 0%,
+    rgba(var(--accent-rgb), 0.78) 100%
+  );
+  border-color: rgba(var(--accent-rgb), 0.4);
   color: var(--paper);
   box-shadow:
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.35),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
-    0 12px 18px rgba(var(--accent-rgb), 0.35);
+    0 12px 20px rgba(var(--accent-rgb), 0.32),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.3);
 }
 
 .screen--pro-profile .pro-profile-hero-action.is-ghost {
-  background: linear-gradient(180deg, var(--accent-tint-04) 0%, var(--accent-tint-08) 100%);
-  border-color: rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.55);
+  border-color: rgba(var(--shadow-rgb), 0.1);
   color: var(--pro-muted);
-  box-shadow:
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.9),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
-    0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-profile .pro-profile-hero-settings {
@@ -29941,29 +29939,30 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-certificates-action.is-toggle {
-  background: linear-gradient(180deg, var(--accent-tint-04) 0%, var(--accent-tint-08) 100%);
-  border-color: rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.6);
+  border-color: rgba(var(--shadow-rgb), 0.1);
   color: var(--pro-ink);
-  box-shadow:
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.9),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
-    0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-ig-body {
   --pro-ig-card-radius: 20px;
   --pro-ig-card-radius-sm: 16px;
-  --pro-ig-card-bg: rgba(var(--paper-rgb), 0.9);
-  --pro-ig-card-border: var(--pro-border);
-  --pro-ig-card-shadow: 0 12px 18px rgba(var(--shadow-rgb), 0.08);
-  --pro-ig-card-inset: none;
+  --pro-ig-card-bg: rgba(var(--paper-rgb), 0.7);
+  --pro-ig-card-border: var(--glass-border);
+  --pro-ig-card-shadow: var(--glass-shadow-soft);
+  --pro-ig-card-inset: var(--glass-inset);
   gap: 12px;
 }
 
 .screen--pro-profile .pro-profile-status-card {
   background: var(--glass-bg-strong);
-  border-color: var(--pro-border);
-  box-shadow: var(--glass-shadow-soft);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-status-card::after {
@@ -29976,21 +29975,23 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-facts-grid {
-  background: rgba(var(--paper-rgb), 0.92);
-  border-color: var(--pro-border);
-  box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow-soft), var(--glass-inset);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-fact-card {
-  background: var(--paper);
-  border-color: var(--pro-border);
-  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.06);
+  background: rgba(var(--paper-rgb), 0.7);
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-fact-card.is-muted {
-  background: rgba(var(--shadow-rgb), 0.04);
+  background: rgba(var(--paper-rgb), 0.5);
 }
 
 .screen--pro-profile .pro-profile-fact-icon {
@@ -30002,38 +30003,31 @@ h2 {
 
 .screen--pro-profile .pro-profile-certificates {
   background: var(--glass-bg-strong);
-  border-color: var(--pro-border);
-  box-shadow: var(--glass-shadow-soft);
-}
-
-.screen--pro-profile .pro-profile-certificates-action {
-  background: var(--accent);
-  border-color: transparent;
-  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
-}
-
-.screen--pro-profile .pro-profile-certificates-action.is-toggle {
-  background: rgba(var(--accent-rgb), 0.12);
-  color: var(--pro-ink);
-  border-color: rgba(var(--accent-rgb), 0.28);
-  box-shadow: none;
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-certificate-card {
-  background: var(--paper);
-  border-color: var(--pro-border);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.08);
+  background: rgba(var(--paper-rgb), 0.72);
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-certificate-media {
-  background: rgba(var(--shadow-rgb), 0.04);
-  border-color: rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.55);
+  border-color: rgba(var(--shadow-rgb), 0.1);
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel {
   background: var(--glass-bg-strong);
-  border-color: var(--pro-border);
-  box-shadow: var(--glass-shadow-soft);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
   border-radius: 24px;
 }
 
@@ -30042,44 +30036,35 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel-count {
-  background: rgba(var(--paper-rgb), 0.9);
-  border-color: var(--pro-border);
-  box-shadow: none;
+  background: rgba(var(--paper-rgb), 0.75);
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
   color: var(--pro-muted);
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel-nav {
-  background: rgba(var(--paper-rgb), 0.8);
-  border-color: var(--pro-border);
-  box-shadow: none;
+  background: rgba(var(--paper-rgb), 0.62);
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel-tab.is-active {
-  background: rgba(var(--accent-rgb), 0.16);
-  border-color: rgba(var(--accent-rgb), 0.28);
+  background: rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.32);
   color: var(--pro-ink);
 }
 
-.screen--pro-profile .pro-profile-portfolio-panel-action {
-  background: var(--accent);
-  border-color: transparent;
-  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.2);
-}
-
-.screen--pro-profile .pro-profile-portfolio-panel-action.is-primary {
-  background: var(--accent-strong);
-  box-shadow: 0 12px 18px rgba(var(--accent-rgb), 0.22);
-}
-
 .screen--pro-profile .pro-profile-portfolio-item {
-  background: rgba(var(--paper-rgb), 0.9);
+  background: rgba(var(--paper-rgb), 0.68);
   border: 1px solid rgba(var(--shadow-rgb), 0.08);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.06);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-portfolio-item.is-add {
   border-style: dashed;
-  background: rgba(var(--shadow-rgb), 0.03);
+  background: rgba(var(--paper-rgb), 0.45);
 }
 
 .screen--pro-profile .pro-profile-portfolio-badge {
@@ -30089,8 +30074,10 @@ h2 {
 
 .screen--pro-profile .pro-profile-schedule-panel {
   background: var(--glass-bg-strong);
-  border-color: var(--pro-border);
-  box-shadow: var(--glass-shadow-soft);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-schedule-panel::before {
@@ -30101,26 +30088,30 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-schedule-info {
-  background: var(--paper);
-  border-color: var(--pro-border);
+  background: rgba(var(--paper-rgb), 0.72);
+  border-color: rgba(var(--shadow-rgb), 0.08);
   color: var(--pro-ink);
-  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-schedule-popover {
-  background: var(--paper);
-  border-color: var(--pro-border);
-  box-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.14);
+  background: rgba(var(--paper-rgb), 0.82);
+  border-color: rgba(var(--shadow-rgb), 0.1);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-schedule-popover::before {
-  background: var(--paper);
-  border-left-color: var(--pro-border);
-  border-top-color: var(--pro-border);
+  background: rgba(var(--paper-rgb), 0.82);
+  border-left-color: rgba(var(--shadow-rgb), 0.1);
+  border-top-color: rgba(var(--shadow-rgb), 0.1);
 }
 
 .screen--pro-profile .pro-profile-schedule-popover-day {
-  background: rgba(var(--shadow-rgb), 0.04);
+  background: rgba(var(--paper-rgb), 0.55);
   border-color: rgba(var(--shadow-rgb), 0.08);
 }
 
@@ -30131,9 +30122,9 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-schedule-day {
-  background: rgba(var(--shadow-rgb), 0.04);
+  background: rgba(var(--paper-rgb), 0.55);
   border-color: rgba(var(--shadow-rgb), 0.08);
-  box-shadow: none;
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-profile .pro-profile-schedule-day.is-active {
@@ -30149,20 +30140,24 @@ h2 {
 
 .screen--pro-profile .pro-profile-reviews {
   background: var(--glass-bg-strong);
-  border-color: var(--pro-border);
-  box-shadow: var(--glass-shadow-soft);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-profile .pro-profile-reviews-count-pill {
-  background: rgba(var(--paper-rgb), 0.9);
-  border-color: var(--pro-border);
-  box-shadow: none;
+  background: rgba(var(--paper-rgb), 0.75);
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-profile .pro-profile-reviews-summary {
-  background: var(--paper);
-  border-color: var(--pro-border);
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
+  background: rgba(var(--paper-rgb), 0.78);
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-reviews-bar-track {
@@ -30170,25 +30165,27 @@ h2 {
 }
 
 .screen--pro-profile .pro-profile-review-card {
-  background: var(--paper);
-  border-color: var(--pro-border);
-  box-shadow: 0 8px 12px rgba(var(--shadow-rgb), 0.06);
+  background: rgba(var(--paper-rgb), 0.7);
+  border-color: rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-profile .pro-profile-review-avatar {
-  background: rgba(var(--shadow-rgb), 0.04);
-  border-color: rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.55);
+  border-color: rgba(var(--shadow-rgb), 0.1);
 }
 
 .screen--pro-profile .pro-profile-reviews-empty {
-  background: rgba(var(--shadow-rgb), 0.04);
-  border-color: rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.5);
+  border-color: rgba(var(--shadow-rgb), 0.1);
 }
 
 .screen--pro-profile .pro-bottom-nav {
-  --pro-nav-bg: rgba(var(--paper-rgb), 0.94);
-  --pro-nav-border: rgba(var(--shadow-rgb), 0.08);
-  --pro-nav-shadow: 0 -12px 22px rgba(var(--shadow-rgb), 0.12);
+  --pro-nav-bg: rgba(var(--paper-rgb), 0.82);
+  --pro-nav-border: rgba(var(--shadow-rgb), 0.1);
+  --pro-nav-shadow: 0 -14px 24px rgba(var(--shadow-rgb), 0.14);
 }
 
 .screen--pro-profile .pro-nav-item.is-active {
