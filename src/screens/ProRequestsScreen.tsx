@@ -1491,6 +1491,21 @@ export const ProRequestsScreen = ({
     }
     return selectedSlotViews.filter((slot) => slot.status === slotFilter)
   }, [selectedSlotViews, slotFilter])
+  const slotStats = useMemo(() => {
+    const stats = {
+      free: 0,
+      booked: 0,
+      pending: 0,
+      closed: 0,
+    }
+    selectedSlotViews.forEach((slot) => {
+      if (slot.status === 'free') stats.free += 1
+      else if (slot.status === 'booked') stats.booked += 1
+      else if (slot.status === 'pending') stats.pending += 1
+      else if (slot.status === 'closed') stats.closed += 1
+    })
+    return stats
+  }, [selectedSlotViews])
   const slotDetails = useMemo(() => {
     if (!slotDetailsId) return null
     return selectedSlotViews.find((slot) => slot.id === slotDetailsId) ?? null
@@ -4091,6 +4106,43 @@ export const ProRequestsScreen = ({
                 </div>
               </section>
 
+              <div className="pro-bookings-summary" aria-label="Сводка по дню">
+                <div className="pro-bookings-summary-card">
+                  <div className="pro-bookings-summary-item">
+                    <span className="pro-bookings-summary-label">Записей</span>
+                    <span className="pro-bookings-summary-value">
+                      {selectedBookings.length}
+                    </span>
+                  </div>
+                  <div className="pro-bookings-summary-item">
+                    <span className="pro-bookings-summary-label">Свободно</span>
+                    <span className="pro-bookings-summary-value">
+                      {slotStats.free}
+                    </span>
+                  </div>
+                  <div className="pro-bookings-summary-item">
+                    <span className="pro-bookings-summary-label">Закрыто</span>
+                    <span className="pro-bookings-summary-value">
+                      {slotStats.closed}
+                    </span>
+                  </div>
+                </div>
+                {(slotStats.pending > 0 || slotStats.booked > 0) && (
+                  <div className="pro-bookings-summary-pills">
+                    {slotStats.booked > 0 && (
+                      <span className="pro-bookings-summary-pill">
+                        Занято: {slotStats.booked}
+                      </span>
+                    )}
+                    {slotStats.pending > 0 && (
+                      <span className="pro-bookings-summary-pill is-warning">
+                        Переносов: {slotStats.pending}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <section
                 className="pro-slots-inline"
                 ref={slotsSectionRef}
@@ -4167,6 +4219,39 @@ export const ProRequestsScreen = ({
                           slotConfirm?.type !== 'cancel-booking' &&
                           slotConfirm?.slotId === slot.id
                         const isBookingSlot = Boolean(booking)
+                        const bookingClientName =
+                          booking?.clientName?.trim() || 'Клиент'
+                        const bookingServiceName = booking?.serviceName ?? ''
+                        const bookingLocationLabel = booking
+                          ? locationLabelMap[booking.locationType] ?? ''
+                          : ''
+                        const hasBookingDeposit =
+                          typeof booking?.depositAmount === 'number'
+                            ? booking.depositAmount > 0
+                            : typeof booking?.depositPercent === 'number'
+                              ? booking.depositPercent > 0
+                              : false
+                        const bookingDepositStatus =
+                          booking?.depositStatus ??
+                          (hasBookingDeposit ? 'pending' : 'not_required')
+                        const bookingDepositLabel =
+                          bookingDepositStatus === 'submitted'
+                            ? 'Чек на проверке'
+                            : bookingDepositStatus === 'pending'
+                              ? 'Ожидает депозит'
+                              : bookingDepositStatus === 'rejected'
+                                ? 'Чек отклонён'
+                                : bookingDepositStatus === 'expired'
+                                  ? 'Слот снят'
+                                  : ''
+                        const bookingDepositTone =
+                          bookingDepositStatus === 'rejected' ||
+                          bookingDepositStatus === 'expired'
+                            ? 'is-danger'
+                            : bookingDepositStatus === 'submitted' ||
+                                bookingDepositStatus === 'pending'
+                              ? 'is-warning'
+                              : ''
                         const isDetailsOpen = isBookingSlot && slotDetails?.id === slot.id
                         const isExpanded = isDetailsOpen
                         const isWide = isSlotConfirmTarget
@@ -4260,6 +4345,28 @@ export const ProRequestsScreen = ({
                                 </div>
                                 {slot.status === 'closed' && slot.reason && (
                                   <div className="pro-slot-meta">{slot.reason}</div>
+                                )}
+                                {isBookingSlot && (
+                                  <div className="pro-slot-meta pro-slot-meta--booking">
+                                    <span className="pro-slot-meta-title">
+                                      {bookingClientName}
+                                    </span>
+                                    <span className="pro-slot-meta-subtitle">
+                                      {bookingServiceName}
+                                      {bookingLocationLabel
+                                        ? ` · ${bookingLocationLabel}`
+                                        : ''}
+                                    </span>
+                                    {bookingDepositLabel && (
+                                      <div className="pro-slot-meta-pills">
+                                        <span
+                                          className={`pro-slot-meta-pill ${bookingDepositTone}`}
+                                        >
+                                          {bookingDepositLabel}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>

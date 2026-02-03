@@ -16276,21 +16276,22 @@
   --pro-nav-accent: var(--pro-accent);
   --pro-nav-accent-2: var(--pro-accent-2);
   overflow-x: hidden;
-  background:
-    radial-gradient(120% 120% at 10% -10%, rgba(var(--accent-rgb), 0.18), transparent 60%),
-    radial-gradient(140% 120% at 100% 0%, rgba(var(--raspberry-rgb), 0.14), transparent 62%),
-    radial-gradient(140% 140% at 80% 90%, rgba(var(--accent-rgb), 0.6), transparent 65%),
-    linear-gradient(180deg, var(--cream) 0%, var(--accent-tint-04) 55%, var(--paper) 100%);
+  background: var(--app-bg);
 }
 
 .screen--pro-requests .booking-calendar-card {
-  background: var(--paper);
-  border: 1px solid var(--pro-border);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-requests .booking-calendar-card::before {
-  background: none;
-  opacity: 0;
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(var(--paper-rgb), 0.5), transparent 55%),
+    radial-gradient(120% 120% at 100% 0%, rgba(var(--accent-rgb), 0.2), transparent 60%);
+  opacity: 0.6;
 }
 
 .screen--pro-requests .requests-list {
@@ -16318,38 +16319,46 @@
 }
 
 .screen--pro-requests .requests-tabs {
-  border-color: var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.7);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .screen--pro-requests .requests-section-toggle {
-  border-color: var(--pro-border);
-  background: rgba(var(--paper-rgb), 0.72);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-soft);
   color: var(--pro-muted);
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-requests .requests-section-toggle.is-open {
-  background: rgba(var(--accent-rgb), 0.18);
-  color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.3);
+  background: var(--metal-active-bg);
+  color: var(--metal-active-text);
+  box-shadow: var(--metal-active-shadow);
 }
 
 .screen--pro-requests .requests-tab {
-  color: var(--pro-muted);
-  border: 1.5px solid transparent;
+  color: var(--metal-text);
+  border: 1px solid var(--metal-border);
+  background: var(--metal-bg);
+  box-shadow: var(--metal-shadow), var(--metal-inset);
 }
 
 .screen--pro-requests .requests-tab.is-active {
-  background: rgba(var(--accent-rgb), 0.14);
-  border: 1.5px solid rgba(var(--accent-rgb), 0.35);
-  color: var(--accent-strong);
-  box-shadow: none;
+  background: var(--metal-active-bg);
+  border-color: var(--metal-active-border);
+  color: var(--metal-active-text);
+  box-shadow: var(--metal-active-shadow);
 }
 
 .screen--pro-requests .booking-item {
-  border: 1px solid var(--pro-border, var(--pro-border));
-  background: var(--pro-surface-strong, rgba(var(--paper-rgb), 0.92));
-  box-shadow: 0 16px 26px rgba(var(--shadow-rgb), 0.12);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
 }
 
 .screen--pro-requests .booking-item-master {
@@ -16366,8 +16375,10 @@
 }
 
 .screen--pro-requests .booking-item-avatar {
-  background: rgba(var(--accent-rgb), 0.16);
+  background: var(--glass-bg-soft);
   color: var(--ink);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-requests .booking-status.is-waiting {
@@ -16394,9 +16405,10 @@
 }
 
 .screen--pro-requests .booking-action {
-  border-color: var(--pro-border, var(--pro-border));
-  background: rgba(var(--paper-rgb), 0.9);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-soft);
   color: var(--pro-ink);
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-requests .booking-action.is-primary {
@@ -16407,9 +16419,10 @@
 }
 
 .screen--pro-requests .booking-price-input {
-  border-color: var(--pro-border, var(--pro-border));
-  background: rgba(var(--paper-rgb), 0.88);
+  border-color: var(--glass-border);
+  background: var(--glass-bg-soft);
   color: var(--pro-ink);
+  box-shadow: var(--glass-inset);
 }
 
 .screen--pro-requests .requests-empty,
@@ -16425,9 +16438,9 @@
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgba(var(--surface-muted-rgb), 0.78);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(var(--paper-rgb), 0.65);
+  backdrop-filter: blur(14px) saturate(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -16441,27 +16454,84 @@
   scroll-margin-top: calc(16px + var(--safe-top));
 }
 
+.pro-bookings-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pro-bookings-summary-card {
+  border-radius: 18px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pro-bookings-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.pro-bookings-summary-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-bookings-summary-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-bookings-summary-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pro-bookings-summary-pill {
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  box-shadow: var(--glass-inset);
+}
+
+.pro-bookings-summary-pill.is-warning {
+  border-color: rgba(var(--warning-rgb), 0.35);
+  background: rgba(var(--warning-rgb), 0.12);
+  color: var(--warning);
+}
+
 .pro-slots-sheet {
   width: min(520px, 100%);
   border-radius: 26px 26px 22px 22px;
   padding: 12px 14px 18px;
-  background: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.98) 0%,
-    rgba(var(--paper-rgb), 0.92) 100%
-  );
-  border: 1px solid rgba(var(--accent-rgb), 0.14);
-  box-shadow: 0 28px 40px rgba(var(--shadow-rgb), 0.18),
-    0 12px 22px rgba(var(--accent-rgb), 0.12),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
   display: flex;
   flex-direction: column;
   gap: 12px;
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  backdrop-filter: blur(12px) saturate(1.05);
-  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
   animation: pro-sheet-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -16474,10 +16544,10 @@
   height: 240px;
   background: radial-gradient(
     60% 70% at 20% 20%,
-    rgba(var(--accent-rgb), 0.25),
+    rgba(var(--accent-rgb), 0.2),
     transparent 60%
   );
-  opacity: 0.8;
+  opacity: 0.7;
   pointer-events: none;
 }
 
@@ -16490,10 +16560,10 @@
   height: 260px;
   background: radial-gradient(
     60% 70% at 70% 70%,
-    rgba(var(--raspberry-rgb), 0.2),
+    rgba(var(--raspberry-rgb), 0.16),
     transparent 65%
   );
-  opacity: 0.75;
+  opacity: 0.65;
   pointer-events: none;
 }
 
@@ -16511,13 +16581,8 @@
   width: 36px;
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(var(--shadow-rgb), 0.3),
-    rgba(var(--shadow-rgb), 0.08)
-  );
-  box-shadow: inset 0 0 0 1px rgba(var(--paper-rgb), 0.6),
-    0 4px 8px rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--shadow-rgb), 0.18);
+  box-shadow: inset 0 0 0 1px rgba(var(--paper-rgb), 0.5);
 }
 
 .pro-slots-head {
@@ -16588,11 +16653,11 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: rgba(var(--paper-rgb), 0.9);
+  background: var(--glass-bg-soft);
   color: var(--pro-ink);
   font-size: 18px;
   cursor: pointer;
-  box-shadow: 0 10px 14px rgba(var(--shadow-rgb), 0.1);
+  box-shadow: var(--glass-inset);
 }
 
 .pro-slots-close:focus-visible {
@@ -16601,29 +16666,21 @@
 }
 
 .pro-slots-filters {
-  --metal-bg: rgba(var(--paper-rgb), 0.58);
-  --metal-border: rgba(var(--shadow-rgb), 0.14);
+  --metal-bg: var(--glass-bg-soft);
+  --metal-border: var(--glass-border);
   --metal-text: var(--pro-muted);
-  --metal-shadow: none;
-  --metal-inset: inset 0 1px 0 rgba(var(--paper-rgb), 0.7);
-  --metal-active-bg: linear-gradient(
-    180deg,
-    rgba(var(--accent-rgb), 0.32),
-    rgba(var(--accent-rgb), 0.16)
-  );
-  --metal-active-border: rgba(var(--accent-rgb), 0.5);
-  --metal-active-text: var(--accent-strong);
-  --metal-active-shadow: 0 8px 14px rgba(var(--accent-rgb), 0.16);
+  --metal-shadow: var(--glass-inset);
+  --metal-inset: var(--glass-inset);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 4px;
   padding: 4px;
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.1);
-  background: rgba(var(--paper-rgb), 0.72);
-  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.6);
-  backdrop-filter: blur(12px) saturate(1.05);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-slots-filter {
@@ -16708,8 +16765,11 @@
 
 .pro-slots-empty {
   border-radius: 16px;
-  border: 1px dashed rgba(var(--shadow-rgb), 0.14);
-  background: rgba(var(--paper-rgb), 0.94);
+  border: 1px dashed var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -16754,22 +16814,20 @@
 }
 
 .pro-slot-card {
-  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
   padding: 5px 10px;
-  background: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.98),
-    rgba(var(--paper-rgb), 0.92)
-  );
+  background: var(--glass-bg-soft);
   display: flex;
   flex-direction: column;
   gap: 3px;
-  box-shadow: 0 10px 18px rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-shadow-soft);
   min-height: 40px;
   width: min(100%, 320px);
   position: relative;
   overflow: hidden;
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
 }
 
 .pro-slot-card:not(.is-open) {
@@ -16911,9 +16969,9 @@
 }
 
 .pro-slot-status.is-free {
-  background: var(--paper);
+  background: var(--glass-bg-soft);
   color: var(--ink);
-  border-color: rgba(var(--shadow-rgb), 0.2);
+  border-color: var(--glass-border);
 }
 
 .pro-slot-status.is-booked {
@@ -16972,12 +17030,8 @@
 }
 
 .pro-slot-action {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
-  background: linear-gradient(
-    180deg,
-    rgba(var(--paper-rgb), 0.96),
-    rgba(var(--paper-rgb), 0.72)
-  );
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
   border-radius: 999px;
   padding: 2px 6px;
   font-size: 9px;
@@ -16985,8 +17039,8 @@
   color: var(--pro-muted);
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 6px 12px rgba(var(--shadow-rgb), 0.08);
-  backdrop-filter: blur(10px) saturate(1.1);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-frost-soft);
   transition: transform 0.18s ease, filter 0.18s ease, background 0.18s ease,
     border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
@@ -17043,11 +17097,7 @@
 .pro-slot-action.is-danger {
   color: var(--danger);
   border-color: rgba(var(--danger-rgb), 0.32);
-  background: linear-gradient(
-    180deg,
-    rgba(var(--danger-rgb), 0.16),
-    rgba(var(--danger-rgb), 0.08)
-  );
+  background: rgba(var(--danger-rgb), 0.12);
   box-shadow: 0 6px 12px rgba(var(--danger-rgb), 0.12);
 }
 
@@ -17075,6 +17125,52 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--pro-muted);
+}
+
+.pro-slot-meta--booking {
+  margin-top: 4px;
+  gap: 4px;
+}
+
+.pro-slot-meta-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-slot-meta-subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pro-muted);
+}
+
+.pro-slot-meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pro-slot-meta-pill {
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  padding: 3px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--pro-ink);
+  box-shadow: var(--glass-inset);
+}
+
+.pro-slot-meta-pill.is-warning {
+  border-color: rgba(var(--warning-rgb), 0.35);
+  background: rgba(var(--warning-rgb), 0.12);
+  color: var(--warning);
+}
+
+.pro-slot-meta-pill.is-danger {
+  border-color: rgba(var(--danger-rgb), 0.35);
+  background: rgba(var(--danger-rgb), 0.12);
+  color: var(--danger);
 }
 
 .pro-slot-details {
@@ -17202,7 +17298,9 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--pro-muted);
-  background: rgba(var(--shadow-rgb), 0.08);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
 }
 
 .pro-slot-details-date {
@@ -17243,9 +17341,9 @@
   position: fixed;
   inset: 0;
   z-index: 96;
-  background: rgba(var(--surface-muted-rgb), 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(var(--paper-rgb), 0.7);
+  backdrop-filter: blur(14px) saturate(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -17257,9 +17355,11 @@
   max-height: calc(100dvh - 24px);
   border-radius: 26px 26px 20px 20px;
   padding: 12px 14px 16px;
-  background: rgba(var(--paper-rgb), 0.98);
-  border: 1px solid rgba(var(--paper-rgb), 0.78);
-  box-shadow: 0 26px 40px rgba(var(--shadow-rgb), 0.2);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -17272,7 +17372,8 @@
   width: 36px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(var(--shadow-rgb), 0.24);
+  background: rgba(var(--shadow-rgb), 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--paper-rgb), 0.5);
 }
 
 .pro-slot-details-sheet-head {
@@ -17308,7 +17409,7 @@
 
 .pro-slot-details-sheet-close {
   border: none;
-  background: rgba(var(--shadow-rgb), 0.12);
+  background: var(--glass-bg-soft);
   color: var(--pro-muted);
   width: 32px;
   height: 32px;
@@ -17316,6 +17417,7 @@
   font-size: 20px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--glass-inset);
 }
 
 .pro-slot-details-sheet-close:focus-visible {
@@ -17344,15 +17446,15 @@
 }
 
 .pro-slot-details-sheet-action {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(var(--paper-rgb), 0.92);
+  background: var(--glass-bg-soft);
   cursor: pointer;
-  box-shadow: 0 10px 16px rgba(var(--shadow-rgb), 0.08);
+  box-shadow: var(--glass-inset);
 }
 
 .pro-slot-details-sheet-action.is-primary {
@@ -17409,8 +17511,9 @@
 
 .pro-slots-confirm {
   border-radius: 16px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: rgba(var(--paper-rgb), 0.96);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -17446,14 +17549,15 @@
 }
 
 .pro-slots-confirm-secondary {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 8px 10px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(var(--paper-rgb), 0.92);
+  background: var(--glass-bg-soft);
   cursor: pointer;
+  box-shadow: var(--glass-inset);
 }
 
 .pro-slots-notice {
@@ -17496,9 +17600,9 @@
   position: fixed;
   inset: 0;
   z-index: 94;
-  background: rgba(var(--surface-muted-rgb), 0.78);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(var(--paper-rgb), 0.7);
+  backdrop-filter: blur(14px) saturate(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -17509,9 +17613,11 @@
   width: min(520px, 100%);
   border-radius: 24px 24px 20px 20px;
   padding: 10px 14px 16px;
-  background: rgba(var(--paper-rgb), 0.98);
-  border: 1px solid rgba(var(--paper-rgb), 0.7);
-  box-shadow: 0 24px 32px rgba(var(--shadow-rgb), 0.18);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -17529,6 +17635,7 @@
   height: 4px;
   border-radius: 999px;
   background: rgba(var(--shadow-rgb), 0.2);
+  box-shadow: inset 0 0 0 1px rgba(var(--paper-rgb), 0.5);
 }
 
 .pro-slot-sheet-head {
@@ -17581,8 +17688,9 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--pro-ink);
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: rgba(var(--paper-rgb), 0.92);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   align-self: flex-start;
 }
 
@@ -17593,13 +17701,14 @@
 }
 
 .pro-slot-preset {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 11px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(var(--paper-rgb), 0.92);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   cursor: pointer;
 }
 
@@ -17616,13 +17725,14 @@
 }
 
 .pro-slot-time-chip {
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 8px 4px;
   font-size: 11px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(var(--paper-rgb), 0.92);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   cursor: pointer;
 }
 
@@ -17678,7 +17788,9 @@
   border-radius: 999px;
   padding: 4px 8px;
   border: 1px solid transparent;
-  background: rgba(var(--paper-rgb), 0.92);
+  background: var(--glass-bg-soft);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-inset);
 }
 
 .pro-slot-legend-item.is-booked {
@@ -17727,14 +17839,15 @@
 }
 
 .pro-slot-sheet-secondary {
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 9px 12px;
   font-size: 12px;
   font-weight: 700;
   color: var(--pro-ink);
-  background: rgba(var(--paper-rgb), 0.92);
+  background: var(--glass-bg-soft);
   cursor: pointer;
+  box-shadow: var(--glass-inset);
 }
 
 .pro-slot-sheet-error {
@@ -17746,8 +17859,9 @@
 
 .pro-slot-sheet-confirm {
   border-radius: 16px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: rgba(var(--paper-rgb), 0.96);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -17770,12 +17884,13 @@
 .pro-slot-textarea {
   width: 100%;
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  border: 1px solid var(--glass-border);
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 600;
   color: var(--pro-ink);
-  background: rgba(var(--paper-rgb), 0.92);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   resize: vertical;
   min-height: 90px;
 }
@@ -17788,8 +17903,9 @@
 
 .pro-slot-preview-row {
   border-radius: 14px;
-  border: 1px solid rgba(var(--shadow-rgb), 0.12);
-  background: rgba(var(--paper-rgb), 0.94);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-soft);
+  box-shadow: var(--glass-inset);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
