@@ -4281,24 +4281,22 @@ export const ProRequestsScreen = ({
                                           {statusLabel}
                                         </span>
                                       </div>
-                                      <div className="pro-slot-preview">
-                                        <span
-                                          className="pro-slot-preview-avatar"
-                                          aria-hidden="true"
-                                        >
-                                          {bookingClientInitials}
+                                      <span
+                                        className="pro-slot-preview-avatar"
+                                        aria-hidden="true"
+                                      >
+                                        {bookingClientInitials}
+                                      </span>
+                                      <span className="pro-slot-preview-text">
+                                        <span className="pro-slot-preview-name">
+                                          {bookingClientName}
                                         </span>
-                                        <span className="pro-slot-preview-text">
-                                          <span className="pro-slot-preview-name">
-                                            {bookingClientName}
+                                        {bookingPreviewLabel && (
+                                          <span className="pro-slot-preview-meta">
+                                            {bookingPreviewLabel}
                                           </span>
-                                          {bookingPreviewLabel && (
-                                            <span className="pro-slot-preview-meta">
-                                              {bookingPreviewLabel}
-                                            </span>
-                                          )}
-                                        </span>
-                                      </div>
+                                        )}
+                                      </span>
                                     </>
                                   ) : (
                                     <>

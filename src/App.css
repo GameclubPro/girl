@@ -16862,6 +16862,12 @@
   position: relative;
 }
 
+.pro-slot-top.is-booking {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: center;
+}
+
 .pro-slot-toggle {
   border: none;
   background: transparent;
@@ -17165,6 +17171,13 @@
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-inset);
   flex: 0 0 auto;
+}
+
+.pro-slot-card.is-booked .pro-slot-preview-avatar,
+.pro-slot-card.is-pending .pro-slot-preview-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 12px;
 }
 
 .pro-slot-preview-text {
