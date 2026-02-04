@@ -7,6 +7,7 @@ type MediaCropperProps = {
   src: string
   kind: CropperKind
   maxBytes: number
+  coverAspect?: number
   isBusy?: boolean
   error?: string
   onCancel: () => void
@@ -42,12 +43,13 @@ export const MediaCropper = ({
   src,
   kind,
   maxBytes,
+  coverAspect: coverAspectOverride,
   isBusy = false,
   error = '',
   onCancel,
   onConfirm,
 }: MediaCropperProps) => {
-  const [coverAspect, setCoverAspect] = useState(getCoverAspect)
+  const [autoCoverAspect, setAutoCoverAspect] = useState(getCoverAspect)
   const [cropRect, setCropRect] = useState<{ width: number; height: number } | null>(
     null
   )
@@ -84,6 +86,10 @@ export const MediaCropper = ({
     lastDistanceRef.current = null
   }, [])
 
+  const coverAspect = useMemo(
+    () => (coverAspectOverride ? coverAspectOverride : autoCoverAspect),
+    [autoCoverAspect, coverAspectOverride]
+  )
   const aspect = useMemo(() => (kind === 'avatar' ? 1 : coverAspect), [
     kind,
     coverAspect,
@@ -111,12 +117,13 @@ export const MediaCropper = ({
   }, [src])
 
   useEffect(() => {
+    if (coverAspectOverride) return
     const handleResize = () => {
-      setCoverAspect(getCoverAspect())
+      setAutoCoverAspect(getCoverAspect())
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  }, [coverAspectOverride])
 
   const measureCropRect = useCallback(() => {
     const frame = frameRef.current

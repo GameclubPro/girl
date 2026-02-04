@@ -322,7 +322,7 @@ type MasterFollower = {
 
 type StatId = 'works' | 'rating' | 'reviews' | 'followers'
 type CropperKind = 'avatar' | 'cover'
-type CropperState = { kind: CropperKind; src: string }
+type CropperState = { kind: CropperKind; src: string; coverAspect?: number }
 
 const MAX_MEDIA_BYTES = 3 * 1024 * 1024
 const MAX_MEDIA_INPUT_BYTES = 12 * 1024 * 1024
@@ -458,6 +458,7 @@ export const ProProfileScreen = ({
   )
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const coverRef = useRef<HTMLDivElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
   const portfolioCameraInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
@@ -2282,7 +2283,16 @@ export const ProProfileScreen = ({
     setIsAvatarActionsOpen(false)
     try {
       const dataUrl = await readImageFileAsync(file)
-      setCropperState({ kind, src: dataUrl })
+      const coverAspect =
+        kind === 'cover'
+          ? (() => {
+              const rect = coverRef.current?.getBoundingClientRect()
+              if (!rect || !rect.width || !rect.height) return undefined
+              const aspect = rect.width / rect.height
+              return Number.isFinite(aspect) && aspect > 0 ? aspect : undefined
+            })()
+          : undefined
+      setCropperState({ kind, src: dataUrl, coverAspect })
     } catch (error) {
       setMediaError('Не удалось прочитать файл.')
     }
@@ -3166,6 +3176,7 @@ export const ProProfileScreen = ({
               coverUrl ? ' has-image' : ''
             }${isCoverUploading ? ' is-loading' : ''}`}
             style={coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined}
+            ref={coverRef}
             aria-busy={isCoverUploading}
             aria-disabled={isCoverUploading}
             role="button"
@@ -4657,6 +4668,7 @@ export const ProProfileScreen = ({
         <MediaCropper
           src={cropperState.src}
           kind={cropperState.kind}
+          coverAspect={cropperState.coverAspect}
           maxBytes={MAX_MEDIA_BYTES}
           isBusy={isCropperUploading}
           error={mediaError}
