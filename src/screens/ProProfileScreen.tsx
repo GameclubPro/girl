@@ -413,6 +413,7 @@ export const ProProfileScreen = ({
   const [avatarUrl, setAvatarUrl] = useState('')
   const [hasAvatar, setHasAvatar] = useState(false)
   const [coverUrl, setCoverUrl] = useState('')
+  const [editorCoverAspect, setEditorCoverAspect] = useState<number | null>(null)
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] =
     useState<MasterReviewSummary | null>(null)
@@ -500,6 +501,44 @@ export const ProProfileScreen = ({
   const hasLoadedRef = useRef(false)
   const isSavingRef = useRef(false)
   const queuedPayloadRef = useRef<ProfilePayload | null>(null)
+  const getCoverAspectValue = useCallback(() => {
+    const rect = coverRef.current?.getBoundingClientRect()
+    if (rect && rect.width > 1 && rect.height > 1) {
+      const aspect = rect.width / rect.height
+      if (Number.isFinite(aspect) && aspect > 0) return aspect
+    }
+    if (typeof window === 'undefined') return undefined
+    const viewportWidth =
+      document.documentElement?.clientWidth || window.innerWidth || 360
+    const width = clampValue(viewportWidth, 320, 430)
+    const height = clampValue(0.56 * width, 210, 250)
+    const aspect = width / height
+    return Number.isFinite(aspect) && aspect > 0 ? aspect : undefined
+  }, [])
+  useEffect(() => {
+    const updateAspect = () => {
+      const next = getCoverAspectValue()
+      if (!next) return
+      setEditorCoverAspect((current) =>
+        current && Math.abs(current - next) < 0.01 ? current : next
+      )
+    }
+    updateAspect()
+    if (typeof window === 'undefined') return
+    window.addEventListener('resize', updateAspect)
+    const element = coverRef.current
+    if (element && typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(updateAspect)
+      observer.observe(element)
+      return () => {
+        observer.disconnect()
+        window.removeEventListener('resize', updateAspect)
+      }
+    }
+    return () => {
+      window.removeEventListener('resize', updateAspect)
+    }
+  }, [getCoverAspectValue])
   const serviceStrings = useMemo(
     () => toServiceStrings(serviceItems),
     [serviceItems]
@@ -650,6 +689,16 @@ export const ProProfileScreen = ({
   const progressStyle = {
     '--progress-value': `${profileCompletion}%`,
   } as CSSProperties
+  const coverPreviewStyle = useMemo(() => {
+    const style = {} as CSSProperties & Record<string, string>
+    if (coverUrl) {
+      style.backgroundImage = `url(${coverUrl})`
+    }
+    if (editorCoverAspect) {
+      style['--cover-preview-aspect'] = editorCoverAspect.toString()
+    }
+    return style
+  }, [coverUrl, editorCoverAspect])
   const reviewCount = reviewSummary?.count ?? 0
   const reviewAverage = reviewSummary?.average ?? 0
   const reviewDistribution = reviewSummary?.distribution ?? []
@@ -2285,23 +2334,7 @@ export const ProProfileScreen = ({
     setIsAvatarActionsOpen(false)
     try {
       const dataUrl = await readImageFileAsync(file)
-      const coverAspect =
-        kind === 'cover'
-          ? (() => {
-              const rect = coverRef.current?.getBoundingClientRect()
-              if (rect && rect.width > 1 && rect.height > 1) {
-                const aspect = rect.width / rect.height
-                if (Number.isFinite(aspect) && aspect > 0) return aspect
-              }
-              if (typeof window === 'undefined') return undefined
-              const viewportWidth =
-                document.documentElement?.clientWidth || window.innerWidth || 360
-              const width = clampValue(viewportWidth, 320, 430)
-              const height = clampValue(0.42 * width, 152, 184)
-              const aspect = width / height
-              return Number.isFinite(aspect) && aspect > 0 ? aspect : undefined
-            })()
-          : undefined
+      const coverAspect = kind === 'cover' ? getCoverAspectValue() : undefined
       setCropperState({ kind, src: dataUrl, coverAspect })
     } catch (error) {
       setMediaError('Не удалось прочитать файл.')
@@ -4935,9 +4968,7 @@ export const ProProfileScreen = ({
                       className={`pro-profile-editor-media-cover${
                         coverUrl ? ' has-image' : ''
                       }${isCoverUploading ? ' is-loading' : ''}`}
-                      style={
-                        coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined
-                      }
+                      style={coverPreviewStyle}
                       aria-busy={isCoverUploading}
                     >
                       {!coverUrl && (

@@ -14350,8 +14350,9 @@
 }
 
 .pro-profile-editor-media-cover {
+  --cover-preview-aspect: 1.78;
   width: 100%;
-  height: 140px;
+  aspect-ratio: var(--cover-preview-aspect);
   border-radius: 18px;
   background: linear-gradient(
     135deg,
