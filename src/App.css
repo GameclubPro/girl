@@ -12380,8 +12380,13 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--paper);
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-3) 100%);
-  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.28);
+  background: rgba(var(--accent-rgb), 0.92);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
+  box-shadow:
+    0 16px 24px rgba(var(--accent-rgb), 0.28),
+    0 6px 12px rgba(var(--shadow-rgb), 0.18);
+  backdrop-filter: blur(6px) saturate(1.08);
+  -webkit-backdrop-filter: blur(6px) saturate(1.08);
   cursor: pointer;
   width: 100%;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
