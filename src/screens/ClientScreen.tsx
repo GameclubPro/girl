@@ -71,12 +71,16 @@ const parseLength = (value: string) => {
 }
 
 const buildShowcasePool = (data: MasterProfile[]) =>
-  data.flatMap((profile) => {
+  (Array.isArray(data) ? data : []).flatMap((profile, profileIndex) => {
     const categories = Array.isArray(profile.categories) ? profile.categories : []
-    return parsePortfolioItems(profile.portfolioUrls ?? [])
+    const showcaseItems = parsePortfolioItems(profile.showcaseUrls ?? [])
+    const portfolioItems = parsePortfolioItems(profile.portfolioUrls ?? [])
+    const sourceItems = showcaseItems.length > 0 ? showcaseItems : portfolioItems
+    const masterId = profile.userId || `master-${profileIndex}`
+    return sourceItems
       .filter((item) => isImageUrl(item.url))
       .map((item, index) => ({
-        id: `${profile.userId}-${index}`,
+        id: `${masterId}-${item.url}`,
         url: item.url,
         focusX: item.focusX ?? 0.5,
         focusY: item.focusY ?? 0.5,
