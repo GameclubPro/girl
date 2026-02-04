@@ -414,6 +414,7 @@ export const ProProfileScreen = ({
   const [hasAvatar, setHasAvatar] = useState(false)
   const [coverUrl, setCoverUrl] = useState('')
   const [editorCoverAspect, setEditorCoverAspect] = useState<number | null>(null)
+  const [coverFrameWidth, setCoverFrameWidth] = useState<number | null>(null)
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] =
     useState<MasterReviewSummary | null>(null)
@@ -462,6 +463,7 @@ export const ProProfileScreen = ({
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const coverRef = useRef<HTMLDivElement>(null)
+  const editorCoverRef = useRef<HTMLDivElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
   const portfolioCameraInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
@@ -501,35 +503,59 @@ export const ProProfileScreen = ({
   const hasLoadedRef = useRef(false)
   const isSavingRef = useRef(false)
   const queuedPayloadRef = useRef<ProfilePayload | null>(null)
-  const getCoverAspectValue = useCallback(() => {
-    const rect = coverRef.current?.getBoundingClientRect()
-    if (rect && rect.width > 1 && rect.height > 1) {
-      const aspect = rect.width / rect.height
-      if (Number.isFinite(aspect) && aspect > 0) return aspect
+  const getCoverFrameMetrics = useCallback(() => {
+    const editorRect = editorCoverRef.current?.getBoundingClientRect()
+    if (editorRect && editorRect.width > 1 && editorRect.height > 1) {
+      const aspect = editorRect.width / editorRect.height
+      if (Number.isFinite(aspect) && aspect > 0) {
+        return { width: editorRect.width, aspect }
+      }
     }
-    if (typeof window === 'undefined') return undefined
+    const heroRect = coverRef.current?.getBoundingClientRect()
+    if (heroRect && heroRect.width > 1 && heroRect.height > 1) {
+      const aspect = heroRect.width / heroRect.height
+      if (Number.isFinite(aspect) && aspect > 0) {
+        return { width: heroRect.width, aspect }
+      }
+    }
+    if (typeof window === 'undefined') return { aspect: 2.2 }
     const viewportWidth =
       document.documentElement?.clientWidth || window.innerWidth || 360
     const width = clampValue(viewportWidth, 320, 430)
     const height = clampValue(0.56 * width, 210, 250)
     const aspect = width / height
-    return Number.isFinite(aspect) && aspect > 0 ? aspect : undefined
+    return Number.isFinite(aspect) && aspect > 0 ? { width, aspect } : { aspect: 2.2 }
   }, [])
+  const getCoverAspectValue = useCallback(
+    () => getCoverFrameMetrics().aspect,
+    [getCoverFrameMetrics]
+  )
   useEffect(() => {
     const updateAspect = () => {
-      const next = getCoverAspectValue()
-      if (!next) return
+      const metrics = getCoverFrameMetrics()
+      if (!metrics?.aspect) return
       setEditorCoverAspect((current) =>
-        current && Math.abs(current - next) < 0.01 ? current : next
+        current && Math.abs(current - metrics.aspect) < 0.01
+          ? current
+          : metrics.aspect
       )
+      if (metrics.width) {
+        setCoverFrameWidth((current) =>
+          current && Math.abs(current - metrics.width) < 0.5
+            ? current
+            : metrics.width
+        )
+      }
     }
     updateAspect()
     if (typeof window === 'undefined') return
     window.addEventListener('resize', updateAspect)
-    const element = coverRef.current
-    if (element && typeof ResizeObserver !== 'undefined') {
+    const elements = [editorCoverRef.current, coverRef.current].filter(
+      (item): item is HTMLDivElement => Boolean(item)
+    )
+    if (elements.length > 0 && typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(updateAspect)
-      observer.observe(element)
+      elements.forEach((element) => observer.observe(element))
       return () => {
         observer.disconnect()
         window.removeEventListener('resize', updateAspect)
@@ -538,7 +564,7 @@ export const ProProfileScreen = ({
     return () => {
       window.removeEventListener('resize', updateAspect)
     }
-  }, [getCoverAspectValue])
+  }, [editingSection, getCoverFrameMetrics])
   const serviceStrings = useMemo(
     () => toServiceStrings(serviceItems),
     [serviceItems]
@@ -2334,7 +2360,11 @@ export const ProProfileScreen = ({
     setIsAvatarActionsOpen(false)
     try {
       const dataUrl = await readImageFileAsync(file)
-      const coverAspect = kind === 'cover' ? getCoverAspectValue() : undefined
+      const coverMetrics = kind === 'cover' ? getCoverFrameMetrics() : null
+      const coverAspect = kind === 'cover' ? coverMetrics?.aspect : undefined
+      if (kind === 'cover' && coverMetrics?.width) {
+        setCoverFrameWidth(coverMetrics.width)
+      }
       setCropperState({ kind, src: dataUrl, coverAspect })
     } catch (error) {
       setMediaError('Не удалось прочитать файл.')
@@ -4712,6 +4742,9 @@ export const ProProfileScreen = ({
           src={cropperState.src}
           kind={cropperState.kind}
           coverAspect={cropperState.coverAspect}
+          coverFrameWidth={
+            cropperState.kind === 'cover' ? coverFrameWidth ?? undefined : undefined
+          }
           maxBytes={MAX_MEDIA_BYTES}
           isBusy={isCropperUploading}
           error={mediaError}
@@ -4969,6 +5002,7 @@ export const ProProfileScreen = ({
                         coverUrl ? ' has-image' : ''
                       }${isCoverUploading ? ' is-loading' : ''}`}
                       style={coverPreviewStyle}
+                      ref={editorCoverRef}
                       aria-busy={isCoverUploading}
                     >
                       {!coverUrl && (
