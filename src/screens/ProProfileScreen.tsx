@@ -103,6 +103,8 @@ const CERTIFICATE_RATIO_MIN = 4 / 5
 const CERTIFICATE_RATIO_MAX = 4 / 3
 const clampCertificateRatio = (value: number) =>
   Math.min(CERTIFICATE_RATIO_MAX, Math.max(CERTIFICATE_RATIO_MIN, value))
+const clampValue = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value))
 
 const buildCertificateId = () =>
   `cert-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -2287,8 +2289,16 @@ export const ProProfileScreen = ({
         kind === 'cover'
           ? (() => {
               const rect = coverRef.current?.getBoundingClientRect()
-              if (!rect || !rect.width || !rect.height) return undefined
-              const aspect = rect.width / rect.height
+              if (rect && rect.width > 1 && rect.height > 1) {
+                const aspect = rect.width / rect.height
+                if (Number.isFinite(aspect) && aspect > 0) return aspect
+              }
+              if (typeof window === 'undefined') return undefined
+              const viewportWidth =
+                document.documentElement?.clientWidth || window.innerWidth || 360
+              const width = clampValue(viewportWidth, 320, 430)
+              const height = clampValue(0.42 * width, 152, 184)
+              const aspect = width / height
               return Number.isFinite(aspect) && aspect > 0 ? aspect : undefined
             })()
           : undefined

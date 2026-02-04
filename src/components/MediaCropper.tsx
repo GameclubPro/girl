@@ -329,7 +329,8 @@ export const MediaCropper = ({
     const targetWidth =
       kind === 'avatar' ? AVATAR_TARGET_SIZE : COVER_TARGET_WIDTH
     let outputWidth = Math.min(targetWidth, Math.round(cropWidth))
-    let outputHeight = Math.round(outputWidth / aspect)
+    const cropRatio = cropWidth && cropHeight ? cropWidth / cropHeight : aspect
+    let outputHeight = Math.round(outputWidth / cropRatio)
     let quality = 0.92
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
@@ -358,7 +359,7 @@ export const MediaCropper = ({
         quality -= 0.07
       } else if (outputWidth > 720) {
         outputWidth = Math.round(outputWidth * 0.9)
-        outputHeight = Math.round(outputWidth / aspect)
+        outputHeight = Math.round(outputWidth / cropRatio)
       } else {
         break
       }

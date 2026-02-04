@@ -23635,7 +23635,7 @@ h2 {
 }
 
 .screen--client-master-profile .pro-profile-ig-cover {
-  height: 170px;
+  height: clamp(152px, 42vw, 184px);
   background: linear-gradient(
     135deg,
     var(--accent-2) 0%,
