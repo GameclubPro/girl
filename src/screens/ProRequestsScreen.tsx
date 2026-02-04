@@ -4198,10 +4198,17 @@ export const ProRequestsScreen = ({
                         const isBookingSlot = Boolean(booking)
                         const bookingClientName =
                           booking?.clientName?.trim() || 'Клиент'
+                        const bookingClientInitials = getInitials(bookingClientName)
                         const bookingServiceName = booking?.serviceName ?? ''
                         const bookingLocationLabel = booking
                           ? locationLabelMap[booking.locationType] ?? ''
                           : ''
+                        const bookingPreviewLabel = [
+                          bookingServiceName,
+                          bookingLocationLabel,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
                         const hasBookingDeposit =
                           typeof booking?.depositAmount === 'number'
                             ? booking.depositAmount > 0
@@ -4261,20 +4268,62 @@ export const ProRequestsScreen = ({
                                     />
                                   )}
                                   <span className="pro-slot-time">{timeLabel}</span>
-                                  <span
-                                    className={`pro-slot-status is-${slot.status}`}
-                                    aria-label={statusLabelFull}
-                                    title={statusLabelFull}
-                                  >
-                                    {statusLabel}
-                                  </span>
                                   {isBookingSlot ? (
+                                    <div className="pro-slot-preview">
+                                      <span
+                                        className="pro-slot-preview-avatar"
+                                        aria-hidden="true"
+                                      >
+                                        {bookingClientInitials}
+                                      </span>
+                                      <span className="pro-slot-preview-text">
+                                        <span className="pro-slot-preview-name">
+                                          {bookingClientName}
+                                        </span>
+                                        {bookingPreviewLabel && (
+                                          <>
+                                            <span className="pro-slot-preview-sep">
+                                              ·
+                                            </span>
+                                            <span className="pro-slot-preview-service">
+                                              {bookingPreviewLabel}
+                                            </span>
+                                          </>
+                                        )}
+                                      </span>
+                                      {bookingDepositLabel && (
+                                        <span
+                                          className={`pro-slot-preview-pill ${bookingDepositTone}`}
+                                        >
+                                          {bookingDepositLabel}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
                                     <span
-                                      className="pro-slot-toggle-icon"
-                                      aria-hidden="true"
+                                      className={`pro-slot-status is-${slot.status}`}
+                                      aria-label={statusLabelFull}
+                                      title={statusLabelFull}
                                     >
-                                      <IconChevron />
+                                      {statusLabel}
                                     </span>
+                                  )}
+                                  {isBookingSlot ? (
+                                    <div className="pro-slot-trailing">
+                                      <span
+                                        className={`pro-slot-status is-${slot.status}`}
+                                        aria-label={statusLabelFull}
+                                        title={statusLabelFull}
+                                      >
+                                        {statusLabel}
+                                      </span>
+                                      <span
+                                        className="pro-slot-toggle-icon"
+                                        aria-hidden="true"
+                                      >
+                                        <IconChevron />
+                                      </span>
+                                    </div>
                                   ) : (
                                     <div
                                       className={`pro-slot-actions${
@@ -4322,28 +4371,6 @@ export const ProRequestsScreen = ({
                                 </div>
                                 {slot.status === 'closed' && slot.reason && (
                                   <div className="pro-slot-meta">{slot.reason}</div>
-                                )}
-                                {isBookingSlot && (
-                                  <div className="pro-slot-meta pro-slot-meta--booking">
-                                    <span className="pro-slot-meta-title">
-                                      {bookingClientName}
-                                    </span>
-                                    <span className="pro-slot-meta-subtitle">
-                                      {bookingServiceName}
-                                      {bookingLocationLabel
-                                        ? ` · ${bookingLocationLabel}`
-                                        : ''}
-                                    </span>
-                                    {bookingDepositLabel && (
-                                      <div className="pro-slot-meta-pills">
-                                        <span
-                                          className={`pro-slot-meta-pill ${bookingDepositTone}`}
-                                        >
-                                          {bookingDepositLabel}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
                                 )}
                               </div>
                             </div>

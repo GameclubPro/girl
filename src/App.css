@@ -17119,50 +17119,84 @@
   color: var(--pro-muted);
 }
 
-.pro-slot-meta--booking {
-  margin-top: 4px;
-  gap: 4px;
+.pro-slot-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  justify-self: start;
 }
 
-.pro-slot-meta-title {
-  font-size: 12px;
+.pro-slot-preview-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
   font-weight: 700;
-  color: var(--pro-ink);
+  color: var(--ink);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
+  flex: 0 0 auto;
 }
 
-.pro-slot-meta-subtitle {
-  font-size: 11px;
+.pro-slot-preview-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--pro-ink);
+  line-height: 1.1;
+}
+
+.pro-slot-preview-name {
+  font-weight: 700;
+}
+
+.pro-slot-preview-sep {
+  margin: 0 4px;
   color: var(--pro-muted);
 }
 
-.pro-slot-meta-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.pro-slot-preview-service {
+  color: var(--pro-muted);
 }
 
-.pro-slot-meta-pill {
+.pro-slot-preview-pill {
   border-radius: 999px;
   border: 1px solid var(--glass-border);
   background: var(--glass-bg-soft);
-  padding: 3px 6px;
+  padding: 2px 6px;
   font-size: 9px;
   font-weight: 700;
   color: var(--pro-ink);
   box-shadow: var(--glass-inset);
+  flex: 0 0 auto;
 }
 
-.pro-slot-meta-pill.is-warning {
+.pro-slot-preview-pill.is-warning {
   border-color: rgba(var(--warning-rgb), 0.35);
   background: rgba(var(--warning-rgb), 0.12);
   color: var(--warning);
 }
 
-.pro-slot-meta-pill.is-danger {
+.pro-slot-preview-pill.is-danger {
   border-color: rgba(var(--danger-rgb), 0.35);
   background: rgba(var(--danger-rgb), 0.12);
   color: var(--danger);
+}
+
+.pro-slot-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
 }
 
 .pro-slot-details {
