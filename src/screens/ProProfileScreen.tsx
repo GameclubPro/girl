@@ -3709,80 +3709,80 @@ export const ProProfileScreen = ({
                     </span>
                     Добавить работу
                   </button>
-                </div>
-                <div className="pro-profile-showcase-card pro-profile-showcase-preview">
-                  <div className="pro-profile-showcase-preview-head">
-                    <span className="pro-profile-showcase-preview-title">
-                      Как это увидит клиент
-                    </span>
-                  </div>
-                  <div className="pro-profile-showcase-preview-card">
-                    <span
-                      className={`pro-profile-showcase-preview-media${
-                        showcasePreviewIsSample ? ' is-sample' : ''
-                      }`}
-                    >
-                      {showcasePreviewDisplayUrl ? (
-                        <img
-                          src={buildImageUrl(showcasePreviewDisplayUrl, {
-                            width: showcasePreviewWidths[1],
-                            quality: showcasePreviewQuality,
-                          })}
-                          alt={
-                            showcasePreviewIsSample
-                              ? 'Пример витрины'
-                              : showcasePreviewTitle
-                          }
-                          loading="lazy"
-                          style={{ objectPosition: showcasePreviewFocus.position }}
-                          srcSet={buildImageSrcSet(
-                            showcasePreviewDisplayUrl,
-                            showcasePreviewWidths,
-                            { quality: showcasePreviewQuality }
-                          )}
-                          sizes="56px"
-                        />
-                      ) : (
-                        <span
-                          className="pro-profile-showcase-preview-icon"
-                          aria-hidden="true"
-                        >
-                          ✦
-                        </span>
-                      )}
-                    </span>
-                    <div className="pro-profile-showcase-preview-body">
-                      <span className="pro-profile-showcase-preview-name">
-                        {showcasePreviewTitle}
-                      </span>
-                      <span
-                        className={`pro-profile-showcase-preview-meta${
-                          showcasePreviewMetaIsFallback ? ' is-muted' : ''
-                        }`}
-                      >
-                        {showcasePreviewMetaLabel}
-                      </span>
-                      <span
-                        className={`pro-profile-showcase-preview-location${
-                          showcasePreviewLocationIsFallback ? ' is-muted' : ''
-                        }`}
-                      >
-                        {showcasePreviewLocation}
+                  <div className="pro-profile-showcase-preview">
+                    <div className="pro-profile-showcase-preview-head">
+                      <span className="pro-profile-showcase-preview-title">
+                        Как это увидит клиент
                       </span>
                     </div>
-                    <button
-                      className="pro-profile-showcase-preview-cta"
-                      type="button"
-                      disabled
-                      aria-disabled="true"
-                    >
-                      Хочу так же
-                    </button>
+                    <div className="pro-profile-showcase-preview-card">
+                      <span
+                        className={`pro-profile-showcase-preview-media${
+                          showcasePreviewIsSample ? ' is-sample' : ''
+                        }`}
+                      >
+                        {showcasePreviewDisplayUrl ? (
+                          <img
+                            src={buildImageUrl(showcasePreviewDisplayUrl, {
+                              width: showcasePreviewWidths[1],
+                              quality: showcasePreviewQuality,
+                            })}
+                            alt={
+                              showcasePreviewIsSample
+                                ? 'Пример витрины'
+                                : showcasePreviewTitle
+                            }
+                            loading="lazy"
+                            style={{ objectPosition: showcasePreviewFocus.position }}
+                            srcSet={buildImageSrcSet(
+                              showcasePreviewDisplayUrl,
+                              showcasePreviewWidths,
+                              { quality: showcasePreviewQuality }
+                            )}
+                            sizes="56px"
+                          />
+                        ) : (
+                          <span
+                            className="pro-profile-showcase-preview-icon"
+                            aria-hidden="true"
+                          >
+                            ✦
+                          </span>
+                        )}
+                      </span>
+                      <div className="pro-profile-showcase-preview-body">
+                        <span className="pro-profile-showcase-preview-name">
+                          {showcasePreviewTitle}
+                        </span>
+                        <span
+                          className={`pro-profile-showcase-preview-meta${
+                            showcasePreviewMetaIsFallback ? ' is-muted' : ''
+                          }`}
+                        >
+                          {showcasePreviewMetaLabel}
+                        </span>
+                        <span
+                          className={`pro-profile-showcase-preview-location${
+                            showcasePreviewLocationIsFallback ? ' is-muted' : ''
+                          }`}
+                        >
+                          {showcasePreviewLocation}
+                        </span>
+                      </div>
+                      <button
+                        className="pro-profile-showcase-preview-cta"
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                      >
+                        Хочу так же
+                      </button>
+                    </div>
+                    <p className="pro-profile-showcase-preview-note">
+                      После загрузки выберите услугу — цена и время подставятся
+                      автоматически.
+                    </p>
                   </div>
-                  <p className="pro-profile-showcase-preview-note">
-                    После загрузки выберите услугу — цена и время подставятся
-                    автоматически.
-                  </p>
                 </div>
                 {hasShowcase && (
                   <div className="pro-profile-showcase-card pro-profile-showcase-gallery">
