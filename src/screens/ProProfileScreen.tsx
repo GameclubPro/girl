@@ -526,10 +526,6 @@ export const ProProfileScreen = ({
     const aspect = width / height
     return Number.isFinite(aspect) && aspect > 0 ? { width, aspect } : { aspect: 2.2 }
   }, [])
-  const getCoverAspectValue = useCallback(
-    () => getCoverFrameMetrics().aspect,
-    [getCoverFrameMetrics]
-  )
   useEffect(() => {
     const updateAspect = () => {
       const metrics = getCoverFrameMetrics()

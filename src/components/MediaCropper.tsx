@@ -398,7 +398,9 @@ export const MediaCropper = ({
   }
 
   const frameStyle = useMemo(() => {
-    const style = { '--crop-aspect': aspect } as CSSProperties & Record<string, string>
+    const style = {
+      '--crop-aspect': `${aspect}`,
+    } as CSSProperties & Record<string, string>
     if (kind === 'cover' && coverFrameWidth) {
       style['--crop-width'] = `${Math.round(coverFrameWidth)}px`
     }
