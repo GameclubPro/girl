@@ -46,6 +46,7 @@ import type { PortfolioItem, ServiceItem } from '../utils/profileContent'
 import { getProfileStatusSummary } from '../utils/profileStatus'
 import { isGeoFailure, requestPreciseLocation } from '../utils/geo'
 import { normalizeScheduleDays } from '../utils/schedule'
+import { buildImageSrcSet, buildImageUrl } from '../utils/media'
 
 type ProProfileScreenProps = {
   apiBase: string
@@ -947,6 +948,42 @@ export const ProProfileScreen = ({
   const showcaseSubtitle = hasShowcase
     ? `Работ в витрине: ${showcaseCountLabel}`
     : `Добавьте до ${MAX_SHOWCASE_ITEMS} лучших работ`
+  const showcasePreviewService = useMemo(
+    () => serviceItems.find((item) => item.name.trim()),
+    [serviceItems]
+  )
+  const showcasePreviewTitle =
+    showcasePreviewService?.name.trim() || 'Маникюр'
+  const showcasePreviewMetaRaw = showcasePreviewService
+    ? formatServiceMeta(showcasePreviewService)
+    : ''
+  const showcasePreviewMeta = showcasePreviewMetaRaw
+    ? showcasePreviewMetaRaw.split(' • ').join(' · ')
+    : ''
+  const showcasePreviewMetaLabel =
+    showcasePreviewMeta ||
+    (priceFromValue !== null || priceToValue !== null ? priceLabel : '') ||
+    'от 1200 ₽ · 90 мин'
+  const showcasePreviewMetaIsFallback =
+    !showcasePreviewMeta &&
+    !(priceFromValue !== null || priceToValue !== null)
+  const showcasePreviewLocation =
+    locationLabel !== 'Город не указан'
+      ? locationLabel.replace(', ', ' · ')
+      : 'Ростов-на-Дону · Кировский'
+  const showcasePreviewLocationIsFallback = locationLabel === 'Город не указан'
+  const showcasePreviewMedia = useMemo(
+    () =>
+      showcaseItems.find((item) => isImageUrl(item.url)) ??
+      portfolioItems.find((item) => isImageUrl(item.url)) ??
+      null,
+    [portfolioItems, showcaseItems]
+  )
+  const showcasePreviewFocus = resolvePortfolioFocus(showcasePreviewMedia)
+  const showcasePreviewMediaUrl = showcasePreviewMedia?.url ?? ''
+  const showcasePreviewWidths = [64, 96, 128]
+  const showcasePreviewQuality = 72
+  const hasShowcasePreviewMedia = Boolean(showcasePreviewMediaUrl)
   const isPortfolioFull = portfolioItems.length >= MAX_PORTFOLIO_ITEMS
   const portfolioLightboxItem =
     portfolioLightboxIndex !== null ? portfolioItems[portfolioLightboxIndex] ?? null : null
@@ -3643,31 +3680,103 @@ export const ProProfileScreen = ({
                 </div>
               )}
               <div className="pro-profile-showcase-panel">
-                {!hasShowcase ? (
-                  <div className="pro-profile-showcase-empty">
-                    <button
-                      className="pro-cabinet-showcase-add"
-                      type="button"
-                      onClick={handleShowcaseAddClick}
-                      disabled={isShowcaseUploading}
-                    >
-                      + Добавить работу
-                    </button>
-                    <div className="pro-cabinet-showcase-preview">
-                      <div className="pro-cabinet-showcase-sample">
-                        <span className="pro-cabinet-showcase-sample-icon">✦</span>
-                        <span className="pro-cabinet-showcase-sample-label">
-                          Пример витрины
-                        </span>
-                      </div>
-                      <p className="pro-cabinet-showcase-hint">
-                        Перетащите, чтобы задать порядок. Нажмите на фото, чтобы
-                        выбрать фокус кадра.
-                      </p>
-                    </div>
+                <div className="pro-profile-showcase-card pro-profile-showcase-intro">
+                  <div className="pro-profile-showcase-intro-text">
+                    <h3 className="pro-profile-showcase-intro-title">
+                      Витрина — это лента для клиентов
+                    </h3>
+                    <p className="pro-profile-showcase-intro-subtitle">
+                      Клиент видит ваше фото в общем списке работ и может сразу
+                      записаться по этой работе.
+                    </p>
                   </div>
-                ) : (
-                  <>
+                  <button
+                    className="pro-profile-showcase-add"
+                    type="button"
+                    onClick={handleShowcaseAddClick}
+                    disabled={isShowcaseUploading || !showShowcaseAddTile}
+                  >
+                    <span
+                      className="pro-profile-showcase-add-icon"
+                      aria-hidden="true"
+                    >
+                      +
+                    </span>
+                    Добавить работу
+                  </button>
+                </div>
+                <div className="pro-profile-showcase-card pro-profile-showcase-preview">
+                  <div className="pro-profile-showcase-preview-head">
+                    <span className="pro-profile-showcase-preview-title">
+                      Как это увидит клиент
+                    </span>
+                  </div>
+                  <div className="pro-profile-showcase-preview-card">
+                    <span
+                      className={`pro-profile-showcase-preview-media${
+                        hasShowcasePreviewMedia ? '' : ' is-placeholder'
+                      }`}
+                    >
+                      {hasShowcasePreviewMedia ? (
+                        <img
+                          src={buildImageUrl(showcasePreviewMediaUrl, {
+                            width: showcasePreviewWidths[1],
+                            quality: showcasePreviewQuality,
+                          })}
+                          alt={showcasePreviewTitle}
+                          loading="lazy"
+                          style={{ objectPosition: showcasePreviewFocus.position }}
+                          srcSet={buildImageSrcSet(
+                            showcasePreviewMediaUrl,
+                            showcasePreviewWidths,
+                            { quality: showcasePreviewQuality }
+                          )}
+                          sizes="56px"
+                        />
+                      ) : (
+                        <span
+                          className="pro-profile-showcase-preview-icon"
+                          aria-hidden="true"
+                        >
+                          ✦
+                        </span>
+                      )}
+                    </span>
+                    <div className="pro-profile-showcase-preview-body">
+                      <span className="pro-profile-showcase-preview-name">
+                        {showcasePreviewTitle}
+                      </span>
+                      <span
+                        className={`pro-profile-showcase-preview-meta${
+                          showcasePreviewMetaIsFallback ? ' is-muted' : ''
+                        }`}
+                      >
+                        {showcasePreviewMetaLabel}
+                      </span>
+                      <span
+                        className={`pro-profile-showcase-preview-location${
+                          showcasePreviewLocationIsFallback ? ' is-muted' : ''
+                        }`}
+                      >
+                        {showcasePreviewLocation}
+                      </span>
+                    </div>
+                    <button
+                      className="pro-profile-showcase-preview-cta"
+                      type="button"
+                      disabled
+                      aria-disabled="true"
+                    >
+                      Хочу так же
+                    </button>
+                  </div>
+                  <p className="pro-profile-showcase-preview-note">
+                    После загрузки выберите услугу — цена и время подставятся
+                    автоматически.
+                  </p>
+                </div>
+                {hasShowcase && (
+                  <div className="pro-profile-showcase-card pro-profile-showcase-gallery">
                     <p className="pro-profile-showcase-subtitle">
                       {showcaseSubtitle}
                     </p>
@@ -3758,7 +3867,7 @@ export const ProProfileScreen = ({
                       Перетащите, чтобы задать порядок. Нажмите на фото, чтобы
                       выбрать фокус кадра.
                     </p>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
