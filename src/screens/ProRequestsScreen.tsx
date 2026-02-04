@@ -3013,7 +3013,7 @@ export const ProRequestsScreen = ({
                   }
                   disabled={isActionLoading}
                 >
-                  Подтвердить перенос
+                  Принять перенос
                 </button>
                 <button
                   className="booking-action"
@@ -3056,7 +3056,7 @@ export const ProRequestsScreen = ({
               }
               disabled={isActionLoading}
             >
-              Подтвердить депозит
+              Принять чек
             </button>
             <button
               className="booking-action"
@@ -3133,7 +3133,7 @@ export const ProRequestsScreen = ({
                 }
                 disabled={isActionLoading}
               >
-                Подтвердить
+                Принять
               </button>
             )}
             {canDecline && (
@@ -4606,7 +4606,7 @@ export const ProRequestsScreen = ({
                       onClick={handleSlotDetailsRescheduleAccept}
                       disabled={isSlotDetailsActionLoading}
                     >
-                      Подтвердить перенос
+                      Принять перенос
                     </button>
                     <button
                       className="pro-slot-details-sheet-action"
