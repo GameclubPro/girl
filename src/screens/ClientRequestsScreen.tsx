@@ -2456,29 +2456,34 @@ export const ClientRequestsScreen = ({
                           </span>
                         </div>
                       </div>
-                      <div className="booking-item-meta booking-item-meta--row">
-                        {scheduledLabel && (
-                          <span className="booking-item-meta-segment">
-                            <span className="booking-item-meta-icon" aria-hidden="true">
-                              <IconCalendar />
+                      {scheduledLabel && (
+                        <div className="booking-item-meta booking-item-meta--primary">
+                          <span className="booking-item-meta-icon" aria-hidden="true">
+                            <IconCalendar />
+                          </span>
+                          {scheduledLabel}
+                        </div>
+                      )}
+                      {(locationLabel || distanceLabel) && (
+                        <div className="booking-item-meta booking-item-meta--row booking-item-meta--secondary">
+                          {locationLabel && (
+                            <span className="booking-item-meta-segment">
+                              {locationLabel}
                             </span>
-                            {scheduledLabel}
-                          </span>
-                        )}
-                        {locationLabel && (
-                          <span className="booking-item-meta-segment">
-                            {locationLabel}
-                          </span>
-                        )}
-                        {distanceLabel && (
-                          <span className="booking-item-meta-segment">
-                            <span className="booking-item-meta-icon" aria-hidden="true">
-                              <IconRadius />
+                          )}
+                          {distanceLabel && (
+                            <span className="booking-item-meta-segment">
+                              <span
+                                className="booking-item-meta-icon"
+                                aria-hidden="true"
+                              >
+                                <IconRadius />
+                              </span>
+                              {distanceLabel}
                             </span>
-                            {distanceLabel}
-                          </span>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                       {hasChips && (
                         <div className="booking-item-chips">
                           {rescheduleMetaLabel && (

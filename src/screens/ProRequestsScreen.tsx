@@ -2882,16 +2882,16 @@ export const ProRequestsScreen = ({
             <div className="booking-item-price">{priceLabel}</div>
           </div>
         )}
-        {!isCompact && (
-          <div className="booking-item-meta booking-item-meta--row">
-            {scheduledLabel && (
-              <span className="booking-item-meta-segment">
-                <span className="booking-item-meta-icon" aria-hidden="true">
-                  <IconCalendar />
-                </span>
-                {scheduledLabel}
-              </span>
-            )}
+        {!isCompact && scheduledLabel && (
+          <div className="booking-item-meta booking-item-meta--primary">
+            <span className="booking-item-meta-icon" aria-hidden="true">
+              <IconCalendar />
+            </span>
+            {scheduledLabel}
+          </div>
+        )}
+        {!isCompact && (locationLabel || distanceLabel) && (
+          <div className="booking-item-meta booking-item-meta--row booking-item-meta--secondary">
             {locationLabel && (
               <span className="booking-item-meta-segment">{locationLabel}</span>
             )}
