@@ -14351,8 +14351,7 @@
 
 .pro-profile-editor-media-cover {
   width: 100%;
-  height: auto;
-  aspect-ratio: var(--cover-aspect, 2.3);
+  height: 140px;
   border-radius: 18px;
   background: linear-gradient(
     135deg,
