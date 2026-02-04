@@ -12469,13 +12469,9 @@
   color: var(--pro-muted);
 }
 
-.pro-profile-showcase-preview-media.is-placeholder {
-  border: 1px dashed rgba(var(--shadow-rgb), 0.18);
-  background: linear-gradient(
-    145deg,
-    rgba(var(--surface-muted-rgb), 0.9),
-    rgba(var(--paper-rgb), 0.85)
-  );
+.pro-profile-showcase-preview-media.is-sample {
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.94);
 }
 
 .pro-profile-showcase-preview-media img {

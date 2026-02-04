@@ -984,6 +984,11 @@ export const ProProfileScreen = ({
   const showcasePreviewWidths = [64, 96, 128]
   const showcasePreviewQuality = 72
   const hasShowcasePreviewMedia = Boolean(showcasePreviewMediaUrl)
+  const showcaseSampleUrl = '/showcase-sample.webp'
+  const showcasePreviewDisplayUrl = hasShowcasePreviewMedia
+    ? showcasePreviewMediaUrl
+    : showcaseSampleUrl
+  const showcasePreviewIsSample = !hasShowcasePreviewMedia
   const isPortfolioFull = portfolioItems.length >= MAX_PORTFOLIO_ITEMS
   const portfolioLightboxItem =
     portfolioLightboxIndex !== null ? portfolioItems[portfolioLightboxIndex] ?? null : null
@@ -3714,20 +3719,24 @@ export const ProProfileScreen = ({
                   <div className="pro-profile-showcase-preview-card">
                     <span
                       className={`pro-profile-showcase-preview-media${
-                        hasShowcasePreviewMedia ? '' : ' is-placeholder'
+                        showcasePreviewIsSample ? ' is-sample' : ''
                       }`}
                     >
-                      {hasShowcasePreviewMedia ? (
+                      {showcasePreviewDisplayUrl ? (
                         <img
-                          src={buildImageUrl(showcasePreviewMediaUrl, {
+                          src={buildImageUrl(showcasePreviewDisplayUrl, {
                             width: showcasePreviewWidths[1],
                             quality: showcasePreviewQuality,
                           })}
-                          alt={showcasePreviewTitle}
+                          alt={
+                            showcasePreviewIsSample
+                              ? 'Пример витрины'
+                              : showcasePreviewTitle
+                          }
                           loading="lazy"
                           style={{ objectPosition: showcasePreviewFocus.position }}
                           srcSet={buildImageSrcSet(
-                            showcasePreviewMediaUrl,
+                            showcasePreviewDisplayUrl,
                             showcasePreviewWidths,
                             { quality: showcasePreviewQuality }
                           )}
