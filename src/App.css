@@ -16939,7 +16939,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  min-width: 0;
+  min-width: 56px;
 }
 
 .pro-slot-time-badge {
@@ -17146,7 +17146,7 @@
 .pro-slot-preview {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   justify-self: start;
 }
@@ -17170,9 +17170,9 @@
 .pro-slot-preview-text {
   min-width: 0;
   flex: 1 1 auto;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-size: 12px;
   font-weight: 600;
   color: var(--pro-ink);
@@ -17181,15 +17181,16 @@
 
 .pro-slot-preview-name {
   font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.pro-slot-preview-sep {
-  margin: 0 4px;
+.pro-slot-preview-meta {
   color: var(--pro-muted);
-}
-
-.pro-slot-preview-service {
-  color: var(--pro-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .pro-slot-preview-pill {

@@ -4293,23 +4293,11 @@ export const ProRequestsScreen = ({
                                             {bookingClientName}
                                           </span>
                                           {bookingPreviewLabel && (
-                                            <>
-                                              <span className="pro-slot-preview-sep">
-                                                ·
-                                              </span>
-                                              <span className="pro-slot-preview-service">
-                                                {bookingPreviewLabel}
-                                              </span>
-                                            </>
+                                            <span className="pro-slot-preview-meta">
+                                              {bookingPreviewLabel}
+                                            </span>
                                           )}
                                         </span>
-                                        {bookingDepositLabel && (
-                                          <span
-                                            className={`pro-slot-preview-pill ${bookingDepositTone}`}
-                                          >
-                                            {bookingDepositLabel}
-                                          </span>
-                                        )}
                                       </div>
                                     </>
                                   ) : (
@@ -4328,6 +4316,13 @@ export const ProRequestsScreen = ({
                                   )}
                                   {isBookingSlot ? (
                                     <div className="pro-slot-trailing">
+                                      {bookingDepositLabel && (
+                                        <span
+                                          className={`pro-slot-preview-pill ${bookingDepositTone}`}
+                                        >
+                                          {bookingDepositLabel}
+                                        </span>
+                                      )}
                                       <span
                                         className="pro-slot-toggle-icon"
                                         aria-hidden="true"
