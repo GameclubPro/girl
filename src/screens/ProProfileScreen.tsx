@@ -413,6 +413,7 @@ export const ProProfileScreen = ({
   const [avatarUrl, setAvatarUrl] = useState('')
   const [hasAvatar, setHasAvatar] = useState(false)
   const [coverUrl, setCoverUrl] = useState('')
+  const [coverAspect, setCoverAspect] = useState(2.3)
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] =
     useState<MasterReviewSummary | null>(null)
@@ -487,6 +488,21 @@ export const ProProfileScreen = ({
   const portfolioLongPressTimerRef = useRef<number | null>(null)
   const portfolioLongPressTriggeredRef = useRef(false)
   const portfolioLongPressStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  const getCoverAspectFromLayout = useCallback(() => {
+    const rect = coverRef.current?.getBoundingClientRect()
+    if (rect && rect.width > 1 && rect.height > 1) {
+      const aspect = rect.width / rect.height
+      if (Number.isFinite(aspect) && aspect > 0) return aspect
+    }
+    if (typeof window === 'undefined') return 2.3
+    const viewportWidth =
+      document.documentElement?.clientWidth || window.innerWidth || 360
+    const width = clampValue(viewportWidth, 320, 430)
+    const height = clampValue(0.42 * width, 152, 184)
+    const aspect = width / height
+    return Number.isFinite(aspect) && aspect > 0 ? aspect : 2.3
+  }, [])
   const followersRequestIdRef = useRef(0)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const settingsOpenRef = useRef(false)
@@ -1485,6 +1501,19 @@ export const ProProfileScreen = ({
   }, [cropperState])
 
   useEffect(() => {
+    const updateAspect = () => {
+      setCoverAspect(getCoverAspectFromLayout())
+    }
+    updateAspect()
+    const raf = window.requestAnimationFrame(updateAspect)
+    window.addEventListener('resize', updateAspect)
+    return () => {
+      window.cancelAnimationFrame(raf)
+      window.removeEventListener('resize', updateAspect)
+    }
+  }, [getCoverAspectFromLayout])
+
+  useEffect(() => {
     cropperStateRef.current = cropperState
   }, [cropperState])
 
@@ -2285,23 +2314,7 @@ export const ProProfileScreen = ({
     setIsAvatarActionsOpen(false)
     try {
       const dataUrl = await readImageFileAsync(file)
-      const coverAspect =
-        kind === 'cover'
-          ? (() => {
-              const rect = coverRef.current?.getBoundingClientRect()
-              if (rect && rect.width > 1 && rect.height > 1) {
-                const aspect = rect.width / rect.height
-                if (Number.isFinite(aspect) && aspect > 0) return aspect
-              }
-              if (typeof window === 'undefined') return undefined
-              const viewportWidth =
-                document.documentElement?.clientWidth || window.innerWidth || 360
-              const width = clampValue(viewportWidth, 320, 430)
-              const height = clampValue(0.42 * width, 152, 184)
-              const aspect = width / height
-              return Number.isFinite(aspect) && aspect > 0 ? aspect : undefined
-            })()
-          : undefined
+      const coverAspect = kind === 'cover' ? getCoverAspectFromLayout() : undefined
       setCropperState({ kind, src: dataUrl, coverAspect })
     } catch (error) {
       setMediaError('Не удалось прочитать файл.')
@@ -4936,7 +4949,12 @@ export const ProProfileScreen = ({
                         coverUrl ? ' has-image' : ''
                       }${isCoverUploading ? ' is-loading' : ''}`}
                       style={
-                        coverUrl ? { backgroundImage: `url(${coverUrl})` } : undefined
+                        ({
+                          ...(coverUrl
+                            ? { backgroundImage: `url(${coverUrl})` }
+                            : {}),
+                          '--cover-aspect': String(coverAspect),
+                        } as CSSProperties)
                       }
                       aria-busy={isCoverUploading}
                     >
