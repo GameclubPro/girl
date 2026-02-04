@@ -4267,49 +4267,56 @@ export const ProRequestsScreen = ({
                                       onClick={() => toggleSlotExpand(slot)}
                                     />
                                   )}
-                                  <span className="pro-slot-time">{timeLabel}</span>
                                   {isBookingSlot ? (
-                                    <div className="pro-slot-preview">
-                                      <span
-                                        className="pro-slot-preview-avatar"
-                                        aria-hidden="true"
-                                      >
-                                        {bookingClientInitials}
-                                      </span>
-                                      <span className="pro-slot-preview-text">
-                                        <span className="pro-slot-preview-name">
-                                          {bookingClientName}
+                                    <>
+                                      <div className="pro-slot-time-stack">
+                                        <span className="pro-slot-time">
+                                          {timeLabel}
                                         </span>
-                                        {bookingPreviewLabel && (
-                                          <>
-                                            <span className="pro-slot-preview-sep">
-                                              ·
-                                            </span>
-                                            <span className="pro-slot-preview-service">
-                                              {bookingPreviewLabel}
-                                            </span>
-                                          </>
-                                        )}
-                                      </span>
-                                      {bookingDepositLabel && (
                                         <span
-                                          className={`pro-slot-preview-pill ${bookingDepositTone}`}
+                                          className={`pro-slot-status pro-slot-time-badge is-${slot.status}`}
+                                          aria-label={statusLabelFull}
+                                          title={statusLabelFull}
                                         >
-                                          {bookingDepositLabel}
+                                          {statusLabel}
                                         </span>
-                                      )}
-                                    </div>
+                                      </div>
+                                      <div className="pro-slot-preview">
+                                        <span
+                                          className="pro-slot-preview-avatar"
+                                          aria-hidden="true"
+                                        >
+                                          {bookingClientInitials}
+                                        </span>
+                                        <span className="pro-slot-preview-text">
+                                          <span className="pro-slot-preview-name">
+                                            {bookingClientName}
+                                          </span>
+                                          {bookingPreviewLabel && (
+                                            <>
+                                              <span className="pro-slot-preview-sep">
+                                                ·
+                                              </span>
+                                              <span className="pro-slot-preview-service">
+                                                {bookingPreviewLabel}
+                                              </span>
+                                            </>
+                                          )}
+                                        </span>
+                                        {bookingDepositLabel && (
+                                          <span
+                                            className={`pro-slot-preview-pill ${bookingDepositTone}`}
+                                          >
+                                            {bookingDepositLabel}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </>
                                   ) : (
-                                    <span
-                                      className={`pro-slot-status is-${slot.status}`}
-                                      aria-label={statusLabelFull}
-                                      title={statusLabelFull}
-                                    >
-                                      {statusLabel}
-                                    </span>
-                                  )}
-                                  {isBookingSlot ? (
-                                    <div className="pro-slot-trailing">
+                                    <>
+                                      <span className="pro-slot-time">
+                                        {timeLabel}
+                                      </span>
                                       <span
                                         className={`pro-slot-status is-${slot.status}`}
                                         aria-label={statusLabelFull}
@@ -4317,6 +4324,10 @@ export const ProRequestsScreen = ({
                                       >
                                         {statusLabel}
                                       </span>
+                                    </>
+                                  )}
+                                  {isBookingSlot ? (
+                                    <div className="pro-slot-trailing">
                                       <span
                                         className="pro-slot-toggle-icon"
                                         aria-hidden="true"
