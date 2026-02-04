@@ -29841,6 +29841,7 @@ h2 {
 
 .pro-cropper-frame.is-cover {
   width: var(--crop-width, min(92vw, 420px));
+  height: var(--crop-height, auto);
   border-radius: 22px;
 }
 

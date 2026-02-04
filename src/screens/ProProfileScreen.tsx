@@ -415,6 +415,7 @@ export const ProProfileScreen = ({
   const [coverUrl, setCoverUrl] = useState('')
   const [editorCoverAspect, setEditorCoverAspect] = useState<number | null>(null)
   const [coverFrameWidth, setCoverFrameWidth] = useState<number | null>(null)
+  const [coverFrameHeight, setCoverFrameHeight] = useState<number | null>(null)
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] =
     useState<MasterReviewSummary | null>(null)
@@ -508,14 +509,14 @@ export const ProProfileScreen = ({
     if (editorRect && editorRect.width > 1 && editorRect.height > 1) {
       const aspect = editorRect.width / editorRect.height
       if (Number.isFinite(aspect) && aspect > 0) {
-        return { width: editorRect.width, aspect }
+        return { width: editorRect.width, height: editorRect.height, aspect }
       }
     }
     const heroRect = coverRef.current?.getBoundingClientRect()
     if (heroRect && heroRect.width > 1 && heroRect.height > 1) {
       const aspect = heroRect.width / heroRect.height
       if (Number.isFinite(aspect) && aspect > 0) {
-        return { width: heroRect.width, aspect }
+        return { width: heroRect.width, height: heroRect.height, aspect }
       }
     }
     if (typeof window === 'undefined') return { aspect: 2.2 }
@@ -524,7 +525,9 @@ export const ProProfileScreen = ({
     const width = clampValue(viewportWidth, 320, 430)
     const height = clampValue(0.56 * width, 210, 250)
     const aspect = width / height
-    return Number.isFinite(aspect) && aspect > 0 ? { width, aspect } : { aspect: 2.2 }
+    return Number.isFinite(aspect) && aspect > 0
+      ? { width, height, aspect }
+      : { aspect: 2.2 }
   }, [])
   useEffect(() => {
     const updateAspect = () => {
@@ -540,6 +543,13 @@ export const ProProfileScreen = ({
           current && Math.abs(current - metrics.width) < 0.5
             ? current
             : metrics.width
+        )
+      }
+      if (metrics.height) {
+        setCoverFrameHeight((current) =>
+          current && Math.abs(current - metrics.height) < 0.5
+            ? current
+            : metrics.height
         )
       }
     }
@@ -2360,6 +2370,9 @@ export const ProProfileScreen = ({
       const coverAspect = kind === 'cover' ? coverMetrics?.aspect : undefined
       if (kind === 'cover' && coverMetrics?.width) {
         setCoverFrameWidth(coverMetrics.width)
+      }
+      if (kind === 'cover' && coverMetrics?.height) {
+        setCoverFrameHeight(coverMetrics.height)
       }
       setCropperState({ kind, src: dataUrl, coverAspect })
     } catch (error) {
@@ -4740,6 +4753,9 @@ export const ProProfileScreen = ({
           coverAspect={cropperState.coverAspect}
           coverFrameWidth={
             cropperState.kind === 'cover' ? coverFrameWidth ?? undefined : undefined
+          }
+          coverFrameHeight={
+            cropperState.kind === 'cover' ? coverFrameHeight ?? undefined : undefined
           }
           maxBytes={MAX_MEDIA_BYTES}
           isBusy={isCropperUploading}
