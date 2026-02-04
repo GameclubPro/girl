@@ -2414,6 +2414,16 @@ export const ClientRequestsScreen = ({
                     hasExtraDetails ||
                     reschedulePending ||
                     actionVariant !== null
+                  const hasChips =
+                    Boolean(rescheduleMetaLabel) ||
+                    Boolean(promotionLabel) ||
+                    (booking.status === 'price_proposed' && Boolean(priceOfferTimeLeft)) ||
+                    (booking.status === 'confirmed' && Boolean(freeCancelLabel)) ||
+                    (booking.status === 'confirmed' && !freeCancelLabel && !isPast) ||
+                    depositPercent > 0 ||
+                    depositAmount > 0 ||
+                    (depositAmount > 0 && Boolean(depositStatusLabel)) ||
+                    Boolean(criticalHoldLabel)
                   const nextAction = booking.nextAction ?? null
 
                   return (
@@ -2440,6 +2450,7 @@ export const ClientRequestsScreen = ({
                           </div>
                         </div>
                         <div className="booking-item-aside">
+                          <div className="booking-item-price">{priceLabel}</div>
                           <span className={`booking-status ${statusTone}`}>
                             {statusLabel}
                           </span>
@@ -2468,9 +2479,60 @@ export const ClientRequestsScreen = ({
                           </span>
                         )}
                       </div>
-                      {rescheduleMetaLabel && (
-                        <div className={`booking-item-meta ${rescheduleMetaTone}`}>
-                          {rescheduleMetaLabel}
+                      {hasChips && (
+                        <div className="booking-item-chips">
+                          {rescheduleMetaLabel && (
+                            <div
+                              className={`booking-item-meta booking-item-meta--chip ${rescheduleMetaTone}`}
+                            >
+                              {rescheduleMetaLabel}
+                            </div>
+                          )}
+                          {promotionLabel && (
+                            <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
+                              {promotionLabel}
+                            </div>
+                          )}
+                          {booking.status === 'price_proposed' &&
+                            priceOfferTimeLeft && (
+                              <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
+                                Цена действует: {priceOfferTimeLeft}
+                              </div>
+                            )}
+                          {booking.status === 'confirmed' && freeCancelLabel && (
+                            <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
+                              Бесплатная отмена до: {freeCancelLabel}
+                            </div>
+                          )}
+                          {booking.status === 'confirmed' &&
+                            !freeCancelLabel &&
+                            !isPast && (
+                              <div className="booking-item-meta booking-item-meta--chip booking-item-meta--warning">
+                                Отмена без бесплатного окна
+                              </div>
+                            )}
+                          {depositPercent > 0 && (
+                            <div className="booking-item-meta booking-item-meta--chip">
+                              Депозит: {depositPercent}%
+                            </div>
+                          )}
+                          {depositAmount > 0 && (
+                            <div className="booking-item-meta booking-item-meta--chip">
+                              Депозит к оплате: {formatPrice(depositAmount)}
+                            </div>
+                          )}
+                          {depositAmount > 0 && depositStatusLabel && (
+                            <div
+                              className={`booking-item-meta booking-item-meta--chip ${depositStatusTone}`}
+                            >
+                              {depositStatusLabel}
+                            </div>
+                          )}
+                          {criticalHoldLabel && (
+                            <div className="booking-item-meta booking-item-meta--chip booking-item-meta--danger">
+                              {criticalHoldLabel}
+                            </div>
+                          )}
                         </div>
                       )}
                       {nextAction && (
@@ -2683,49 +2745,6 @@ export const ClientRequestsScreen = ({
                             Адрес: {booking.address}
                           </div>
                         )}
-                      <div className="booking-item-price">{priceLabel}</div>
-                      {promotionLabel && (
-                        <div className="booking-item-meta booking-item-meta--highlight">
-                          {promotionLabel}
-                        </div>
-                      )}
-                      {booking.status === 'price_proposed' && priceOfferTimeLeft && (
-                        <div className="booking-item-meta booking-item-meta--highlight">
-                          Цена действует: {priceOfferTimeLeft}
-                        </div>
-                      )}
-                      {booking.status === 'confirmed' && freeCancelLabel && (
-                        <div className="booking-item-meta booking-item-meta--highlight">
-                          Бесплатная отмена до: {freeCancelLabel}
-                        </div>
-                      )}
-                      {booking.status === 'confirmed' &&
-                        !freeCancelLabel &&
-                        !isPast && (
-                          <div className="booking-item-meta booking-item-meta--warning">
-                            Отмена без бесплатного окна
-                          </div>
-                        )}
-                      {depositPercent > 0 && (
-                        <div className="booking-item-meta">
-                          Депозит: {depositPercent}%
-                        </div>
-                      )}
-                      {depositAmount > 0 && (
-                        <div className="booking-item-meta">
-                          Депозит к оплате: {formatPrice(depositAmount)}
-                        </div>
-                      )}
-                      {depositAmount > 0 && depositStatusLabel && (
-                        <div className={`booking-item-meta ${depositStatusTone}`}>
-                          {depositStatusLabel}
-                        </div>
-                      )}
-                      {criticalHoldLabel && (
-                        <div className="booking-item-meta booking-item-meta--danger">
-                          {criticalHoldLabel}
-                        </div>
-                      )}
                       {showDepositPay && (
                         <div className="booking-deposit-pay">
                           <div className="booking-deposit-row">

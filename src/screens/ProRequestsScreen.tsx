@@ -5,6 +5,7 @@ import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStac
 import { NextActionPill } from '../components/NextActionPill'
 import {
   IconCalendar,
+  IconChat,
   IconChevron,
   IconLock,
   IconRadius,
@@ -657,6 +658,9 @@ export const ProRequestsScreen = ({
   const [bookingActionId, setBookingActionId] = useState<number | null>(null)
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
+  >({})
+  const [expandedBookingDetails, setExpandedBookingDetails] = useState<
+    Record<number, boolean>
   >({})
   const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
@@ -2798,6 +2802,10 @@ export const ProRequestsScreen = ({
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
+    const hasExtraDetails =
+      Boolean(booking.cityName || booking.districtName || booking.address) ||
+      Boolean(booking.comment) ||
+      photoItems.length > 0
     const reschedulePending =
       Boolean(booking.rescheduleProposedTime) &&
       Boolean(booking.rescheduleProposedBy)
@@ -2817,7 +2825,19 @@ export const ProRequestsScreen = ({
       ? 'booking-item-meta--warning'
       : 'booking-item-meta--highlight'
     const isCompact = Boolean(options?.compact)
+    const isDetailsOpen = isCompact
+      ? hasExtraDetails
+      : Boolean(expandedBookingDetails[booking.id])
+    const showQuickActions = !isCompact && (booking.chatId || hasExtraDetails)
     const nextAction = booking.nextAction ?? null
+    const hasChips =
+      Boolean(rescheduleMetaLabel) ||
+      Boolean(promotionLabel) ||
+      (booking.status === 'price_proposed' && Boolean(priceOfferTimeLeft)) ||
+      (booking.status === 'confirmed' && Boolean(freeCancelLabel)) ||
+      (!isCompact && depositPercent > 0) ||
+      depositAmount > 0 ||
+      (depositAmount > 0 && Boolean(depositStatusLabel))
 
     return (
       <div
@@ -2841,6 +2861,7 @@ export const ProRequestsScreen = ({
               </div>
             </div>
             <div className="booking-item-aside">
+              <div className="booking-item-price">{priceLabel}</div>
               <span className={`booking-status ${statusTone}`}>
                 {statusLabel}
               </span>
@@ -2851,6 +2872,14 @@ export const ProRequestsScreen = ({
                 className="booking-item-trust"
               />
             </div>
+          </div>
+        )}
+        {isCompact && (
+          <div className="booking-item-summary">
+            <div className="booking-item-service">
+              {booking.serviceName}
+            </div>
+            <div className="booking-item-price">{priceLabel}</div>
           </div>
         )}
         {!isCompact && (
@@ -2876,9 +2905,45 @@ export const ProRequestsScreen = ({
             )}
           </div>
         )}
-        {rescheduleMetaLabel && (
-          <div className={`booking-item-meta ${rescheduleMetaTone}`}>
-            {rescheduleMetaLabel}
+        {hasChips && (
+          <div className="booking-item-chips">
+            {rescheduleMetaLabel && (
+              <div
+                className={`booking-item-meta booking-item-meta--chip ${rescheduleMetaTone}`}
+              >
+                {rescheduleMetaLabel}
+              </div>
+            )}
+            {promotionLabel && (
+              <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
+                {promotionLabel}
+              </div>
+            )}
+            {booking.status === 'price_proposed' && priceOfferTimeLeft && (
+              <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
+                Ожидание клиента: {priceOfferTimeLeft}
+              </div>
+            )}
+            {booking.status === 'confirmed' && freeCancelLabel && (
+              <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
+                Бесплатная отмена до: {freeCancelLabel}
+              </div>
+            )}
+            {!isCompact && depositPercent > 0 && (
+              <div className="booking-item-meta booking-item-meta--chip">
+                Депозит: {depositPercent}%
+              </div>
+            )}
+            {depositAmount > 0 && (
+              <div className="booking-item-meta booking-item-meta--chip">
+                Депозит к оплате: {formatPrice(depositAmount)}
+              </div>
+            )}
+            {depositAmount > 0 && depositStatusLabel && (
+              <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
+                {depositStatusLabel}
+              </div>
+            )}
           </div>
         )}
         {nextAction && !isCompact && (
@@ -2888,7 +2953,42 @@ export const ProRequestsScreen = ({
             onClick={() => handleBookingActionFocus(booking)}
           />
         )}
-        {(booking.cityName || booking.districtName) && (
+        {showQuickActions && (
+          <div className="booking-item-actions">
+            <div className="booking-action-row">
+              {booking.chatId && (
+                <button
+                  className="booking-action-icon is-chat"
+                  type="button"
+                  onClick={() => onOpenChat(booking.chatId!)}
+                >
+                  <span
+                    className="booking-action-icon-symbol"
+                    aria-hidden="true"
+                  >
+                    <IconChat />
+                  </span>
+                  Чат
+                </button>
+              )}
+              {hasExtraDetails && (
+                <button
+                  className="booking-action-icon is-ghost"
+                  type="button"
+                  onClick={() =>
+                    setExpandedBookingDetails((current) => ({
+                      ...current,
+                      [booking.id]: !isDetailsOpen,
+                    }))
+                  }
+                >
+                  {isDetailsOpen ? 'Скрыть' : 'Подробнее'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {isDetailsOpen && (booking.cityName || booking.districtName) && (
           <div className="booking-item-meta">
             {booking.cityName ? booking.cityName : ''}
             {booking.districtName
@@ -2896,40 +2996,9 @@ export const ProRequestsScreen = ({
               : ''}
           </div>
         )}
-        {booking.locationType === 'client' && booking.address && (
+        {isDetailsOpen && booking.locationType === 'client' && booking.address && (
           <div className="booking-item-meta">
             Адрес: {booking.address}
-          </div>
-        )}
-        <div className="booking-item-price">{priceLabel}</div>
-        {promotionLabel && (
-          <div className="booking-item-meta booking-item-meta--highlight">
-            {promotionLabel}
-          </div>
-        )}
-        {booking.status === 'price_proposed' && priceOfferTimeLeft && (
-          <div className="booking-item-meta booking-item-meta--highlight">
-            Ожидание клиента: {priceOfferTimeLeft}
-          </div>
-        )}
-        {booking.status === 'confirmed' && freeCancelLabel && (
-          <div className="booking-item-meta booking-item-meta--highlight">
-            Бесплатная отмена до: {freeCancelLabel}
-          </div>
-        )}
-        {!isCompact && depositPercent > 0 && (
-          <div className="booking-item-meta">
-            Депозит: {depositPercent}%
-          </div>
-        )}
-        {depositAmount > 0 && (
-          <div className="booking-item-meta">
-            Депозит к оплате: {formatPrice(depositAmount)}
-          </div>
-        )}
-        {depositAmount > 0 && depositStatusLabel && (
-          <div className="booking-item-meta booking-item-meta--highlight">
-            {depositStatusLabel}
           </div>
         )}
         {!isCompact && reschedulePending && (
@@ -3004,12 +3073,12 @@ export const ProRequestsScreen = ({
         {outcomeLabel && (
           <div className="booking-item-outcome">Итог: {outcomeLabel}</div>
         )}
-        {booking.comment && (
+        {isDetailsOpen && booking.comment && (
           <div className="booking-item-comment">
             {booking.comment}
           </div>
         )}
-        {photoItems.length > 0 && (
+        {isDetailsOpen && photoItems.length > 0 && (
           <div className="booking-photo-strip" role="list">
             {photoItems.map((url, index) => (
               <span
