@@ -11820,11 +11820,13 @@
 }
 
 .pro-profile-portfolio-panel {
-  border-radius: 24px;
+  border-radius: 0;
   padding: 12px;
-  background: rgba(var(--paper-rgb), 0.95);
-  border: 1px solid rgba(var(--paper-rgb), 0.82);
-  box-shadow: 0 18px 28px rgba(var(--shadow-rgb), 0.12);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft), var(--glass-inset);
+  backdrop-filter: var(--glass-frost-soft);
+  -webkit-backdrop-filter: var(--glass-frost-soft);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -12107,30 +12109,23 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background:
-    radial-gradient(120% 120% at 0% 0%, rgba(var(--surface-muted-rgb), 0.6), transparent 55%),
-    radial-gradient(120% 120% at 100% 0%, rgba(var(--accent-rgb), 0.5), transparent 58%);
-  opacity: 0.7;
+  background: var(--glass-specular);
+  opacity: 0.45;
   pointer-events: none;
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel {
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent-rgb), 0.32),
-    rgba(var(--accent-rgb), 0.22)
-  );
+  background: var(--glass-bg-strong);
   border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
+  border-radius: 0;
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel::before {
-  background:
-    radial-gradient(120% 120% at 0% 0%, rgba(var(--accent-rgb), 0.4), transparent 55%),
-    radial-gradient(140% 140% at 100% 0%, rgba(var(--accent-rgb), 0.3), transparent 60%);
-  opacity: 0.6;
+  background: var(--glass-specular);
+  opacity: 0.5;
 }
 
 .pro-profile-portfolio-panel-head {
@@ -30729,7 +30724,7 @@ h2 {
   box-shadow: var(--glass-shadow), var(--glass-inset);
   backdrop-filter: var(--glass-frost);
   -webkit-backdrop-filter: var(--glass-frost);
-  border-radius: 24px;
+  border-radius: 0;
 }
 
 .screen--pro-profile .pro-profile-portfolio-panel::before {
