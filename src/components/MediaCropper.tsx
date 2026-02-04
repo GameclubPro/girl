@@ -163,18 +163,34 @@ export const MediaCropper = ({
 
   useEffect(() => {
     if (!imageSize || !cropRect) return
-    const rawMinScale = Math.max(
+    const coverScale = Math.max(
       cropRect.width / imageSize.width,
       cropRect.height / imageSize.height
     )
+    const fitScale = Math.min(
+      cropRect.width / imageSize.width,
+      cropRect.height / imageSize.height
+    )
+    const normalizedCoverScale =
+      Number.isFinite(coverScale) && coverScale > 0 ? coverScale : 1
+    const normalizedFitScale =
+      Number.isFinite(fitScale) && fitScale > 0 ? fitScale : normalizedCoverScale
+    const coverStartScale = Math.max(
+      0.05,
+      Math.min(normalizedFitScale, 1)
+    )
     const nextMinScale =
-      Number.isFinite(rawMinScale) && rawMinScale > 0 ? rawMinScale : 1
-    const nextMaxScale = Math.max(nextMinScale * 4, nextMinScale + 0.01)
+      kind === 'cover' ? coverStartScale : normalizedCoverScale
+    const nextMaxScale =
+      kind === 'cover'
+        ? Math.max(normalizedCoverScale * 4, nextMinScale + 0.01)
+        : Math.max(nextMinScale * 4, nextMinScale + 0.01)
+    const startScale = kind === 'cover' ? coverStartScale : normalizedCoverScale
     setMinScale(nextMinScale)
     setMaxScale(nextMaxScale)
-    applyTransform(nextMinScale, { x: 0, y: 0 })
+    applyTransform(startScale, { x: 0, y: 0 })
     resetPointers()
-  }, [applyTransform, cropRect, imageSize, resetPointers, src])
+  }, [applyTransform, cropRect, imageSize, kind, resetPointers, src])
 
   const clampOffset = useCallback(
     (next: { x: number; y: number }, nextScale: number) => {
@@ -310,27 +326,15 @@ export const MediaCropper = ({
     if (!imageRef.current || !cropRect || !imageSize) return ''
     const currentScale = scaleRef.current
     const currentOffset = offsetRef.current
-    const cropWidth = Math.min(imageSize.width, cropRect.width / currentScale)
-    const cropHeight = Math.min(imageSize.height, cropRect.height / currentScale)
-    const cropLeft =
-      imageSize.width / 2 - cropWidth / 2 - currentOffset.x / currentScale
-    const cropTop =
-      imageSize.height / 2 - cropHeight / 2 - currentOffset.y / currentScale
-    const safeLeft = clamp(
-      cropLeft,
-      0,
-      Math.max(0, imageSize.width - cropWidth)
-    )
-    const safeTop = clamp(
-      cropTop,
-      0,
-      Math.max(0, imageSize.height - cropHeight)
-    )
     const targetWidth =
       kind === 'avatar' ? AVATAR_TARGET_SIZE : COVER_TARGET_WIDTH
-    let outputWidth = Math.min(targetWidth, Math.round(cropWidth))
-    const cropRatio = cropWidth && cropHeight ? cropWidth / cropHeight : aspect
-    let outputHeight = Math.round(outputWidth / cropRatio)
+    const cropWidth = Math.min(imageSize.width, cropRect.width / currentScale)
+    const cropHeight = Math.min(imageSize.height, cropRect.height / currentScale)
+    let outputWidth =
+      kind === 'avatar'
+        ? Math.min(targetWidth, Math.round(cropWidth))
+        : targetWidth
+    let outputHeight = Math.round(outputWidth / aspect)
     let quality = 0.92
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
@@ -340,17 +344,59 @@ export const MediaCropper = ({
       canvas.width = Math.max(1, outputWidth)
       canvas.height = Math.max(1, outputHeight)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(
-        imageRef.current,
-        safeLeft,
-        safeTop,
-        cropWidth,
-        cropHeight,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      )
+      if (kind === 'cover') {
+        const backgroundScale = Math.max(
+          canvas.width / imageSize.width,
+          canvas.height / imageSize.height
+        )
+        const backgroundWidth = imageSize.width * backgroundScale
+        const backgroundHeight = imageSize.height * backgroundScale
+        const backgroundX = (canvas.width - backgroundWidth) / 2
+        const backgroundY = (canvas.height - backgroundHeight) / 2
+        ctx.filter = 'blur(24px)'
+        ctx.drawImage(
+          imageRef.current,
+          backgroundX,
+          backgroundY,
+          backgroundWidth,
+          backgroundHeight
+        )
+        ctx.filter = 'none'
+        const frameScale = canvas.width / cropRect.width
+        const drawWidth = imageSize.width * currentScale * frameScale
+        const drawHeight = imageSize.height * currentScale * frameScale
+        const centerX = canvas.width / 2 + currentOffset.x * frameScale
+        const centerY = canvas.height / 2 + currentOffset.y * frameScale
+        const drawX = centerX - drawWidth / 2
+        const drawY = centerY - drawHeight / 2
+        ctx.drawImage(imageRef.current, drawX, drawY, drawWidth, drawHeight)
+      } else {
+        const cropLeft =
+          imageSize.width / 2 - cropWidth / 2 - currentOffset.x / currentScale
+        const cropTop =
+          imageSize.height / 2 - cropHeight / 2 - currentOffset.y / currentScale
+        const safeLeft = clamp(
+          cropLeft,
+          0,
+          Math.max(0, imageSize.width - cropWidth)
+        )
+        const safeTop = clamp(
+          cropTop,
+          0,
+          Math.max(0, imageSize.height - cropHeight)
+        )
+        ctx.drawImage(
+          imageRef.current,
+          safeLeft,
+          safeTop,
+          cropWidth,
+          cropHeight,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        )
+      }
       dataUrl = canvas.toDataURL('image/jpeg', quality)
       if (estimateDataUrlBytes(dataUrl) <= maxBytes) {
         break
@@ -359,7 +405,7 @@ export const MediaCropper = ({
         quality -= 0.07
       } else if (outputWidth > 720) {
         outputWidth = Math.round(outputWidth * 0.9)
-        outputHeight = Math.round(outputWidth / cropRatio)
+        outputHeight = Math.round(outputWidth / aspect)
       } else {
         break
       }
