@@ -16799,6 +16799,16 @@
   min-height: 48px;
 }
 
+.pro-slot-card.is-booked,
+.pro-slot-card.is-pending {
+  padding: 6px 12px;
+}
+
+.pro-slot-card.is-booked:not(.is-open),
+.pro-slot-card.is-pending:not(.is-open) {
+  min-height: 46px;
+}
+
 .pro-slot-row {
   display: flex;
   flex-direction: column;
