@@ -10024,8 +10024,10 @@
 }
 
 .pro-profile-ig-cover.has-image {
-  background-size: cover;
+  background-size: contain;
   background-position: center;
+  background-repeat: no-repeat;
+  background-color: rgba(var(--surface-muted-rgb), 0.6);
 }
 
 .pro-profile-ig-cover.is-loading {
@@ -14373,8 +14375,10 @@
 }
 
 .pro-profile-editor-media-cover.has-image {
-  background-size: cover;
+  background-size: contain;
   background-position: center;
+  background-repeat: no-repeat;
+  background-color: rgba(var(--surface-muted-rgb), 0.6);
   border: none;
 }
 
