@@ -503,10 +503,32 @@ export const ProProfileScreen = ({
   const hasLoadedRef = useRef(false)
   const isSavingRef = useRef(false)
   const queuedPayloadRef = useRef<ProfilePayload | null>(null)
-  const getCoverAspectValue = useCallback(() => {
+  const getCoverRect = useCallback(() => {
+    const editorRect = editorCoverRef.current?.getBoundingClientRect()
+    if (editorRect && editorRect.width > 1 && editorRect.height > 1) {
+      return editorRect
+    }
     const heroRect = coverRef.current?.getBoundingClientRect()
     if (heroRect && heroRect.width > 1 && heroRect.height > 1) {
-      const aspect = heroRect.width / heroRect.height
+      return heroRect
+    }
+    return null
+  }, [])
+  const waitForCoverRect = useCallback(async () => {
+    if (typeof window === 'undefined') return null
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const rect = getCoverRect()
+      if (rect) return rect
+      await new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() => resolve())
+      )
+    }
+    return null
+  }, [getCoverRect])
+  const getCoverAspectValue = useCallback(() => {
+    const rect = getCoverRect()
+    if (rect) {
+      const aspect = rect.width / rect.height
       if (Number.isFinite(aspect) && aspect > 0) return aspect
     }
     if (typeof window === 'undefined') return 1.78
@@ -516,21 +538,15 @@ export const ProProfileScreen = ({
     const height = clampValue(0.56 * width, 210, 250)
     const fallbackAspect = width / height
     return Number.isFinite(fallbackAspect) && fallbackAspect > 0 ? fallbackAspect : 1.78
-  }, [])
+  }, [getCoverRect])
   const getCoverFrameWidth = useCallback(() => {
+    const rect = getCoverRect()
+    if (rect && rect.width > 1) return rect.width
     if (typeof window === 'undefined') return undefined
     const viewportWidth = document.documentElement?.clientWidth || window.innerWidth
     const maxWidth = Math.max(0, viewportWidth - 32)
-    const editorRect = editorCoverRef.current?.getBoundingClientRect()
-    if (editorRect && editorRect.width > 1) {
-      return Math.min(editorRect.width, maxWidth)
-    }
-    const heroRect = coverRef.current?.getBoundingClientRect()
-    if (heroRect && heroRect.width > 1) {
-      return Math.min(heroRect.width, maxWidth)
-    }
     return maxWidth > 0 ? maxWidth : undefined
-  }, [])
+  }, [getCoverRect])
   useEffect(() => {
     const updateAspect = () => {
       const next = getCoverAspectValue()
@@ -542,7 +558,7 @@ export const ProProfileScreen = ({
     updateAspect()
     if (typeof window === 'undefined') return
     window.addEventListener('resize', updateAspect)
-    const element = coverRef.current
+    const element = editorCoverRef.current ?? coverRef.current
     if (element && typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(updateAspect)
       observer.observe(element)
@@ -554,7 +570,7 @@ export const ProProfileScreen = ({
     return () => {
       window.removeEventListener('resize', updateAspect)
     }
-  }, [getCoverAspectValue])
+  }, [editingSection, getCoverAspectValue])
   useEffect(() => {
     const updateWidth = () => {
       const next = getCoverFrameWidth()
@@ -2372,10 +2388,30 @@ export const ProProfileScreen = ({
     setIsAvatarActionsOpen(false)
     try {
       const dataUrl = await readImageFileAsync(file)
-      const coverAspect = kind === 'cover' ? getCoverAspectValue() : undefined
+      let coverAspect: number | undefined
       if (kind === 'cover') {
-        const width = getCoverFrameWidth()
+        const rect = await waitForCoverRect()
+        const rectAspect =
+          rect && rect.height > 0 ? rect.width / rect.height : undefined
+        coverAspect =
+          typeof rectAspect === 'number' &&
+          Number.isFinite(rectAspect) &&
+          rectAspect > 0
+            ? rectAspect
+            : getCoverAspectValue()
+        const width = rect?.width ?? getCoverFrameWidth()
         if (width) setCoverFrameWidth(width)
+        if (
+          typeof coverAspect === 'number' &&
+          Number.isFinite(coverAspect) &&
+          coverAspect > 0
+        ) {
+          setCoverAspectValue((current) =>
+            current && Math.abs(current - coverAspect!) < 0.01
+              ? current
+              : coverAspect!
+          )
+        }
       }
       setCropperState({ kind, src: dataUrl, coverAspect })
     } catch (error) {

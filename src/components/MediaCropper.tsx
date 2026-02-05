@@ -88,10 +88,16 @@ export const MediaCropper = ({
     lastDistanceRef.current = null
   }, [])
 
-  const coverAspect = useMemo(
-    () => (coverAspectOverride ? coverAspectOverride : autoCoverAspect),
-    [autoCoverAspect, coverAspectOverride]
-  )
+  const coverAspect = useMemo(() => {
+    if (
+      typeof coverAspectOverride === 'number' &&
+      Number.isFinite(coverAspectOverride) &&
+      coverAspectOverride > 0
+    ) {
+      return coverAspectOverride
+    }
+    return autoCoverAspect
+  }, [autoCoverAspect, coverAspectOverride])
   const aspect = useMemo(() => (kind === 'avatar' ? 1 : coverAspect), [
     kind,
     coverAspect,
