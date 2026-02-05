@@ -14350,9 +14350,8 @@
 }
 
 .pro-profile-editor-media-cover {
-  --cover-preview-aspect: 1.78;
   width: 100%;
-  aspect-ratio: var(--cover-preview-aspect);
+  aspect-ratio: var(--cover-aspect, 1.78);
   border-radius: 18px;
   background: linear-gradient(
     135deg,
@@ -29840,8 +29839,7 @@ h2 {
 }
 
 .pro-cropper-frame.is-cover {
-  width: var(--crop-width, min(92vw, 420px));
-  height: var(--crop-height, auto);
+  width: min(92vw, 420px);
   border-radius: 22px;
 }
 

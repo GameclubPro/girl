@@ -8,8 +8,6 @@ type MediaCropperProps = {
   kind: CropperKind
   maxBytes: number
   coverAspect?: number
-  coverFrameWidth?: number
-  coverFrameHeight?: number
   isBusy?: boolean
   error?: string
   onCancel: () => void
@@ -46,8 +44,6 @@ export const MediaCropper = ({
   kind,
   maxBytes,
   coverAspect: coverAspectOverride,
-  coverFrameWidth,
-  coverFrameHeight,
   isBusy = false,
   error = '',
   onCancel,
@@ -403,14 +399,8 @@ export const MediaCropper = ({
     const style = {
       '--crop-aspect': `${aspect}`,
     } as CSSProperties & Record<string, string>
-    if (kind === 'cover' && coverFrameWidth) {
-      style['--crop-width'] = `${Math.round(coverFrameWidth)}px`
-    }
-    if (kind === 'cover' && coverFrameHeight) {
-      style['--crop-height'] = `${Math.round(coverFrameHeight)}px`
-    }
     return style
-  }, [aspect, coverFrameHeight, coverFrameWidth, kind])
+  }, [aspect])
   const imageStyle = useMemo(
     () =>
       ({
