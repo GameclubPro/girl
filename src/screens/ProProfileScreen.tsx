@@ -414,6 +414,7 @@ export const ProProfileScreen = ({
   const [hasAvatar, setHasAvatar] = useState(false)
   const [coverUrl, setCoverUrl] = useState('')
   const [coverAspectValue, setCoverAspectValue] = useState<number | null>(null)
+  const [coverFrameWidth, setCoverFrameWidth] = useState<number | null>(null)
   const [reviews, setReviews] = useState<MasterReview[]>([])
   const [reviewSummary, setReviewSummary] =
     useState<MasterReviewSummary | null>(null)
@@ -462,6 +463,7 @@ export const ProProfileScreen = ({
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const coverRef = useRef<HTMLDivElement>(null)
+  const editorCoverRef = useRef<HTMLDivElement>(null)
   const portfolioUploadInputRef = useRef<HTMLInputElement>(null)
   const portfolioCameraInputRef = useRef<HTMLInputElement>(null)
   const portfolioReplaceInputRef = useRef<HTMLInputElement>(null)
@@ -515,6 +517,20 @@ export const ProProfileScreen = ({
     const fallbackAspect = width / height
     return Number.isFinite(fallbackAspect) && fallbackAspect > 0 ? fallbackAspect : 1.78
   }, [])
+  const getCoverFrameWidth = useCallback(() => {
+    if (typeof window === 'undefined') return undefined
+    const viewportWidth = document.documentElement?.clientWidth || window.innerWidth
+    const maxWidth = Math.max(0, viewportWidth - 32)
+    const editorRect = editorCoverRef.current?.getBoundingClientRect()
+    if (editorRect && editorRect.width > 1) {
+      return Math.min(editorRect.width, maxWidth)
+    }
+    const heroRect = coverRef.current?.getBoundingClientRect()
+    if (heroRect && heroRect.width > 1) {
+      return Math.min(heroRect.width, maxWidth)
+    }
+    return maxWidth > 0 ? maxWidth : undefined
+  }, [])
   useEffect(() => {
     const updateAspect = () => {
       const next = getCoverAspectValue()
@@ -539,6 +555,30 @@ export const ProProfileScreen = ({
       window.removeEventListener('resize', updateAspect)
     }
   }, [getCoverAspectValue])
+  useEffect(() => {
+    const updateWidth = () => {
+      const next = getCoverFrameWidth()
+      if (!next) return
+      setCoverFrameWidth((current) =>
+        current && Math.abs(current - next) < 0.5 ? current : next
+      )
+    }
+    updateWidth()
+    if (typeof window === 'undefined') return
+    window.addEventListener('resize', updateWidth)
+    const element = editorCoverRef.current ?? coverRef.current
+    if (element && typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(updateWidth)
+      observer.observe(element)
+      return () => {
+        observer.disconnect()
+        window.removeEventListener('resize', updateWidth)
+      }
+    }
+    return () => {
+      window.removeEventListener('resize', updateWidth)
+    }
+  }, [editingSection, getCoverFrameWidth])
   const serviceStrings = useMemo(
     () => toServiceStrings(serviceItems),
     [serviceItems]
@@ -2333,6 +2373,10 @@ export const ProProfileScreen = ({
     try {
       const dataUrl = await readImageFileAsync(file)
       const coverAspect = kind === 'cover' ? getCoverAspectValue() : undefined
+      if (kind === 'cover') {
+        const width = getCoverFrameWidth()
+        if (width) setCoverFrameWidth(width)
+      }
       setCropperState({ kind, src: dataUrl, coverAspect })
     } catch (error) {
       setMediaError('Не удалось прочитать файл.')
@@ -4710,6 +4754,9 @@ export const ProProfileScreen = ({
           src={cropperState.src}
           kind={cropperState.kind}
           coverAspect={cropperState.coverAspect}
+          coverFrameWidth={
+            cropperState.kind === 'cover' ? coverFrameWidth ?? undefined : undefined
+          }
           maxBytes={MAX_MEDIA_BYTES}
           isBusy={isCropperUploading}
           error={mediaError}
@@ -4967,6 +5014,7 @@ export const ProProfileScreen = ({
                         coverUrl ? ' has-image' : ''
                       }${isCoverUploading ? ' is-loading' : ''}`}
                       style={coverPreviewStyle}
+                      ref={editorCoverRef}
                       aria-busy={isCoverUploading}
                     >
                       {!coverUrl && (
