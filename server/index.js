@@ -1986,6 +1986,15 @@ const upsertChatContext = async (
   const db = options.client ?? pool
   await db.query(
     `
+      WITH resolved AS (
+        SELECT
+          $1::int AS chat_id,
+          $2::text AS context_type,
+          $3::int AS context_id,
+          $4::int AS request_id,
+          (SELECT id FROM service_bookings WHERE id = $5) AS booking_id,
+          $6::int AS response_id
+      )
       INSERT INTO chat_contexts (
         chat_id,
         context_type,
@@ -1994,7 +2003,14 @@ const upsertChatContext = async (
         booking_id,
         response_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
+      SELECT
+        chat_id,
+        context_type,
+        context_id,
+        request_id,
+        booking_id,
+        response_id
+      FROM resolved
       ON CONFLICT (chat_id, context_type, context_id)
       DO UPDATE SET
         request_id = COALESCE(EXCLUDED.request_id, chat_contexts.request_id),
