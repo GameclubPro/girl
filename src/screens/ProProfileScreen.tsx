@@ -505,29 +505,31 @@ export const ProProfileScreen = ({
   const isSavingRef = useRef(false)
   const queuedPayloadRef = useRef<ProfilePayload | null>(null)
   const getCoverFrameMetrics = useCallback(() => {
-    const editorRect = editorCoverRef.current?.getBoundingClientRect()
-    if (editorRect && editorRect.width > 1 && editorRect.height > 1) {
-      const aspect = editorRect.width / editorRect.height
-      if (Number.isFinite(aspect) && aspect > 0) {
-        return { width: editorRect.width, height: editorRect.height, aspect }
-      }
-    }
     const heroRect = coverRef.current?.getBoundingClientRect()
-    if (heroRect && heroRect.width > 1 && heroRect.height > 1) {
-      const aspect = heroRect.width / heroRect.height
-      if (Number.isFinite(aspect) && aspect > 0) {
-        return { width: heroRect.width, height: heroRect.height, aspect }
-      }
-    }
+    const heroAspect =
+      heroRect && heroRect.width > 1 && heroRect.height > 1
+        ? heroRect.width / heroRect.height
+        : null
     if (typeof window === 'undefined') return { aspect: 2.2 }
     const viewportWidth =
       document.documentElement?.clientWidth || window.innerWidth || 360
     const width = clampValue(viewportWidth, 320, 430)
     const height = clampValue(0.56 * width, 210, 250)
-    const aspect = width / height
-    return Number.isFinite(aspect) && aspect > 0
-      ? { width, height, aspect }
-      : { aspect: 2.2 }
+    const fallbackAspect = width / height
+    const aspect =
+      heroAspect && Number.isFinite(heroAspect) && heroAspect > 0
+        ? heroAspect
+        : Number.isFinite(fallbackAspect) && fallbackAspect > 0
+          ? fallbackAspect
+          : 2.2
+    const editorRect = editorCoverRef.current?.getBoundingClientRect()
+    if (editorRect && editorRect.width > 1 && editorRect.height > 1) {
+      return { width: editorRect.width, height: editorRect.height, aspect }
+    }
+    if (heroRect && heroRect.width > 1 && heroRect.height > 1) {
+      return { width: heroRect.width, height: heroRect.height, aspect }
+    }
+    return { width, height, aspect }
   }, [])
   useEffect(() => {
     const updateAspect = () => {
