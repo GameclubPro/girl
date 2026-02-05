@@ -1175,6 +1175,22 @@ export const ClientMasterProfileScreen = ({
                     : undefined
                 }
               >
+                {coverUrl && (
+                  <>
+                    <img
+                      className="pro-cover-image is-blur"
+                      src={coverUrl}
+                      alt=""
+                      aria-hidden="true"
+                    />
+                    <img
+                      className="pro-cover-image is-contain"
+                      src={coverUrl}
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  </>
+                )}
                 <div
                   className="pro-profile-ig-cover-glow pro-profile-hero-cover-glow"
                   aria-hidden="true"
