@@ -73,10 +73,6 @@ export const StartScreen = ({
               alt=""
               aria-hidden="true"
             />
-            <span className="role-card__content" aria-hidden="true">
-              <span className="role-card__title">Мне нужна услуга</span>
-              <span className="role-card__meta">Поиск, заявки и быстрый чат</span>
-            </span>
           </button>
           <button
             className="role-card role-card--pro"
@@ -94,10 +90,6 @@ export const StartScreen = ({
               alt=""
               aria-hidden="true"
             />
-            <span className="role-card__content" aria-hidden="true">
-              <span className="role-card__title">Я мастер</span>
-              <span className="role-card__meta">Клиенты, записи и аналитика</span>
-            </span>
           </button>
         </div>
 
