@@ -1,0 +1,236 @@
+body.tg-emulator-mode {
+  min-height: 100dvh;
+  background: #0e1621;
+}
+
+body.tg-emulator-mode #root {
+  position: relative;
+  width: min(var(--tg-emulator-width, 393px), 100vw);
+  min-height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--tg-emulator-app-bg, var(--tg-theme-bg-color, #ffffff));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 22px 48px rgba(0, 0, 0, 0.42);
+}
+
+.tg-emulator-overlay {
+  position: fixed;
+  inset: 0 auto 0 50%;
+  width: min(var(--tg-emulator-width, 393px), 100vw);
+  height: 100dvh;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+}
+
+.tg-emulator-status {
+  height: var(--tg-emulator-status-height, 20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: var(--tg-emulator-header-bg, #ffffff);
+  color: var(--tg-emulator-status-icon, #111827);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tg-emulator-status-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tg-emulator-status-cell,
+.tg-emulator-status-wifi {
+  width: 12px;
+  height: 10px;
+  display: inline-block;
+  opacity: 0.9;
+}
+
+.tg-emulator-status-cell {
+  background:
+    linear-gradient(to top, currentColor 2px, transparent 2px) 0 100% / 2px 10px no-repeat,
+    linear-gradient(to top, currentColor 4px, transparent 4px) 4px 100% / 2px 10px no-repeat,
+    linear-gradient(to top, currentColor 6px, transparent 6px) 8px 100% / 2px 10px no-repeat;
+}
+
+.tg-emulator-status-wifi {
+  border: 2px solid currentColor;
+  border-top: none;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  transform: translateY(1px);
+}
+
+.tg-emulator-status-battery {
+  position: relative;
+  width: 22px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+}
+
+.tg-emulator-status-battery::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 2px;
+  width: 2px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 0 2px 2px 0;
+}
+
+.tg-emulator-status-battery > span {
+  position: absolute;
+  left: 1.5px;
+  top: 1.5px;
+  width: 14px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 1.5px;
+}
+
+.tg-emulator-topbar {
+  height: var(--tg-emulator-topbar-height, 44px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--tg-emulator-header-bg, #ffffff);
+  color: var(--tg-emulator-header-text, #111827);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.tg-emulator-header-back {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.tg-emulator-header-back.is-visible {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.tg-emulator-header-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+
+.tg-emulator-header-title,
+.tg-emulator-header-subtitle {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tg-emulator-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: inherit;
+}
+
+.tg-emulator-header-subtitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--tg-emulator-header-text, #111827) 68%, transparent);
+}
+
+.tg-emulator-header-spacer {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+}
+
+.tg-emulator-main-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 12px calc(max(var(--tg-safe-bottom-js, 0px), env(safe-area-inset-bottom, 0px)) + 12px);
+  background: var(--tg-emulator-bottom-bar, rgba(255, 255, 255, 0.95));
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  pointer-events: auto;
+}
+
+.tg-emulator-main-wrap[hidden] {
+  display: none !important;
+}
+
+.tg-emulator-main {
+  position: relative;
+  width: 100%;
+  min-height: 50px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--tg-emulator-main-text, #ffffff);
+  background: var(--tg-emulator-main-bg, #2481cc);
+  cursor: pointer;
+}
+
+.tg-emulator-main.is-loading {
+  padding-right: 34px;
+}
+
+.tg-emulator-main.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.36);
+  border-top-color: #ffffff;
+  animation: tg-emulator-spin 0.75s linear infinite;
+}
+
+.tg-emulator-main:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+@keyframes tg-emulator-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 430px) {
+  body.tg-emulator-mode #root {
+    width: 100vw;
+    box-shadow: none;
+  }
+
+  .tg-emulator-overlay {
+    left: 0;
+    width: 100vw;
+    transform: none;
+  }
+}
