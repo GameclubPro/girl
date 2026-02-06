@@ -47,6 +47,7 @@ import { getProfileStatusSummary } from '../utils/profileStatus'
 import { isGeoFailure, requestPreciseLocation } from '../utils/geo'
 import { normalizeScheduleDays } from '../utils/schedule'
 import { buildImageSrcSet, buildImageUrl } from '../utils/media'
+import { hapticSelection } from '../utils/haptics'
 
 type ProProfileScreenProps = {
   apiBase: string
@@ -323,6 +324,7 @@ type MasterFollower = {
 }
 
 type StatId = 'works' | 'rating' | 'reviews' | 'followers'
+type ProfileNavSection = 'details' | 'portfolio' | 'reviews'
 type CropperKind = 'avatar' | 'cover'
 type CropperState = { kind: CropperKind; src: string; coverAspect?: number }
 
@@ -494,10 +496,16 @@ export const ProProfileScreen = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const settingsOpenRef = useRef(false)
   const settingsReturnRef = useRef(false)
+  const [isProfileDetailsExpanded, setIsProfileDetailsExpanded] = useState(
+    () => Boolean(focusSection && focusSection !== 'portfolio')
+  )
+  const [activeProfileNavSection, setActiveProfileNavSection] =
+    useState<ProfileNavSection>(() => (initialPortfolioView ? 'portfolio' : 'details'))
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
     focusSection && focusSection !== 'portfolio' ? focusSection : null
   )
   const editingSectionRef = useRef<InlineSection | null>(null)
+  const detailsSectionRef = useRef<HTMLDivElement | null>(null)
   const autosaveSuccessTimerRef = useRef<number | null>(null)
   const lastSavedRef = useRef('')
   const hasLoadedRef = useRef(false)
@@ -975,6 +983,27 @@ export const ProProfileScreen = ({
           .filter(Boolean)
           .join(' · ')
       : 'Услуги не добавлены'
+  const quickServicesLabel =
+    servicesCount > 0
+      ? formatCount(servicesCount, 'услуга', 'услуги', 'услуг')
+      : 'Услуги не заполнены'
+  const heroQuickFacts = [
+    {
+      id: 'status',
+      label: 'Статус',
+      value: isActive ? 'Принимаете заявки' : 'Пауза',
+    },
+    {
+      id: 'services',
+      label: 'Услуги',
+      value: quickServicesLabel,
+    },
+    {
+      id: 'location',
+      label: 'Локация',
+      value: locationLabel,
+    },
+  ]
   const certificatesSummary =
     certificateCount > 0
       ? formatCount(certificateCount, 'сертификат', 'сертификата', 'сертификатов')
@@ -1276,12 +1305,14 @@ export const ProProfileScreen = ({
     }
     setIsSettingsOpen(false)
     if (section === 'portfolio') {
+      setActiveProfileNavSection('portfolio')
       portfolioPanelRef.current?.scrollIntoView({
         behavior: 'smooth',
         block: 'start',
       })
       return
     }
+    setActiveProfileNavSection('details')
     setEditingSection(section)
   }
   const closeEditor = () => {
@@ -1300,6 +1331,85 @@ export const ProProfileScreen = ({
       onBack()
     }
   }
+  const scrollToProfileSection = useCallback((section: ProfileNavSection) => {
+    if (typeof window === 'undefined') return
+    const prefersReducedMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const target =
+      section === 'details'
+        ? detailsSectionRef.current
+        : section === 'portfolio'
+          ? portfolioPanelRef.current
+          : reviewsSectionRef.current
+    target?.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    })
+  }, [])
+  const handleProfileNavClick = useCallback(
+    (section: ProfileNavSection) => {
+      hapticSelection()
+      setActiveProfileNavSection(section)
+      if (section === 'details') {
+        setIsProfileDetailsExpanded(true)
+      }
+      window.requestAnimationFrame(() => {
+        scrollToProfileSection(section)
+      })
+    },
+    [scrollToProfileSection]
+  )
+  const toggleProfileDetails = useCallback(() => {
+    hapticSelection()
+    setIsProfileDetailsExpanded((current) => !current)
+    setActiveProfileNavSection('details')
+  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (typeof IntersectionObserver === 'undefined') return
+
+    const sectionEntries: Array<{
+      id: ProfileNavSection
+      element: HTMLElement | null
+    }> = [
+      { id: 'details', element: detailsSectionRef.current },
+      { id: 'portfolio', element: portfolioPanelRef.current },
+      { id: 'reviews', element: reviewsSectionRef.current },
+    ]
+    const activeEntries = sectionEntries.filter(
+      (entry): entry is { id: ProfileNavSection; element: HTMLElement } =>
+        Boolean(entry.element)
+    )
+    if (activeEntries.length === 0) return
+
+    const visibilityMap = new Map<ProfileNavSection, number>()
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const section = activeEntries.find((item) => item.element === entry.target)
+          if (!section) return
+          visibilityMap.set(section.id, entry.isIntersecting ? entry.intersectionRatio : 0)
+        })
+        const next = [...visibilityMap.entries()].sort((a, b) => b[1] - a[1])[0]
+        if (next && next[1] > 0) {
+          setActiveProfileNavSection(next[0])
+        }
+      },
+      {
+        threshold: [0.2, 0.45, 0.7],
+        rootMargin: '-20% 0px -48% 0px',
+      }
+    )
+
+    activeEntries.forEach((entry) => {
+      visibilityMap.set(entry.id, 0)
+      observer.observe(entry.element)
+    })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [isProfileDetailsExpanded])
   const persistSaveMessage = (message: string) => {
     if (autosaveSuccessTimerRef.current) {
       window.clearTimeout(autosaveSuccessTimerRef.current)
@@ -1413,23 +1523,20 @@ export const ProProfileScreen = ({
   )
 
   const handleStatTap = (statId: StatId) => {
+    hapticSelection()
     setActiveStat(statId)
     if (statId === 'followers') {
       openFollowersSheet()
       return
     }
     if (statId === 'works') {
+      setActiveProfileNavSection('portfolio')
       setPortfolioView('portfolio')
-      portfolioPanelRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
+      scrollToProfileSection('portfolio')
       return
     }
-    reviewsSectionRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    })
+    setActiveProfileNavSection('reviews')
+    scrollToProfileSection('reviews')
   }
 
   const getStatAriaLabel = (stat: { id: StatId; label: string; value: string }) => {
@@ -3472,7 +3579,11 @@ export const ProProfileScreen = ({
               <button
                 className="pro-profile-hero-action is-primary"
                 type="button"
-                onClick={handlePortfolioAddClick}
+                onClick={() => {
+                  hapticSelection()
+                  setActiveProfileNavSection('portfolio')
+                  handlePortfolioAddClick()
+                }}
                 disabled={isPortfolioUploading || isPortfolioFull}
               >
                 Добавить работу
@@ -3480,145 +3591,218 @@ export const ProProfileScreen = ({
               <button
                 className="pro-profile-hero-action is-ghost"
                 type="button"
-                onClick={openSettings}
+                onClick={() => {
+                  hapticSelection()
+                  openSettings()
+                }}
               >
                 Редактировать
               </button>
             </div>
           </div>
-          <div className="pro-profile-ig-body">
-            <div className="pro-profile-facts">
-              <div
-                className="pro-profile-facts-grid"
-                id="pro-profile-facts-grid"
-              >
-                {profileFacts.map((fact) => (
-                  <button
-                    className={`pro-profile-fact-card is-action${
-                      fact.isMuted ? ' is-muted' : ''
-                    }`}
-                    key={fact.label}
-                    type="button"
-                    onClick={() => openEditor(fact.section)}
-                    aria-label={`Открыть настройки: ${fact.label}`}
-                    aria-haspopup="dialog"
-                  >
-                    <span
-                      className={`pro-profile-fact-icon is-${fact.id}`}
-                      aria-hidden="true"
-                    >
-                      {fact.icon}
-                    </span>
-                    <div className="pro-profile-fact-info">
-                      <span className="pro-profile-fact-value">{fact.value}</span>
-                      <span className="pro-profile-fact-label">{fact.label}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div
-              className={`pro-profile-certificates${
-                isCertificatesCollapsed
-                  ? ' is-collapsed'
-                  : isCertificatesExpanded
-                    ? ' is-expanded'
-                    : ''
+          <div className="pro-profile-hero-quickfacts" role="list">
+            {heroQuickFacts.map((fact) => (
+              <span className="pro-profile-hero-quickfact" key={fact.id} role="listitem">
+                <span className="pro-profile-hero-quickfact-label">{fact.label}</span>
+                <span className="pro-profile-hero-quickfact-value">{fact.value}</span>
+              </span>
+            ))}
+          </div>
+          <div className="pro-profile-hero-nav" role="tablist" aria-label="Разделы профиля">
+            <button
+              className={`pro-profile-hero-nav-item${
+                activeProfileNavSection === 'details' ? ' is-active' : ''
               }`}
+              type="button"
+              role="tab"
+              aria-selected={activeProfileNavSection === 'details'}
+              onClick={() => handleProfileNavClick('details')}
             >
-              <div className="pro-profile-certificates-head">
-                <div className="pro-profile-certificates-summary">
-                  <p className="pro-profile-certificates-kicker">Доверие</p>
-                  <h3 className="pro-profile-certificates-title">Сертификаты</h3>
-                </div>
-                <div className="pro-profile-certificates-actions">
-                  {certificateItems.length > 0 && (
+              Детали
+            </button>
+            <button
+              className={`pro-profile-hero-nav-item${
+                activeProfileNavSection === 'portfolio' ? ' is-active' : ''
+              }`}
+              type="button"
+              role="tab"
+              aria-selected={activeProfileNavSection === 'portfolio'}
+              onClick={() => handleProfileNavClick('portfolio')}
+            >
+              Работы
+            </button>
+            <button
+              className={`pro-profile-hero-nav-item${
+                activeProfileNavSection === 'reviews' ? ' is-active' : ''
+              }`}
+              type="button"
+              role="tab"
+              aria-selected={activeProfileNavSection === 'reviews'}
+              onClick={() => handleProfileNavClick('reviews')}
+            >
+              Отзывы
+            </button>
+          </div>
+          <div
+            ref={detailsSectionRef}
+            className={`pro-profile-ig-body pro-profile-details${
+              isProfileDetailsExpanded ? ' is-expanded' : ' is-collapsed'
+            }`}
+          >
+            <div className="pro-profile-details-head">
+              <p className="pro-profile-details-title">Детали профиля</p>
+              <button
+                className="pro-profile-details-toggle"
+                type="button"
+                onClick={toggleProfileDetails}
+                aria-expanded={isProfileDetailsExpanded}
+              >
+                {isProfileDetailsExpanded ? 'Скрыть' : 'Показать'}
+              </button>
+            </div>
+            <div className="pro-profile-details-content">
+              <div className="pro-profile-facts">
+                <div
+                  className="pro-profile-facts-grid"
+                  id="pro-profile-facts-grid"
+                >
+                  {profileFacts.map((fact) => (
                     <button
-                      className="pro-profile-certificates-action is-toggle"
+                      className={`pro-profile-fact-card is-action${
+                        fact.isMuted ? ' is-muted' : ''
+                      }`}
+                      key={fact.label}
                       type="button"
-                      onClick={() => setIsCertificatesExpanded((current) => !current)}
-                      aria-expanded={isCertificatesExpanded}
-                      aria-controls={certificatesListId}
+                      onClick={() => {
+                        hapticSelection()
+                        openEditor(fact.section)
+                      }}
+                      aria-label={`Открыть настройки: ${fact.label}`}
+                      aria-haspopup="dialog"
                     >
-                      {certificatesToggleLabel}
+                      <span
+                        className={`pro-profile-fact-icon is-${fact.id}`}
+                        aria-hidden="true"
+                      >
+                        {fact.icon}
+                      </span>
+                      <div className="pro-profile-fact-info">
+                        <span className="pro-profile-fact-value">{fact.value}</span>
+                        <span className="pro-profile-fact-label">{fact.label}</span>
+                      </div>
                     </button>
-                  )}
-                  {showCertificatesEditAction && (
-                    <button
-                      className="pro-profile-certificates-action"
-                      type="button"
-                      onClick={() => openEditor('certificates')}
-                    >
-                      {certificatesActionLabel}
-                    </button>
-                  )}
+                  ))}
                 </div>
               </div>
-              {certificateItems.length > 0 && (
-                <div
-                  className={`pro-profile-certificates-list${
-                    isCertificatesExpanded ? ' is-expanded' : ''
-                  }`}
-                  role="list"
-                  id={certificatesListId}
-                  aria-hidden={!isCertificatesExpanded}
-                >
-                  {certificateItems.map((certificate, index) => {
-                    const meta = buildCertificateMeta(certificate)
-                    const title = certificate.title?.trim() || 'Сертификат'
-                    const certificateStyle = certificateRatios[certificate.id]
-                      ? ({
-                          '--certificate-ratio': certificateRatios[certificate.id],
-                        } as CSSProperties)
-                      : undefined
-                    return (
+              <div
+                className={`pro-profile-certificates${
+                  isCertificatesCollapsed
+                    ? ' is-collapsed'
+                    : isCertificatesExpanded
+                      ? ' is-expanded'
+                      : ''
+                }`}
+              >
+                <div className="pro-profile-certificates-head">
+                  <div className="pro-profile-certificates-summary">
+                    <p className="pro-profile-certificates-kicker">Доверие</p>
+                    <h3 className="pro-profile-certificates-title">Сертификаты</h3>
+                  </div>
+                  <div className="pro-profile-certificates-actions">
+                    {certificateItems.length > 0 && (
                       <button
-                        className="pro-profile-certificate-card"
+                        className="pro-profile-certificates-action is-toggle"
                         type="button"
-                        key={certificate.id}
-                        onClick={() => openCertificateLightbox(index)}
-                        role="listitem"
-                        aria-label={title}
+                        onClick={() => {
+                          hapticSelection()
+                          setIsCertificatesExpanded((current) => !current)
+                        }}
+                        aria-expanded={isCertificatesExpanded}
+                        aria-controls={certificatesListId}
                       >
-                        <div
-                          className="pro-profile-certificate-media"
-                          style={certificateStyle}
-                        >
-                          {certificate.url ? (
-                            <img
-                              src={certificate.url}
-                              alt=""
-                              loading="lazy"
-                              onLoad={(event) =>
-                                handleCertificateImageLoad(
-                                  certificate.id,
-                                  event.currentTarget
-                                )
-                              }
-                            />
-                          ) : (
-                            <span className="pro-profile-certificate-fallback">
-                              CERT
-                            </span>
-                          )}
-                        </div>
-                        <div className="pro-profile-certificate-info">
-                          <span className="pro-profile-certificate-title">
-                            {title}
-                          </span>
-                          <span
-                            className={`pro-profile-certificate-meta${
-                              meta ? '' : ' is-muted'
-                            }`}
-                          >
-                            {meta || 'Данные не указаны'}
-                          </span>
-                        </div>
+                        {certificatesToggleLabel}
                       </button>
-                    )
-                  })}
+                    )}
+                    {showCertificatesEditAction && (
+                      <button
+                        className="pro-profile-certificates-action"
+                        type="button"
+                        onClick={() => {
+                          hapticSelection()
+                          openEditor('certificates')
+                        }}
+                      >
+                        {certificatesActionLabel}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
+                {certificateItems.length > 0 && (
+                  <div
+                    className={`pro-profile-certificates-list${
+                      isCertificatesExpanded ? ' is-expanded' : ''
+                    }`}
+                    role="list"
+                    id={certificatesListId}
+                    aria-hidden={!isCertificatesExpanded}
+                  >
+                    {certificateItems.map((certificate, index) => {
+                      const meta = buildCertificateMeta(certificate)
+                      const title = certificate.title?.trim() || 'Сертификат'
+                      const certificateStyle = certificateRatios[certificate.id]
+                        ? ({
+                            '--certificate-ratio': certificateRatios[certificate.id],
+                          } as CSSProperties)
+                        : undefined
+                      return (
+                        <button
+                          className="pro-profile-certificate-card"
+                          type="button"
+                          key={certificate.id}
+                          onClick={() => openCertificateLightbox(index)}
+                          role="listitem"
+                          aria-label={title}
+                        >
+                          <div
+                            className="pro-profile-certificate-media"
+                            style={certificateStyle}
+                          >
+                            {certificate.url ? (
+                              <img
+                                src={certificate.url}
+                                alt=""
+                                loading="lazy"
+                                onLoad={(event) =>
+                                  handleCertificateImageLoad(
+                                    certificate.id,
+                                    event.currentTarget
+                                  )
+                                }
+                              />
+                            ) : (
+                              <span className="pro-profile-certificate-fallback">
+                                CERT
+                              </span>
+                            )}
+                          </div>
+                          <div className="pro-profile-certificate-info">
+                            <span className="pro-profile-certificate-title">
+                              {title}
+                            </span>
+                            <span
+                              className={`pro-profile-certificate-meta${
+                                meta ? '' : ' is-muted'
+                              }`}
+                            >
+                              {meta || 'Данные не указаны'}
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -3650,7 +3834,11 @@ export const ProProfileScreen = ({
                     role="tab"
                     aria-selected={portfolioView === 'portfolio'}
                     aria-controls="pro-profile-portfolio-content"
-                    onClick={() => setPortfolioView('portfolio')}
+                    onClick={() => {
+                      hapticSelection()
+                      setActiveProfileNavSection('portfolio')
+                      setPortfolioView('portfolio')
+                    }}
                   >
                     Портфолио
                   </button>
@@ -3662,7 +3850,11 @@ export const ProProfileScreen = ({
                     role="tab"
                     aria-selected={portfolioView === 'showcase'}
                     aria-controls="pro-profile-showcase-content"
-                    onClick={() => setPortfolioView('showcase')}
+                    onClick={() => {
+                      hapticSelection()
+                      setActiveProfileNavSection('portfolio')
+                      setPortfolioView('showcase')
+                    }}
                   >
                     Витрина
                   </button>
