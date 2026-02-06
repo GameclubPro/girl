@@ -1,0 +1,601 @@
+:root {
+  --ink: #131c2f;
+  --ink-rgb: 19, 28, 47;
+  --ink-deep: #070d19;
+  --muted: #58647b;
+  --muted-rgb: 88, 100, 123;
+  --cream: #f1f5ff;
+  --accent: #146fff;
+  --accent-rgb: 20, 111, 255;
+  --accent-strong: #0f57d4;
+  --raspberry: #10ae95;
+  --raspberry-rgb: 16, 174, 149;
+  --border: #d7deed;
+  --shadow-rgb: 15, 27, 47;
+  --app-bg: radial-gradient(
+      130% 105% at -6% -14%,
+      rgba(var(--accent-rgb), 0.28),
+      transparent 56%
+    ),
+    radial-gradient(
+      130% 120% at 106% -12%,
+      rgba(var(--raspberry-rgb), 0.18),
+      transparent 54%
+    ),
+    radial-gradient(
+      90% 110% at 50% 116%,
+      rgba(var(--paper-rgb), 0.78),
+      transparent 64%
+    ),
+    linear-gradient(180deg, #edf3ff 0%, #f8fbff 58%, #ffffff 100%);
+  --app-bg-soft: radial-gradient(
+      110% 95% at -8% -14%,
+      rgba(var(--accent-rgb), 0.18),
+      transparent 58%
+    ),
+    radial-gradient(
+      120% 100% at 106% -12%,
+      rgba(var(--raspberry-rgb), 0.14),
+      transparent 58%
+    ),
+    linear-gradient(180deg, #f2f6ff 0%, #fbfdff 100%);
+  --glass-border: rgba(16, 33, 67, 0.14);
+  --glass-shadow: 0 24px 42px rgba(14, 25, 43, 0.19);
+  --glass-shadow-soft: 0 16px 30px rgba(14, 25, 43, 0.14);
+  --glass-frost: blur(15px) saturate(1.2);
+  --glass-frost-soft: blur(11px) saturate(1.14);
+  --metal-primary-bg: linear-gradient(
+    140deg,
+    #0a58de 0%,
+    #1f78ff 52%,
+    #4ea8ff 100%
+  );
+  --metal-primary-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.28),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.38);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  overflow-x: hidden;
+  background: var(--app-bg);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      80% 46% at 12% 0%,
+      rgba(var(--paper-rgb), 0.58),
+      transparent 70%
+    ),
+    radial-gradient(
+      76% 44% at 88% 0%,
+      rgba(var(--paper-rgb), 0.44),
+      transparent 72%
+    );
+  z-index: -1;
+}
+
+#root {
+  width: min(430px, 100%);
+  min-height: 100dvh;
+  margin: 0 auto;
+  isolation: isolate;
+}
+
+.screen {
+  position: relative;
+}
+
+.animate {
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background-color 0.22s ease,
+    color 0.22s ease,
+    opacity 0.22s ease;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.address-card,
+.request-card,
+.booking-card,
+.request-item,
+.pro-request-item,
+.booking-item,
+.chat-card,
+.analytics-card,
+.pro-detail-card,
+.pro-cabinet-nav-card,
+.client-profile-card,
+.client-profile-empty-block,
+.client-master-card,
+.chat-request-card,
+.cabinet-request-card,
+.client-master-request-card,
+.pro-followers-card,
+.chat-active-card,
+.chat-support-intro,
+.pro-marketing-panel,
+.pro-profile-editor-section,
+.pro-profile-editor-toggle-card,
+.trust-meter {
+  border-color: rgba(18, 34, 69, 0.14);
+  box-shadow: 0 16px 28px rgba(15, 27, 46, 0.12);
+}
+
+.chat-card,
+.request-item,
+.pro-request-item,
+.booking-item,
+.client-master-card,
+.pro-cabinet-nav-card,
+.pro-followers-card,
+.analytics-card {
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+@media (hover: hover) {
+  .chat-card:hover,
+  .request-item:hover,
+  .pro-request-item:hover,
+  .booking-item:hover,
+  .client-master-card:hover,
+  .pro-cabinet-nav-card:hover,
+  .pro-followers-card:hover,
+  .analytics-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(var(--accent-rgb), 0.26);
+    box-shadow: 0 20px 30px rgba(15, 27, 46, 0.15);
+  }
+}
+
+.cta,
+.request-submit,
+.booking-action,
+.response-action,
+.address-primary,
+.address-secondary,
+.pro-primary,
+.pro-detail-action,
+.client-profile-action,
+.chat-sticky-button,
+.reschedule-primary,
+.reschedule-secondary,
+.chat-send,
+.chat-quick-send,
+.request-chat-link,
+.chat-outcome-action,
+.chat-active-action,
+.pro-slot-sheet-primary,
+.pro-slot-sheet-secondary,
+.pro-slots-footer-primary,
+.pro-slots-footer-secondary,
+.pro-slots-confirm-primary,
+.pro-slots-confirm-secondary,
+.chat-support-topic,
+.chat-reschedule-action {
+  min-height: 44px;
+  border-radius: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.cta:not(:disabled):active,
+.request-submit:not(:disabled):active,
+.booking-action:not(:disabled):active,
+.response-action:not(:disabled):active,
+.address-primary:not(:disabled):active,
+.address-secondary:not(:disabled):active,
+.pro-primary:not(:disabled):active,
+.pro-detail-action:not(:disabled):active,
+.client-profile-action:not(:disabled):active,
+.chat-sticky-button:not(:disabled):active,
+.reschedule-primary:not(:disabled):active,
+.reschedule-secondary:not(:disabled):active,
+.chat-send:not(:disabled):active,
+.chat-quick-send:not(:disabled):active,
+.request-chat-link:not(:disabled):active,
+.chat-outcome-action:not(:disabled):active,
+.chat-active-action:not(:disabled):active,
+.pro-slot-sheet-primary:not(:disabled):active,
+.pro-slot-sheet-secondary:not(:disabled):active,
+.pro-slots-footer-primary:not(:disabled):active,
+.pro-slots-footer-secondary:not(:disabled):active,
+.pro-slots-confirm-primary:not(:disabled):active,
+.pro-slots-confirm-secondary:not(:disabled):active,
+.chat-support-topic:not(:disabled):active,
+.chat-reschedule-action:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.booking-action.is-primary:not(.is-danger),
+.response-action.is-primary,
+.address-primary,
+.cta--primary,
+.pro-primary,
+.pro-profile-hero-action.is-primary,
+.pro-profile-ig-button--primary,
+.pro-profile-portfolio-panel-action.is-primary,
+.pro-cabinet-nav-action.is-primary,
+.pro-cabinet-share-action.is-primary,
+.pro-slots-footer-primary,
+.pro-slots-confirm-primary:not(.is-danger),
+.pro-slot-sheet-primary,
+.client-profile-primary-action,
+.client-profile-action.is-primary,
+.chat-sticky-button.is-primary,
+.reschedule-primary,
+.chat-reschedule-action.is-primary,
+.chat-send,
+.chat-quick-send,
+.request-submit:not(.request-submit--cancel),
+.request-chat-link {
+  border-color: rgba(var(--accent-rgb), 0.52);
+  box-shadow: 0 16px 24px rgba(var(--accent-rgb), 0.24),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.42);
+}
+
+.address-input,
+.address-select,
+.request-select,
+.request-select-input,
+.request-input,
+.request-textarea,
+.booking-price-input,
+.booking-review-textarea,
+.pro-input,
+.pro-select,
+.pro-textarea,
+.pro-response-input,
+.pro-response-textarea,
+.pro-marketing-input,
+.pro-marketing-textarea,
+.pro-marketing-select-trigger,
+.chat-search-input,
+.chat-input,
+.chat-quick-input,
+.reschedule-input,
+.reschedule-note,
+.pro-stories-input,
+.pro-stories-textarea,
+.pro-followers-search-input,
+.pro-service-add-input,
+.pro-service-meta-input {
+  border-color: rgba(16, 34, 68, 0.16);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--paper-rgb), 0.96) 0%,
+    rgba(var(--paper-rgb), 0.9) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.82),
+    0 1px 2px rgba(var(--shadow-rgb), 0.08);
+}
+
+.address-input:focus,
+.address-select:focus,
+.request-select:focus,
+.request-select-input:focus,
+.request-input:focus,
+.request-textarea:focus,
+.booking-price-input:focus,
+.booking-review-textarea:focus,
+.pro-input:focus,
+.pro-select:focus,
+.pro-textarea:focus,
+.pro-response-input:focus,
+.pro-response-textarea:focus,
+.pro-marketing-input:focus,
+.pro-marketing-textarea:focus,
+.pro-marketing-select-trigger:focus,
+.chat-search-input:focus,
+.chat-input:focus,
+.chat-quick-input:focus,
+.reschedule-input:focus,
+.reschedule-note:focus,
+.pro-stories-input:focus,
+.pro-stories-textarea:focus,
+.pro-followers-search-input:focus,
+.pro-service-add-input:focus,
+.pro-service-meta-input:focus {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.85);
+  outline: none;
+}
+
+.section-header {
+  margin-bottom: 2px;
+}
+
+.section-header h3,
+.request-card-title,
+.analytics-card-title,
+.pro-detail-card-head h2,
+.chat-active-title,
+.chat-outcome-title,
+.trust-meter-title {
+  letter-spacing: -0.01em;
+}
+
+.client-section,
+.client-profile-section,
+.requests-section,
+.pro-marketing-section {
+  gap: 12px;
+}
+
+.requests-list,
+.booking-list,
+.chat-list,
+.chat-messages {
+  gap: 12px;
+}
+
+.bottom-nav,
+.pro-bottom-nav {
+  border-radius: 24px 24px 0 0;
+  border: 1px solid rgba(18, 34, 68, 0.14);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--paper-rgb), 0.97) 0%,
+    rgba(244, 249, 255, 0.93) 100%
+  );
+  box-shadow: 0 -16px 30px rgba(15, 27, 46, 0.18);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  padding: 9px 10px calc(12px + var(--safe-bottom));
+}
+
+.nav-item,
+.pro-nav-item {
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 7px 4px;
+  min-height: 50px;
+}
+
+.nav-item.is-active,
+.pro-nav-item.is-active {
+  transform: translateY(-1px);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent-rgb), 0.2),
+    rgba(var(--accent-rgb), 0.1)
+  );
+  border-color: rgba(var(--accent-rgb), 0.34);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.18),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.72);
+}
+
+.nav-label,
+.pro-nav-label {
+  letter-spacing: 0.03em;
+  font-size: 10.5px;
+}
+
+.chat-thread {
+  gap: 14px;
+}
+
+.chat-context-float-card,
+.chat-context-summary,
+.chat-sticky-action,
+.chat-active-card,
+.chat-request-card,
+.chat-support-intro,
+.chat-composer,
+.chat-quick-panel {
+  border-color: rgba(18, 34, 68, 0.16);
+}
+
+.chat-bubble {
+  border-radius: 18px;
+  line-height: 1.42;
+}
+
+.chat-message.is-mine .chat-bubble {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--accent-rgb), 0.2),
+    rgba(var(--accent-rgb), 0.13)
+  );
+}
+
+.chat-composer {
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -16px 30px rgba(15, 27, 46, 0.17);
+}
+
+.chat-input {
+  min-height: 44px;
+  border-radius: 15px;
+}
+
+.chat-attach,
+.chat-send,
+.chat-quick-send {
+  min-height: 44px;
+}
+
+.request-progress {
+  height: 9px;
+}
+
+.request-progress-bar {
+  background: linear-gradient(
+    90deg,
+    rgba(var(--accent-rgb), 0.92),
+    rgba(var(--raspberry-rgb), 0.72)
+  );
+}
+
+.request-summary,
+.request-select,
+.booking-deposit-note,
+.client-profile-location-chip,
+.trust-badge {
+  border-color: rgba(18, 34, 68, 0.16);
+}
+
+.screen--start {
+  background: radial-gradient(
+      120% 80% at 16% -10%,
+      rgba(var(--accent-rgb), 0.38),
+      transparent 54%
+    ),
+    radial-gradient(
+      95% 80% at 88% -8%,
+      rgba(var(--raspberry-rgb), 0.24),
+      transparent 58%
+    ),
+    linear-gradient(180deg, #f2f6ff 0%, #ffffff 58%, #f4f8ff 100%);
+}
+
+.title-block::after {
+  width: 94px;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--accent-rgb), 0.2),
+    rgba(var(--raspberry-rgb), 0.4)
+  );
+}
+
+.screen--start h2.animate.delay-2 {
+  margin-top: 28px;
+}
+
+.role-cards {
+  gap: 14px;
+}
+
+.role-card {
+  position: relative;
+  border-radius: 24px;
+  border: 1px solid rgba(18, 34, 68, 0.14);
+  background: linear-gradient(
+    160deg,
+    rgba(var(--paper-rgb), 0.94),
+    rgba(241, 246, 255, 0.92)
+  );
+  box-shadow: 0 18px 28px rgba(15, 27, 46, 0.16);
+  overflow: hidden;
+}
+
+.role-card__image {
+  transform: scale(1.01);
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.role-card__content {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border-radius: 14px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  color: #f8fbff;
+  background: linear-gradient(
+    160deg,
+    rgba(8, 14, 27, 0.82) 0%,
+    rgba(16, 44, 93, 0.68) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.16);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.role-card__title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.role-card__meta {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.role-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 32px rgba(15, 27, 46, 0.2);
+}
+
+.role-card:hover .role-card__image {
+  transform: scale(1.05);
+}
+
+.footer-copy {
+  max-width: 300px;
+  color: color-mix(in srgb, var(--muted) 88%, #24304a);
+}
+
+@media (max-width: 370px) {
+  .role-card__title {
+    font-size: 11px;
+  }
+
+  .role-card__meta {
+    font-size: 9px;
+  }
+
+  .nav-label,
+  .pro-nav-label {
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

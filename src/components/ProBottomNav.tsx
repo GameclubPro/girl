@@ -5,6 +5,7 @@ import {
   IconNavRequests,
 } from './icons'
 import { useNavPreload } from '../contexts/NavPreloadContext'
+import { hapticSelection } from '../utils/haptics'
 
 type ProNavKey = 'cabinet' | 'requests' | 'chats' | 'profile'
 
@@ -28,6 +29,7 @@ export const ProBottomNav = ({
   const preload = useNavPreload()
   const handleClick = (key: ProNavKey, action: () => void) => () => {
     if (active === key && !allowActiveClick) return
+    hapticSelection()
     action()
   }
   const handlePreload = (key: ProNavKey) => {

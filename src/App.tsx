@@ -38,6 +38,7 @@ import { markNavEnd, markNavStart, markScreenMount, markScreenPaint } from './ut
 import type { ShowcaseMedia } from './screens/ClientShowcaseScreen'
 import { StartScreen } from './screens/StartScreen'
 import './App.css'
+import './miniapp-refresh.css'
 
 const loadAddressScreen = () => import('./screens/AddressScreen')
 const AddressScreen = lazy(() =>

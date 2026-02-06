@@ -7,6 +7,7 @@ import footerLeftImage from '../assets/start-footer-left.webp'
 import footerRightImage from '../assets/start-footer-right.webp'
 import type { Role } from '../types/app'
 import { useNavPreload } from '../contexts/NavPreloadContext'
+import { hapticSelection } from '../utils/haptics'
 
 export const StartScreen = ({
   onRoleSelect,
@@ -61,7 +62,10 @@ export const StartScreen = ({
             type="button"
             aria-label="Мне нужна услуга"
             onPointerDown={() => preload?.('address')}
-            onClick={() => onRoleSelect('client')}
+            onClick={() => {
+              hapticSelection()
+              onRoleSelect('client')
+            }}
           >
             <img
               className="role-card__image"
@@ -69,13 +73,20 @@ export const StartScreen = ({
               alt=""
               aria-hidden="true"
             />
+            <span className="role-card__content" aria-hidden="true">
+              <span className="role-card__title">Мне нужна услуга</span>
+              <span className="role-card__meta">Поиск, заявки и быстрый чат</span>
+            </span>
           </button>
           <button
             className="role-card role-card--pro"
             type="button"
             aria-label="Я мастер"
             onPointerDown={() => preload?.('pro-profile')}
-            onClick={() => onRoleSelect('pro')}
+            onClick={() => {
+              hapticSelection()
+              onRoleSelect('pro')
+            }}
           >
             <img
               className="role-card__image"
@@ -83,6 +94,10 @@ export const StartScreen = ({
               alt=""
               aria-hidden="true"
             />
+            <span className="role-card__content" aria-hidden="true">
+              <span className="role-card__title">Я мастер</span>
+              <span className="role-card__meta">Клиенты, записи и аналитика</span>
+            </span>
           </button>
         </div>
 

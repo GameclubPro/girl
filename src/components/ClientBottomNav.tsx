@@ -1,5 +1,6 @@
 import { IconNavChat, IconNavHome, IconNavProfile, IconNavRequests } from './icons'
 import { useNavPreload } from '../contexts/NavPreloadContext'
+import { hapticSelection } from '../utils/haptics'
 
 type ClientNavKey = 'home' | 'chats' | 'requests' | 'profile'
 
@@ -23,6 +24,7 @@ export const ClientBottomNav = ({
   const preload = useNavPreload()
   const handleClick = (key: ClientNavKey, action: () => void) => () => {
     if (active === key && !allowActiveClick) return
+    hapticSelection()
     action()
   }
   const handlePreload = (key: ClientNavKey) => {
