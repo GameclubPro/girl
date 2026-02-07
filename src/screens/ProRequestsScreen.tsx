@@ -3865,9 +3865,77 @@ export const ProRequestsScreen = ({
     }
   }
 
+  const totalIncoming = items.length + pendingBookingItems.length
+  const attentionFromRequests = items.filter(
+    (item) => item.nextAction && item.nextAction.tone !== 'neutral'
+  ).length
+  const pendingActionsTotal = pendingBookingItems.length + attentionFromRequests
+  const hasSyncIssues = Boolean(loadError || bookingsError)
+  const isSyncing = isLoading || isBookingsLoading
+  const requestsOverviewSubtitle =
+    activeTab === 'requests'
+      ? 'Входящие заявки, отклики и срочные действия в одном потоке.'
+      : 'Подтвержденные записи, календарь и депозиты под контролем.'
+  const requestsOverviewContext =
+    activeTab === 'requests'
+      ? `Отклики в работе: ${items.length}`
+      : `Слотов в работе: ${confirmedBookingItems.length}`
+  const requestsSyncLabel = hasSyncIssues
+    ? 'Нужна проверка синхронизации'
+    : isSyncing
+      ? 'Синхронизация...'
+      : 'Синхронизировано'
+
   return (
     <div className="screen screen--pro screen--pro-requests">
       <div className="pro-shell">
+        <section className="pro-requests-overview animate delay-1">
+          <div className="pro-requests-overview-copy">
+            <p className="pro-requests-overview-kicker">Рабочий поток</p>
+            <h1 className="pro-requests-overview-title">Заявки и записи</h1>
+            <p className="pro-requests-overview-subtitle">
+              {requestsOverviewSubtitle}
+            </p>
+          </div>
+          <div className="pro-requests-overview-stats">
+            <div className="pro-requests-overview-stat">
+              <span className="pro-requests-overview-stat-value">
+                {totalIncoming}
+              </span>
+              <span className="pro-requests-overview-stat-label">Входящие</span>
+            </div>
+            <div className="pro-requests-overview-stat">
+              <span className="pro-requests-overview-stat-value">
+                {confirmedBookingItems.length}
+              </span>
+              <span className="pro-requests-overview-stat-label">Подтверждены</span>
+            </div>
+            <div className="pro-requests-overview-stat">
+              <span className="pro-requests-overview-stat-value">
+                {pendingActionsTotal}
+              </span>
+              <span className="pro-requests-overview-stat-label">
+                Нужны действия
+              </span>
+            </div>
+          </div>
+          <div className="pro-requests-overview-meta">
+            <span className="pro-requests-overview-meta-pill">
+              {requestsOverviewContext}
+            </span>
+            <span className="pro-requests-overview-meta-pill">
+              Депозиты: {depositPipelineBookingsCount}
+            </span>
+            <span
+              className={`pro-requests-overview-meta-pill${
+                hasSyncIssues ? ' is-error' : isSyncing ? ' is-loading' : ' is-ok'
+              }`}
+            >
+              {requestsSyncLabel}
+            </span>
+          </div>
+        </section>
+
         {!isActive && (
           <div className="pro-banner">
             <div>

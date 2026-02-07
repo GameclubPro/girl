@@ -573,6 +573,10 @@ function App() {
   }, [view])
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [view])
+
+  useEffect(() => {
     if (warmupDoneRef.current || view === 'start') return
     warmupDoneRef.current = true
     const queue = (role === 'pro' ? proWarmViews : clientWarmViews).filter(

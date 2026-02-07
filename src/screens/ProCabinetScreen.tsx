@@ -129,7 +129,8 @@ export const ProCabinetScreen = ({
   onOpenStories,
   onOpenSupport,
 }: ProCabinetScreenProps) => {
-  const { requestStats, bookingStats, bookings } = useProCabinetData(
+  const { requestStats, bookingStats, bookings, isLoading, combinedError } =
+    useProCabinetData(
     apiBase,
     userId
   )
@@ -244,6 +245,15 @@ export const ProCabinetScreen = ({
     [profileDisplayName]
   )
   const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
+  const pendingActions = requestStats.open + bookingStats.pending
+  const nextBookingLabel = bookingStats.nextBookingTime
+    ? formatShortDate(new Date(bookingStats.nextBookingTime))
+    : 'Нет ближайших слотов'
+  const overviewStatusLabel = combinedError
+    ? 'Требуется синхронизация'
+    : isLoading
+      ? 'Обновляем данные'
+      : 'Данные актуальны'
   const tapHint = (
     <span className="pro-cabinet-nav-hint" aria-hidden="true">
       <span className="pro-cabinet-nav-hint-arrow" />
@@ -253,9 +263,57 @@ export const ProCabinetScreen = ({
   return (
     <div className="screen screen--pro screen--pro-cabinet">
       <div className="pro-cabinet-shell pro-cabinet-shell--icons">
+        <section className="pro-cabinet-overview animate delay-1">
+          <div className="pro-cabinet-overview-copy">
+            <p className="pro-cabinet-overview-kicker">Панель мастера</p>
+            <h1 className="pro-cabinet-overview-title">Операционный центр</h1>
+            <p className="pro-cabinet-overview-subtitle">
+              Контролируйте поток заявок, клиентов и занятость по календарю.
+            </p>
+          </div>
+          <div className="pro-cabinet-overview-stats">
+            <div className="pro-cabinet-overview-stat">
+              <span className="pro-cabinet-overview-stat-value">
+                {pendingActions}
+              </span>
+              <span className="pro-cabinet-overview-stat-label">
+                Нужны действия
+              </span>
+            </div>
+            <div className="pro-cabinet-overview-stat">
+              <span className="pro-cabinet-overview-stat-value">
+                {bookingStats.upcomingWeek}
+              </span>
+              <span className="pro-cabinet-overview-stat-label">На неделе</span>
+            </div>
+            <div className="pro-cabinet-overview-stat">
+              <span className="pro-cabinet-overview-stat-value">
+                {bookingStats.uniqueClients}
+              </span>
+              <span className="pro-cabinet-overview-stat-label">Клиентов</span>
+            </div>
+          </div>
+          <div className="pro-cabinet-overview-meta">
+            <span className="pro-cabinet-overview-meta-pill">
+              Ближайший слот: {nextBookingLabel}
+            </span>
+            <span
+              className={`pro-cabinet-overview-meta-pill${
+                combinedError
+                  ? ' is-error'
+                  : isLoading
+                    ? ' is-loading'
+                    : ' is-ok'
+              }`}
+            >
+              {overviewStatusLabel}
+            </span>
+          </div>
+        </section>
+
         <div className="pro-cabinet-nav-grid">
           <button
-            className="pro-cabinet-nav-card is-analytics animate delay-1"
+            className="pro-cabinet-nav-card is-analytics animate delay-2"
             type="button"
             onClick={onOpenAnalytics}
           >
@@ -296,7 +354,7 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-calendar animate delay-2"
+            className="pro-cabinet-nav-card is-calendar animate delay-3"
             type="button"
             onClick={onOpenCalendar}
           >
@@ -337,7 +395,7 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-clients animate delay-3"
+            className="pro-cabinet-nav-card is-clients animate delay-4"
             type="button"
             onClick={onOpenClients}
           >
@@ -406,7 +464,7 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-marketing animate delay-4"
+            className="pro-cabinet-nav-card is-marketing animate delay-5"
             type="button"
             onClick={onOpenMarketing}
           >
@@ -444,7 +502,7 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-stories animate delay-5"
+            className="pro-cabinet-nav-card is-stories animate delay-6"
             type="button"
             onClick={onOpenStories}
           >
@@ -474,7 +532,7 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-showcase animate delay-6"
+            className="pro-cabinet-nav-card is-showcase animate delay-7"
             type="button"
             onClick={onOpenShowcase}
           >
