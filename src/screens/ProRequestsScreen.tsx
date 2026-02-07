@@ -394,6 +394,30 @@ const getInitials = (value: string) => {
   return normalized.slice(0, 2).toUpperCase()
 }
 
+const resolveBookingDepositAmount = (booking: Booking) => {
+  const depositPercent =
+    typeof booking.depositPercent === 'number'
+      ? Math.max(0, Math.round(booking.depositPercent))
+      : 0
+  const basePrice =
+    typeof booking.servicePrice === 'number'
+      ? booking.servicePrice
+      : typeof booking.proposedPrice === 'number'
+        ? booking.proposedPrice
+        : null
+  if (typeof booking.depositAmount === 'number') {
+    return booking.depositAmount
+  }
+  if (basePrice && depositPercent > 0) {
+    return Math.round((basePrice * depositPercent) / 100)
+  }
+  return 0
+}
+
+const resolveBookingDepositStatus = (booking: Booking, depositAmount: number) =>
+  booking.depositStatus ??
+  (booking.status === 'confirmed' && depositAmount > 0 ? 'pending' : 'not_required')
+
 type ProRequest = ServiceRequest & {
   responseId?: number | null
   responseStatus?: string | null
@@ -659,10 +683,14 @@ export const ProRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
+  const [depositReviewBookingId, setDepositReviewBookingId] = useState<
+    number | null
+  >(null)
   const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
   const pendingRequestFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusIdRef = useRef<number | null>(null)
+  const pendingDepositReviewBookingIdRef = useRef<number | null>(null)
   const autoSwitchHandledRef = useRef(false)
   const autoSwitchLockedRef = useRef(false)
   const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
@@ -780,6 +808,13 @@ export const ProRequestsScreen = ({
     }, 4000)
     return () => window.clearTimeout(timeout)
   }, [focusedBookingId])
+  useEffect(() => {
+    if (depositReviewBookingId === null) return
+    const exists = bookings.some((booking) => booking.id === depositReviewBookingId)
+    if (!exists) {
+      setDepositReviewBookingId(null)
+    }
+  }, [bookings, depositReviewBookingId])
   useEffect(() => {
     onTabChange?.(activeTab)
   }, [activeTab, onTabChange])
@@ -1213,6 +1248,24 @@ export const ProRequestsScreen = ({
         ['declined', 'cancelled'].includes(booking.status)
       ),
     [bookingItems]
+  )
+  const depositReviewBooking = useMemo(
+    () =>
+      depositReviewBookingId === null
+        ? null
+        : bookingItems.find((booking) => booking.id === depositReviewBookingId) ?? null,
+    [bookingItems, depositReviewBookingId]
+  )
+  const depositReviewAmount = useMemo(
+    () => (depositReviewBooking ? resolveBookingDepositAmount(depositReviewBooking) : 0),
+    [depositReviewBooking]
+  )
+  const depositReviewStatus = useMemo(
+    () =>
+      depositReviewBooking
+        ? resolveBookingDepositStatus(depositReviewBooking, depositReviewAmount)
+        : 'not_required',
+    [depositReviewAmount, depositReviewBooking]
   )
   const bookingCalendarItems = useMemo(() => {
     return confirmedBookingItems
@@ -2053,8 +2106,11 @@ export const ProRequestsScreen = ({
   )
 
   const handleBookingActionFocus = useCallback(
-    (booking: Booking) => {
+    (booking: Booking, actionId?: string | null) => {
       const targetTab = booking.status === 'confirmed' ? 'bookings' : 'requests'
+      if (actionId === 'check_deposit') {
+        pendingDepositReviewBookingIdRef.current = booking.id
+      }
       if (activeTab !== targetTab) {
         pendingBookingFocusIdRef.current = booking.id
         handleUserTabChange(targetTab)
@@ -2064,6 +2120,10 @@ export const ProRequestsScreen = ({
         focusBookingInCalendar(booking)
       } else {
         focusPendingBooking(booking.id)
+      }
+      if (actionId === 'check_deposit') {
+        setDepositReviewBookingId(booking.id)
+        pendingDepositReviewBookingIdRef.current = null
       }
     },
     [activeTab, focusBookingInCalendar, focusPendingBooking, handleUserTabChange]
@@ -2094,6 +2154,10 @@ export const ProRequestsScreen = ({
       focusBookingInCalendar(booking)
     } else {
       focusPendingBooking(bookingId)
+    }
+    if (pendingDepositReviewBookingIdRef.current === bookingId) {
+      setDepositReviewBookingId(bookingId)
+      pendingDepositReviewBookingIdRef.current = null
     }
     onFocusHandled?.()
   }, [
@@ -2767,34 +2831,24 @@ export const ProRequestsScreen = ({
       typeof booking.depositPercent === 'number'
         ? Math.max(0, Math.round(booking.depositPercent))
         : 0
-    const basePrice =
-      typeof booking.servicePrice === 'number'
-        ? booking.servicePrice
-        : typeof booking.proposedPrice === 'number'
-          ? booking.proposedPrice
-          : null
-    const resolvedDepositAmount =
-      typeof booking.depositAmount === 'number'
-        ? booking.depositAmount
-        : basePrice && depositPercent > 0
-          ? Math.round((basePrice * depositPercent) / 100)
-          : 0
-    const depositAmount =
-      typeof resolvedDepositAmount === 'number' ? resolvedDepositAmount : 0
-    const depositStatus =
-      booking.depositStatus ?? (depositAmount > 0 ? 'pending' : 'not_required')
+    const depositAmount = resolveBookingDepositAmount(booking)
+    const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
     const depositStatusLabel =
-      depositStatus === 'submitted'
-        ? 'Чек загружен, ждёт подтверждения'
-        : depositStatus === 'confirmed'
-          ? 'Депозит подтверждён'
-          : depositStatus === 'rejected'
-            ? 'Чек отклонён'
-            : depositStatus === 'expired'
-              ? 'Время оплаты вышло, слот снят'
-              : depositStatus === 'pending'
-                ? 'Ожидает оплаты депозита'
-                : ''
+      depositAmount > 0 &&
+      booking.status !== 'confirmed' &&
+      depositStatus === 'not_required'
+        ? 'Депозит активируется после подтверждения'
+        : depositStatus === 'submitted'
+          ? 'Чек загружен, ждёт подтверждения'
+          : depositStatus === 'confirmed'
+            ? 'Депозит подтверждён'
+            : depositStatus === 'rejected'
+              ? 'Чек отклонён'
+              : depositStatus === 'expired'
+                ? 'Время оплаты вышло, слот снят'
+                : depositStatus === 'pending'
+                  ? 'Ожидает оплаты депозита'
+                  : ''
     const canConfirmDeposit = depositStatus === 'submitted'
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
@@ -2842,7 +2896,7 @@ export const ProRequestsScreen = ({
       Boolean(promotionLabel) ||
       (booking.status === 'price_proposed' && Boolean(priceOfferTimeLeft)) ||
       (booking.status === 'confirmed' && Boolean(freeCancelLabel)) ||
-      (!isCompact && depositPercent > 0) ||
+      (!isCompact && depositPercent > 0 && depositAmount <= 0) ||
       depositAmount > 0 ||
       (depositAmount > 0 && Boolean(depositStatusLabel))
 
@@ -2951,14 +3005,14 @@ export const ProRequestsScreen = ({
                 Бесплатная отмена до: {freeCancelLabel}
               </div>
             )}
-            {!isCompact && depositPercent > 0 && (
+            {!isCompact && depositPercent > 0 && depositAmount <= 0 && (
               <div className="booking-item-meta booking-item-meta--chip">
                 Депозит: {depositPercent}%
               </div>
             )}
             {depositAmount > 0 && (
               <div className="booking-item-meta booking-item-meta--chip">
-                Депозит к оплате: {formatPrice(depositAmount)}
+                Депозит: {formatPrice(depositAmount)}
               </div>
             )}
             {depositAmount > 0 && depositStatusLabel && (
@@ -2972,7 +3026,7 @@ export const ProRequestsScreen = ({
           <NextActionPill
             action={nextAction}
             className="booking-action-pill"
-            onClick={() => handleBookingActionFocus(booking)}
+            onClick={() => handleBookingActionFocus(booking, nextAction.id)}
           />
         )}
         {hasExtraDetails && (
@@ -3055,7 +3109,13 @@ export const ProRequestsScreen = ({
         )}
         {booking.depositProofUrl && (
           <div className="booking-deposit-proof">
-            <img src={booking.depositProofUrl} alt="Чек оплаты" />
+            <button
+              className="booking-deposit-proof-button"
+              type="button"
+              onClick={() => setDepositReviewBookingId(booking.id)}
+            >
+              <img src={booking.depositProofUrl} alt="Чек оплаты" />
+            </button>
           </div>
         )}
         {canConfirmDeposit && (
@@ -3063,23 +3123,21 @@ export const ProRequestsScreen = ({
             <button
               className="booking-action is-primary"
               type="button"
-              onClick={() =>
-                handleBookingAction(booking.id, 'master-deposit-confirm')
-              }
+              onClick={() => setDepositReviewBookingId(booking.id)}
               disabled={isActionLoading}
             >
-              Принять чек
+              Проверить чек
             </button>
-            <button
-              className="booking-action"
-              type="button"
-              onClick={() =>
-                handleBookingAction(booking.id, 'master-deposit-reject')
-              }
-              disabled={isActionLoading}
-            >
-              Отклонить
-            </button>
+            {booking.chatId && (
+              <button
+                className="booking-action"
+                type="button"
+                onClick={() => onOpenChat(booking.chatId!)}
+                disabled={isActionLoading}
+              >
+                Открыть чат
+              </button>
+            )}
           </div>
         )}
         {outcomeLabel && (
@@ -3235,21 +3293,22 @@ export const ProRequestsScreen = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-
-      if (!response.ok) {
-        throw new Error('Booking update failed')
-      }
-
       const data = (await response.json().catch(() => null)) as
         | {
+            error?: string
             status?: Booking['status']
             proposedPrice?: number | null
             depositStatus?: Booking['depositStatus']
             depositAmount?: number | null
+            depositHoldExpiresAt?: string | null
+            depositProofUrl?: string | null
             scheduledAt?: string | null
             chatId?: number | null
           }
         | null
+      if (!response.ok) {
+        throw new Error(data?.error || 'Booking update failed')
+      }
 
       setBookings((current) =>
         current.map((booking) => {
@@ -3290,6 +3349,12 @@ export const ProRequestsScreen = ({
           if (typeof data?.depositAmount === 'number') {
             next.depositAmount = data.depositAmount
           }
+          if ('depositHoldExpiresAt' in (data ?? {})) {
+            next.depositHoldExpiresAt = data?.depositHoldExpiresAt ?? null
+          }
+          if (typeof data?.depositProofUrl === 'string') {
+            next.depositProofUrl = data.depositProofUrl
+          }
           if (typeof data?.chatId === 'number') {
             next.chatId = data.chatId
           }
@@ -3297,10 +3362,23 @@ export const ProRequestsScreen = ({
           return next
         })
       )
+      if (
+        action === 'master-deposit-confirm' ||
+        action === 'master-deposit-reject'
+      ) {
+        setDepositReviewBookingId(null)
+      }
     } catch (error) {
+      const errorCode = error instanceof Error ? error.message : ''
+      const message =
+        errorCode === 'deposit_status_invalid'
+          ? 'Чек уже обработан. Обновите список.'
+          : errorCode === 'status_invalid'
+            ? 'Действие недоступно в текущем статусе.'
+            : 'Не удалось обновить запись.'
       setBookingActionError((current) => ({
         ...current,
-        [bookingId]: 'Не удалось обновить запись.',
+        [bookingId]: message,
       }))
     } finally {
       setBookingActionId((current) => (current === bookingId ? null : current))
@@ -3317,6 +3395,10 @@ export const ProRequestsScreen = ({
       [booking.id]: 'Чат ещё создаётся. Откройте список чатов.',
     }))
   }
+
+  const handleCloseDepositReview = useCallback(() => {
+    setDepositReviewBookingId(null)
+  }, [])
 
   const handleSubmit = async (requestId: number) => {
     if (submittingId) return
@@ -4272,15 +4354,16 @@ export const ProRequestsScreen = ({
                         ]
                           .filter(Boolean)
                           .join(' · ')
-                        const hasBookingDeposit =
-                          typeof booking?.depositAmount === 'number'
-                            ? booking.depositAmount > 0
-                            : typeof booking?.depositPercent === 'number'
-                              ? booking.depositPercent > 0
-                              : false
+                        const bookingDepositAmount = booking
+                          ? resolveBookingDepositAmount(booking)
+                          : 0
                         const bookingDepositStatus =
-                          booking?.depositStatus ??
-                          (hasBookingDeposit ? 'pending' : 'not_required')
+                          booking
+                            ? resolveBookingDepositStatus(
+                                booking,
+                                bookingDepositAmount
+                              )
+                            : 'not_required'
                         const bookingDepositLabel =
                           bookingDepositStatus === 'submitted'
                             ? 'Чек на проверке'
@@ -4507,6 +4590,116 @@ export const ProRequestsScreen = ({
             </>
           )}
       </div>
+
+      {depositReviewBooking && (
+        <div
+          className="deposit-sheet-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pro-deposit-sheet-title"
+          onClick={handleCloseDepositReview}
+        >
+          <div
+            className="deposit-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="deposit-sheet-handle" aria-hidden="true" />
+            <header className="deposit-sheet-head">
+              <div>
+                <p className="deposit-sheet-kicker">Проверка депозита</p>
+                <h3 className="deposit-sheet-title" id="pro-deposit-sheet-title">
+                  {depositReviewBooking.clientName ?? 'Клиент'}
+                </h3>
+                <p className="deposit-sheet-subtitle">
+                  {depositReviewBooking.serviceName} ·{' '}
+                  {formatDateTime(depositReviewBooking.scheduledAt)}
+                </p>
+              </div>
+              <button
+                className="deposit-sheet-close"
+                type="button"
+                onClick={handleCloseDepositReview}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="deposit-sheet-amount-card">
+              <p className="deposit-sheet-amount-label">Сумма депозита</p>
+              <p className="deposit-sheet-amount-value">
+                {depositReviewAmount > 0
+                  ? formatPrice(depositReviewAmount)
+                  : 'Не указана'}
+              </p>
+              <p className="deposit-sheet-status">
+                {depositReviewStatus === 'submitted'
+                  ? 'Клиент отправил чек, требуется ваша проверка'
+                  : depositReviewStatus === 'confirmed'
+                    ? 'Депозит подтверждён'
+                    : depositReviewStatus === 'rejected'
+                      ? 'Чек отклонён, ожидание повторной отправки'
+                      : 'Статус депозита обновляется'}
+              </p>
+            </div>
+
+            <div className="deposit-sheet-body">
+              {depositReviewBooking.depositProofUrl ? (
+                <div className="deposit-sheet-proof">
+                  <img src={depositReviewBooking.depositProofUrl} alt="Чек оплаты" />
+                </div>
+              ) : (
+                <p className="deposit-sheet-note">
+                  Клиент ещё не приложил чек.
+                </p>
+              )}
+              {bookingActionError[depositReviewBooking.id] && (
+                <p className="deposit-sheet-note is-error">
+                  {bookingActionError[depositReviewBooking.id]}
+                </p>
+              )}
+            </div>
+
+            <div className="deposit-sheet-actions">
+              <button
+                className="deposit-sheet-primary"
+                type="button"
+                onClick={() =>
+                  handleBookingAction(depositReviewBooking.id, 'master-deposit-confirm')
+                }
+                disabled={
+                  bookingActionId === depositReviewBooking.id ||
+                  depositReviewStatus !== 'submitted'
+                }
+              >
+                Подтвердить депозит
+              </button>
+              <button
+                className="deposit-sheet-secondary"
+                type="button"
+                onClick={() =>
+                  handleBookingAction(depositReviewBooking.id, 'master-deposit-reject')
+                }
+                disabled={
+                  bookingActionId === depositReviewBooking.id ||
+                  depositReviewStatus !== 'submitted'
+                }
+              >
+                Отклонить чек
+              </button>
+              {depositReviewBooking.chatId && (
+                <button
+                  className="deposit-sheet-secondary"
+                  type="button"
+                  onClick={() => onOpenChat(depositReviewBooking.chatId!)}
+                >
+                  Открыть чат
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {slotDetailsBooking && (
         <div

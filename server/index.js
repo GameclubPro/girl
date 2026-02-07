@@ -3027,7 +3027,8 @@ const buildBookingNextAction = (booking, viewerRole) => {
   const depositAmount =
     typeof resolvedDepositAmount === 'number' ? resolvedDepositAmount : 0
   const depositStatus =
-    booking.depositStatus ?? (depositAmount > 0 ? 'pending' : 'not_required')
+    booking.depositStatus ??
+    (status === 'confirmed' && depositAmount > 0 ? 'pending' : 'not_required')
 
   if (role === 'client') {
     if (status === 'price_proposed') {
@@ -3045,7 +3046,11 @@ const buildBookingNextAction = (booking, viewerRole) => {
         tone: 'alert',
       })
     }
-    if (depositAmount > 0 && ['pending', 'rejected'].includes(depositStatus)) {
+    if (
+      status === 'confirmed' &&
+      depositAmount > 0 &&
+      ['pending', 'rejected'].includes(depositStatus)
+    ) {
       const amountLabel = formatPriceLabel(depositAmount)
       return buildNextAction({
         id: 'pay_deposit',
@@ -3089,7 +3094,7 @@ const buildBookingNextAction = (booking, viewerRole) => {
       tone: 'alert',
     })
   }
-  if (depositStatus === 'submitted') {
+  if (status === 'confirmed' && depositStatus === 'submitted') {
     const amountLabel = formatPriceLabel(depositAmount)
     return buildNextAction({
       id: 'check_deposit',
@@ -3772,6 +3777,7 @@ const runDepositHoldCycle = async () => {
         WHERE deposit_hold_expires_at IS NOT NULL
           AND deposit_hold_expires_at <= NOW()
           AND deposit_status IN ('pending', 'rejected')
+          AND status = 'confirmed'
           AND status NOT IN ('cancelled', 'declined')
         ORDER BY deposit_hold_expires_at ASC
         LIMIT $1
@@ -3795,6 +3801,7 @@ const runDepositHoldCycle = async () => {
               AND deposit_hold_expires_at IS NOT NULL
               AND deposit_hold_expires_at <= NOW()
               AND deposit_status IN ('pending', 'rejected')
+              AND status = 'confirmed'
               AND status NOT IN ('cancelled', 'declined')
             FOR UPDATE
           `,
@@ -9665,9 +9672,9 @@ app.post('/api/bookings', async (req, res) => {
       discountChoice?.source === 'campaign' ? discountChoice.campaign : null
     const discountSource = discountChoice?.source ?? null
     const depositAmount = calculateDepositAmount(profile, effectiveServicePrice)
-    const depositStatus = depositAmount > 0 ? 'pending' : 'not_required'
-    const depositHoldExpiresAt =
-      depositStatus === 'pending' ? buildDepositHoldExpiresAt() : null
+    // Deposit flow starts only after booking gets confirmed.
+    const depositStatus = 'not_required'
+    const depositHoldExpiresAt = null
 
     const limits = await resolveClientLimits(normalizedUserId)
     const dayWindowStart = new Date(Date.now() - DAY_MS).toISOString()
@@ -10048,14 +10055,44 @@ app.patch('/api/bookings/:id', async (req, res) => {
         return
       }
 
+      const depositPercentValue = clampValue(
+        parseOptionalInt(booking.depositPercent) ?? 0,
+        0,
+        100
+      )
+      const basePrice =
+        typeof booking.servicePrice === 'number'
+          ? booking.servicePrice
+          : typeof booking.proposedPrice === 'number'
+            ? booking.proposedPrice
+            : null
+      const depositAmountValue =
+        typeof booking.depositAmount === 'number'
+          ? booking.depositAmount
+          : basePrice && depositPercentValue > 0
+            ? Math.round((basePrice * depositPercentValue) / 100)
+            : 0
+      const depositStatusValue = depositAmountValue > 0 ? 'pending' : 'not_required'
+      const depositHoldExpiresAtValue =
+        depositStatusValue === 'pending' ? buildDepositHoldExpiresAt() : null
+
       await pool.query(
         `
           UPDATE service_bookings
           SET status = 'confirmed',
+              deposit_amount = $2,
+              deposit_status = $3,
+              deposit_hold_expires_at = $4,
+              deposit_paid_at = NULL,
               updated_at = NOW()
           WHERE id = $1
         `,
-        [bookingId]
+        [
+          bookingId,
+          depositAmountValue,
+          depositStatusValue,
+          depositHoldExpiresAtValue,
+        ]
       )
       void evaluateClientSpamBlock(booking.clientId)
 
@@ -10094,26 +10131,6 @@ app.patch('/api/bookings/:id', async (req, res) => {
         console.error('Failed to create chat for booking:', chatError)
       }
 
-      const depositPercentValue = clampValue(
-        parseOptionalInt(booking.depositPercent) ?? 0,
-        0,
-        100
-      )
-      const basePrice =
-        typeof booking.servicePrice === 'number'
-          ? booking.servicePrice
-          : typeof booking.proposedPrice === 'number'
-            ? booking.proposedPrice
-            : null
-      const depositAmountValue =
-        typeof booking.depositAmount === 'number'
-          ? booking.depositAmount
-          : basePrice && depositPercentValue > 0
-            ? Math.round((basePrice * depositPercentValue) / 100)
-            : 0
-      const depositStatusValue =
-        booking.depositStatus ?? (depositAmountValue > 0 ? 'pending' : 'not_required')
-
       if (
         chatPayload?.chatId &&
         depositAmountValue > 0 &&
@@ -10126,7 +10143,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         })
         if (!isDuplicate) {
           const amountLabel = formatPriceLabel(depositAmountValue)
-          const holdLabel = formatTimeLeftLabel(booking.depositHoldExpiresAt)
+          const holdLabel = formatTimeLeftLabel(depositHoldExpiresAtValue)
           const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
           const body = ['Нужен депозит.', amountLabel && `Сумма: ${amountLabel}`, holdText]
             .filter(Boolean)
@@ -10136,7 +10153,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
             bookingId,
             serviceName: booking.serviceName ?? null,
             depositAmount: depositAmountValue,
-            holdExpiresAt: booking.depositHoldExpiresAt ?? null,
+            holdExpiresAt: depositHoldExpiresAtValue,
           }
           const messageResult = await insertSystemMessage({
             chatId: chatPayload.chatId,
@@ -10170,7 +10187,14 @@ app.patch('/api/bookings/:id', async (req, res) => {
         }
       }
 
-      res.json({ ok: true, status: 'confirmed', chatId: chatPayload?.chatId ?? null })
+      res.json({
+        ok: true,
+        status: 'confirmed',
+        depositStatus: depositStatusValue,
+        depositAmount: depositAmountValue,
+        depositHoldExpiresAt: depositHoldExpiresAtValue,
+        chatId: chatPayload?.chatId ?? null,
+      })
       return
     }
 
@@ -10307,25 +10331,12 @@ app.patch('/api/bookings/:id', async (req, res) => {
           ? discountChoice.campaign
           : null
       const discountSource = discountChoice?.source ?? null
-      let nextDepositAmount =
-        typeof booking.depositAmount === 'number' ? booking.depositAmount : null
-      let nextDepositStatus = booking.depositStatus ?? null
-      let nextDepositHoldExpiresAt = booking.depositHoldExpiresAt ?? null
-      if (depositPercentValue > 0) {
-        nextDepositAmount = Math.round((effectivePrice * depositPercentValue) / 100)
-        if (
-          nextDepositAmount > 0 &&
-          (!nextDepositStatus || nextDepositStatus === 'not_required')
-        ) {
-          nextDepositStatus = 'pending'
-        }
-      }
-      if (nextDepositStatus === 'pending') {
-        nextDepositHoldExpiresAt =
-          nextDepositHoldExpiresAt ?? buildDepositHoldExpiresAt()
-      } else {
-        nextDepositHoldExpiresAt = null
-      }
+      const nextDepositAmount =
+        depositPercentValue > 0
+          ? Math.round((effectivePrice * depositPercentValue) / 100)
+          : 0
+      const nextDepositStatus = 'not_required'
+      const nextDepositHoldExpiresAt = null
 
       await pool.query(
         `
@@ -10511,27 +10522,13 @@ app.patch('/api/bookings/:id', async (req, res) => {
         0,
         100
       )
-      let nextDepositAmount =
-        typeof booking.depositAmount === 'number' ? booking.depositAmount : null
-      let nextDepositStatus = booking.depositStatus ?? null
-      let nextDepositHoldExpiresAt = booking.depositHoldExpiresAt ?? null
-      if (depositPercentValue > 0 && (!nextDepositAmount || nextDepositAmount <= 0)) {
-        nextDepositAmount = Math.round(
-          (booking.proposedPrice * depositPercentValue) / 100
-        )
-        if (
-          nextDepositAmount > 0 &&
-          (!nextDepositStatus || nextDepositStatus === 'not_required')
-        ) {
-          nextDepositStatus = 'pending'
-        }
-      }
-      if (nextDepositStatus === 'pending') {
-        nextDepositHoldExpiresAt =
-          nextDepositHoldExpiresAt ?? buildDepositHoldExpiresAt()
-      } else {
-        nextDepositHoldExpiresAt = null
-      }
+      const nextDepositAmount =
+        depositPercentValue > 0
+          ? Math.round((booking.proposedPrice * depositPercentValue) / 100)
+          : 0
+      const nextDepositStatus = nextDepositAmount > 0 ? 'pending' : 'not_required'
+      const nextDepositHoldExpiresAt =
+        nextDepositStatus === 'pending' ? buildDepositHoldExpiresAt() : null
 
       await pool.query(
         `
@@ -10542,6 +10539,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
               deposit_amount = $3,
               deposit_status = $4,
               deposit_hold_expires_at = $5,
+              deposit_paid_at = NULL,
               updated_at = NOW()
           WHERE id = $1
         `,
@@ -10647,6 +10645,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         servicePrice: booking.proposedPrice,
         depositAmount: nextDepositAmount,
         depositStatus: nextDepositStatus,
+        depositHoldExpiresAt: nextDepositHoldExpiresAt,
         chatId: chatPayload?.chatId ?? null,
       })
       return
@@ -10757,7 +10756,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         res.status(403).json({ error: 'forbidden' })
         return
       }
-      if (['declined', 'cancelled'].includes(booking.status)) {
+      if (booking.status !== 'confirmed') {
         res.status(409).json({ error: 'status_invalid' })
         return
       }
@@ -10777,9 +10776,22 @@ app.patch('/api/bookings/:id', async (req, res) => {
         res.status(409).json({ error: 'deposit_not_required' })
         return
       }
-      if (booking.depositStatus === 'confirmed') {
+      const depositStatus =
+        booking.depositStatus ?? (depositAmount > 0 ? 'pending' : 'not_required')
+      if (depositStatus === 'confirmed') {
         res.status(409).json({ error: 'deposit_already_confirmed' })
         return
+      }
+      if (!['pending', 'rejected'].includes(depositStatus)) {
+        res.status(409).json({ error: 'deposit_status_invalid' })
+        return
+      }
+      if (booking.depositHoldExpiresAt) {
+        const holdExpiresAtMs = new Date(booking.depositHoldExpiresAt).getTime()
+        if (Number.isFinite(holdExpiresAtMs) && holdExpiresAtMs <= Date.now()) {
+          res.status(409).json({ error: 'hold_expired' })
+          return
+        }
       }
       if (normalizedDepositProofPath) {
         const safeUserId = sanitizePathSegment(normalizedUserId)
@@ -10789,7 +10801,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         }
       }
 
-      await pool.query(
+      const updateResult = await pool.query(
         `
           UPDATE service_bookings
           SET deposit_amount = $2,
@@ -10799,9 +10811,16 @@ app.patch('/api/bookings/:id', async (req, res) => {
               deposit_proof_path = COALESCE($3, deposit_proof_path),
               updated_at = NOW()
           WHERE id = $1
+            AND status = 'confirmed'
+            AND (deposit_status IN ('pending', 'rejected') OR deposit_status IS NULL)
+            AND (deposit_hold_expires_at IS NULL OR deposit_hold_expires_at > NOW())
         `,
         [bookingId, depositAmount, normalizedDepositProofPath || null]
       )
+      if (updateResult.rowCount === 0) {
+        res.status(409).json({ error: 'hold_expired' })
+        return
+      }
 
       let chatPayload = null
       try {
@@ -10878,6 +10897,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         ok: true,
         depositStatus: 'submitted',
         depositAmount,
+        depositHoldExpiresAt: null,
         depositProofUrl: normalizedDepositProofPath
           ? buildPublicUrl(req, normalizedDepositProofPath)
           : null,
@@ -10889,6 +10909,10 @@ app.patch('/api/bookings/:id', async (req, res) => {
     if (normalizedAction === 'master-deposit-confirm') {
       if (!isMaster) {
         res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.status !== 'confirmed') {
+        res.status(409).json({ error: 'status_invalid' })
         return
       }
       if (booking.depositStatus !== 'submitted') {
@@ -10972,13 +10996,17 @@ app.patch('/api/bookings/:id', async (req, res) => {
       } catch (chatError) {
         console.error('Failed to notify deposit confirmation:', chatError)
       }
-      res.json({ ok: true, depositStatus: 'confirmed' })
+      res.json({ ok: true, depositStatus: 'confirmed', depositHoldExpiresAt: null })
       return
     }
 
     if (normalizedAction === 'master-deposit-reject') {
       if (!isMaster) {
         res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      if (booking.status !== 'confirmed') {
+        res.status(409).json({ error: 'status_invalid' })
         return
       }
       if (booking.depositStatus !== 'submitted') {
@@ -11064,7 +11092,11 @@ app.patch('/api/bookings/:id', async (req, res) => {
       } catch (chatError) {
         console.error('Failed to notify deposit rejection:', chatError)
       }
-      res.json({ ok: true, depositStatus: 'rejected' })
+      res.json({
+        ok: true,
+        depositStatus: 'rejected',
+        depositHoldExpiresAt: nextHoldExpiresAt,
+      })
       return
     }
 

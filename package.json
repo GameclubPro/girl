@@ -13,7 +13,9 @@
     "screenshot:miniapp": "node scripts/miniapp-screenshot.mjs",
     "screenshot:miniapp:matrix": "node scripts/miniapp-screenshot-suite.mjs",
     "screenshot:booking-item": "node scripts/booking-item-autoshot.mjs",
-    "screenshot:booking-item:matrix": "node scripts/booking-item-autoshot-suite.mjs"
+    "screenshot:booking-item:matrix": "node scripts/booking-item-autoshot-suite.mjs",
+    "screenshot:deposit-sheet": "node scripts/deposit-sheet-autoshot.mjs",
+    "screenshot:deposit-sheet:matrix": "node scripts/deposit-sheet-autoshot-suite.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",
