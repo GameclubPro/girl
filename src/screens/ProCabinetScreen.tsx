@@ -287,7 +287,7 @@ export const ProCabinetScreen = ({
   const focusSubtitle = isOfflineFallback
     ? 'Связь нестабильна. Данные обновятся автоматически.'
     : combinedError
-    ? 'Обновите ленту, чтобы вернуть актуальные заявки.'
+      ? 'Обновите ленту, чтобы вернуть актуальные заявки.'
     : hasPendingActions
       ? 'Сначала закройте входящие и ожидания по записям.'
       : bookingStats.upcomingWeek > 0
@@ -319,31 +319,31 @@ export const ProCabinetScreen = ({
       : 'Есть база, можно вернуть больше клиентов'
     : 'Начните с заявок, чтобы собрать базу'
   const requestsHint = requestStats.open
-    ? `Ответьте на ${requestStats.open} ${formatCountLabel(
+    ? `${requestStats.open} ${formatCountLabel(
         requestStats.open,
-        'заявку',
+        'заявка',
         'заявки',
         'заявок'
-      )}`
+      )} к ответу`
     : requestStats.total > 0
-      ? 'Все заявки обработаны'
-      : 'Пока новых заявок нет'
+      ? 'Очередь чистая'
+      : 'Новых нет'
   const calendarHint = bookingStats.upcomingWeek
-    ? `На неделе ${bookingStats.upcomingWeek} ${formatCountLabel(
+    ? `${bookingStats.upcomingWeek} ${formatCountLabel(
         bookingStats.upcomingWeek,
         'запись',
         'записи',
         'записей'
-      )}`
-    : 'Неделя свободна: добавьте новые окна'
+      )} на неделе`
+    : 'Окна не открыты'
   const toolsPreviewSubtitle = marketingAudience
-    ? 'Аналитика, клиенты, истории и продвижение в одном блоке.'
-    : 'Откройте инструменты и запустите первые точки роста.'
+    ? 'Разверните блок, когда закроете приоритеты.'
+    : 'Разверните блок и запустите первые точки роста.'
   const nextStep = useMemo(() => {
     if (requestStats.open > 0) {
       return {
         title: 'Ответьте на заявки',
-        subtitle: 'Быстрый ответ заметно повышает шанс записи.',
+        subtitle: 'Быстрый ответ повышает шанс записи.',
         actionLabel: 'Открыть заявки',
         onAction: onViewRequests,
       }
@@ -351,7 +351,7 @@ export const ProCabinetScreen = ({
     if (bookingStats.upcomingWeek === 0) {
       return {
         title: 'Откройте новые окна в календаре',
-        subtitle: 'Добавьте хотя бы 2 слота, чтобы ускорить поток.',
+        subtitle: 'Добавьте 2 слота, чтобы ускорить поток.',
         actionLabel: 'Заполнить слоты',
         onAction: onOpenCalendar,
       }
@@ -359,7 +359,7 @@ export const ProCabinetScreen = ({
     if (marketingAudience === 0) {
       return {
         title: 'Запустите первое продвижение',
-        subtitle: 'Соберите первую аудиторию через истории и витрину.',
+        subtitle: 'Начните с историй и витрины.',
         actionLabel: 'Старт продвижения',
         onAction: onOpenMarketing,
       }
@@ -384,7 +384,14 @@ export const ProCabinetScreen = ({
       <div className="pro-cabinet-shell pro-cabinet-shell--icons">
         <section className="pro-cabinet-overview animate delay-1">
           <div className="pro-cabinet-overview-copy">
-            <p className="pro-cabinet-overview-kicker">Сегодня</p>
+            <div className="pro-cabinet-overview-head">
+              <p className="pro-cabinet-overview-kicker">Сегодня</p>
+              <span
+                className={`pro-cabinet-overview-state${overviewStatusClassName}`}
+              >
+                {overviewStatusLabel}
+              </span>
+            </div>
             <h1 className="pro-cabinet-overview-title">{focusTitle}</h1>
             <p className="pro-cabinet-overview-subtitle">{focusSubtitle}</p>
           </div>
@@ -413,11 +420,6 @@ export const ProCabinetScreen = ({
           <div className="pro-cabinet-overview-meta">
             <span className="pro-cabinet-overview-meta-pill">
               Ближайший слот: {nextBookingLabel}
-            </span>
-            <span
-              className={`pro-cabinet-overview-meta-pill${overviewStatusClassName}`}
-            >
-              {overviewStatusLabel}
             </span>
           </div>
           <div className="pro-cabinet-overview-actions">
@@ -479,7 +481,7 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-inline">
                 <span className="pro-cabinet-nav-inline-note">{requestsHint}</span>
                 <span className="pro-cabinet-nav-inline-link">
-                  {requestStats.open > 0 ? 'Перейти к ответам' : 'Открыть шаблоны'}
+                  {requestStats.open > 0 ? 'К ответам' : 'Шаблоны'}
                 </span>
               </div>
             </div>
@@ -525,9 +527,7 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-inline">
                 <span className="pro-cabinet-nav-inline-note">{calendarHint}</span>
                 <span className="pro-cabinet-nav-inline-link">
-                  {bookingStats.upcomingWeek > 0
-                    ? 'Проверить день'
-                    : 'Заполнить слоты'}
+                  {bookingStats.upcomingWeek > 0 ? 'Окна' : 'Слоты'}
                 </span>
               </div>
             </div>
@@ -549,7 +549,7 @@ export const ProCabinetScreen = ({
               {nextStep.actionLabel}
             </button>
             <button
-              className="pro-cabinet-next-step-action is-ghost"
+              className="pro-cabinet-next-step-action is-ghost is-compact"
               type="button"
               onClick={() => setIsToolsExpanded((current) => !current)}
             >
