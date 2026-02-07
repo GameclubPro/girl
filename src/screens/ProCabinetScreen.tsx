@@ -624,40 +624,36 @@ export const ProCabinetScreen = ({
     ? 'Начните рабочий день'
     : combinedError
       ? 'Проверьте синхронизацию'
-      : activeJourneyStep.status === 'active'
-        ? activeJourneyStep.title
-        : hasPendingActions
-          ? `${pendingActions} задач на сейчас`
-          : bookingStats.upcomingWeek > 0
-            ? 'График под контролем'
-            : 'День свободен для роста'
+      : hasPendingActions
+        ? `${pendingActions} задач на сейчас`
+        : bookingStats.upcomingWeek > 0
+          ? 'День под контролем'
+          : 'Свободная неделя для роста'
   const focusSubtitle = isOfflineFallback
     ? 'Связь нестабильна. Данные обновятся автоматически.'
     : combinedError
       ? 'Обновите ленту, чтобы вернуть актуальные заявки.'
-      : activeJourneyStep.status === 'active'
-        ? activeJourneyStep.subtitle
-        : hasPendingActions
-          ? 'Сначала закройте входящие и ожидания по записям.'
-          : bookingStats.upcomingWeek > 0
-            ? 'Неделя заполнена. Проверьте окна и напомните о себе клиентам.'
-            : 'Свободный день: усилите поток через витрину и истории.'
+      : hasPendingActions
+        ? 'Сначала закройте входящие и ожидания по записям.'
+        : bookingStats.upcomingWeek > 0
+          ? 'Проверьте окна в календаре и поддержите текущий темп.'
+          : 'Свободная неделя: выполните шаг из дорожки ниже.'
   const focusPrimaryActionLabel = isOfflineFallback
     ? 'Обновить ленту'
     : combinedError
       ? 'Обновить данные'
-      : activeJourneyStep.status === 'active'
-        ? activeJourneyStep.actionLabel
-        : hasPendingActions
-          ? 'Разобрать заявки'
-          : 'Открыть календарь'
+      : hasPendingActions
+        ? 'Разобрать заявки'
+        : bookingStats.upcomingWeek > 0
+          ? 'Открыть календарь'
+          : activeJourneyStep.actionLabel
   const focusPrimaryAction = combinedError
     ? refresh
-    : activeJourneyStep.status === 'active'
-      ? activeJourneyStep.onAction
-      : hasPendingActions
-        ? onViewRequests
-        : onOpenCalendar
+    : hasPendingActions
+      ? onViewRequests
+      : bookingStats.upcomingWeek > 0
+        ? onOpenCalendar
+        : activeJourneyStep.onAction
   const storiesBadgeLabel = hasStoriesPublished ? 'LIVE' : 'START'
   const storiesHint = hasStoriesPublished
     ? `${activeStoriesCount} ${formatCountLabel(
@@ -879,20 +875,15 @@ export const ProCabinetScreen = ({
               {activeJourneyStep.subtitle}
             </p>
           </div>
-          {isRoadmapCoachmarkVisible ? (
-            <div className="pro-cabinet-roadmap-coachmark" role="status">
-              <span className="pro-cabinet-roadmap-coachmark-text">
-                Шаги кликабельны: откройте нужный раздел в 1 тап.
-              </span>
-              <button
-                className="pro-cabinet-roadmap-coachmark-action"
-                type="button"
-                onClick={() => setIsRoadmapCoachmarkVisible(false)}
-              >
-                Понятно
-              </button>
-            </div>
-          ) : null}
+          <div
+            className={`pro-cabinet-roadmap-tip${
+              isRoadmapCoachmarkVisible ? ' is-visible' : ''
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            Шаги кликабельны: откройте нужный раздел в 1 тап.
+          </div>
           <div className="pro-cabinet-roadmap-meter" aria-hidden="true">
             <span
               className="pro-cabinet-roadmap-meter-fill"
