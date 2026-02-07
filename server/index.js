@@ -10050,10 +10050,6 @@ app.patch('/api/bookings/:id', async (req, res) => {
         res.status(403).json({ error: 'forbidden' })
         return
       }
-      if (booking.status !== 'pending' || booking.servicePrice === null) {
-        res.status(409).json({ error: 'status_invalid' })
-        return
-      }
 
       const depositPercentValue = clampValue(
         parseOptionalInt(booking.depositPercent) ?? 0,
@@ -10072,6 +10068,31 @@ app.patch('/api/bookings/:id', async (req, res) => {
           : basePrice && depositPercentValue > 0
             ? Math.round((basePrice * depositPercentValue) / 100)
             : 0
+      const existingDepositStatus = normalizeText(booking.depositStatus)
+      const existingDepositHoldExpiresAt =
+        booking.depositHoldExpiresAt ?? null
+
+      if (booking.status === 'confirmed') {
+        const chatId = await loadBookingChatId(bookingId)
+        res.json({
+          ok: true,
+          status: 'confirmed',
+          depositStatus:
+            existingDepositStatus ||
+            (depositAmountValue > 0 ? 'pending' : 'not_required'),
+          depositAmount: depositAmountValue,
+          depositHoldExpiresAt:
+            depositAmountValue > 0 ? existingDepositHoldExpiresAt : null,
+          chatId,
+        })
+        return
+      }
+
+      if (booking.status !== 'pending' || booking.servicePrice === null) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
+
       const depositStatusValue = depositAmountValue > 0 ? 'pending' : 'not_required'
       const depositHoldExpiresAtValue =
         depositStatusValue === 'pending' ? buildDepositHoldExpiresAt() : null
@@ -10136,64 +10157,73 @@ app.patch('/api/bookings/:id', async (req, res) => {
         depositAmountValue > 0 &&
         depositStatusValue === 'pending'
       ) {
-        const isDuplicate = await isDuplicateSystemEvent({
-          chatId: chatPayload.chatId,
-          event: 'deposit_pending',
-          bookingId,
-        })
-        if (!isDuplicate) {
-          const amountLabel = formatPriceLabel(depositAmountValue)
-          const holdLabel = formatTimeLeftLabel(depositHoldExpiresAtValue)
-          const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
-          const body = ['Нужен депозит.', amountLabel && `Сумма: ${amountLabel}`, holdText]
-            .filter(Boolean)
-            .join(' ')
-          const meta = {
+        try {
+          const isDuplicate = await isDuplicateSystemEvent({
+            chatId: chatPayload.chatId,
             event: 'deposit_pending',
             bookingId,
-            serviceName: booking.serviceName ?? null,
-            depositAmount: depositAmountValue,
-            holdExpiresAt: depositHoldExpiresAtValue,
+          })
+          if (!isDuplicate) {
+            const amountLabel = formatPriceLabel(depositAmountValue)
+            const holdLabel = formatTimeLeftLabel(depositHoldExpiresAtValue)
+            const holdText = holdLabel ? `Слот удерживается ${holdLabel}.` : ''
+            const body = ['Нужен депозит.', amountLabel && `Сумма: ${amountLabel}`, holdText]
+              .filter(Boolean)
+              .join(' ')
+            const meta = {
+              event: 'deposit_pending',
+              bookingId,
+              serviceName: booking.serviceName ?? null,
+              depositAmount: depositAmountValue,
+              holdExpiresAt: depositHoldExpiresAtValue,
+            }
+            const messageResult = await insertSystemMessage({
+              chatId: chatPayload.chatId,
+              body,
+              meta,
+              actorId: normalizedUserId,
+              audience: 'client',
+            })
+            const messagePayload = {
+              id: messageResult.id,
+              chatId: chatPayload.chatId,
+              senderId: null,
+              type: 'system',
+              body,
+              meta,
+              attachmentUrl: null,
+              createdAt: messageResult.createdAt,
+            }
+            void notifyChatMembers(chatPayload.chatId, {
+              type: 'message:new',
+              chatId: chatPayload.chatId,
+              message: messagePayload,
+            })
+            void sendChatNotification({
+              chatId: chatPayload.chatId,
+              senderId: normalizedUserId,
+              audience: 'client',
+              title: 'Нужен депозит',
+              text: body,
+            })
           }
-          const messageResult = await insertSystemMessage({
-            chatId: chatPayload.chatId,
-            body,
-            meta,
-            actorId: normalizedUserId,
-            audience: 'client',
-          })
-          const messagePayload = {
-            id: messageResult.id,
-            chatId: chatPayload.chatId,
-            senderId: null,
-            type: 'system',
-            body,
-            meta,
-            attachmentUrl: null,
-            createdAt: messageResult.createdAt,
-          }
-          void notifyChatMembers(chatPayload.chatId, {
-            type: 'message:new',
-            chatId: chatPayload.chatId,
-            message: messagePayload,
-          })
-          void sendChatNotification({
-            chatId: chatPayload.chatId,
-            senderId: normalizedUserId,
-            audience: 'client',
-            title: 'Нужен депозит',
-            text: body,
-          })
+        } catch (depositMessageError) {
+          console.error(
+            'Failed to publish deposit pending system message:',
+            depositMessageError
+          )
         }
       }
 
+      const responseChatId =
+        chatPayload?.chatId ?? (await loadBookingChatId(bookingId))
       res.json({
         ok: true,
         status: 'confirmed',
         depositStatus: depositStatusValue,
         depositAmount: depositAmountValue,
         depositHoldExpiresAt: depositHoldExpiresAtValue,
-        chatId: chatPayload?.chatId ?? null,
+        chatId: responseChatId ?? null,
       })
       return
     }

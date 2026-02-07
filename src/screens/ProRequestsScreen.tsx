@@ -2822,6 +2822,7 @@ export const ProRequestsScreen = ({
       'price_proposed',
     ].includes(booking.status)
     const isActionLoading = bookingActionId !== null
+    const isCurrentActionLoading = bookingActionId === booking.id
     const draftPrice = bookingDrafts[booking.id] ?? ''
     const clientName = booking.clientName ?? 'Клиент'
     const clientInitials = getInitials(clientName)
@@ -3185,7 +3186,7 @@ export const ProRequestsScreen = ({
                 }
                 disabled={isActionLoading}
               >
-                Принять
+                {isCurrentActionLoading ? 'Подтверждаем...' : 'Принять'}
               </button>
             )}
             {canDecline && (
@@ -3370,9 +3371,19 @@ export const ProRequestsScreen = ({
       }
     } catch (error) {
       const errorCode = error instanceof Error ? error.message : ''
+      const shouldResyncBookings =
+        action === 'master-accept' &&
+        (errorCode === 'status_invalid' || errorCode === 'server_error')
+      if (shouldResyncBookings) {
+        void loadBookings({ silent: true, force: true })
+      }
       const message =
         errorCode === 'deposit_status_invalid'
           ? 'Чек уже обработан. Обновите список.'
+          : errorCode === 'status_invalid' && action === 'master-accept'
+            ? 'Запись уже обновлена. Синхронизируем список.'
+            : errorCode === 'server_error' && action === 'master-accept'
+              ? 'Проверяем статус подтверждения...'
           : errorCode === 'status_invalid'
             ? 'Действие недоступно в текущем статусе.'
             : 'Не удалось обновить запись.'
