@@ -1151,7 +1151,7 @@ body {
 }
 
 .pro-cabinet-overview-action {
-  min-height: 42px;
+  min-height: 44px;
   border-radius: 12px;
   border: 1px solid rgba(var(--shadow-rgb), 0.14);
   background: rgba(var(--paper-rgb), 0.88);
@@ -1206,6 +1206,32 @@ body {
   gap: 8px;
 }
 
+.pro-cabinet-next-step-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pro-cabinet-next-step-info {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--paper-rgb), 0.9);
+  color: rgba(var(--ink-rgb), 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pro-cabinet-next-step-info:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.26);
+  outline-offset: 2px;
+}
+
 .pro-cabinet-next-step-score {
   min-height: 24px;
   border-radius: 999px;
@@ -1244,7 +1270,7 @@ body {
 }
 
 .pro-cabinet-roadmap-coachmark-action {
-  min-height: 34px;
+  min-height: 44px;
   border-radius: 10px;
   border: 1px solid rgba(var(--accent-rgb), 0.28);
   background: rgba(var(--paper-rgb), 0.92);
@@ -1352,7 +1378,7 @@ body {
 }
 
 .pro-cabinet-next-step-action {
-  min-height: 42px;
+  min-height: 44px;
   border-radius: 11px;
   font-size: 11px;
 }
@@ -1550,6 +1576,10 @@ body {
 
   .pro-cabinet-roadmap-step-label {
     font-size: 8px;
+  }
+
+  .pro-cabinet-next-step-head-actions {
+    gap: 5px;
   }
 
   .pro-cabinet-overview-meta {

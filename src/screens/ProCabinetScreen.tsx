@@ -383,10 +383,6 @@ export const ProCabinetScreen = ({
   )
   const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
-  const roadmapCoachmarkStorageKey = useMemo(
-    () => `kiven-pro-roadmap-coachmark:${userId}`,
-    [userId]
-  )
   const [isRoadmapCoachmarkVisible, setIsRoadmapCoachmarkVisible] =
     useState(false)
   const profileMissingFields = profileData?.missingFields ?? []
@@ -678,48 +674,16 @@ export const ProCabinetScreen = ({
       : marketingAudience
         ? 'Есть база клиентов, подключите продвижение'
         : 'Начните с заявок, затем подключите рост'
-  const requestsHint = requestStats.open
-    ? `${requestStats.open} ${formatCountLabel(
-        requestStats.open,
-        'заявка',
-        'заявки',
-        'заявок'
-      )} к ответу`
+  const requestsHintCompact = requestStats.open
+    ? `${requestStats.open} к ответу`
     : requestStats.total > 0
       ? 'Очередь чистая'
       : 'Новых нет'
-  const calendarHint = bookingStats.upcomingWeek
-    ? `${bookingStats.upcomingWeek} ${formatCountLabel(
-        bookingStats.upcomingWeek,
-        'запись',
-        'записи',
-        'записей'
-      )} на неделе`
+  const calendarHintCompact = bookingStats.upcomingWeek
+    ? `${bookingStats.upcomingWeek} на неделе`
     : hasScheduleConfigured
-      ? 'Окна открыты, записей пока нет'
-      : 'Подключите график'
-  useEffect(() => {
-    if (!userId) return
-    try {
-      const isSeen = window.localStorage.getItem(roadmapCoachmarkStorageKey) === '1'
-      setIsRoadmapCoachmarkVisible(!isSeen)
-    } catch (error) {
-      setIsRoadmapCoachmarkVisible(false)
-    }
-  }, [roadmapCoachmarkStorageKey, userId])
-  useEffect(() => {
-    if (completedJourneySteps >= journeySteps.length) {
-      setIsRoadmapCoachmarkVisible(false)
-    }
-  }, [completedJourneySteps, journeySteps.length])
-  const dismissRoadmapCoachmark = () => {
-    setIsRoadmapCoachmarkVisible(false)
-    try {
-      window.localStorage.setItem(roadmapCoachmarkStorageKey, '1')
-    } catch (error) {
-      // ignore storage errors
-    }
-  }
+      ? 'Неделя пуста'
+      : 'Нужен график'
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -826,7 +790,9 @@ export const ProCabinetScreen = ({
                 </div>
               </div>
               <div className="pro-cabinet-nav-inline">
-                <span className="pro-cabinet-nav-inline-note">{requestsHint}</span>
+                <span className="pro-cabinet-nav-inline-note">
+                  {requestsHintCompact}
+                </span>
                 <span className="pro-cabinet-nav-inline-link">
                   {requestStats.open > 0 ? 'К ответам' : 'Шаблоны'}
                 </span>
@@ -872,7 +838,9 @@ export const ProCabinetScreen = ({
                 </span>
               </div>
               <div className="pro-cabinet-nav-inline">
-                <span className="pro-cabinet-nav-inline-note">{calendarHint}</span>
+                <span className="pro-cabinet-nav-inline-note">
+                  {calendarHintCompact}
+                </span>
                 <span className="pro-cabinet-nav-inline-link">
                   {bookingStats.upcomingWeek > 0
                     ? 'Окна'
@@ -889,9 +857,22 @@ export const ProCabinetScreen = ({
           <div className="pro-cabinet-next-step-copy">
             <div className="pro-cabinet-next-step-head">
               <p className="pro-cabinet-next-step-kicker">Рабочая дорожка</p>
-              <span className="pro-cabinet-next-step-score">
-                {completedJourneySteps}/{journeySteps.length}
-              </span>
+              <div className="pro-cabinet-next-step-head-actions">
+                <button
+                  className="pro-cabinet-next-step-info"
+                  type="button"
+                  onClick={() =>
+                    setIsRoadmapCoachmarkVisible((current) => !current)
+                  }
+                  aria-expanded={isRoadmapCoachmarkVisible}
+                  aria-label="Показать подсказку"
+                >
+                  i
+                </button>
+                <span className="pro-cabinet-next-step-score">
+                  {completedJourneySteps}/{journeySteps.length}
+                </span>
+              </div>
             </div>
             <h2 className="pro-cabinet-next-step-title">{activeJourneyStep.title}</h2>
             <p className="pro-cabinet-next-step-subtitle">
@@ -901,12 +882,12 @@ export const ProCabinetScreen = ({
           {isRoadmapCoachmarkVisible ? (
             <div className="pro-cabinet-roadmap-coachmark" role="status">
               <span className="pro-cabinet-roadmap-coachmark-text">
-                Двигайтесь по шагам слева направо, чтобы стабилизировать поток.
+                Шаги кликабельны: откройте нужный раздел в 1 тап.
               </span>
               <button
                 className="pro-cabinet-roadmap-coachmark-action"
                 type="button"
-                onClick={dismissRoadmapCoachmark}
+                onClick={() => setIsRoadmapCoachmarkVisible(false)}
               >
                 Понятно
               </button>
