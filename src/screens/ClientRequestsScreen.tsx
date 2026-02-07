@@ -1870,13 +1870,42 @@ export const ClientRequestsScreen = ({
 
           {activeTab === 'requests' && (
             <>
-              {isLoading && <p className="requests-status">Загружаем заявки...</p>}
-              {loadError && <p className="requests-error">{loadError}</p>}
+              {isLoading && (
+                <div className="requests-state-card is-loading" role="status">
+                  <p className="requests-state-title">Загружаем заявки</p>
+                  <p className="requests-state-text">
+                    Обновляем отклики и статусы записей.
+                  </p>
+                </div>
+              )}
+              {loadError && (
+                <div className="requests-state-card is-error" role="alert">
+                  <p className="requests-state-title">Не удалось загрузить заявки</p>
+                  <p className="requests-state-text">{loadError}</p>
+                  <button
+                    className="requests-state-action"
+                    type="button"
+                    onClick={() => void loadRequests()}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
 
               {!isLoading && !items.length && !loadError && (
-                <p className="requests-empty">
-                  Пока нет заявок. Создайте первую!
-                </p>
+                <div className="requests-state-card is-empty" role="status">
+                  <p className="requests-state-title">Пока нет активных заявок</p>
+                  <p className="requests-state-text">
+                    Создайте заявку, и мастера начнут отправлять отклики.
+                  </p>
+                  <button
+                    className="requests-state-action"
+                    type="button"
+                    onClick={onCreateRequest}
+                  >
+                    Создать заявку
+                  </button>
+                </div>
               )}
 
               {items.length > 0 && (
@@ -2281,12 +2310,34 @@ export const ClientRequestsScreen = ({
           {activeTab === 'bookings' && (
             <>
               {isBookingsLoading && (
-                <p className="requests-status">Загружаем записи...</p>
+                <div className="requests-state-card is-loading" role="status">
+                  <p className="requests-state-title">Загружаем записи</p>
+                  <p className="requests-state-text">
+                    Подтягиваем календарь и ближайшие слоты.
+                  </p>
+                </div>
               )}
-              {bookingsError && <p className="requests-error">{bookingsError}</p>}
+              {bookingsError && (
+                <div className="requests-state-card is-error" role="alert">
+                  <p className="requests-state-title">Не удалось загрузить записи</p>
+                  <p className="requests-state-text">{bookingsError}</p>
+                  <button
+                    className="requests-state-action"
+                    type="button"
+                    onClick={() => void loadBookings()}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
 
               {!isBookingsLoading && bookingItems.length === 0 && !bookingsError && (
-                <p className="requests-empty">Пока нет записей.</p>
+                <div className="requests-state-card is-empty" role="status">
+                  <p className="requests-state-title">Пока нет записей</p>
+                  <p className="requests-state-text">
+                    Здесь появятся подтвержденные встречи и депозиты.
+                  </p>
+                </div>
               )}
 
               {!isBookingsLoading && bookingItems.length > 0 && !bookingsError && (
@@ -2338,15 +2389,25 @@ export const ClientRequestsScreen = ({
                 bookingItems.length > 0 &&
                 selectedBookings.length === 0 &&
                 !bookingsError && (
-                  <p className="requests-empty">
-                    На выбранный день записей нет. Выберите дату с отметкой.
-                  </p>
+                  <div className="requests-state-card is-empty" role="status">
+                    <p className="requests-state-title">
+                      На выбранный день записей нет
+                    </p>
+                    <p className="requests-state-text">
+                      Выберите дату с отметкой в календаре.
+                    </p>
+                  </div>
                 )}
 
               {selectedBookings.length > 0 && visibleBookingsCount === 0 && (
-                <p className="requests-empty">
-                  Нет записей, требующих действий. Переключитесь на «Все».
-                </p>
+                <div className="requests-state-card is-empty" role="status">
+                  <p className="requests-state-title">
+                    Нет записей, требующих действий
+                  </p>
+                  <p className="requests-state-text">
+                    Переключитесь на фильтр «Все», чтобы увидеть полный список.
+                  </p>
+                </div>
               )}
 
               {visibleBookingsCount > 0 && (

@@ -3935,21 +3935,66 @@ export const ProRequestsScreen = ({
 
         {activeTab === 'requests' && (
           <>
-            {isLoading && <p className="requests-status">Загружаем заявки...</p>}
-            {loadError && <p className="requests-error">{loadError}</p>}
-            {isBookingsLoading && (
-              <p className="requests-status">Загружаем записи...</p>
+            {isLoading && (
+              <div className="requests-state-card is-loading" role="status">
+                <p className="requests-state-title">Загружаем заявки</p>
+                <p className="requests-state-text">
+                  Обновляем входящие запросы и отклики.
+                </p>
+              </div>
             )}
-            {bookingsError && <p className="requests-error">{bookingsError}</p>}
+            {loadError && (
+              <div className="requests-state-card is-error" role="alert">
+                <p className="requests-state-title">Не удалось загрузить заявки</p>
+                <p className="requests-state-text">{loadError}</p>
+                <button
+                  className="requests-state-action"
+                  type="button"
+                  onClick={() => void loadRequests({ force: true })}
+                >
+                  Повторить
+                </button>
+              </div>
+            )}
+            {isBookingsLoading && (
+              <div className="requests-state-card is-loading" role="status">
+                <p className="requests-state-title">Загружаем записи</p>
+                <p className="requests-state-text">
+                  Сверяем календарь и подтвержденные слоты.
+                </p>
+              </div>
+            )}
+            {bookingsError && (
+              <div className="requests-state-card is-error" role="alert">
+                <p className="requests-state-title">Не удалось загрузить записи</p>
+                <p className="requests-state-text">{bookingsError}</p>
+                <button
+                  className="requests-state-action"
+                  type="button"
+                  onClick={() => void loadBookings({ force: true })}
+                >
+                  Повторить
+                </button>
+              </div>
+            )}
 
             {showRequestsEmpty && (
-              <p className="requests-empty">
-                {!isActive
-                  ? 'Вы на паузе. Включите прием заявок.'
-                  : missingFields.some((field) => field !== 'displayName')
-                  ? 'Заполните профиль, чтобы видеть заявки рядом.'
-                  : 'Пока нет заявок и записей в работе.'}
-              </p>
+              <div className="requests-state-card is-empty" role="status">
+                <p className="requests-state-title">
+                  {!isActive
+                    ? 'Вы на паузе'
+                    : missingFields.some((field) => field !== 'displayName')
+                      ? 'Профиль требует обновления'
+                      : 'Пока нет заявок и записей в работе'}
+                </p>
+                <p className="requests-state-text">
+                  {!isActive
+                    ? 'Включите прием заявок в профиле, чтобы получать новые отклики.'
+                    : missingFields.some((field) => field !== 'displayName')
+                      ? 'Заполните ключевые поля профиля, и заявки снова появятся.'
+                      : 'Ссылка для записи ниже поможет привлечь новых клиентов быстрее.'}
+                </p>
+              </div>
             )}
             {showRequestsEmpty && renderShareCard()}
 
@@ -4842,9 +4887,26 @@ export const ProRequestsScreen = ({
               </section>
 
               {isBookingsLoading && (
-                <p className="requests-status">Загружаем записи...</p>
+                <div className="requests-state-card is-loading" role="status">
+                  <p className="requests-state-title">Загружаем записи</p>
+                  <p className="requests-state-text">
+                    Подготавливаем список встреч и календарь.
+                  </p>
+                </div>
               )}
-              {bookingsError && <p className="requests-error">{bookingsError}</p>}
+              {bookingsError && (
+                <div className="requests-state-card is-error" role="alert">
+                  <p className="requests-state-title">Не удалось загрузить записи</p>
+                  <p className="requests-state-text">{bookingsError}</p>
+                  <button
+                    className="requests-state-action"
+                    type="button"
+                    onClick={() => void loadBookings({ force: true })}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
               {renderShareCard()}
             </>
           )}
