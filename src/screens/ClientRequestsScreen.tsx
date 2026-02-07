@@ -2409,10 +2409,8 @@ export const ClientRequestsScreen = ({
                   const rescheduleMetaTone = canRespondReschedule
                     ? 'booking-item-meta--warning'
                     : 'booking-item-meta--highlight'
-                  const showActions =
-                    Boolean(booking.chatId) ||
-                    reschedulePending ||
-                    actionVariant !== null
+                  const showCornerChat = Boolean(booking.chatId)
+                  const showActions = reschedulePending || actionVariant !== null
                   const hasChips =
                     Boolean(rescheduleMetaLabel) ||
                     Boolean(promotionLabel) ||
@@ -2431,7 +2429,7 @@ export const ClientRequestsScreen = ({
 
                   return (
                     <div
-                      className={`booking-item${
+                      className={`booking-item${showCornerChat ? ' has-corner-action' : ''}${
                         focusedBookingId === booking.id ? ' is-focus' : ''
                       }`}
                       key={booking.id}
@@ -2459,6 +2457,19 @@ export const ClientRequestsScreen = ({
                           </span>
                         </div>
                       </div>
+                      {showCornerChat && (
+                        <button
+                          className="booking-item-chat-corner"
+                          type="button"
+                          onClick={() => onOpenChat(booking.chatId!)}
+                          aria-label="Открыть чат"
+                        >
+                          <span className="booking-action-icon-symbol" aria-hidden="true">
+                            <IconChat />
+                          </span>
+                          <span className="booking-item-chat-corner-label">Чат</span>
+                        </button>
+                      )}
                       {scheduledLabel && (
                         <div className="booking-item-meta booking-item-meta--primary">
                           <span className="booking-item-meta-icon" aria-hidden="true">
@@ -2590,23 +2601,6 @@ export const ClientRequestsScreen = ({
                       )}
                       {showActions && (
                         <div className="booking-item-actions">
-                          {booking.chatId && (
-                            <div className="booking-action-row">
-                              <button
-                                className="booking-action-icon is-chat"
-                                type="button"
-                                onClick={() => onOpenChat(booking.chatId!)}
-                              >
-                                <span
-                                  className="booking-action-icon-symbol"
-                                  aria-hidden="true"
-                                >
-                                  <IconChat />
-                                </span>
-                                Чат
-                              </button>
-                            </div>
-                          )}
                           {reschedulePending && (
                             <div className="booking-action-row booking-action-row--top">
                               {canRespondReschedule && (

@@ -2826,7 +2826,7 @@ export const ProRequestsScreen = ({
       ? 'booking-item-meta--warning'
       : 'booking-item-meta--highlight'
     const isCompact = Boolean(options?.compact)
-    const showQuickActions = !isCompact && Boolean(booking.chatId)
+    const showCornerChat = !isCompact && Boolean(booking.chatId)
     const nextAction = booking.nextAction ?? null
     const hasPrimaryBookingActions =
       reschedulePending ||
@@ -2848,7 +2848,9 @@ export const ProRequestsScreen = ({
 
     return (
       <div
-        className={`booking-item${options?.archived ? ' is-archived' : ''}${
+        className={`booking-item${showCornerChat ? ' has-corner-action' : ''}${
+          options?.archived ? ' is-archived' : ''
+        }${
           focusedBookingId === booking.id ? ' is-focus' : ''
         }${isCompact ? ' is-compact' : ''}`}
         key={booking.id}
@@ -2880,6 +2882,19 @@ export const ProRequestsScreen = ({
               />
             </div>
           </div>
+        )}
+        {showCornerChat && (
+          <button
+            className="booking-item-chat-corner"
+            type="button"
+            onClick={() => onOpenChat(booking.chatId!)}
+            aria-label="Открыть чат"
+          >
+            <span className="booking-action-icon-symbol" aria-hidden="true">
+              <IconChat />
+            </span>
+            <span className="booking-item-chat-corner-label">Чат</span>
+          </button>
         )}
         {isCompact && (
           <div className="booking-item-summary">
@@ -2996,27 +3011,6 @@ export const ProRequestsScreen = ({
                 ))}
               </div>
             )}
-          </div>
-        )}
-        {showQuickActions && (
-          <div className="booking-item-actions">
-            <div className="booking-action-row">
-              {booking.chatId && (
-                <button
-                  className="booking-action-icon is-chat"
-                  type="button"
-                  onClick={() => onOpenChat(booking.chatId!)}
-                >
-                  <span
-                    className="booking-action-icon-symbol"
-                    aria-hidden="true"
-                  >
-                    <IconChat />
-                  </span>
-                  Чат
-                </button>
-              )}
-            </div>
           </div>
         )}
         {!isCompact && reschedulePending && (
