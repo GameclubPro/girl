@@ -261,18 +261,24 @@ const resolveBookingDepositAmount = (booking: Booking) => {
       : typeof booking.proposedPrice === 'number'
         ? booking.proposedPrice
         : null
-  if (typeof booking.depositAmount === 'number') {
+  if (typeof booking.depositAmount === 'number' && booking.depositAmount > 0) {
     return booking.depositAmount
   }
   if (basePrice && depositPercent > 0) {
     return Math.round((basePrice * depositPercent) / 100)
   }
+  if (typeof booking.depositAmount === 'number') {
+    return booking.depositAmount
+  }
   return 0
 }
 
 const resolveBookingDepositStatus = (booking: Booking, depositAmount: number) =>
-  booking.depositStatus ??
-  (booking.status === 'confirmed' && depositAmount > 0 ? 'pending' : 'not_required')
+  booking.depositStatus && booking.depositStatus !== 'not_required'
+    ? booking.depositStatus
+    : booking.status === 'confirmed' && depositAmount > 0
+      ? 'pending'
+      : booking.depositStatus ?? 'not_required'
 
 const hasBookingAction = (booking: Booking, actionId: BookingActionId) =>
   Array.isArray(booking.availableActions) &&

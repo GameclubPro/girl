@@ -639,9 +639,19 @@ const timedQuery = async (label, text, params) => {
 
 const resolveDepositType = (profile) => {
   const normalized = normalizeText(profile?.depositType).toLowerCase()
-  if (['none', 'percent', 'fixed'].includes(normalized)) return normalized
   const depositFixed = parseOptionalInt(profile?.depositFixed) ?? 0
   const depositPercent = parseOptionalInt(profile?.depositPercent) ?? 0
+  if (normalized === 'fixed') {
+    if (depositFixed > 0) return 'fixed'
+    if (depositPercent > 0) return 'percent'
+    return 'none'
+  }
+  if (normalized === 'percent') {
+    if (depositPercent > 0) return 'percent'
+    if (depositFixed > 0) return 'fixed'
+    return 'none'
+  }
+  if (normalized === 'none') return 'none'
   if (depositFixed > 0) return 'fixed'
   if (depositPercent > 0) return 'percent'
   return 'none'
@@ -3036,20 +3046,31 @@ const resolveBookingDepositAmount = (booking) => {
     typeof booking?.depositPercent === 'number'
       ? Math.max(0, Math.round(booking.depositPercent))
       : 0
-  if (typeof booking?.depositAmount === 'number') {
+  if (typeof booking?.depositAmount === 'number' && booking.depositAmount > 0) {
     return booking.depositAmount
   }
   if (basePrice && depositPercent > 0) {
     return Math.round((basePrice * depositPercent) / 100)
   }
+  if (typeof booking?.depositAmount === 'number') {
+    return booking.depositAmount
+  }
   return 0
 }
 
-const resolveBookingDepositStatus = (booking, depositAmount) =>
-  booking?.depositStatus ??
-  (normalizeText(booking?.status) === 'confirmed' && depositAmount > 0
-    ? 'pending'
-    : 'not_required')
+const resolveBookingDepositStatus = (booking, depositAmount) => {
+  const normalizedStatus = normalizeText(booking?.depositStatus)
+  if (
+    normalizedStatus &&
+    normalizedStatus !== 'not_required'
+  ) {
+    return normalizedStatus
+  }
+  if (normalizeText(booking?.status) === 'confirmed' && depositAmount > 0) {
+    return 'pending'
+  }
+  return normalizedStatus || 'not_required'
+}
 
 const isBookingOutcomePending = (booking) => {
   if (!booking || normalizeText(booking.status) !== 'confirmed' || booking.outcome) {
@@ -3304,13 +3325,21 @@ const buildBookingNextAction = (
 
 const buildBookingWorkflowMeta = (booking, viewerRole) => {
   const role = viewerRole === 'master' ? 'master' : 'client'
+  const depositAmount = resolveBookingDepositAmount(booking)
+  const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
   const workflowStage = resolveBookingWorkflowStage(booking)
   const availableActions = buildBookingAvailableActions(booking, role)
   const nextAction = buildBookingNextAction(booking, role, {
     workflowStage,
     availableActions,
   })
-  return { workflowStage, availableActions, nextAction }
+  return {
+    depositAmount,
+    depositStatus,
+    workflowStage,
+    availableActions,
+    nextAction,
+  }
 }
 
 const buildClientRequestNextAction = (request) => {
@@ -10259,19 +10288,19 @@ app.patch('/api/bookings/:id', async (req, res) => {
         0,
         100
       )
-      const basePrice =
-        typeof booking.servicePrice === 'number'
-          ? booking.servicePrice
-          : typeof booking.proposedPrice === 'number'
-            ? booking.proposedPrice
-            : null
+      const basePrice = resolveBookingBasePrice(booking)
+      const resolvedDepositAmount = resolveBookingDepositAmount(booking)
       const depositAmountValue =
+        resolvedDepositAmount > 0 ||
         typeof booking.depositAmount === 'number'
-          ? booking.depositAmount
+          ? resolvedDepositAmount
           : basePrice && depositPercentValue > 0
             ? Math.round((basePrice * depositPercentValue) / 100)
             : 0
-      const existingDepositStatus = normalizeText(booking.depositStatus)
+      const existingDepositStatus = resolveBookingDepositStatus(
+        booking,
+        depositAmountValue
+      )
       const existingDepositHoldExpiresAt =
         booking.depositHoldExpiresAt ?? null
 
@@ -10281,9 +10310,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
           await withActorWorkflow({
             ok: true,
             status: 'confirmed',
-            depositStatus:
-              existingDepositStatus ||
-              (depositAmountValue > 0 ? 'pending' : 'not_required'),
+            depositStatus: existingDepositStatus,
             depositAmount: depositAmountValue,
             depositHoldExpiresAt:
               depositAmountValue > 0 ? existingDepositHoldExpiresAt : null,
@@ -11019,29 +11046,18 @@ app.patch('/api/bookings/:id', async (req, res) => {
         res.status(409).json({ error: 'status_invalid' })
         return
       }
-      const basePrice =
-        typeof booking.servicePrice === 'number'
-          ? booking.servicePrice
-          : typeof booking.proposedPrice === 'number'
-            ? booking.proposedPrice
-            : null
-      const depositAmount =
-        typeof booking.depositAmount === 'number' && booking.depositAmount > 0
-          ? booking.depositAmount
-          : basePrice && booking.depositPercent
-            ? Math.round((basePrice * booking.depositPercent) / 100)
-            : 0
+      const depositAmount = resolveBookingDepositAmount(booking)
       if (!depositAmount || depositAmount <= 0) {
         res.status(409).json({ error: 'deposit_not_required' })
         return
       }
       const depositStatus =
-        booking.depositStatus ?? (depositAmount > 0 ? 'pending' : 'not_required')
+        resolveBookingDepositStatus(booking, depositAmount)
       if (depositStatus === 'confirmed') {
         res.status(409).json({ error: 'deposit_already_confirmed' })
         return
       }
-      if (!['pending', 'rejected'].includes(depositStatus)) {
+      if (!['pending', 'rejected', 'not_required'].includes(depositStatus)) {
         res.status(409).json({ error: 'deposit_status_invalid' })
         return
       }
@@ -11073,7 +11089,10 @@ app.patch('/api/bookings/:id', async (req, res) => {
               updated_at = NOW()
           WHERE id = $1
             AND status = 'confirmed'
-            AND (deposit_status IN ('pending', 'rejected') OR deposit_status IS NULL)
+            AND (
+              deposit_status IN ('pending', 'rejected', 'not_required')
+              OR deposit_status IS NULL
+            )
             AND (deposit_hold_expires_at IS NULL OR deposit_hold_expires_at > NOW())
         `,
         [bookingId, depositAmount, normalizedDepositProofPath]

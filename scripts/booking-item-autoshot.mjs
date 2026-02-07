@@ -37,6 +37,8 @@ const toNumber = (value, fallback, min, max) => {
 const args = parseArgs(process.argv.slice(2))
 const userId = args.get('userId') ?? '100001'
 const apiBase = args.get('apiBase') ?? 'https://third.play-team.online'
+const scenario = args.get('scenario') ?? 'master-pending'
+const tab = args.get('tab') ?? 'requests'
 const url =
   args.get('url') ?? `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}`
 const output = resolve(
@@ -61,8 +63,9 @@ const STORAGE_PREFIX = 'kiven:data-cache'
 
 const nowIso = new Date().toISOString()
 const scheduledAt = new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString()
+const depositHoldExpiresAt = new Date(Date.now() + 14 * 60 * 1000).toISOString()
 
-const bookingFixture = {
+const bookingFixtureBase = {
   id: 900001,
   clientId: userId,
   masterId: 'master_demo',
@@ -87,19 +90,54 @@ const bookingFixture = {
   districtName: 'ЦАО',
   address: 'Тверская, 1',
   scheduledAt,
-  status: 'pending',
-  depositPercent: 10,
-  nextAction: {
-    id: 'master_accept_booking',
-    title: 'Подтвердить запись',
-    tone: 'primary',
-  },
   chatId: 5001,
   photoUrls: [],
   comment: 'Покрытие нюд, без дизайна.',
   createdAt: nowIso,
   updatedAt: nowIso,
 }
+
+const bookingFixture =
+  scenario === 'master-deposit-pending'
+    ? {
+        ...bookingFixtureBase,
+        status: 'confirmed',
+        depositPercent: 10,
+        depositAmount: 0,
+        depositStatus: 'not_required',
+        depositHoldExpiresAt,
+        nextAction: {
+          id: 'check_deposit',
+          title: 'Ожидает оплаты депозита',
+          tone: 'alert',
+        },
+      }
+    : scenario === 'master-deposit-submitted'
+      ? {
+          ...bookingFixtureBase,
+          status: 'confirmed',
+          depositPercent: 10,
+          depositAmount: 0,
+          depositStatus: 'submitted',
+          depositHoldExpiresAt,
+          depositProofUrl:
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/w8AAn8B9o8F8QAAAABJRU5ErkJggg==',
+          nextAction: {
+            id: 'check_deposit',
+            title: 'Проверить депозит',
+            tone: 'alert',
+          },
+        }
+      : {
+          ...bookingFixtureBase,
+          status: 'pending',
+          depositPercent: 10,
+          nextAction: {
+            id: 'master_accept_booking',
+            title: 'Подтвердить запись',
+            tone: 'primary',
+          },
+        }
 
 const cacheEntries = [
   {
@@ -141,7 +179,8 @@ try {
   await page.waitForTimeout(800)
   await page.getByRole('button', { name: 'Заявки', exact: true }).click()
   await page.waitForTimeout(1200)
-  await page.getByRole('tab', { name: /Заявки/ }).first().click()
+  const tabPattern = tab === 'bookings' ? /Записи/ : /Заявки/
+  await page.getByRole('tab', { name: tabPattern }).first().click()
   await page.waitForTimeout(800)
 
   const firstBooking = page.locator('.booking-item').first()
