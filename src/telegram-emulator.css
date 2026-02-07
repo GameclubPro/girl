@@ -4,10 +4,13 @@ body.tg-emulator-mode {
 }
 
 body.tg-emulator-mode #root {
+  --tg-emulator-top-offset: calc(
+    var(--tg-emulator-status-height, 20px) + var(--tg-emulator-topbar-height, 44px)
+  );
   position: relative;
   width: min(var(--tg-emulator-width, 393px), 100vw);
-  min-height: 100dvh;
-  margin: 0 auto;
+  min-height: calc(100dvh - var(--tg-emulator-top-offset));
+  margin: var(--tg-emulator-top-offset) auto 0;
   overflow: hidden;
   background: var(--tg-emulator-app-bg, var(--tg-theme-bg-color, #ffffff));
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 22px 48px rgba(0, 0, 0, 0.42);
