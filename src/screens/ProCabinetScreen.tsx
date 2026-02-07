@@ -12,7 +12,12 @@ import {
   IconUsers,
 } from '../components/icons'
 import { useProCabinetData, type ClientSummary } from '../hooks/useProCabinetData'
-import type { MasterProfile, ProProfileSection } from '../types/app'
+import type {
+  MarketingSummary,
+  MasterProfile,
+  ProProfileSection,
+  Promotion,
+} from '../types/app'
 import {
   isImageUrl,
   parsePortfolioItems,
@@ -99,6 +104,39 @@ const formatClientMeta = (client: ClientSummary) => {
 
 const showcaseSlotClasses = ['is-a', 'is-b', 'is-c', 'is-d'] as const
 
+type MasterJourneyStepId = 'profile' | 'flow' | 'growth' | 'retention'
+
+type MasterJourneyStepStatus = 'done' | 'active' | 'todo'
+
+type MasterJourneyDraftStep = {
+  id: MasterJourneyStepId
+  chipLabel: string
+  title: string
+  subtitle: string
+  actionLabel: string
+  onAction: () => void
+  isDone: boolean
+}
+
+type MasterJourneyStep = Omit<MasterJourneyDraftStep, 'isDone'> & {
+  status: MasterJourneyStepStatus
+}
+
+const toMasterJourneySteps = (draft: MasterJourneyDraftStep[]) => {
+  let locked = false
+  return draft.map<MasterJourneyStep>((step) => {
+    const { isDone, ...rest } = step
+    if (locked) {
+      return { ...rest, status: 'todo' }
+    }
+    if (isDone) {
+      return { ...rest, status: 'done' }
+    }
+    locked = true
+    return { ...rest, status: 'active' }
+  })
+}
+
 type ProCabinetScreenProps = {
   apiBase: string
   userId: string
@@ -143,45 +181,136 @@ export const ProCabinetScreen = ({
     userId
   )
   const [showcasePreview, setShowcasePreview] = useState<PortfolioItem[]>([])
+  const [profileData, setProfileData] = useState<MasterProfile | null>(null)
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null)
   const [profileDisplayName, setProfileDisplayName] = useState('')
+  const [activeStoriesCount, setActiveStoriesCount] = useState(0)
+  const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(
+    null
+  )
+  const [promotions, setPromotions] = useState<Promotion[]>([])
 
   useEffect(() => {
     if (!userId) return
     let cancelled = false
 
-    const loadShowcase = async () => {
+    const loadCabinetMeta = async () => {
       try {
-        const response = await fetch(
-          `${apiBase}/api/masters/${encodeURIComponent(userId)}`
-        )
-        if (!response.ok) {
-          throw new Error('Load showcase failed')
-        }
-        const data = (await response.json()) as MasterProfile
+        const encodedUserId = encodeURIComponent(userId)
+        const profileUrl = `${apiBase}/api/masters/${encodedUserId}?userId=${encodedUserId}`
+        const storiesUrl = `${apiBase}/api/masters/${encodedUserId}/stories`
+        const marketingSummaryUrl = `${apiBase}/api/pro/marketing/summary?userId=${encodedUserId}`
+        const promotionsUrl = `${apiBase}/api/pro/marketing/promotions?userId=${encodedUserId}`
+        const [
+          profileResult,
+          storiesResult,
+          marketingSummaryResult,
+          promotionsResult,
+        ] = await Promise.allSettled([
+          fetch(profileUrl),
+          fetch(storiesUrl),
+          fetch(marketingSummaryUrl),
+          fetch(promotionsUrl),
+        ])
+
         if (cancelled) return
-        const showcaseItems = parsePortfolioItems(data.showcaseUrls ?? [])
-        const portfolioItems = parsePortfolioItems(data.portfolioUrls ?? [])
-        const previewSource =
-          showcaseItems.length > 0 ? showcaseItems : portfolioItems
-        const imageItems = previewSource.filter((item) => isImageUrl(item.url))
-        const previewItems = (imageItems.length > 0 ? imageItems : previewSource).slice(
-          0,
-          2
-        )
-        setShowcasePreview(previewItems)
-        setProfileAvatarUrl(data.avatarUrl ?? null)
-        setProfileDisplayName(data.displayName ?? '')
-      } catch (error) {
-        if (!cancelled) {
+
+        if (profileResult.status === 'fulfilled' && profileResult.value.ok) {
+          const data = (await profileResult.value.json().catch(() => null)) as
+            | MasterProfile
+            | null
+          if (!data) {
+            throw new Error('Load profile failed')
+          }
+          const showcaseItems = parsePortfolioItems(data.showcaseUrls ?? [])
+          const portfolioItems = parsePortfolioItems(data.portfolioUrls ?? [])
+          const previewSource =
+            showcaseItems.length > 0 ? showcaseItems : portfolioItems
+          const imageItems = previewSource.filter((item) => isImageUrl(item.url))
+          const previewItems = (
+            imageItems.length > 0 ? imageItems : previewSource
+          ).slice(0, 2)
+          setProfileData(data)
+          setShowcasePreview(previewItems)
+          setProfileAvatarUrl(data.avatarUrl ?? null)
+          setProfileDisplayName(data.displayName ?? '')
+        } else {
+          setProfileData(null)
           setShowcasePreview([])
           setProfileAvatarUrl(null)
           setProfileDisplayName('')
         }
+
+        if (storiesResult.status === 'fulfilled' && storiesResult.value.ok) {
+          const storiesPayload = (await storiesResult.value
+            .json()
+            .catch(() => [])) as unknown
+          setActiveStoriesCount(
+            Array.isArray(storiesPayload) ? storiesPayload.length : 0
+          )
+        } else {
+          setActiveStoriesCount(0)
+        }
+
+        if (
+          marketingSummaryResult.status === 'fulfilled' &&
+          marketingSummaryResult.value.ok
+        ) {
+          const summary = (await marketingSummaryResult.value
+            .json()
+            .catch(() => null)) as MarketingSummary | null
+          if (summary) {
+            setMarketingSummary({
+              botOptInCount: Number(summary.botOptInCount) || 0,
+              chatCount: Number(summary.chatCount) || 0,
+              repeatEligibleTotal:
+                summary.repeatEligibleTotal === null
+                  ? null
+                  : Number(summary.repeatEligibleTotal) || 0,
+              repeatEligibleBotCount:
+                summary.repeatEligibleBotCount === null
+                  ? null
+                  : Number(summary.repeatEligibleBotCount) || 0,
+              repeatEligibleChatCount:
+                summary.repeatEligibleChatCount === null
+                  ? null
+                  : Number(summary.repeatEligibleChatCount) || 0,
+              repeatLastSentAt: summary.repeatLastSentAt ?? null,
+              repeatCheckedAt: summary.repeatCheckedAt ?? null,
+            })
+          } else {
+            setMarketingSummary(null)
+          }
+        } else {
+          setMarketingSummary(null)
+        }
+
+        if (promotionsResult.status === 'fulfilled' && promotionsResult.value.ok) {
+          const promotionsPayload = (await promotionsResult.value
+            .json()
+            .catch(() => [])) as unknown
+          setPromotions(
+            Array.isArray(promotionsPayload)
+              ? (promotionsPayload as Promotion[])
+              : []
+          )
+        } else {
+          setPromotions([])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setProfileData(null)
+          setShowcasePreview([])
+          setProfileAvatarUrl(null)
+          setProfileDisplayName('')
+          setActiveStoriesCount(0)
+          setMarketingSummary(null)
+          setPromotions([])
+        }
       }
     }
 
-    void loadShowcase()
+    void loadCabinetMeta()
 
     return () => {
       cancelled = true
@@ -254,16 +383,211 @@ export const ProCabinetScreen = ({
   )
   const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
+  const profileMissingFields = profileData?.missingFields ?? []
+  const hasProfileBasicsGap = profileMissingFields.some((field) =>
+    ['displayName', 'categories', 'workFormat', 'cityId', 'districtId'].includes(
+      field
+    )
+  )
+  const hasServicesConfigured = (profileData?.services?.length ?? 0) > 0
+  const hasPortfolioConfigured =
+    (profileData?.portfolioUrls?.length ?? 0) > 0 ||
+    (profileData?.showcaseUrls?.length ?? 0) > 0
+  const hasScheduleConfigured =
+    (profileData?.scheduleDays?.length ?? 0) > 0 &&
+    Boolean(profileData?.scheduleStart) &&
+    Boolean(profileData?.scheduleEnd)
+  const isProfileReadyForFlow =
+    !hasProfileBasicsGap &&
+    hasServicesConfigured &&
+    hasPortfolioConfigured &&
+    hasScheduleConfigured
+  const marketingReach =
+    (marketingSummary?.botOptInCount ?? 0) + (marketingSummary?.chatCount ?? 0)
+  const hasGrowthChannels = marketingReach > 0
+  const hasActivePromotion =
+    Boolean(profileData?.activePromotion) ||
+    promotions.some((promotion) => promotion.status === 'active')
+  const hasStoriesPublished = activeStoriesCount > 0
   const pendingActions = requestStats.open + bookingStats.pending
   const hasPendingActions = pendingActions > 0
   const hasMetricsData = requestStats.total > 0 || bookingStats.total > 0
   const isOfflineFallback = Boolean(combinedError) && !hasMetricsData
+  const journeySteps = useMemo(() => {
+    let profileTitle = 'Профиль и график готовы'
+    let profileSubtitle = 'Основа собрана, можно стабильно принимать записи.'
+    let profileActionLabel = 'Открыть профиль'
+    let profileAction = () => onEditProfile()
+    if (hasProfileBasicsGap) {
+      profileTitle = 'Заполните основу профиля'
+      profileSubtitle = 'Имя, категории, формат и локация нужны для выдачи.'
+      profileActionLabel = 'Заполнить основу'
+      profileAction = () => onEditProfile('basic')
+    } else if (!hasServicesConfigured) {
+      profileTitle = 'Добавьте услуги'
+      profileSubtitle = 'Клиенты должны видеть понятный список услуг.'
+      profileActionLabel = 'Добавить услуги'
+      profileAction = () => onEditProfile('services')
+    } else if (!hasPortfolioConfigured) {
+      profileTitle = 'Добавьте примеры работ'
+      profileSubtitle = 'Витрина повышает доверие и ускоряет выбор.'
+      profileActionLabel = 'Добавить работы'
+      profileAction = () => onEditProfile('portfolio')
+    } else if (!hasScheduleConfigured) {
+      profileTitle = 'Подключите график'
+      profileSubtitle = 'Без графика нельзя стабильно принимать записи.'
+      profileActionLabel = 'Подключить график'
+      profileAction = () => onEditProfile('availability')
+    }
+
+    let flowTitle = 'Поток на неделе стабилен'
+    let flowSubtitle = 'Входящие закрыты, неделя уже заполнена записями.'
+    let flowActionLabel = 'Открыть календарь'
+    let flowAction = onOpenCalendar
+    if (requestStats.open > 0) {
+      flowTitle = `Ответьте на ${requestStats.open} ${formatCountLabel(
+        requestStats.open,
+        'заявку',
+        'заявки',
+        'заявок'
+      )}`
+      flowSubtitle = 'Быстрый ответ повышает шанс получить запись.'
+      flowActionLabel = 'Открыть заявки'
+      flowAction = onViewRequests
+    } else if (bookingStats.upcomingWeek === 0) {
+      flowTitle = 'На неделе пока нет записей'
+      flowSubtitle = 'Откройте календарь и добавьте окна под новые записи.'
+      flowActionLabel = 'Открыть календарь'
+      flowAction = onOpenCalendar
+    } else if (bookingStats.upcomingWeek < 2) {
+      flowTitle = 'Усильте неделю до 2+ записей'
+      flowSubtitle = 'Добавьте свободные окна, чтобы ускорить поток.'
+      flowActionLabel = 'Добавить окна'
+      flowAction = onOpenCalendar
+    }
+
+    let growthTitle = 'Продвижение подключено'
+    let growthSubtitle = 'Контент и оффер уже работают на рост.'
+    let growthActionLabel = 'Управлять ростом'
+    let growthAction = onOpenMarketing
+    if (!hasStoriesPublished) {
+      growthTitle = 'Добавьте первую историю'
+      growthSubtitle = 'Истории возвращают внимание клиентов в ленте.'
+      growthActionLabel = 'Добавить сторис'
+      growthAction = onOpenStories
+    } else if (!hasActivePromotion && !hasGrowthChannels) {
+      growthTitle = 'Подключите продвижение'
+      growthSubtitle = 'Соберите каналы и запустите первый оффер.'
+      growthActionLabel = 'Подключить рост'
+      growthAction = onOpenMarketing
+    } else if (!hasActivePromotion) {
+      growthTitle = 'Запустите акцию'
+      growthSubtitle = 'Аудитория подключена, пора дать повод записаться.'
+      growthActionLabel = 'Запустить акцию'
+      growthAction = onOpenMarketing
+    }
+
+    let retentionTitle = 'Повторы запущены'
+    let retentionSubtitle = 'База клиентов растет и возвращается снова.'
+    let retentionActionLabel = 'Открыть аналитику'
+    let retentionAction = onOpenAnalytics
+    if (totalClients === 0) {
+      retentionTitle = 'Соберите первых клиентов'
+      retentionSubtitle = 'Начните с заявок, чтобы сформировать клиентскую базу.'
+      retentionActionLabel = 'Открыть заявки'
+      retentionAction = onViewRequests
+    } else if (repeatClients === 0) {
+      retentionTitle = 'Запустите повторные записи'
+      retentionSubtitle = 'Добавьте сценарий возврата в базе клиентов.'
+      retentionActionLabel = 'Открыть базу'
+      retentionAction = onOpenClients
+    } else if (totalClients < 3) {
+      retentionTitle = 'Расширьте клиентскую базу'
+      retentionSubtitle = 'Нужно минимум 3 клиента для стабильного повтора.'
+      retentionActionLabel = 'Открыть базу'
+      retentionAction = onOpenClients
+    }
+
+    const draftSteps: MasterJourneyDraftStep[] = [
+      {
+        id: 'profile',
+        chipLabel: 'Профиль',
+        title: profileTitle,
+        subtitle: profileSubtitle,
+        actionLabel: profileActionLabel,
+        onAction: profileAction,
+        isDone: isProfileReadyForFlow,
+      },
+      {
+        id: 'flow',
+        chipLabel: 'Поток',
+        title: flowTitle,
+        subtitle: flowSubtitle,
+        actionLabel: flowActionLabel,
+        onAction: flowAction,
+        isDone: requestStats.open === 0 && bookingStats.upcomingWeek >= 2,
+      },
+      {
+        id: 'growth',
+        chipLabel: 'Рост',
+        title: growthTitle,
+        subtitle: growthSubtitle,
+        actionLabel: growthActionLabel,
+        onAction: growthAction,
+        isDone: hasStoriesPublished && (hasActivePromotion || hasGrowthChannels),
+      },
+      {
+        id: 'retention',
+        chipLabel: 'Повторы',
+        title: retentionTitle,
+        subtitle: retentionSubtitle,
+        actionLabel: retentionActionLabel,
+        onAction: retentionAction,
+        isDone: totalClients >= 3 && repeatClients > 0,
+      },
+    ]
+
+    return toMasterJourneySteps(draftSteps)
+  }, [
+    bookingStats.upcomingWeek,
+    hasActivePromotion,
+    hasGrowthChannels,
+    hasProfileBasicsGap,
+    hasPortfolioConfigured,
+    hasScheduleConfigured,
+    hasServicesConfigured,
+    hasStoriesPublished,
+    isProfileReadyForFlow,
+    onEditProfile,
+    onOpenAnalytics,
+    onOpenCalendar,
+    onOpenClients,
+    onOpenMarketing,
+    onOpenStories,
+    onViewRequests,
+    repeatClients,
+    requestStats.open,
+    totalClients,
+  ])
+  const completedJourneySteps = journeySteps.filter(
+    (step) => step.status === 'done'
+  ).length
+  const journeyProgress = Math.round(
+    (completedJourneySteps / journeySteps.length) * 100
+  )
+  const activeJourneyStep =
+    journeySteps.find((step) => step.status === 'active') ??
+    journeySteps[journeySteps.length - 1]
+  const toolsPreviewSubtitle =
+    activeJourneyStep.status === 'active'
+      ? `Сфокусируйтесь на шаге «${activeJourneyStep.chipLabel}», затем открывайте блоки роста.`
+      : 'Блоки роста готовы: масштабируйте стабильный поток.'
   const nextBookingLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
-    : 'Нет ближайших слотов'
+    : 'Нет ближайших записей'
   const nextBookingCompactLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
-    : 'нет'
+    : 'нет записей'
   const overviewStatusLabel = isOfflineFallback
     ? 'Оффлайн режим'
     : combinedError
@@ -278,49 +602,76 @@ export const ProCabinetScreen = ({
       : isLoading
         ? ' is-loading'
         : ' is-ok'
+  const focusSecondaryActionLabel =
+    activeJourneyStep.id === 'profile'
+      ? 'Заявки'
+      : activeJourneyStep.id === 'flow'
+        ? 'Чаты'
+        : activeJourneyStep.id === 'growth'
+          ? 'Календарь'
+          : 'Продвижение'
+  const focusSecondaryAction =
+    activeJourneyStep.id === 'profile'
+      ? onViewRequests
+      : activeJourneyStep.id === 'flow'
+        ? onViewChats
+        : activeJourneyStep.id === 'growth'
+          ? onOpenCalendar
+          : onOpenMarketing
   const focusTitle = isOfflineFallback
     ? 'Начните рабочий день'
     : combinedError
-    ? 'Проверьте синхронизацию'
-    : hasPendingActions
-      ? `${pendingActions} задач на сейчас`
-      : bookingStats.upcomingWeek > 0
-        ? 'График под контролем'
-        : 'День свободен для роста'
+      ? 'Проверьте синхронизацию'
+      : activeJourneyStep.status === 'active'
+        ? activeJourneyStep.title
+        : hasPendingActions
+          ? `${pendingActions} задач на сейчас`
+          : bookingStats.upcomingWeek > 0
+            ? 'График под контролем'
+            : 'День свободен для роста'
   const focusSubtitle = isOfflineFallback
     ? 'Связь нестабильна. Данные обновятся автоматически.'
     : combinedError
       ? 'Обновите ленту, чтобы вернуть актуальные заявки.'
-    : hasPendingActions
-      ? 'Сначала закройте входящие и ожидания по записям.'
-      : bookingStats.upcomingWeek > 0
-        ? 'Неделя заполнена. Проверьте окна и напомните о себе клиентам.'
-        : 'Свободный день: усилите поток через витрину и истории.'
+      : activeJourneyStep.status === 'active'
+        ? activeJourneyStep.subtitle
+        : hasPendingActions
+          ? 'Сначала закройте входящие и ожидания по записям.'
+          : bookingStats.upcomingWeek > 0
+            ? 'Неделя заполнена. Проверьте окна и напомните о себе клиентам.'
+            : 'Свободный день: усилите поток через витрину и истории.'
   const focusPrimaryActionLabel = isOfflineFallback
     ? 'Обновить ленту'
     : combinedError
       ? 'Обновить данные'
-    : hasPendingActions
-      ? 'Разобрать заявки'
-      : 'Открыть календарь'
+      : activeJourneyStep.status === 'active'
+        ? activeJourneyStep.actionLabel
+        : hasPendingActions
+          ? 'Разобрать заявки'
+          : 'Открыть календарь'
   const focusPrimaryAction = combinedError
     ? refresh
-    : hasPendingActions
-      ? onViewRequests
-      : onOpenCalendar
-  const focusSecondaryActionLabel = hasPendingActions
-    ? 'Открыть чаты'
-    : 'Продвижение'
-  const focusSecondaryAction = hasPendingActions ? onViewChats : onOpenMarketing
-  const storiesBadgeLabel = bookingStats.upcoming > 0 ? 'ACTIVE' : 'START'
-  const storiesHint = bookingStats.upcoming > 0
-    ? 'Напомните про свободные окна'
+    : activeJourneyStep.status === 'active'
+      ? activeJourneyStep.onAction
+      : hasPendingActions
+        ? onViewRequests
+        : onOpenCalendar
+  const storiesBadgeLabel = hasStoriesPublished ? 'LIVE' : 'START'
+  const storiesHint = hasStoriesPublished
+    ? `${activeStoriesCount} ${formatCountLabel(
+        activeStoriesCount,
+        'история',
+        'истории',
+        'историй'
+      )} в эфире`
     : 'Добавьте первую историю'
-  const marketingHint = marketingAudience
-    ? marketingRepeatRate >= 0.45
-      ? 'Повторные клиенты держат темп'
-      : 'Есть база, можно вернуть больше клиентов'
-    : 'Начните с заявок, чтобы собрать базу'
+  const marketingHint = hasActivePromotion
+    ? 'Акция активна и приводит записи'
+    : hasGrowthChannels
+      ? 'Каналы подключены, можно запускать оффер'
+      : marketingAudience
+        ? 'Есть база клиентов, подключите продвижение'
+        : 'Начните с заявок, затем подключите рост'
   const requestsHint = requestStats.open
     ? `${requestStats.open} ${formatCountLabel(
         requestStats.open,
@@ -338,49 +689,9 @@ export const ProCabinetScreen = ({
         'записи',
         'записей'
       )} на неделе`
-    : 'Окна не открыты'
-  const toolsPreviewSubtitle = marketingAudience
-    ? 'Разверните блок, когда закроете приоритеты.'
-    : 'Разверните блок и запустите первые точки роста.'
-  const nextStep = useMemo(() => {
-    if (requestStats.open > 0) {
-      return {
-        title: 'Ответьте на заявки',
-        subtitle: 'Быстрый ответ повышает шанс записи.',
-        actionLabel: 'Открыть заявки',
-        onAction: onViewRequests,
-      }
-    }
-    if (bookingStats.upcomingWeek === 0) {
-      return {
-        title: 'Откройте новые окна в календаре',
-        subtitle: 'Добавьте 2 слота, чтобы ускорить поток.',
-        actionLabel: 'Заполнить слоты',
-        onAction: onOpenCalendar,
-      }
-    }
-    if (marketingAudience === 0) {
-      return {
-        title: 'Запустите первое продвижение',
-        subtitle: 'Начните с историй и витрины.',
-        actionLabel: 'Старт продвижения',
-        onAction: onOpenMarketing,
-      }
-    }
-    return {
-      title: 'Усильте повторные продажи',
-      subtitle: 'Предложите активным клиентам повторный визит.',
-      actionLabel: 'Перейти в рост',
-      onAction: onOpenMarketing,
-    }
-  }, [
-    bookingStats.upcomingWeek,
-    marketingAudience,
-    onOpenCalendar,
-    onOpenMarketing,
-    onViewRequests,
-    requestStats.open,
-  ])
+    : hasScheduleConfigured
+      ? 'Окна открыты, записей пока нет'
+      : 'Подключите график'
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -423,11 +734,14 @@ export const ProCabinetScreen = ({
           <div className="pro-cabinet-overview-meta">
             <span className="pro-cabinet-overview-meta-pill">
               <span className="pro-cabinet-overview-meta-long">
-                Ближайший слот: {nextBookingLabel}
+                Ближайшая запись: {nextBookingLabel}
               </span>
               <span className="pro-cabinet-overview-meta-short">
-                Слот: {nextBookingCompactLabel}
+                Запись: {nextBookingCompactLabel}
               </span>
+            </span>
+            <span className="pro-cabinet-overview-meta-pill">
+              Дорожка: {completedJourneySteps}/{journeySteps.length}
             </span>
           </div>
           <div className="pro-cabinet-overview-actions">
@@ -535,7 +849,11 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-inline">
                 <span className="pro-cabinet-nav-inline-note">{calendarHint}</span>
                 <span className="pro-cabinet-nav-inline-link">
-                  {bookingStats.upcomingWeek > 0 ? 'Окна' : 'Слоты'}
+                  {bookingStats.upcomingWeek > 0
+                    ? 'Окна'
+                    : hasScheduleConfigured
+                      ? 'Неделя'
+                      : 'График'}
                 </span>
               </div>
             </div>
@@ -544,17 +862,49 @@ export const ProCabinetScreen = ({
 
         <section className="pro-cabinet-next-step animate delay-4">
           <div className="pro-cabinet-next-step-copy">
-            <p className="pro-cabinet-next-step-kicker">Следующий шаг</p>
-            <h2 className="pro-cabinet-next-step-title">{nextStep.title}</h2>
-            <p className="pro-cabinet-next-step-subtitle">{nextStep.subtitle}</p>
+            <div className="pro-cabinet-next-step-head">
+              <p className="pro-cabinet-next-step-kicker">Рабочая дорожка</p>
+              <span className="pro-cabinet-next-step-score">
+                {completedJourneySteps}/{journeySteps.length}
+              </span>
+            </div>
+            <h2 className="pro-cabinet-next-step-title">{activeJourneyStep.title}</h2>
+            <p className="pro-cabinet-next-step-subtitle">
+              {activeJourneyStep.subtitle}
+            </p>
+          </div>
+          <div className="pro-cabinet-roadmap-meter" aria-hidden="true">
+            <span
+              className="pro-cabinet-roadmap-meter-fill"
+              style={{ '--roadmap-progress': `${journeyProgress}%` } as CSSProperties}
+            />
+          </div>
+          <div className="pro-cabinet-roadmap-steps">
+            {journeySteps.map((step) => (
+              <div
+                className={`pro-cabinet-roadmap-step is-${step.status}${
+                  step.id === activeJourneyStep.id ? ' is-current' : ''
+                }`}
+                key={step.id}
+              >
+                <span className="pro-cabinet-roadmap-step-label">{step.chipLabel}</span>
+                <span className="pro-cabinet-roadmap-step-state">
+                  {step.status === 'done'
+                    ? 'Готово'
+                    : step.status === 'active'
+                      ? 'Сейчас'
+                      : 'Далее'}
+                </span>
+              </div>
+            ))}
           </div>
           <div className="pro-cabinet-next-step-actions">
             <button
               className="pro-cabinet-next-step-action is-primary"
               type="button"
-              onClick={nextStep.onAction}
+              onClick={activeJourneyStep.onAction}
             >
-              {nextStep.actionLabel}
+              {activeJourneyStep.actionLabel}
             </button>
             <button
               className="pro-cabinet-next-step-action is-ghost is-compact"

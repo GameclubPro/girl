@@ -109,6 +109,11 @@ export type MasterProfile = {
   viewerMarketingOptIn?: boolean | null
   activePromotion?: PromotionSummary | null
   campaignDiscount?: CampaignDiscountSummary | null
+  profileStatus?: ProfileStatus
+  missingFields?: string[]
+  completeness?: number
+  isFilterReady?: boolean
+  isResponseReady?: boolean
 }
 
 export type MarketingSummary = {
