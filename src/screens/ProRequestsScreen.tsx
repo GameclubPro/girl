@@ -2864,6 +2864,12 @@ export const ProRequestsScreen = ({
             <div className="booking-item-main">
               <div className="booking-item-main-row">
                 <div className="booking-item-master">{clientName}</div>
+                <TrustBadge
+                  trust={booking.clientTrust ?? null}
+                  size="sm"
+                  variant="label"
+                  className="booking-item-trust"
+                />
               </div>
               <div className="booking-item-service">
                 {booking.serviceName}
@@ -2874,12 +2880,6 @@ export const ProRequestsScreen = ({
               <span className={`booking-status ${statusTone}`}>
                 {statusLabel}
               </span>
-              <TrustBadge
-                trust={booking.clientTrust ?? null}
-                size="sm"
-                variant="label"
-                className="booking-item-trust"
-              />
             </div>
           </div>
         )}
