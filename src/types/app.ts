@@ -280,6 +280,38 @@ export type DepositStatus =
   | 'rejected'
   | 'expired'
 
+export type BookingWorkflowStage =
+  | 'pending_waiting_master_confirmation'
+  | 'pending_waiting_master_price'
+  | 'price_offered_to_client'
+  | 'confirmed_deposit_pending'
+  | 'confirmed_deposit_submitted'
+  | 'confirmed_deposit_rejected'
+  | 'confirmed_active'
+  | 'confirmed_awaiting_outcome'
+  | 'cancelled_deposit_expired'
+  | 'cancelled'
+  | 'declined'
+  | string
+
+export type BookingActionId =
+  | 'master-accept'
+  | 'master-decline'
+  | 'master-propose-price'
+  | 'client-accept-price'
+  | 'client-decline-price'
+  | 'client-cancel'
+  | 'client-delete'
+  | 'client-deposit-submit'
+  | 'master-deposit-confirm'
+  | 'master-deposit-reject'
+  | 'reschedule-propose'
+  | 'reschedule-accept'
+  | 'reschedule-decline'
+  | 'reschedule-cancel'
+  | 'set-outcome'
+  | 'leave_review'
+
 export type Booking = {
   id: number
   clientId: string
@@ -328,6 +360,8 @@ export type Booking = {
   discountSource?: 'promotion' | 'campaign' | null
   status: BookingStatus
   nextAction?: NextAction | null
+  workflowStage?: BookingWorkflowStage | null
+  availableActions?: BookingActionId[] | null
   outcome?: string | null
   attendanceAt?: string | null
   lateMinutes?: number | null
@@ -456,6 +490,8 @@ export type ChatSummary = {
     depositAmount?: number | null
     depositStatus?: DepositStatus | null
     depositHoldExpiresAt?: string | null
+    workflowStage?: BookingWorkflowStage | null
+    availableActions?: BookingActionId[] | null
     outcome?: string | null
     lateMinutes?: number | null
     createdAt?: string | null
@@ -516,6 +552,8 @@ export type ChatDetail = {
     depositAmount?: number | null
     depositStatus?: DepositStatus | null
     depositHoldExpiresAt?: string | null
+    workflowStage?: BookingWorkflowStage | null
+    availableActions?: BookingActionId[] | null
     status?: string | null
     outcome?: string | null
     lateMinutes?: number | null

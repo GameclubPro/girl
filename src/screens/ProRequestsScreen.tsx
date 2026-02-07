@@ -15,6 +15,7 @@ import {
 } from '../components/icons'
 import { categoryItems } from '../data/clientData'
 import type {
+  BookingActionId,
   Booking,
   MasterProfile,
   ProfileStatus,
@@ -418,7 +419,18 @@ const resolveBookingDepositStatus = (booking: Booking, depositAmount: number) =>
   booking.depositStatus ??
   (booking.status === 'confirmed' && depositAmount > 0 ? 'pending' : 'not_required')
 
+const hasBookingAction = (booking: Booking, actionId: BookingActionId) =>
+  Array.isArray(booking.availableActions) &&
+  booking.availableActions.includes(actionId)
+
 const isBookingAwaitingDepositConfirmation = (booking: Booking) => {
+  if (
+    booking.workflowStage === 'confirmed_deposit_pending' ||
+    booking.workflowStage === 'confirmed_deposit_submitted' ||
+    booking.workflowStage === 'confirmed_deposit_rejected'
+  ) {
+    return true
+  }
   if (booking.status !== 'confirmed') return false
   const depositAmount = resolveBookingDepositAmount(booking)
   if (depositAmount <= 0) return false
@@ -431,8 +443,11 @@ const isBookingAwaitingDepositConfirmation = (booking: Booking) => {
 }
 
 const isBookingInRequestsPipeline = (booking: Booking) =>
-  ['pending', 'price_pending', 'price_proposed'].includes(booking.status) ||
-  isBookingAwaitingDepositConfirmation(booking)
+  booking.workflowStage === 'pending_waiting_master_confirmation' ||
+  booking.workflowStage === 'pending_waiting_master_price' ||
+  booking.workflowStage === 'price_offered_to_client' ||
+  isBookingAwaitingDepositConfirmation(booking) ||
+  ['pending', 'price_pending', 'price_proposed'].includes(booking.status)
 
 type ProRequest = ServiceRequest & {
   responseId?: number | null
@@ -1273,7 +1288,12 @@ export const ProRequestsScreen = ({
     [pendingBookingItems]
   )
   const confirmedBookingItems = useMemo(
-    () => bookingItems.filter((booking) => booking.status === 'confirmed'),
+    () =>
+      bookingItems.filter(
+        (booking) =>
+          booking.status === 'confirmed' &&
+          !isBookingAwaitingDepositConfirmation(booking)
+      ),
     [bookingItems]
   )
   const archivedBookingItems = useMemo(
@@ -2141,7 +2161,7 @@ export const ProRequestsScreen = ({
 
   const handleBookingActionFocus = useCallback(
     (booking: Booking, actionId?: string | null) => {
-      const targetTab = booking.status === 'confirmed' ? 'bookings' : 'requests'
+      const targetTab = isBookingInRequestsPipeline(booking) ? 'requests' : 'bookings'
       if (actionId === 'check_deposit') {
         pendingDepositReviewBookingIdRef.current = booking.id
       }
@@ -2178,7 +2198,7 @@ export const ProRequestsScreen = ({
     if (!bookingId) return
     const booking = bookings.find((item) => item.id === bookingId)
     if (!booking) return
-    const targetTab = booking.status === 'confirmed' ? 'bookings' : 'requests'
+    const targetTab = isBookingInRequestsPipeline(booking) ? 'requests' : 'bookings'
     if (activeTab !== targetTab) {
       setActiveTab(targetTab)
       return
@@ -2846,22 +2866,24 @@ export const ProRequestsScreen = ({
             discountPriceBefore
           )}`
         : ''
-    const canAccept = booking.status === 'pending' && hasServicePrice
+    const canAccept =
+      hasBookingAction(booking, 'master-accept') ||
+      (booking.status === 'pending' && hasServicePrice)
     const canPropose =
-      !hasServicePrice &&
+      hasBookingAction(booking, 'master-propose-price') ||
+      (!hasServicePrice &&
+        ['pending', 'price_pending', 'price_proposed'].includes(booking.status))
+    const canDecline =
+      hasBookingAction(booking, 'master-decline') ||
       ['pending', 'price_pending', 'price_proposed'].includes(booking.status)
-    const canDecline = [
-      'pending',
-      'price_pending',
-      'price_proposed',
-    ].includes(booking.status)
     const isActionLoading = bookingActionId !== null
     const isCurrentActionLoading = bookingActionId === booking.id
     const draftPrice = bookingDrafts[booking.id] ?? ''
     const clientName = booking.clientName ?? 'Клиент'
     const clientInitials = getInitials(clientName)
     const outcomeLabel = formatOutcomeLabel(booking.outcome, booking.lateMinutes)
-    const canMarkOutcome = isOutcomePending(booking)
+    const canMarkOutcome =
+      hasBookingAction(booking, 'set-outcome') || isOutcomePending(booking)
     const depositPercent =
       typeof booking.depositPercent === 'number'
         ? Math.max(0, Math.round(booking.depositPercent))
@@ -2884,7 +2906,9 @@ export const ProRequestsScreen = ({
                 : depositStatus === 'pending'
                   ? 'Ожидает оплаты депозита'
                   : ''
-    const canConfirmDeposit = depositStatus === 'submitted'
+    const canConfirmDeposit =
+      hasBookingAction(booking, 'master-deposit-confirm') ||
+      depositStatus === 'submitted'
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
@@ -3339,6 +3363,9 @@ export const ProRequestsScreen = ({
             depositProofUrl?: string | null
             scheduledAt?: string | null
             chatId?: number | null
+            nextAction?: Booking['nextAction']
+            workflowStage?: Booking['workflowStage']
+            availableActions?: Booking['availableActions']
           }
         | null
       if (!response.ok) {
@@ -3393,7 +3420,17 @@ export const ProRequestsScreen = ({
           if (typeof data?.chatId === 'number') {
             next.chatId = data.chatId
           }
-          next.nextAction = null
+          if ('workflowStage' in (data ?? {})) {
+            next.workflowStage = data?.workflowStage ?? null
+          }
+          if ('availableActions' in (data ?? {})) {
+            next.availableActions = data?.availableActions ?? []
+          }
+          if ('nextAction' in (data ?? {})) {
+            next.nextAction = data?.nextAction ?? null
+          } else {
+            next.nextAction = null
+          }
           return next
         })
       )

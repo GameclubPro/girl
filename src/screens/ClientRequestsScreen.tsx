@@ -14,7 +14,13 @@ import { NextActionPill } from '../components/NextActionPill'
 import { RescheduleSheet } from '../components/RescheduleSheet'
 import { VirtualStack, type VirtualStackHandle } from '../components/VirtualStack'
 import { categoryItems } from '../data/clientData'
-import type { Booking, ChatMessage, RequestResponse, ServiceRequest } from '../types/app'
+import type {
+  Booking,
+  BookingActionId,
+  ChatMessage,
+  RequestResponse,
+  ServiceRequest,
+} from '../types/app'
 import { getChatStream } from '../utils/chatStream'
 import { fetchJsonCached, readCache } from '../utils/dataCache'
 
@@ -267,6 +273,10 @@ const resolveBookingDepositAmount = (booking: Booking) => {
 const resolveBookingDepositStatus = (booking: Booking, depositAmount: number) =>
   booking.depositStatus ??
   (booking.status === 'confirmed' && depositAmount > 0 ? 'pending' : 'not_required')
+
+const hasBookingAction = (booking: Booking, actionId: BookingActionId) =>
+  Array.isArray(booking.availableActions) &&
+  booking.availableActions.includes(actionId)
 
 type ClientRequestsScreenProps = {
   apiBase: string
@@ -617,13 +627,16 @@ export const ClientRequestsScreen = ({
     const list = bookingItems.filter((booking) => {
       const depositAmount = resolveBookingDepositAmount(booking)
       const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
+      const needsDepositAction =
+        hasBookingAction(booking, 'client-deposit-submit') ||
+        (booking.status === 'confirmed' &&
+          depositAmount > 0 &&
+          (depositStatus === 'pending' || depositStatus === 'rejected'))
       const isActive =
         booking.status !== 'cancelled' && booking.status !== 'declined'
       return (
         isActive &&
-        booking.status === 'confirmed' &&
-        depositAmount > 0 &&
-        (depositStatus === 'pending' || depositStatus === 'rejected')
+        needsDepositAction
       )
     })
     const resolveHoldMsLeft = (booking: Booking) => {
@@ -768,19 +781,27 @@ export const ClientRequestsScreen = ({
       const depositAmount = resolveBookingDepositAmount(booking)
       const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
       const needsDeposit =
-        booking.status === 'confirmed' &&
-        depositAmount > 0 &&
-        (depositStatus === 'pending' || depositStatus === 'rejected')
-      const needsPriceDecision = booking.status === 'price_proposed'
+        hasBookingAction(booking, 'client-deposit-submit') ||
+        (booking.status === 'confirmed' &&
+          depositAmount > 0 &&
+          (depositStatus === 'pending' || depositStatus === 'rejected'))
+      const needsPriceDecision =
+        hasBookingAction(booking, 'client-accept-price') ||
+        booking.status === 'price_proposed'
       const needsConfirmation =
-        booking.status === 'pending' || booking.status === 'price_pending'
+        hasBookingAction(booking, 'client-cancel') ||
+        booking.status === 'pending' ||
+        booking.status === 'price_pending'
       const needsRescheduleDecision =
+        hasBookingAction(booking, 'reschedule-accept') ||
+        hasBookingAction(booking, 'reschedule-decline') ||
         Boolean(booking.rescheduleProposedTime) &&
         booking.rescheduleProposedBy === 'master'
       const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
       const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
       const needsReview =
-        booking.status === 'confirmed' && isPast && !booking.reviewId
+        hasBookingAction(booking, 'leave_review') ||
+        (booking.status === 'confirmed' && isPast && !booking.reviewId)
       return (
         needsDeposit ||
         needsPriceDecision ||
@@ -1217,6 +1238,9 @@ export const ClientRequestsScreen = ({
             depositHoldExpiresAt?: string | null
             depositProofUrl?: string | null
             chatId?: number | null
+            nextAction?: Booking['nextAction']
+            workflowStage?: Booking['workflowStage']
+            availableActions?: Booking['availableActions']
           }
         | null
       if (!response.ok) {
@@ -1260,7 +1284,17 @@ export const ClientRequestsScreen = ({
           if (typeof data?.chatId === 'number') {
             next.chatId = data.chatId
           }
-          next.nextAction = null
+          if ('workflowStage' in (data ?? {})) {
+            next.workflowStage = data?.workflowStage ?? null
+          }
+          if ('availableActions' in (data ?? {})) {
+            next.availableActions = data?.availableActions ?? []
+          }
+          if ('nextAction' in (data ?? {})) {
+            next.nextAction = data?.nextAction ?? null
+          } else {
+            next.nextAction = null
+          }
           return next
         })
       })
@@ -2377,11 +2411,17 @@ export const ClientRequestsScreen = ({
                           discountPriceBefore
                         )}`
                       : ''
-                  const canAcceptPrice = booking.status === 'price_proposed'
-                  const canDeclinePrice = booking.status === 'price_proposed'
-                  const canCancel = ['pending', 'price_pending', 'price_proposed'].includes(
-                    booking.status
-                  )
+                  const canAcceptPrice =
+                    hasBookingAction(booking, 'client-accept-price') ||
+                    booking.status === 'price_proposed'
+                  const canDeclinePrice =
+                    hasBookingAction(booking, 'client-decline-price') ||
+                    booking.status === 'price_proposed'
+                  const canCancel =
+                    hasBookingAction(booking, 'client-cancel') ||
+                    ['pending', 'price_pending', 'price_proposed'].includes(
+                      booking.status
+                    )
                   const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
                   const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
                   const freeCancelUntilMs =
@@ -2394,22 +2434,31 @@ export const ClientRequestsScreen = ({
                       ? formatDateTime(new Date(freeCancelUntilMs).toISOString())
                       : ''
                   const canReschedule =
-                    booking.status === 'confirmed' &&
-                    typeof timeUntilMs === 'number' &&
-                    timeUntilMs >= cancelWindowMs
+                    hasBookingAction(booking, 'reschedule-propose') ||
+                    (booking.status === 'confirmed' &&
+                      typeof timeUntilMs === 'number' &&
+                      timeUntilMs >= cancelWindowMs)
                   const reschedulePending =
                     Boolean(booking.rescheduleProposedTime) &&
                     Boolean(booking.rescheduleProposedBy)
                   const rescheduleByClient = booking.rescheduleProposedBy === 'client'
-                  const canRespondReschedule = reschedulePending && !rescheduleByClient
-                  const canCancelReschedule = reschedulePending && rescheduleByClient
+                  const canRespondReschedule =
+                    hasBookingAction(booking, 'reschedule-accept') ||
+                    hasBookingAction(booking, 'reschedule-decline') ||
+                    (reschedulePending && !rescheduleByClient)
+                  const canCancelReschedule =
+                    hasBookingAction(booking, 'reschedule-cancel') ||
+                    (reschedulePending && rescheduleByClient)
                   const canCancelConfirmed =
-                    booking.status === 'confirmed' &&
-                    typeof timeUntilMs === 'number' &&
-                    timeUntilMs > 0 &&
-                    (cancelWindowMs === 0 || timeUntilMs < cancelWindowMs)
+                    (hasBookingAction(booking, 'client-cancel') &&
+                      booking.status === 'confirmed') ||
+                    (booking.status === 'confirmed' &&
+                      typeof timeUntilMs === 'number' &&
+                      timeUntilMs > 0 &&
+                      (cancelWindowMs === 0 || timeUntilMs < cancelWindowMs))
                   const canLeaveReview =
-                    booking.status === 'confirmed' && isPast && !booking.reviewId
+                    hasBookingAction(booking, 'leave_review') ||
+                    (booking.status === 'confirmed' && isPast && !booking.reviewId)
                   const hasReview =
                     booking.status === 'confirmed' && isPast && Boolean(booking.reviewId)
                   const depositPercent =
@@ -2444,8 +2493,9 @@ export const ClientRequestsScreen = ({
                       ? 'booking-item-meta--danger'
                       : 'booking-item-meta--highlight'
                   const canSubmitDeposit =
-                    booking.status === 'confirmed' &&
-                    (depositStatus === 'pending' || depositStatus === 'rejected')
+                    hasBookingAction(booking, 'client-deposit-submit') ||
+                    (booking.status === 'confirmed' &&
+                      (depositStatus === 'pending' || depositStatus === 'rejected'))
                   const showDepositPay = depositAmount > 0 && canSubmitDeposit
                   const depositHoldTimeLeft = booking.depositHoldExpiresAt
                     ? formatTimeLeft(booking.depositHoldExpiresAt)
@@ -2467,7 +2517,9 @@ export const ClientRequestsScreen = ({
                       ? `Критично: осталось ${depositHoldTimeLeft}`
                       : ''
                   const canDelete =
-                    booking.status === 'cancelled' || booking.status === 'declined'
+                    hasBookingAction(booking, 'client-delete') ||
+                    booking.status === 'cancelled' ||
+                    booking.status === 'declined'
                   const canRescheduleAction = canReschedule && !reschedulePending
                   const actionVariant = canDelete
                     ? 'delete'

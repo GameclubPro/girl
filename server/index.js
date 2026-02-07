@@ -1953,6 +1953,36 @@ const loadBookingChatId = async (bookingId, options = {}) => {
   return result.rows[0]?.id ?? null
 }
 
+const loadBookingWorkflowMetaForViewer = async (bookingId, viewerRole) => {
+  const result = await pool.query(
+    `
+      SELECT
+        b.id,
+        b.status,
+        b.service_price AS "servicePrice",
+        b.proposed_price AS "proposedPrice",
+        b.service_duration AS "serviceDuration",
+        b.scheduled_at AS "scheduledAt",
+        b.cancel_window_hours AS "cancelWindowHours",
+        b.deposit_percent AS "depositPercent",
+        b.deposit_amount AS "depositAmount",
+        b.deposit_status AS "depositStatus",
+        b.deposit_hold_expires_at AS "depositHoldExpiresAt",
+        b.reschedule_proposed_by AS "rescheduleProposedBy",
+        b.reschedule_proposed_time AS "rescheduleProposedTime",
+        b.outcome,
+        mr.id AS "reviewId"
+      FROM service_bookings b
+      LEFT JOIN master_reviews mr ON mr.booking_id = b.id
+      WHERE b.id = $1
+    `,
+    [bookingId]
+  )
+  const booking = result.rows[0]
+  if (!booking) return null
+  return buildBookingWorkflowMeta(booking, viewerRole)
+}
+
 const lockChatPair = async (db, clientId, masterId) => {
   const key = `${clientId}:${masterId}`
   await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key])
@@ -2993,45 +3023,199 @@ const buildNextAction = ({ id, title, subtitle, tone, deadlineAt }) => {
   }
 }
 
-const buildBookingNextAction = (booking, viewerRole) => {
+const resolveBookingBasePrice = (booking) =>
+  typeof booking?.servicePrice === 'number'
+    ? booking.servicePrice
+    : typeof booking?.proposedPrice === 'number'
+      ? booking.proposedPrice
+      : null
+
+const resolveBookingDepositAmount = (booking) => {
+  const basePrice = resolveBookingBasePrice(booking)
+  const depositPercent =
+    typeof booking?.depositPercent === 'number'
+      ? Math.max(0, Math.round(booking.depositPercent))
+      : 0
+  if (typeof booking?.depositAmount === 'number') {
+    return booking.depositAmount
+  }
+  if (basePrice && depositPercent > 0) {
+    return Math.round((basePrice * depositPercent) / 100)
+  }
+  return 0
+}
+
+const resolveBookingDepositStatus = (booking, depositAmount) =>
+  booking?.depositStatus ??
+  (normalizeText(booking?.status) === 'confirmed' && depositAmount > 0
+    ? 'pending'
+    : 'not_required')
+
+const isBookingOutcomePending = (booking) => {
+  if (!booking || normalizeText(booking.status) !== 'confirmed' || booking.outcome) {
+    return false
+  }
+  const scheduledAt = booking.scheduledAt ? new Date(booking.scheduledAt) : null
+  if (!scheduledAt || Number.isNaN(scheduledAt.getTime())) return false
+  const durationMinutes =
+    typeof booking.serviceDuration === 'number' && booking.serviceDuration > 0
+      ? booking.serviceDuration
+      : BOOKING_DURATION_FALLBACK_MINUTES
+  return scheduledAt.getTime() + durationMinutes * 60 * 1000 <= Date.now()
+}
+
+const buildBookingAvailableActions = (booking, viewerRole) => {
+  if (!booking || !booking.status) return []
+  const status = normalizeText(booking.status)
+  const role = viewerRole === 'master' ? 'master' : 'client'
+  if (!status) return []
+
+  const actions = []
+  const hasServicePrice =
+    typeof booking.servicePrice === 'number' ||
+    typeof booking.proposedPrice === 'number'
+  const depositAmount = resolveBookingDepositAmount(booking)
+  const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
+  const rescheduleTime = booking.rescheduleProposedTime
+  const rescheduleBy = normalizeText(booking.rescheduleProposedBy)
+  const nowMs = Date.now()
+  const scheduledMs = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : NaN
+  const hasScheduledAt = Number.isFinite(scheduledMs)
+  const timeUntilMs = hasScheduledAt ? scheduledMs - nowMs : null
+  const cancelWindowHours = clampValue(
+    parseOptionalInt(booking.cancelWindowHours) ?? BOOKING_FREE_CANCEL_HOURS,
+    0,
+    72
+  )
+  const cancelWindowMs = cancelWindowHours * 60 * 60 * 1000
+
+  if (rescheduleTime && rescheduleBy && rescheduleBy !== role) {
+    actions.push('reschedule-accept', 'reschedule-decline')
+  } else if (rescheduleTime && rescheduleBy && rescheduleBy === role) {
+    actions.push('reschedule-cancel')
+  }
+
+  if (role === 'master') {
+    if (status === 'pending' && hasServicePrice) {
+      actions.push('master-accept')
+    }
+    if (!hasServicePrice && ['pending', 'price_pending', 'price_proposed'].includes(status)) {
+      actions.push('master-propose-price')
+    }
+    if (['pending', 'price_pending', 'price_proposed'].includes(status)) {
+      actions.push('master-decline')
+    }
+    if (status === 'confirmed' && depositStatus === 'submitted') {
+      actions.push('master-deposit-confirm', 'master-deposit-reject')
+    }
+    if (isBookingOutcomePending(booking)) {
+      actions.push('set-outcome')
+    }
+  } else {
+    if (status === 'price_proposed' && typeof booking.proposedPrice === 'number') {
+      actions.push('client-accept-price', 'client-decline-price')
+    }
+    if (
+      status === 'confirmed' &&
+      depositAmount > 0 &&
+      ['pending', 'rejected'].includes(depositStatus)
+    ) {
+      actions.push('client-deposit-submit')
+    }
+    if (['pending', 'price_pending', 'price_proposed'].includes(status)) {
+      actions.push('client-cancel')
+    }
+    if (
+      status === 'confirmed' &&
+      !rescheduleTime &&
+      typeof timeUntilMs === 'number' &&
+      timeUntilMs > 0
+    ) {
+      if (timeUntilMs >= cancelWindowMs) {
+        actions.push('reschedule-propose')
+      }
+      if (cancelWindowMs === 0 || timeUntilMs < cancelWindowMs) {
+        actions.push('client-cancel')
+      }
+    }
+    if (status === 'cancelled' || status === 'declined') {
+      actions.push('client-delete')
+    }
+    const hasReviewField =
+      Object.prototype.hasOwnProperty.call(booking, 'reviewId')
+    if (hasReviewField && normalizeText(status) === 'confirmed' && !booking.reviewId) {
+      const scheduledAt = booking.scheduledAt
+        ? new Date(booking.scheduledAt).getTime()
+        : NaN
+      if (Number.isFinite(scheduledAt) && scheduledAt <= Date.now()) {
+        actions.push('leave_review')
+      }
+    }
+  }
+
+  return Array.from(new Set(actions))
+}
+
+const resolveBookingWorkflowStage = (booking) => {
+  if (!booking || !booking.status) return null
+  const status = normalizeText(booking.status)
+  if (!status) return null
+  const hasServicePrice =
+    typeof booking.servicePrice === 'number' ||
+    typeof booking.proposedPrice === 'number'
+  const depositAmount = resolveBookingDepositAmount(booking)
+  const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
+
+  if (status === 'pending') {
+    return hasServicePrice
+      ? 'pending_waiting_master_confirmation'
+      : 'pending_waiting_master_price'
+  }
+  if (status === 'price_pending') return 'pending_waiting_master_price'
+  if (status === 'price_proposed') return 'price_offered_to_client'
+  if (status === 'confirmed') {
+    if (depositAmount > 0) {
+      if (depositStatus === 'submitted') return 'confirmed_deposit_submitted'
+      if (depositStatus === 'pending') return 'confirmed_deposit_pending'
+      if (depositStatus === 'rejected') return 'confirmed_deposit_rejected'
+    }
+    if (isBookingOutcomePending(booking)) return 'confirmed_awaiting_outcome'
+    return 'confirmed_active'
+  }
+  if (status === 'cancelled' && depositStatus === 'expired') {
+    return 'cancelled_deposit_expired'
+  }
+  if (status === 'cancelled') return 'cancelled'
+  if (status === 'declined') return 'declined'
+  return status
+}
+
+const buildBookingNextAction = (
+  booking,
+  viewerRole,
+  options = {}
+) => {
   if (!booking || !booking.status) return null
   const status = normalizeText(booking.status)
   if (!status || ['cancelled', 'declined'].includes(status)) return null
   const role = viewerRole === 'master' ? 'master' : 'client'
-  const rescheduleTime = booking.rescheduleProposedTime
-  const rescheduleBy = normalizeText(booking.rescheduleProposedBy)
-  if (rescheduleTime && rescheduleBy && rescheduleBy !== role) {
+  const workflowStage =
+    options.workflowStage ?? resolveBookingWorkflowStage(booking)
+  const availableActions = Array.isArray(options.availableActions)
+    ? options.availableActions
+    : buildBookingAvailableActions(booking, role)
+  const hasAction = (actionId) => availableActions.includes(actionId)
+  const depositAmount = resolveBookingDepositAmount(booking)
+
+  if (hasAction('reschedule-accept')) {
     return buildNextAction({
       id: 'reschedule_confirm',
       title: 'Подтвердить перенос',
       tone: 'alert',
     })
   }
-
-  const basePrice =
-    typeof booking.servicePrice === 'number'
-      ? booking.servicePrice
-      : typeof booking.proposedPrice === 'number'
-        ? booking.proposedPrice
-        : null
-  const depositPercent =
-    typeof booking.depositPercent === 'number'
-      ? Math.max(0, Math.round(booking.depositPercent))
-      : 0
-  const resolvedDepositAmount =
-    typeof booking.depositAmount === 'number'
-      ? booking.depositAmount
-      : basePrice && depositPercent > 0
-        ? Math.round((basePrice * depositPercent) / 100)
-        : 0
-  const depositAmount =
-    typeof resolvedDepositAmount === 'number' ? resolvedDepositAmount : 0
-  const depositStatus =
-    booking.depositStatus ??
-    (status === 'confirmed' && depositAmount > 0 ? 'pending' : 'not_required')
-
   if (role === 'client') {
-    if (status === 'price_proposed') {
+    if (hasAction('client-accept-price')) {
       const priceLabel = formatPriceLabel(
         typeof booking.proposedPrice === 'number'
           ? booking.proposedPrice
@@ -3046,11 +3230,7 @@ const buildBookingNextAction = (booking, viewerRole) => {
         tone: 'alert',
       })
     }
-    if (
-      status === 'confirmed' &&
-      depositAmount > 0 &&
-      ['pending', 'rejected'].includes(depositStatus)
-    ) {
+    if (hasAction('client-deposit-submit')) {
       const amountLabel = formatPriceLabel(depositAmount)
       return buildNextAction({
         id: 'pay_deposit',
@@ -3062,7 +3242,11 @@ const buildBookingNextAction = (booking, viewerRole) => {
     }
     const hasReviewField =
       Object.prototype.hasOwnProperty.call(booking, 'reviewId')
-    if (status === 'confirmed' && hasReviewField && !booking.reviewId) {
+    if (
+      hasReviewField &&
+      !booking.reviewId &&
+      (hasAction('leave_review') || workflowStage === 'confirmed_awaiting_outcome')
+    ) {
       const scheduledAt = booking.scheduledAt
         ? new Date(booking.scheduledAt).getTime()
         : NaN
@@ -3077,24 +3261,15 @@ const buildBookingNextAction = (booking, viewerRole) => {
     return null
   }
 
-  if (status === 'pending') {
-    const hasPrice =
-      typeof booking.servicePrice === 'number' ||
-      typeof booking.proposedPrice === 'number'
+  if (hasAction('master-accept') || hasAction('master-propose-price')) {
+    const hasPrice = hasAction('master-accept')
     return buildNextAction({
       id: hasPrice ? 'confirm_booking' : 'send_price',
       title: hasPrice ? 'Подтвердить запись' : 'Предложить цену',
       tone: 'alert',
     })
   }
-  if (status === 'price_pending') {
-    return buildNextAction({
-      id: 'send_price',
-      title: 'Предложить цену',
-      tone: 'alert',
-    })
-  }
-  if (status === 'confirmed' && depositStatus === 'submitted') {
+  if (hasAction('master-deposit-confirm')) {
     const amountLabel = formatPriceLabel(depositAmount)
     return buildNextAction({
       id: 'check_deposit',
@@ -3103,7 +3278,7 @@ const buildBookingNextAction = (booking, viewerRole) => {
       tone: 'alert',
     })
   }
-  if (status === 'confirmed' && !booking.outcome) {
+  if (hasAction('set-outcome')) {
     const scheduledAt = booking.scheduledAt
       ? new Date(booking.scheduledAt)
       : null
@@ -3122,6 +3297,17 @@ const buildBookingNextAction = (booking, viewerRole) => {
     }
   }
   return null
+}
+
+const buildBookingWorkflowMeta = (booking, viewerRole) => {
+  const role = viewerRole === 'master' ? 'master' : 'client'
+  const workflowStage = resolveBookingWorkflowStage(booking)
+  const availableActions = buildBookingAvailableActions(booking, role)
+  const nextAction = buildBookingNextAction(booking, role, {
+    workflowStage,
+    availableActions,
+  })
+  return { workflowStage, availableActions, nextAction }
 }
 
 const buildClientRequestNextAction = (request) => {
@@ -7594,9 +7780,10 @@ app.get('/api/bookings', async (req, res) => {
         depositQrUrl: buildPublicUrl(req, row.depositQrPath),
         lateCancelFeePercent: 0,
       }
+      const workflow = buildBookingWorkflowMeta(booking, 'client')
       return {
         ...booking,
-        nextAction: buildBookingNextAction(booking, 'client'),
+        ...workflow,
       }
     })
 
@@ -7752,9 +7939,10 @@ app.get('/api/pro/bookings', async (req, res) => {
         clientTrustUpdatedAt: undefined,
         lateCancelFeePercent: 0,
       }
+      const workflow = buildBookingWorkflowMeta(booking, 'master')
       return {
         ...booking,
-        nextAction: buildBookingNextAction(booking, 'master'),
+        ...workflow,
       }
     })
 
@@ -10045,6 +10233,14 @@ app.patch('/api/bookings/:id', async (req, res) => {
       }
     }
 
+    const withActorWorkflow = async (payload) => {
+      const workflow = await loadBookingWorkflowMetaForViewer(
+        bookingId,
+        isMaster ? 'master' : 'client'
+      )
+      return workflow ? { ...payload, ...workflow } : payload
+    }
+
     if (normalizedAction === 'master-accept') {
       if (!isMaster) {
         res.status(403).json({ error: 'forbidden' })
@@ -10074,17 +10270,19 @@ app.patch('/api/bookings/:id', async (req, res) => {
 
       if (booking.status === 'confirmed') {
         const chatId = await loadBookingChatId(bookingId)
-        res.json({
-          ok: true,
-          status: 'confirmed',
-          depositStatus:
-            existingDepositStatus ||
-            (depositAmountValue > 0 ? 'pending' : 'not_required'),
-          depositAmount: depositAmountValue,
-          depositHoldExpiresAt:
-            depositAmountValue > 0 ? existingDepositHoldExpiresAt : null,
-          chatId,
-        })
+        res.json(
+          await withActorWorkflow({
+            ok: true,
+            status: 'confirmed',
+            depositStatus:
+              existingDepositStatus ||
+              (depositAmountValue > 0 ? 'pending' : 'not_required'),
+            depositAmount: depositAmountValue,
+            depositHoldExpiresAt:
+              depositAmountValue > 0 ? existingDepositHoldExpiresAt : null,
+            chatId,
+          })
+        )
         return
       }
 
@@ -10217,14 +10415,16 @@ app.patch('/api/bookings/:id', async (req, res) => {
 
       const responseChatId =
         chatPayload?.chatId ?? (await loadBookingChatId(bookingId))
-      res.json({
-        ok: true,
-        status: 'confirmed',
-        depositStatus: depositStatusValue,
-        depositAmount: depositAmountValue,
-        depositHoldExpiresAt: depositHoldExpiresAtValue,
-        chatId: responseChatId ?? null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          status: 'confirmed',
+          depositStatus: depositStatusValue,
+          depositAmount: depositAmountValue,
+          depositHoldExpiresAt: depositHoldExpiresAtValue,
+          chatId: responseChatId ?? null,
+        })
+      )
       return
     }
 
@@ -10317,7 +10517,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         }
       }
 
-      res.json({ ok: true, status: 'declined' })
+      res.json(await withActorWorkflow({ ok: true, status: 'declined' }))
       return
     }
 
@@ -10527,13 +10727,15 @@ app.patch('/api/bookings/:id', async (req, res) => {
         }
       }
 
-      res.json({
-        ok: true,
-        status: 'price_proposed',
-        proposedPrice: parsedPrice,
-        depositAmount: nextDepositAmount,
-        depositStatus: nextDepositStatus,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          status: 'price_proposed',
+          proposedPrice: parsedPrice,
+          depositAmount: nextDepositAmount,
+          depositStatus: nextDepositStatus,
+        })
+      )
       return
     }
 
@@ -10669,15 +10871,17 @@ app.patch('/api/bookings/:id', async (req, res) => {
         }
       }
 
-      res.json({
-        ok: true,
-        status: 'confirmed',
-        servicePrice: booking.proposedPrice,
-        depositAmount: nextDepositAmount,
-        depositStatus: nextDepositStatus,
-        depositHoldExpiresAt: nextDepositHoldExpiresAt,
-        chatId: chatPayload?.chatId ?? null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          status: 'confirmed',
+          servicePrice: booking.proposedPrice,
+          depositAmount: nextDepositAmount,
+          depositStatus: nextDepositStatus,
+          depositHoldExpiresAt: nextDepositHoldExpiresAt,
+          chatId: chatPayload?.chatId ?? null,
+        })
+      )
       return
     }
 
@@ -10777,7 +10981,7 @@ app.patch('/api/bookings/:id', async (req, res) => {
         }
       }
 
-      res.json({ ok: true, status: 'cancelled' })
+      res.json(await withActorWorkflow({ ok: true, status: 'cancelled' }))
       return
     }
 
@@ -10923,16 +11127,18 @@ app.patch('/api/bookings/:id', async (req, res) => {
         console.error('Failed to notify deposit submission:', chatError)
       }
 
-      res.json({
-        ok: true,
-        depositStatus: 'submitted',
-        depositAmount,
-        depositHoldExpiresAt: null,
-        depositProofUrl: normalizedDepositProofPath
-          ? buildPublicUrl(req, normalizedDepositProofPath)
-          : null,
-        chatId: chatPayload?.chatId ?? null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          depositStatus: 'submitted',
+          depositAmount,
+          depositHoldExpiresAt: null,
+          depositProofUrl: normalizedDepositProofPath
+            ? buildPublicUrl(req, normalizedDepositProofPath)
+            : null,
+          chatId: chatPayload?.chatId ?? null,
+        })
+      )
       return
     }
 
@@ -11026,7 +11232,13 @@ app.patch('/api/bookings/:id', async (req, res) => {
       } catch (chatError) {
         console.error('Failed to notify deposit confirmation:', chatError)
       }
-      res.json({ ok: true, depositStatus: 'confirmed', depositHoldExpiresAt: null })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          depositStatus: 'confirmed',
+          depositHoldExpiresAt: null,
+        })
+      )
       return
     }
 
@@ -11122,11 +11334,13 @@ app.patch('/api/bookings/:id', async (req, res) => {
       } catch (chatError) {
         console.error('Failed to notify deposit rejection:', chatError)
       }
-      res.json({
-        ok: true,
-        depositStatus: 'rejected',
-        depositHoldExpiresAt: nextHoldExpiresAt,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          depositStatus: 'rejected',
+          depositHoldExpiresAt: nextHoldExpiresAt,
+        })
+      )
       return
     }
 
@@ -11281,13 +11495,15 @@ app.patch('/api/bookings/:id', async (req, res) => {
         console.error('Failed to notify reschedule proposal:', chatError)
       }
 
-      res.json({
-        ok: true,
-        rescheduleProposedAt,
-        rescheduleProposedBy: proposerRole,
-        rescheduleProposedTime: normalizedProposedAt,
-        rescheduleNote: normalizedRescheduleNote || null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          rescheduleProposedAt,
+          rescheduleProposedBy: proposerRole,
+          rescheduleProposedTime: normalizedProposedAt,
+          rescheduleNote: normalizedRescheduleNote || null,
+        })
+      )
       return
     }
 
@@ -11416,14 +11632,16 @@ app.patch('/api/bookings/:id', async (req, res) => {
         console.error('Failed to notify reschedule acceptance:', chatError)
       }
 
-      res.json({
-        ok: true,
-        scheduledAt: proposedDate.toISOString(),
-        rescheduleProposedAt: null,
-        rescheduleProposedBy: null,
-        rescheduleProposedTime: null,
-        rescheduleNote: null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          scheduledAt: proposedDate.toISOString(),
+          rescheduleProposedAt: null,
+          rescheduleProposedBy: null,
+          rescheduleProposedTime: null,
+          rescheduleNote: null,
+        })
+      )
       return
     }
 
@@ -11515,13 +11733,15 @@ app.patch('/api/bookings/:id', async (req, res) => {
         console.error('Failed to notify reschedule decline:', chatError)
       }
 
-      res.json({
-        ok: true,
-        rescheduleProposedAt: null,
-        rescheduleProposedBy: null,
-        rescheduleProposedTime: null,
-        rescheduleNote: null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          rescheduleProposedAt: null,
+          rescheduleProposedBy: null,
+          rescheduleProposedTime: null,
+          rescheduleNote: null,
+        })
+      )
       return
     }
 
@@ -11613,13 +11833,15 @@ app.patch('/api/bookings/:id', async (req, res) => {
         console.error('Failed to notify reschedule cancel:', chatError)
       }
 
-      res.json({
-        ok: true,
-        rescheduleProposedAt: null,
-        rescheduleProposedBy: null,
-        rescheduleProposedTime: null,
-        rescheduleNote: null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          rescheduleProposedAt: null,
+          rescheduleProposedBy: null,
+          rescheduleProposedTime: null,
+          rescheduleNote: null,
+        })
+      )
       return
     }
 
@@ -11741,12 +11963,14 @@ app.patch('/api/bookings/:id', async (req, res) => {
         }
       }
 
-      res.json({
-        ok: true,
-        status: 'cancelled',
-        cancelWindowHours,
-        depositPercent,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          status: 'cancelled',
+          cancelWindowHours,
+          depositPercent,
+        })
+      )
       return
     }
 
@@ -11795,13 +12019,15 @@ app.patch('/api/bookings/:id', async (req, res) => {
         })
         const trust = await refreshClientTrustScore(booking.clientId)
 
-        res.json({
-          ok: true,
-          status: 'cancelled',
-          outcome: null,
-          legacyOutcome: 'late_cancel',
-          trust,
-        })
+        res.json(
+          await withActorWorkflow({
+            ok: true,
+            status: 'cancelled',
+            outcome: null,
+            legacyOutcome: 'late_cancel',
+            trust,
+          })
+        )
         return
       }
 
@@ -11976,14 +12202,16 @@ app.patch('/api/bookings/:id', async (req, res) => {
         })
       }
 
-      res.json({
-        ok: true,
-        outcome: normalizedOutcome,
-        lateMinutes: normalizedOutcome === 'late' ? parsedLateMinutes : null,
-        trust,
-        systemMessage: systemMessagePayload,
-        chatId: chatPayload?.chatId ?? null,
-      })
+      res.json(
+        await withActorWorkflow({
+          ok: true,
+          outcome: normalizedOutcome,
+          lateMinutes: normalizedOutcome === 'late' ? parsedLateMinutes : null,
+          trust,
+          systemMessage: systemMessagePayload,
+          chatId: chatPayload?.chatId ?? null,
+        })
+      )
       return
     }
 
@@ -13714,9 +13942,10 @@ app.get('/api/chats', async (req, res) => {
               createdAt: row.bookingCreatedAt,
             }
           : null
-      const nextAction = activeBooking
-        ? buildBookingNextAction(activeBooking, isClient ? 'client' : 'master')
+      const bookingWorkflow = activeBooking
+        ? buildBookingWorkflowMeta(activeBooking, isClient ? 'client' : 'master')
         : null
+      const nextAction = bookingWorkflow?.nextAction ?? null
 
       return {
         id: row.id,
@@ -13746,7 +13975,13 @@ app.get('/api/chats', async (req, res) => {
           trust: counterpartTrust ?? undefined,
         },
         request: activeRequest,
-        booking: activeBooking,
+        booking: activeBooking
+          ? {
+              ...activeBooking,
+              workflowStage: bookingWorkflow?.workflowStage ?? null,
+              availableActions: bookingWorkflow?.availableActions ?? [],
+            }
+          : null,
       }
     })
 
@@ -14152,9 +14387,10 @@ app.get('/api/chats/:id', async (req, res) => {
             createdAt: row.bookingCreatedAt,
           }
         : null
-    const nextAction = bookingPayload
-      ? buildBookingNextAction(bookingPayload, isClient ? 'client' : 'master')
+    const bookingWorkflow = bookingPayload
+      ? buildBookingWorkflowMeta(bookingPayload, isClient ? 'client' : 'master')
       : null
+    const nextAction = bookingWorkflow?.nextAction ?? null
 
     res.json({
       chat: {
@@ -14182,7 +14418,13 @@ app.get('/api/chats/:id', async (req, res) => {
         trust: counterpartTrust ?? undefined,
       },
       request: requestPayload,
-      booking: bookingPayload,
+      booking: bookingPayload
+        ? {
+            ...bookingPayload,
+            workflowStage: bookingWorkflow?.workflowStage ?? null,
+            availableActions: bookingWorkflow?.availableActions ?? [],
+          }
+        : null,
       contexts,
       nextAction,
     })
