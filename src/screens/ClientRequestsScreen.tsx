@@ -2690,10 +2690,12 @@ export const ClientRequestsScreen = ({
                         </div>
                         <div className="booking-item-aside">
                           <div className="booking-item-price">{priceLabel}</div>
-                          <span className={`booking-status ${statusTone}`}>
-                            {statusLabel}
-                          </span>
                         </div>
+                      </div>
+                      <div className="booking-item-status-row">
+                        <span className={`booking-status ${statusTone}`}>
+                          {statusLabel}
+                        </span>
                       </div>
                       {showCornerChat && (
                         <button
