@@ -87,6 +87,7 @@ const DEFAULT_SLOT_RANGE_DAYS = 14
 const BOOKING_DURATION_MIN = 60
 const PRICE_OFFER_HOURS = 12
 const FREE_CANCEL_HOURS = 12
+const LIVE_REFRESH_INTERVAL_MS = 20_000
 
 const getDayKey = (date: Date) => dayKeyOrder[date.getDay()] ?? 'mon'
 
@@ -1212,6 +1213,10 @@ export const ProRequestsScreen = ({
   useEffect(() => {
     if (!userId) return
     const unsubscribe = stream.subscribe((payload) => {
+      if (payload?.type === 'request:dispatch') {
+        scheduleReload({ requests: true })
+        return
+      }
       if (payload?.type === 'chat:created') {
         scheduleReload({ requests: true, bookings: true })
         return
@@ -1271,6 +1276,23 @@ export const ProRequestsScreen = ({
       reloadFlagsRef.current = { requests: false, bookings: false }
     }
   }, [bookingEvents, requestEvents, scheduleReload, stream, userId])
+
+  useEffect(() => {
+    if (!userId || typeof window === 'undefined') return
+    const intervalId = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return
+      }
+      if (activeTab === 'requests') {
+        void loadRequests({ silent: true, force: true })
+        void loadBookings({ silent: true, force: true })
+        return
+      }
+      void loadBookings({ silent: true, force: true })
+    }, LIVE_REFRESH_INTERVAL_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [activeTab, loadBookings, loadRequests, userId])
 
   useEffect(() => {
     return () => {
@@ -3525,17 +3547,65 @@ export const ProRequestsScreen = ({
       ) {
         setDepositReviewBookingId(null)
       }
+      if (action === 'master-accept') {
+        void loadBookings({ silent: true, force: true })
+        void loadRequests({ silent: true, force: true })
+      }
     } catch (error) {
       const errorCode = error instanceof Error ? error.message : ''
+      const isMasterAcceptRecoverableError =
+        action === 'master-accept' &&
+        (errorCode === 'status_invalid' || errorCode === 'server_error')
+      if (isMasterAcceptRecoverableError) {
+        setBookings((current) =>
+          current.map((booking) => {
+            if (booking.id !== bookingId) return booking
+            const depositAmount = resolveBookingDepositAmount(booking)
+            const nextDepositStatus =
+              depositAmount > 0
+                ? resolveBookingDepositStatus(
+                    { ...booking, status: 'confirmed', depositStatus: booking.depositStatus ?? null },
+                    depositAmount
+                  )
+                : booking.depositStatus ?? 'not_required'
+            const nextWorkflowStage =
+              depositAmount > 0
+                ? nextDepositStatus === 'submitted'
+                  ? 'confirmed_deposit_submitted'
+                  : nextDepositStatus === 'rejected'
+                    ? 'confirmed_deposit_rejected'
+                    : 'confirmed_deposit_pending'
+                : 'confirmed_active'
+            return {
+              ...booking,
+              status: 'confirmed',
+              depositStatus: nextDepositStatus,
+              workflowStage: nextWorkflowStage,
+              availableActions: Array.isArray(booking.availableActions)
+                ? booking.availableActions.filter(
+                    (actionId) =>
+                      actionId !== 'master-accept' &&
+                      actionId !== 'master-decline' &&
+                      actionId !== 'master-propose-price'
+                  )
+                : booking.availableActions,
+              nextAction: null,
+            }
+          })
+        )
+      }
       const shouldResyncBookings =
-        (action === 'master-accept' &&
-          (errorCode === 'status_invalid' || errorCode === 'server_error')) ||
+        isMasterAcceptRecoverableError ||
         ((action === 'master-deposit-confirm' || action === 'master-deposit-reject') &&
           (errorCode === 'status_invalid' ||
             errorCode === 'deposit_status_invalid' ||
             errorCode === 'server_error'))
+      const shouldResyncRequests = isMasterAcceptRecoverableError
       if (shouldResyncBookings) {
         void loadBookings({ silent: true, force: true })
+      }
+      if (shouldResyncRequests) {
+        void loadRequests({ silent: true, force: true })
       }
       const message =
         errorCode === 'deposit_status_invalid' &&

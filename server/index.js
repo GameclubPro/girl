@@ -3728,7 +3728,7 @@ const dispatchRequestBatch = async (request, batchSize, batch) => {
     })`
   })
 
-  await pool.query(
+  const insertResult = await pool.query(
     `
       INSERT INTO request_dispatches (
         request_id,
@@ -3739,11 +3739,32 @@ const dispatchRequestBatch = async (request, batchSize, batch) => {
       )
       VALUES ${placeholders.join(', ')}
       ON CONFLICT (request_id, master_id) DO NOTHING
+      RETURNING
+        request_id AS "requestId",
+        master_id AS "masterId",
+        batch,
+        sent_at AS "sentAt",
+        expires_at AS "expiresAt"
     `,
     values
   )
 
-  return { dispatched: selected.length, expiresAt }
+  const inserted = Array.isArray(insertResult.rows) ? insertResult.rows : []
+  inserted.forEach((row) => {
+    try {
+      broadcastToUser(row.masterId, {
+        type: 'request:dispatch',
+        requestId: row.requestId,
+        batch: row.batch,
+        sentAt: row.sentAt,
+        dispatchExpiresAt: row.expiresAt,
+      })
+    } catch (error) {
+      console.error('Failed to broadcast request dispatch event:', error)
+    }
+  })
+
+  return { dispatched: inserted.length, expiresAt }
 }
 
 const expireStaleDispatches = async () => {
