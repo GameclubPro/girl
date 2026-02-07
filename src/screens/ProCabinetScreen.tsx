@@ -5,6 +5,7 @@ import {
   IconCalendar,
   IconChat,
   IconDashboard,
+  IconList,
   IconShowcase,
   IconStories,
   IconSupport,
@@ -129,7 +130,14 @@ export const ProCabinetScreen = ({
   onOpenStories,
   onOpenSupport,
 }: ProCabinetScreenProps) => {
-  const { requestStats, bookingStats, bookings, isLoading, combinedError } =
+  const {
+    requestStats,
+    bookingStats,
+    bookings,
+    isLoading,
+    combinedError,
+    refresh,
+  } =
     useProCabinetData(
     apiBase,
     userId
@@ -224,7 +232,7 @@ export const ProCabinetScreen = ({
     () => bookingStats.clientSummaries.slice(0, 2),
     [bookingStats.clientSummaries]
   )
-  const clientRows = clientHighlights.length > 0 ? clientHighlights : [null, null]
+  const clientRows = clientHighlights.length > 0 ? clientHighlights : [null]
   const totalClients = bookingStats.uniqueClients
   const repeatClients = bookingStats.repeatClients
   const newClients = Math.max(0, totalClients - repeatClients)
@@ -239,13 +247,14 @@ export const ProCabinetScreen = ({
     ? Math.min(100, Math.max(12, Math.round(marketingRepeatRate * 100)))
     : 0
   const showcaseTiles: Array<PortfolioItem | null> =
-    showcasePreview.length > 0 ? showcasePreview : [null]
+    showcasePreview.length > 0 ? showcasePreview : [null, null]
   const profileInitials = useMemo(
     () => getInitials(profileDisplayName || 'Мастер'),
     [profileDisplayName]
   )
   const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
   const pendingActions = requestStats.open + bookingStats.pending
+  const hasPendingActions = pendingActions > 0
   const nextBookingLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
     : 'Нет ближайших слотов'
@@ -254,22 +263,52 @@ export const ProCabinetScreen = ({
     : isLoading
       ? 'Обновляем данные'
       : 'Данные актуальны'
-  const tapHint = (
-    <span className="pro-cabinet-nav-hint" aria-hidden="true">
-      <span className="pro-cabinet-nav-hint-arrow" />
-    </span>
-  )
+  const focusTitle = combinedError
+    ? 'Проверьте синхронизацию'
+    : hasPendingActions
+      ? `${pendingActions} задач на сейчас`
+      : bookingStats.upcomingWeek > 0
+        ? 'График под контролем'
+        : 'День свободен для роста'
+  const focusSubtitle = combinedError
+    ? 'Обновите ленту данных, чтобы не пропустить заявки и записи.'
+    : hasPendingActions
+      ? 'Сначала разберите входящие, затем закройте ожидания по записи.'
+      : bookingStats.upcomingWeek > 0
+        ? 'План на неделю заполнен. Проверьте окна и напомните о себе в историях.'
+        : 'Можно усилить поток через витрину и продвижение.'
+  const focusPrimaryActionLabel = combinedError
+    ? 'Обновить данные'
+    : hasPendingActions
+      ? 'Разобрать заявки'
+      : 'Открыть календарь'
+  const focusPrimaryAction = combinedError
+    ? refresh
+    : hasPendingActions
+      ? onViewRequests
+      : onOpenCalendar
+  const focusSecondaryActionLabel = hasPendingActions
+    ? 'Открыть чаты'
+    : 'Продвижение'
+  const focusSecondaryAction = hasPendingActions ? onViewChats : onOpenMarketing
+  const storiesBadgeLabel = bookingStats.upcoming > 0 ? 'ACTIVE' : 'START'
+  const storiesHint = bookingStats.upcoming > 0
+    ? 'Напомните про свободные окна'
+    : 'Добавьте первую историю'
+  const marketingHint = marketingAudience
+    ? marketingRepeatRate >= 0.45
+      ? 'Повторные клиенты держат темп'
+      : 'Есть база, можно вернуть больше клиентов'
+    : 'Начните с заявок, чтобы собрать базу'
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
       <div className="pro-cabinet-shell pro-cabinet-shell--icons">
         <section className="pro-cabinet-overview animate delay-1">
           <div className="pro-cabinet-overview-copy">
-            <p className="pro-cabinet-overview-kicker">Панель мастера</p>
-            <h1 className="pro-cabinet-overview-title">Операционный центр</h1>
-            <p className="pro-cabinet-overview-subtitle">
-              Контролируйте поток заявок, клиентов и занятость по календарю.
-            </p>
+            <p className="pro-cabinet-overview-kicker">Сегодня</p>
+            <h1 className="pro-cabinet-overview-title">{focusTitle}</h1>
+            <p className="pro-cabinet-overview-subtitle">{focusSubtitle}</p>
           </div>
           <div className="pro-cabinet-overview-stats">
             <div className="pro-cabinet-overview-stat">
@@ -309,56 +348,69 @@ export const ProCabinetScreen = ({
               {overviewStatusLabel}
             </span>
           </div>
+          <div className="pro-cabinet-overview-actions">
+            <button
+              className="pro-cabinet-overview-action is-primary"
+              type="button"
+              onClick={focusPrimaryAction}
+            >
+              {focusPrimaryActionLabel}
+            </button>
+            <button
+              className="pro-cabinet-overview-action is-ghost"
+              type="button"
+              onClick={focusSecondaryAction}
+            >
+              {focusSecondaryActionLabel}
+            </button>
+          </div>
         </section>
 
-        <div className="pro-cabinet-nav-grid">
+        <div className="pro-cabinet-nav-grid pro-cabinet-nav-grid--primary">
           <button
-            className="pro-cabinet-nav-card is-analytics animate delay-2"
+            className="pro-cabinet-nav-card is-requests is-primary animate delay-2"
             type="button"
-            onClick={onOpenAnalytics}
+            onClick={onViewRequests}
           >
-            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconDashboard />
+                <IconList />
               </span>
               <div className="pro-cabinet-nav-info">
-                <span className="pro-cabinet-nav-kicker">Статистика</span>
-                <span className="pro-cabinet-nav-title">Аналитика</span>
+                <span className="pro-cabinet-nav-kicker">Приоритет</span>
+                <span className="pro-cabinet-nav-title">Заявки</span>
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
-              <div className="pro-cabinet-nav-spark" aria-hidden="true">
-                {analyticsSpark.map((value, index) => (
-                  <span
-                    className="pro-cabinet-nav-spark-bar"
-                    key={`analytics-spark-${index}`}
-                    style={{ '--spark': value } as CSSProperties}
-                  />
-                ))}
+              <div className="pro-cabinet-nav-pills">
+                <span className="pro-cabinet-nav-pill is-alert">
+                  Новые {requestStats.open}
+                </span>
+                <span className="pro-cabinet-nav-pill is-ghost">
+                  Ожидают {bookingStats.pending}
+                </span>
               </div>
               <div className="pro-cabinet-nav-stats">
                 <div className="pro-cabinet-nav-stat">
                   <span className="pro-cabinet-nav-stat-value">
-                    {requestStats.open}
+                    {requestStats.total}
                   </span>
-                  <span className="pro-cabinet-nav-stat-label">Открытые</span>
+                  <span className="pro-cabinet-nav-stat-label">В работе</span>
                 </div>
                 <div className="pro-cabinet-nav-stat">
                   <span className="pro-cabinet-nav-stat-value">
-                    {bookingStats.confirmed}
+                    {requestStats.responses}
                   </span>
-                  <span className="pro-cabinet-nav-stat-label">Записи</span>
+                  <span className="pro-cabinet-nav-stat-label">Отклики</span>
                 </div>
               </div>
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-calendar animate delay-3"
+            className="pro-cabinet-nav-card is-calendar is-primary animate delay-3"
             type="button"
             onClick={onOpenCalendar}
           >
-            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconCalendar />
@@ -394,12 +446,54 @@ export const ProCabinetScreen = ({
               </div>
             </div>
           </button>
+        </div>
+
+        <div className="pro-cabinet-nav-grid pro-cabinet-nav-grid--secondary">
           <button
-            className="pro-cabinet-nav-card is-clients animate delay-4"
+            className="pro-cabinet-nav-card is-analytics animate delay-4"
+            type="button"
+            onClick={onOpenAnalytics}
+          >
+            <div className="pro-cabinet-nav-head">
+              <span className="pro-cabinet-nav-icon" aria-hidden="true">
+                <IconDashboard />
+              </span>
+              <div className="pro-cabinet-nav-info">
+                <span className="pro-cabinet-nav-kicker">Тренды</span>
+                <span className="pro-cabinet-nav-title">Аналитика</span>
+              </div>
+            </div>
+            <div className="pro-cabinet-nav-preview">
+              <div className="pro-cabinet-nav-spark" aria-hidden="true">
+                {analyticsSpark.map((value, index) => (
+                  <span
+                    className="pro-cabinet-nav-spark-bar"
+                    key={`analytics-spark-${index}`}
+                    style={{ '--spark': value } as CSSProperties}
+                  />
+                ))}
+              </div>
+              <div className="pro-cabinet-nav-stats">
+                <div className="pro-cabinet-nav-stat">
+                  <span className="pro-cabinet-nav-stat-value">
+                    {bookingStats.confirmed}
+                  </span>
+                  <span className="pro-cabinet-nav-stat-label">Подтверждено</span>
+                </div>
+                <div className="pro-cabinet-nav-stat">
+                  <span className="pro-cabinet-nav-stat-value">
+                    {bookingStats.upcomingWeek}
+                  </span>
+                  <span className="pro-cabinet-nav-stat-label">Неделя</span>
+                </div>
+              </div>
+            </div>
+          </button>
+          <button
+            className="pro-cabinet-nav-card is-clients animate delay-5"
             type="button"
             onClick={onOpenClients}
           >
-            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconUsers />
@@ -413,10 +507,10 @@ export const ProCabinetScreen = ({
               <div className="pro-cabinet-nav-client-list">
                 {clientRows.map((client, index) => {
                   const isGhost = !client
-                  const name = client?.name ?? 'Первые клиенты'
+                  const name = client?.name ?? 'Клиентов пока нет'
                   const meta = client
                     ? formatClientMeta(client)
-                    : 'Появятся после записи'
+                    : 'Примите первую заявку'
                   const isRepeat = client ? client.count > 1 : false
                   const badge = client ? (isRepeat ? 'повторный' : 'новый') : null
                   return (
@@ -449,26 +543,31 @@ export const ProCabinetScreen = ({
                 })}
               </div>
               <div className="pro-cabinet-nav-client-foot">
-                <div
-                  className={`pro-cabinet-nav-client-meter${
-                    totalClients > 0 ? '' : ' is-empty'
-                  }`}
-                  style={{ '--repeat-share': repeatShare } as CSSProperties}
-                  aria-hidden="true"
-                />
-                <div className="pro-cabinet-nav-client-meta">
-                  <span>Повторные {repeatClients}</span>
-                  <span className="is-muted">Новые {newClients}</span>
-                </div>
+                {totalClients > 0 ? (
+                  <>
+                    <div
+                      className="pro-cabinet-nav-client-meter"
+                      style={{ '--repeat-share': repeatShare } as CSSProperties}
+                      aria-hidden="true"
+                    />
+                    <div className="pro-cabinet-nav-client-meta">
+                      <span>Повторные {repeatClients}</span>
+                      <span className="is-muted">Новые {newClients}</span>
+                    </div>
+                  </>
+                ) : (
+                  <span className="pro-cabinet-nav-client-empty-hint">
+                    Первые клиенты появятся из заявок
+                  </span>
+                )}
               </div>
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-marketing animate delay-5"
+            className="pro-cabinet-nav-card is-marketing animate delay-6"
             type="button"
             onClick={onOpenMarketing}
           >
-            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconChat />
@@ -479,6 +578,7 @@ export const ProCabinetScreen = ({
               </div>
             </div>
             <div className="pro-cabinet-nav-preview">
+              <p className="pro-cabinet-nav-note">{marketingHint}</p>
               <div className="pro-cabinet-nav-meter" aria-hidden="true">
                 <span
                   className="pro-cabinet-nav-meter-fill"
@@ -502,11 +602,10 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-stories animate delay-6"
+            className="pro-cabinet-nav-card is-stories animate delay-7"
             type="button"
             onClick={onOpenStories}
           >
-            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconStories />
@@ -518,7 +617,9 @@ export const ProCabinetScreen = ({
             </div>
             <div className="pro-cabinet-nav-preview">
               <div className="pro-cabinet-nav-stories">
-                <span className="pro-cabinet-nav-stories-badge">NEW</span>
+                <span className="pro-cabinet-nav-stories-badge">
+                  {storiesBadgeLabel}
+                </span>
                 <span className="pro-cabinet-nav-story-ring" aria-hidden="true">
                   <span className="pro-cabinet-nav-story-avatar">
                     {avatarDisplayUrl ? (
@@ -528,15 +629,15 @@ export const ProCabinetScreen = ({
                     )}
                   </span>
                 </span>
+                <p className="pro-cabinet-nav-stories-text">{storiesHint}</p>
               </div>
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-showcase animate delay-7"
+            className="pro-cabinet-nav-card is-showcase is-wide animate delay-7"
             type="button"
             onClick={onOpenShowcase}
           >
-            {tapHint}
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
                 <IconShowcase />

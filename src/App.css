@@ -4438,10 +4438,19 @@
   flex: 0 0 auto;
 }
 
+.pro-cabinet-nav-grid--primary {
+  grid-template-columns: 1fr;
+  gap: clamp(8px, 1.3dvh, 11px);
+}
+
+.pro-cabinet-nav-grid--secondary {
+  gap: clamp(8px, 1.3dvh, 11px);
+}
+
 .pro-cabinet-support-card {
   width: min(420px, 100%);
   align-self: center;
-  margin-top: clamp(8px, 1.6dvh, 12px);
+  margin-top: clamp(6px, 1.2dvh, 10px);
   appearance: none;
   border: 1px solid rgba(var(--accent-rgb), 0.2);
   background: linear-gradient(
@@ -4455,7 +4464,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: clamp(64px, 9dvh, 74px);
+  min-height: clamp(56px, 7.6dvh, 64px);
   color: var(--pro-ink);
   text-align: left;
   cursor: pointer;
@@ -4516,19 +4525,37 @@
 
 .pro-cabinet-support-action {
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 10px;
+  padding: 7px 11px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--accent-strong);
   background: rgba(var(--accent-rgb), 0.14);
   border: 1px solid rgba(var(--accent-rgb), 0.28);
   flex-shrink: 0;
 }
 
+.screen--pro-cabinet .pro-bottom-nav {
+  padding: 6px 10px calc(8px + var(--safe-bottom));
+  border-radius: 18px 18px 0 0;
+}
+
+.screen--pro-cabinet .pro-nav-item {
+  min-height: 44px;
+  gap: 2px;
+}
+
+.screen--pro-cabinet .pro-nav-item.is-active {
+  transform: none;
+}
+
 @media (max-width: 360px) {
   .pro-cabinet-nav-grid {
+    gap: clamp(6px, 1dvh, 8px);
+  }
+
+  .pro-cabinet-nav-grid--primary,
+  .pro-cabinet-nav-grid--secondary {
     gap: clamp(6px, 1dvh, 8px);
   }
 
@@ -4560,10 +4587,6 @@
     display: none;
   }
 
-  .pro-cabinet-nav-client-row:nth-child(2) {
-    display: none;
-  }
-
   .pro-cabinet-nav-support-text {
     -webkit-line-clamp: 1;
   }
@@ -4575,12 +4598,12 @@
   }
 
   .pro-cabinet-nav-pills,
-  .pro-cabinet-nav-client-foot {
+  .pro-cabinet-nav-client-foot,
+  .pro-cabinet-nav-note {
     display: none;
   }
 
-  .pro-cabinet-nav-support-text,
-  .pro-cabinet-nav-hint {
+  .pro-cabinet-nav-support-text {
     display: none;
   }
 
@@ -4739,8 +4762,24 @@
   --tile-accent: var(--accent-rgb);
 }
 
+.pro-cabinet-nav-card.is-requests {
+  --tile-accent: var(--accent-rgb);
+}
+
 .pro-cabinet-nav-card.is-calendar {
   --tile-accent: var(--accent-rgb);
+}
+
+.pro-cabinet-nav-card.is-primary {
+  min-height: clamp(124px, 18dvh, 156px);
+}
+
+.pro-cabinet-nav-card.is-requests.is-primary {
+  min-height: clamp(102px, 15dvh, 126px);
+}
+
+.pro-cabinet-nav-card.is-wide {
+  grid-column: 1 / -1;
 }
 
 .pro-cabinet-nav-card.is-clients {
@@ -4816,9 +4855,9 @@
 
 .pro-cabinet-nav-kicker {
   margin: 0;
-  font-size: clamp(8px, 1.4dvh, 9px);
+  font-size: clamp(9px, 1.4dvh, 10px);
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--pro-muted);
 }
@@ -4826,7 +4865,7 @@
 .pro-cabinet-nav-title {
   margin: 0;
   font-family: var(--font-title);
-  font-size: clamp(12px, 3.5vw, 15px);
+  font-size: clamp(14px, 3.8vw, 18px);
   font-weight: 700;
   color: var(--pro-ink);
   text-align: left;
@@ -4889,7 +4928,7 @@
 
 .pro-cabinet-nav-stories-text {
   margin: 0;
-  font-size: clamp(9px, 1.5dvh, 11px);
+  font-size: clamp(10px, 1.5dvh, 12px);
   font-weight: 600;
   color: var(--pro-muted);
 }
@@ -4998,7 +5037,7 @@
 }
 
 .pro-cabinet-nav-client-name {
-  font-size: clamp(9px, 1.5dvh, 10px);
+  font-size: clamp(10px, 1.5dvh, 12px);
   font-weight: 700;
   color: var(--pro-ink);
   white-space: nowrap;
@@ -5007,7 +5046,7 @@
 }
 
 .pro-cabinet-nav-client-meta-text {
-  font-size: clamp(7px, 1.2dvh, 8px);
+  font-size: clamp(9px, 1.2dvh, 10px);
   font-weight: 600;
   color: var(--pro-muted);
   white-space: nowrap;
@@ -5018,7 +5057,7 @@
 .pro-cabinet-nav-client-badge {
   border-radius: 999px;
   padding: 2px 5px;
-  font-size: clamp(6px, 1.1dvh, 7px);
+  font-size: clamp(7px, 1.1dvh, 8px);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5044,6 +5083,16 @@
   display: flex;
   flex-direction: column;
   gap: clamp(3px, 0.8dvh, 4px);
+}
+
+.pro-cabinet-nav-client-empty-hint {
+  font-size: clamp(9px, 1.3dvh, 10px);
+  font-weight: 600;
+  color: var(--pro-muted);
+  border-radius: 10px;
+  border: 1px dashed rgba(var(--tile-accent), 0.26);
+  background: rgba(var(--paper-rgb), 0.6);
+  padding: 6px 8px;
 }
 
 .pro-cabinet-nav-client-meter {
@@ -5258,17 +5307,25 @@
 }
 
 .pro-cabinet-nav-meter {
-  height: clamp(40px, 6.8dvh, 52px);
+  height: 8px;
   border-radius: 999px;
-  background: transparent;
-  overflow: visible;
+  background: rgba(var(--tile-accent), 0.16);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(var(--tile-accent), 0.18);
 }
 
 .pro-cabinet-nav-meter-fill {
+  --meter: 0;
   display: block;
   height: 100%;
-  width: 100%;
-  background: no-repeat left center / contain url("/marketing-arrow.webp");
+  width: calc(var(--meter) * 1%);
+  max-width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--tile-accent), 0.92),
+    rgba(var(--tile-accent), 0.42)
+  );
 }
 
 .pro-cabinet-nav-stats {
@@ -5285,16 +5342,23 @@
 }
 
 .pro-cabinet-nav-stat-value {
-  font-size: clamp(12px, 2.4dvh, 15px);
+  font-size: clamp(14px, 2.2dvh, 16px);
   font-weight: 700;
   color: var(--pro-ink);
 }
 
 .pro-cabinet-nav-stat-label {
-  font-size: clamp(7px, 1.2dvh, 8px);
+  font-size: clamp(9px, 1.2dvh, 10px);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-cabinet-nav-note {
+  margin: 0;
+  font-size: clamp(10px, 1.4dvh, 11px);
+  font-weight: 600;
   color: var(--pro-muted);
 }
 
@@ -5306,12 +5370,18 @@
 
 .pro-cabinet-nav-pill {
   border-radius: 999px;
-  padding: 3px 7px;
-  font-size: clamp(8px, 1.3dvh, 9px);
+  padding: 4px 8px;
+  font-size: clamp(9px, 1.3dvh, 10px);
   font-weight: 700;
   border: 1px solid rgba(var(--tile-accent), 0.24);
   background: rgba(var(--tile-accent), 0.12);
   color: var(--pro-ink);
+}
+
+.pro-cabinet-nav-pill.is-alert {
+  border-color: rgba(var(--danger-rgb), 0.3);
+  background: rgba(var(--danger-rgb), 0.1);
+  color: #b64040;
 }
 
 .pro-cabinet-nav-pill.is-ghost {
