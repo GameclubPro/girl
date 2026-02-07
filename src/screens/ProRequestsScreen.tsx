@@ -3027,7 +3027,7 @@ export const ProRequestsScreen = ({
       (booking.status === 'confirmed' && Boolean(freeCancelLabel)) ||
       (!isCompact && depositPercent > 0 && depositAmount <= 0) ||
       depositAmount > 0 ||
-      (depositAmount > 0 && Boolean(depositStatusLabel))
+      (depositAmount > 0 && !showDepositStage && Boolean(depositStatusLabel))
 
     return (
       <div
@@ -3159,7 +3159,7 @@ export const ProRequestsScreen = ({
                 Депозит: {formatPrice(depositAmount)}
               </div>
             )}
-            {depositAmount > 0 && depositStatusLabel && (
+            {!showDepositStage && depositAmount > 0 && depositStatusLabel && (
               <div className="booking-item-meta booking-item-meta--chip booking-item-meta--highlight">
                 {depositStatusLabel}
               </div>

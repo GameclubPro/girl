@@ -2655,7 +2655,9 @@ export const ClientRequestsScreen = ({
                     (booking.status === 'confirmed' && !freeCancelLabel && !isPast) ||
                     (depositPercent > 0 && depositAmount <= 0) ||
                     depositAmount > 0 ||
-                    (depositAmount > 0 && Boolean(depositStatusLabel)) ||
+                    (depositAmount > 0 &&
+                      !showDepositStage &&
+                      Boolean(depositStatusLabel)) ||
                     Boolean(criticalHoldLabel)
                   const nextAction = booking.nextAction ?? null
                   const hasPrimaryBookingActions =
@@ -2791,7 +2793,9 @@ export const ClientRequestsScreen = ({
                               Депозит: {formatPrice(depositAmount)}
                             </div>
                           )}
-                          {depositAmount > 0 && depositStatusLabel && (
+                          {!showDepositStage &&
+                            depositAmount > 0 &&
+                            depositStatusLabel && (
                             <div
                               className={`booking-item-meta booking-item-meta--chip ${depositStatusTone}`}
                             >
