@@ -97,13 +97,14 @@ const getBookingStats = (bookings: Booking[]): BookingStats => {
   let lastCreatedTime: number | null = null
 
   bookings.forEach((booking) => {
+    const isCancelled = ['declined', 'cancelled'].includes(booking.status)
     if (booking.status === 'confirmed') {
       confirmed += 1
     }
     if (['pending', 'price_pending', 'price_proposed'].includes(booking.status)) {
       pending += 1
     }
-    if (['declined', 'cancelled'].includes(booking.status)) {
+    if (isCancelled) {
       cancelled += 1
     }
 
@@ -111,7 +112,7 @@ const getBookingStats = (bookings: Booking[]): BookingStats => {
     if (scheduledMs !== null) {
       if (
         scheduledMs >= now &&
-        !['declined', 'cancelled'].includes(booking.status)
+        !isCancelled
       ) {
         upcoming += 1
         if (scheduledMs < weekEnd) {
@@ -129,6 +130,8 @@ const getBookingStats = (bookings: Booking[]): BookingStats => {
         lastCreatedTime = createdMs
       }
     }
+
+    if (isCancelled) return
 
     const clientId = booking.clientId ? String(booking.clientId) : null
     if (!clientId) return

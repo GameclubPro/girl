@@ -25,6 +25,7 @@ const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on'])
 const FALSE_VALUES = new Set(['0', 'false', 'no', 'off'])
 const THEME_KEYS = new Set<ThemeMode>(['light', 'dark'])
 const PLATFORM_KEYS = new Set<PlatformMode>(['ios', 'android'])
+const TELEGRAM_USER_ID_MAX = Number.MAX_SAFE_INTEGER
 const TELEGRAM_CSS_VARS = [
   '--tg-theme-bg-color',
   '--tg-theme-text-color',
@@ -323,7 +324,11 @@ export const setupTelegramEmulator = () => {
     return
   }
 
-  const userId = clamp(parseNumber(params.get('tgUserId'), 100001), 1, 2147483647)
+  const userId = clamp(
+    parseNumber(params.get('tgUserId'), 100001),
+    1,
+    TELEGRAM_USER_ID_MAX
+  )
   const firstName = params.get('tgFirstName')?.trim() || 'Kiven'
   const lastName = params.get('tgLastName')?.trim() || 'Tester'
   const username = params.get('tgUsername')?.trim() || 'kiven_designer'

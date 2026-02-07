@@ -122,6 +122,8 @@ type MasterJourneyStep = Omit<MasterJourneyDraftStep, 'isDone'> & {
   status: MasterJourneyStepStatus
 }
 
+type ProfileLoadState = 'loading' | 'ready' | 'missing' | 'error'
+
 const toMasterJourneySteps = (draft: MasterJourneyDraftStep[]) => {
   let locked = false
   return draft.map<MasterJourneyStep>((step) => {
@@ -184,6 +186,8 @@ export const ProCabinetScreen = ({
   const [profileData, setProfileData] = useState<MasterProfile | null>(null)
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null)
   const [profileDisplayName, setProfileDisplayName] = useState('')
+  const [profileLoadState, setProfileLoadState] =
+    useState<ProfileLoadState>('loading')
   const [activeStoriesCount, setActiveStoriesCount] = useState(0)
   const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(
     null
@@ -196,6 +200,7 @@ export const ProCabinetScreen = ({
 
     const loadCabinetMeta = async () => {
       try {
+        setProfileLoadState('loading')
         const encodedUserId = encodeURIComponent(userId)
         const profileUrl = `${apiBase}/api/masters/${encodedUserId}?userId=${encodedUserId}`
         const storiesUrl = `${apiBase}/api/masters/${encodedUserId}/stories`
@@ -234,11 +239,22 @@ export const ProCabinetScreen = ({
           setShowcasePreview(previewItems)
           setProfileAvatarUrl(data.avatarUrl ?? null)
           setProfileDisplayName(data.displayName ?? '')
+          setProfileLoadState('ready')
+        } else if (
+          profileResult.status === 'fulfilled' &&
+          profileResult.value.status === 404
+        ) {
+          setProfileData(null)
+          setShowcasePreview([])
+          setProfileAvatarUrl(null)
+          setProfileDisplayName('')
+          setProfileLoadState('missing')
         } else {
           setProfileData(null)
           setShowcasePreview([])
           setProfileAvatarUrl(null)
           setProfileDisplayName('')
+          setProfileLoadState('error')
         }
 
         if (storiesResult.status === 'fulfilled' && storiesResult.value.ok) {
@@ -303,6 +319,7 @@ export const ProCabinetScreen = ({
           setShowcasePreview([])
           setProfileAvatarUrl(null)
           setProfileDisplayName('')
+          setProfileLoadState('error')
           setActiveStoriesCount(0)
           setMarketingSummary(null)
           setPromotions([])
@@ -385,12 +402,16 @@ export const ProCabinetScreen = ({
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
   const [isRoadmapCoachmarkVisible, setIsRoadmapCoachmarkVisible] =
     useState(false)
+  const isProfileMetaUnavailable = profileLoadState === 'error'
+  const isProfileMissing = profileLoadState === 'missing'
   const profileMissingFields = profileData?.missingFields ?? []
-  const hasProfileBasicsGap = profileMissingFields.some((field) =>
-    ['displayName', 'categories', 'workFormat', 'cityId', 'districtId'].includes(
-      field
+  const hasProfileBasicsGap =
+    isProfileMissing ||
+    profileMissingFields.some((field) =>
+      ['displayName', 'categories', 'workFormat', 'cityId', 'districtId'].includes(
+        field
+      )
     )
-  )
   const hasServicesConfigured = (profileData?.services?.length ?? 0) > 0
   const hasPortfolioConfigured =
     (profileData?.portfolioUrls?.length ?? 0) > 0 ||
@@ -399,11 +420,12 @@ export const ProCabinetScreen = ({
     (profileData?.scheduleDays?.length ?? 0) > 0 &&
     Boolean(profileData?.scheduleStart) &&
     Boolean(profileData?.scheduleEnd)
+  const hasScheduleEvidence = hasScheduleConfigured || bookingStats.upcoming > 0
   const isProfileReadyForFlow =
     !hasProfileBasicsGap &&
     hasServicesConfigured &&
     hasPortfolioConfigured &&
-    hasScheduleConfigured
+    hasScheduleEvidence
   const marketingReach =
     (marketingSummary?.botOptInCount ?? 0) + (marketingSummary?.chatCount ?? 0)
   const hasGrowthChannels = marketingReach > 0
@@ -420,11 +442,34 @@ export const ProCabinetScreen = ({
     let profileSubtitle = 'Основа собрана, можно стабильно принимать записи.'
     let profileActionLabel = 'Открыть профиль'
     let profileAction = () => onEditProfile()
-    if (hasProfileBasicsGap) {
+    if (isProfileMetaUnavailable) {
+      profileTitle = 'Проверьте профиль'
+      profileSubtitle = 'Синхронизация профиля недоступна, обновите экран.'
+      profileActionLabel = 'Обновить данные'
+      profileAction = refresh
+    } else if (hasProfileBasicsGap) {
+      const missingBasics = new Set(profileMissingFields)
       profileTitle = 'Заполните основу профиля'
       profileSubtitle = 'Имя, категории, формат и локация нужны для выдачи.'
       profileActionLabel = 'Заполнить основу'
       profileAction = () => onEditProfile('basic')
+      if (missingBasics.has('cityId') || missingBasics.has('districtId')) {
+        profileTitle = 'Добавьте локацию'
+        profileSubtitle = 'Укажите город и район, чтобы клиенты находили вас в выдаче.'
+        profileActionLabel = 'Указать локацию'
+      } else if (missingBasics.has('displayName')) {
+        profileTitle = 'Добавьте имя профиля'
+        profileSubtitle = 'Понятное имя повышает доверие и кликабельность.'
+        profileActionLabel = 'Заполнить имя'
+      } else if (missingBasics.has('categories')) {
+        profileTitle = 'Выберите категории'
+        profileSubtitle = 'Категории влияют на попадание в подборки и поиск.'
+        profileActionLabel = 'Выбрать категории'
+      } else if (missingBasics.has('workFormat')) {
+        profileTitle = 'Выберите формат работы'
+        profileSubtitle = 'Уточните, где принимаете: у себя, у клиента или оба формата.'
+        profileActionLabel = 'Выбрать формат'
+      }
     } else if (!hasServicesConfigured) {
       profileTitle = 'Добавьте услуги'
       profileSubtitle = 'Клиенты должны видеть понятный список услуг.'
@@ -435,7 +480,7 @@ export const ProCabinetScreen = ({
       profileSubtitle = 'Витрина повышает доверие и ускоряет выбор.'
       profileActionLabel = 'Добавить работы'
       profileAction = () => onEditProfile('portfolio')
-    } else if (!hasScheduleConfigured) {
+    } else if (!hasScheduleEvidence) {
       profileTitle = 'Подключите график'
       profileSubtitle = 'Без графика нельзя стабильно принимать записи.'
       profileActionLabel = 'Подключить график'
@@ -456,16 +501,40 @@ export const ProCabinetScreen = ({
       flowSubtitle = 'Быстрый ответ повышает шанс получить запись.'
       flowActionLabel = 'Открыть заявки'
       flowAction = onViewRequests
+    } else if (!hasScheduleEvidence && !isProfileMetaUnavailable) {
+      flowTitle = 'Подключите график'
+      flowSubtitle = 'Без графика клиенты не могут записаться на удобное время.'
+      flowActionLabel = 'Подключить график'
+      flowAction = () => onEditProfile('availability')
     } else if (bookingStats.upcomingWeek === 0) {
       flowTitle = 'На неделе пока нет записей'
-      flowSubtitle = 'Откройте календарь и добавьте окна под новые записи.'
-      flowActionLabel = 'Открыть календарь'
-      flowAction = onOpenCalendar
+      if (!hasActivePromotion && !hasGrowthChannels) {
+        flowSubtitle =
+          'График уже есть. Подключите продвижение, чтобы получить новые записи.'
+        flowActionLabel = 'Подключить продвижение'
+        flowAction = onOpenMarketing
+      } else {
+        flowSubtitle =
+          'Проверьте календарь и заявки: сейчас важнее конверсия, а не новые окна.'
+        flowActionLabel = requestStats.total > 0 ? 'Открыть заявки' : 'Открыть календарь'
+        flowAction = requestStats.total > 0 ? onViewRequests : onOpenCalendar
+      }
     } else if (bookingStats.upcomingWeek < 2) {
-      flowTitle = 'Усильте неделю до 2+ записей'
-      flowSubtitle = 'Добавьте свободные окна, чтобы ускорить поток.'
-      flowActionLabel = 'Добавить окна'
-      flowAction = onOpenCalendar
+      flowTitle = 'На неделе мало записей'
+      flowSubtitle =
+        'Усилите поток через быстрые ответы и продвижение, чтобы добрать загрузку.'
+      flowActionLabel =
+        requestStats.total > 0
+          ? 'Открыть заявки'
+          : hasActivePromotion || hasGrowthChannels
+            ? 'Открыть календарь'
+            : 'Открыть продвижение'
+      flowAction =
+        requestStats.total > 0
+          ? onViewRequests
+          : hasActivePromotion || hasGrowthChannels
+            ? onOpenCalendar
+            : onOpenMarketing
     }
 
     let growthTitle = 'Продвижение подключено'
@@ -527,7 +596,11 @@ export const ProCabinetScreen = ({
         subtitle: flowSubtitle,
         actionLabel: flowActionLabel,
         onAction: flowAction,
-        isDone: requestStats.open === 0 && bookingStats.upcomingWeek >= 2,
+        isDone:
+          requestStats.open === 0 &&
+          (bookingStats.upcomingWeek >= 2 ||
+            (bookingStats.upcomingWeek > 0 &&
+              (hasActivePromotion || hasGrowthChannels))),
       },
       {
         id: 'growth',
@@ -552,14 +625,16 @@ export const ProCabinetScreen = ({
     return toMasterJourneySteps(draftSteps)
   }, [
     bookingStats.upcomingWeek,
+    profileMissingFields,
     hasActivePromotion,
     hasGrowthChannels,
     hasProfileBasicsGap,
     hasPortfolioConfigured,
-    hasScheduleConfigured,
+    hasScheduleEvidence,
     hasServicesConfigured,
     hasStoriesPublished,
     isProfileReadyForFlow,
+    isProfileMetaUnavailable,
     onEditProfile,
     onOpenAnalytics,
     onOpenCalendar,
@@ -568,7 +643,9 @@ export const ProCabinetScreen = ({
     onOpenStories,
     onViewRequests,
     repeatClients,
+    refresh,
     requestStats.open,
+    requestStats.total,
     totalClients,
   ])
   const completedJourneySteps = journeySteps.filter(
@@ -586,12 +663,12 @@ export const ProCabinetScreen = ({
       : 'Блоки роста готовы: масштабируйте стабильный поток.'
   const nextBookingLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
-    : 'Нет ближайших записей'
+    : 'нет'
   const nextBookingCompactLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
-    : 'нет записей'
+    : 'нет'
   const overviewStatusLabel = isOfflineFallback
-    ? 'Оффлайн режим'
+    ? 'Оффлайн'
     : combinedError
       ? 'Требуется синхронизация'
     : isLoading
@@ -620,40 +697,78 @@ export const ProCabinetScreen = ({
         : activeJourneyStep.id === 'growth'
           ? onOpenCalendar
           : onOpenMarketing
+  const shouldPromptScheduleSetup =
+    !hasScheduleEvidence && !isProfileMetaUnavailable
+  const shouldPromptMarketing =
+    hasScheduleEvidence &&
+    bookingStats.upcomingWeek === 0 &&
+    !hasPendingActions &&
+    !hasActivePromotion &&
+    !hasGrowthChannels
+  const shouldFocusProfileStep =
+    !isOfflineFallback &&
+    !combinedError &&
+    !hasPendingActions &&
+    activeJourneyStep.id === 'profile' &&
+    activeJourneyStep.status === 'active'
   const focusTitle = isOfflineFallback
     ? 'Начните рабочий день'
     : combinedError
       ? 'Проверьте синхронизацию'
       : hasPendingActions
         ? `${pendingActions} задач на сейчас`
-        : bookingStats.upcomingWeek > 0
+        : shouldFocusProfileStep
+          ? activeJourneyStep.title
+        : shouldPromptScheduleSetup
+          ? 'Подключите рабочий график'
+          : bookingStats.upcomingWeek > 0
           ? 'День под контролем'
-          : 'Свободная неделя для роста'
+          : shouldPromptMarketing
+            ? 'Неделя без записей'
+            : 'Свободная неделя для роста'
   const focusSubtitle = isOfflineFallback
-    ? 'Связь нестабильна. Данные обновятся автоматически.'
+    ? 'Нет связи с сервером. Нажмите «Обновить данные».'
     : combinedError
       ? 'Обновите ленту, чтобы вернуть актуальные заявки.'
       : hasPendingActions
         ? 'Сначала закройте входящие и ожидания по записям.'
-        : bookingStats.upcomingWeek > 0
+        : shouldFocusProfileStep
+          ? activeJourneyStep.subtitle
+        : shouldPromptScheduleSetup
+          ? 'Без графика клиентам не выбрать время. Подключите расписание.'
+          : bookingStats.upcomingWeek > 0
           ? 'Проверьте окна в календаре и поддержите текущий темп.'
-          : 'Свободная неделя: выполните шаг из дорожки ниже.'
+          : shouldPromptMarketing
+            ? 'График есть, но спроса мало. Подключите продвижение и оффер.'
+            : 'Свободная неделя: выполните шаг из дорожки ниже.'
   const focusPrimaryActionLabel = isOfflineFallback
-    ? 'Обновить ленту'
+    ? 'Обновить данные'
     : combinedError
       ? 'Обновить данные'
       : hasPendingActions
         ? 'Разобрать заявки'
-        : bookingStats.upcomingWeek > 0
+        : shouldFocusProfileStep
+          ? activeJourneyStep.actionLabel
+        : shouldPromptScheduleSetup
+          ? 'Подключить график'
+          : bookingStats.upcomingWeek > 0
           ? 'Открыть календарь'
-          : activeJourneyStep.actionLabel
+          : shouldPromptMarketing
+            ? 'Подключить продвижение'
+            : activeJourneyStep.actionLabel
   const focusPrimaryAction = combinedError
     ? refresh
     : hasPendingActions
       ? onViewRequests
-      : bookingStats.upcomingWeek > 0
+      : shouldFocusProfileStep
+        ? activeJourneyStep.onAction
+      : shouldPromptScheduleSetup
+        ? () => onEditProfile('availability')
+        : bookingStats.upcomingWeek > 0
         ? onOpenCalendar
-        : activeJourneyStep.onAction
+        : shouldPromptMarketing
+          ? onOpenMarketing
+          : activeJourneyStep.onAction
   const storiesBadgeLabel = hasStoriesPublished ? 'LIVE' : 'START'
   const storiesHint = hasStoriesPublished
     ? `${activeStoriesCount} ${formatCountLabel(
@@ -677,9 +792,13 @@ export const ProCabinetScreen = ({
       : 'Новых нет'
   const calendarHintCompact = bookingStats.upcomingWeek
     ? `${bookingStats.upcomingWeek} на неделе`
-    : hasScheduleConfigured
-      ? 'Неделя пуста'
-      : 'Нужен график'
+    : shouldPromptScheduleSetup
+      ? 'Нужен график'
+      : isProfileMetaUnavailable
+        ? 'Нет данных'
+        : requestStats.total > 0
+          ? 'Есть заявки'
+          : 'Записей нет'
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -710,7 +829,9 @@ export const ProCabinetScreen = ({
               <span className="pro-cabinet-overview-stat-value">
                 {bookingStats.upcomingWeek}
               </span>
-              <span className="pro-cabinet-overview-stat-label">На неделе</span>
+              <span className="pro-cabinet-overview-stat-label">
+                Записи 7д
+              </span>
             </div>
             <div className="pro-cabinet-overview-stat">
               <span className="pro-cabinet-overview-stat-value">
@@ -827,10 +948,10 @@ export const ProCabinetScreen = ({
               </div>
               <div className="pro-cabinet-nav-pills">
                 <span className="pro-cabinet-nav-pill">
-                  На неделе {bookingStats.upcomingWeek}
+                  Записей {bookingStats.upcomingWeek}
                 </span>
                 <span className="pro-cabinet-nav-pill is-ghost">
-                  Активных {bookingStats.upcoming}
+                  Будущих {bookingStats.upcoming}
                 </span>
               </div>
               <div className="pro-cabinet-nav-inline">
@@ -840,9 +961,9 @@ export const ProCabinetScreen = ({
                 <span className="pro-cabinet-nav-inline-link">
                   {bookingStats.upcomingWeek > 0
                     ? 'Окна'
-                    : hasScheduleConfigured
-                      ? 'Неделя'
-                      : 'График'}
+                    : shouldPromptScheduleSetup || isProfileMetaUnavailable
+                      ? 'График'
+                      : 'Неделя'}
                 </span>
               </div>
             </div>
