@@ -1106,6 +1106,25 @@ body {
   gap: 2px;
 }
 
+.pro-cabinet-overview-stat.is-actionable {
+  border-color: rgba(var(--accent-rgb), 0.34);
+  background:
+    linear-gradient(
+      162deg,
+      rgba(var(--accent-rgb), 0.14),
+      rgba(var(--paper-rgb), 0.92)
+    );
+}
+
+.pro-cabinet-overview-stat.is-actionable .pro-cabinet-overview-stat-value {
+  color: var(--accent-strong);
+}
+
+.pro-cabinet-overview-stat.is-calm {
+  border-color: rgba(var(--success-rgb), 0.22);
+  background: rgba(var(--success-rgb), 0.08);
+}
+
 .pro-cabinet-overview-stat-value {
   font-size: 17px;
   font-weight: 800;
@@ -1143,6 +1162,16 @@ body {
 
 .pro-cabinet-overview-meta-short {
   display: none;
+}
+
+.pro-cabinet-overview-meta-journey-short {
+  display: none;
+}
+
+.pro-cabinet-overview-meta-pill.is-journey {
+  border-color: rgba(var(--accent-rgb), 0.22);
+  background: rgba(var(--accent-rgb), 0.1);
+  color: rgba(var(--accent-rgb), 0.92);
 }
 
 .pro-cabinet-overview-actions {
@@ -1354,6 +1383,21 @@ body {
   opacity: 0.86;
 }
 
+.pro-cabinet-roadmap-step.is-locked {
+  opacity: 0.58;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.pro-cabinet-roadmap-step.is-locked .pro-cabinet-roadmap-step-dot {
+  border-color: rgba(var(--shadow-rgb), 0.26);
+  background: rgba(var(--shadow-rgb), 0.14);
+}
+
+.pro-cabinet-roadmap-step:disabled {
+  pointer-events: none;
+}
+
 .pro-cabinet-roadmap-step.is-current {
   box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.1);
 }
@@ -1536,6 +1580,14 @@ body {
     min-width: 96px;
     padding-inline: 10px;
     font-size: 11px;
+  }
+
+  .pro-cabinet-overview-meta-journey-long {
+    display: none;
+  }
+
+  .pro-cabinet-overview-meta-journey-short {
+    display: inline;
   }
 }
 
