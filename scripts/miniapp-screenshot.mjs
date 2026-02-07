@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { chromium, devices } from 'playwright'
 
@@ -49,6 +49,15 @@ const height = toNumber(args.get('height'), 844, 640, 2000)
 const waitMs = toNumber(args.get('wait'), 1200, 0, 30000)
 const selector = args.get('selector') ?? ''
 const fullPage = toBoolean(args.get('fullPage'))
+const runtimeLibsDir = resolve(
+  args.get('runtimeLibs') ?? '.local/runtime-libs/root/usr/lib/x86_64-linux-gnu'
+)
+
+if (existsSync(runtimeLibsDir)) {
+  process.env.LD_LIBRARY_PATH = process.env.LD_LIBRARY_PATH
+    ? `${runtimeLibsDir}:${process.env.LD_LIBRARY_PATH}`
+    : runtimeLibsDir
+}
 
 mkdirSync(dirname(output), { recursive: true })
 

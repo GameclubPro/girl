@@ -10,3 +10,5 @@ uploads/
 .env.development.local
 .env.production.local
 .DS_Store
+.logs/
+.local/runtime-libs/

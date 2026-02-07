@@ -4,12 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "setup:visual": "npm install && npx playwright install chromium && ./scripts/install-runtime-libs.sh",
     "dev": "vite",
     "api": "node server/index.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "screenshot:miniapp": "node scripts/miniapp-screenshot.mjs"
+    "screenshot:miniapp": "node scripts/miniapp-screenshot.mjs",
+    "screenshot:miniapp:matrix": "node scripts/miniapp-screenshot-suite.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",
