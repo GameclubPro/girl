@@ -659,9 +659,6 @@ export const ProRequestsScreen = ({
   const [bookingActionError, setBookingActionError] = useState<
     Record<number, string>
   >({})
-  const [expandedBookingDetails, setExpandedBookingDetails] = useState<
-    Record<number, boolean>
-  >({})
   const [focusedRequestId, setFocusedRequestId] = useState<number | null>(null)
   const [focusedBookingId, setFocusedBookingId] = useState<number | null>(null)
   const pendingRequestFocusIdRef = useRef<number | null>(null)
@@ -2802,8 +2799,12 @@ export const ProRequestsScreen = ({
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
+    const cityDistrictLabel = [booking.cityName, booking.districtName]
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+      .join(' • ')
     const hasExtraDetails =
-      Boolean(booking.cityName || booking.districtName || booking.address) ||
+      Boolean(cityDistrictLabel || booking.address) ||
       Boolean(booking.comment) ||
       photoItems.length > 0
     const reschedulePending =
@@ -2825,10 +2826,7 @@ export const ProRequestsScreen = ({
       ? 'booking-item-meta--warning'
       : 'booking-item-meta--highlight'
     const isCompact = Boolean(options?.compact)
-    const isDetailsOpen = isCompact
-      ? hasExtraDetails
-      : Boolean(expandedBookingDetails[booking.id])
-    const showQuickActions = !isCompact && (booking.chatId || hasExtraDetails)
+    const showQuickActions = !isCompact && Boolean(booking.chatId)
     const nextAction = booking.nextAction ?? null
     const hasPrimaryBookingActions =
       reschedulePending ||
@@ -2962,6 +2960,44 @@ export const ProRequestsScreen = ({
             onClick={() => handleBookingActionFocus(booking)}
           />
         )}
+        {hasExtraDetails && (
+          <div className="booking-item-details">
+            {cityDistrictLabel && (
+              <div className="booking-item-detail-row">
+                <span className="booking-item-detail-label">Локация</span>
+                <span className="booking-item-detail-value">
+                  {cityDistrictLabel}
+                </span>
+              </div>
+            )}
+            {booking.locationType === 'client' && booking.address && (
+              <div className="booking-item-detail-row">
+                <span className="booking-item-detail-label">Адрес</span>
+                <span className="booking-item-detail-value">
+                  {booking.address}
+                </span>
+              </div>
+            )}
+            {booking.comment && (
+              <div className="booking-item-comment">
+                {booking.comment}
+              </div>
+            )}
+            {photoItems.length > 0 && (
+              <div className="booking-photo-strip" role="list">
+                {photoItems.map((url, index) => (
+                  <span
+                    className="booking-photo-thumb"
+                    key={`${booking.id}-${index}`}
+                    role="listitem"
+                  >
+                    <img src={url} alt="" loading="lazy" />
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {showQuickActions && (
           <div className="booking-item-actions">
             <div className="booking-action-row">
@@ -2980,34 +3016,7 @@ export const ProRequestsScreen = ({
                   Чат
                 </button>
               )}
-              {hasExtraDetails && (
-                <button
-                  className="booking-action-icon is-ghost"
-                  type="button"
-                  onClick={() =>
-                    setExpandedBookingDetails((current) => ({
-                      ...current,
-                      [booking.id]: !isDetailsOpen,
-                    }))
-                  }
-                >
-                  {isDetailsOpen ? 'Скрыть' : 'Подробнее'}
-                </button>
-              )}
             </div>
-          </div>
-        )}
-        {isDetailsOpen && (booking.cityName || booking.districtName) && (
-          <div className="booking-item-meta">
-            {booking.cityName ? booking.cityName : ''}
-            {booking.districtName
-              ? `${booking.cityName ? ' • ' : ''}${booking.districtName}`
-              : ''}
-          </div>
-        )}
-        {isDetailsOpen && booking.locationType === 'client' && booking.address && (
-          <div className="booking-item-meta">
-            Адрес: {booking.address}
           </div>
         )}
         {!isCompact && reschedulePending && (
@@ -3081,24 +3090,6 @@ export const ProRequestsScreen = ({
         )}
         {outcomeLabel && (
           <div className="booking-item-outcome">Итог: {outcomeLabel}</div>
-        )}
-        {isDetailsOpen && booking.comment && (
-          <div className="booking-item-comment">
-            {booking.comment}
-          </div>
-        )}
-        {isDetailsOpen && photoItems.length > 0 && (
-          <div className="booking-photo-strip" role="list">
-            {photoItems.map((url, index) => (
-              <span
-                className="booking-photo-thumb"
-                key={`${booking.id}-${index}`}
-                role="listitem"
-              >
-                <img src={url} alt="" loading="lazy" />
-              </span>
-            ))}
-          </div>
         )}
         {canPropose && (
           <div className="booking-price-form">

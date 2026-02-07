@@ -2943,6 +2943,17 @@
   .booking-item .booking-item-meta--primary {
     width: 100%;
   }
+
+  .booking-item-detail-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .booking-item-detail-value {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 .booking-item-outcome {
@@ -2999,6 +3010,53 @@
   background: var(--surface-muted);
   border-radius: 14px;
   padding: 8px 10px;
+}
+
+.booking-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(var(--shadow-rgb), 0.12);
+}
+
+.booking-item-detail-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.booking-item-detail-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--muted-rgb), 0.84);
+}
+
+.booking-item-detail-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.booking-item .booking-item-comment {
+  margin-top: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  max-height: 88px;
+  overflow: hidden;
+}
+
+.booking-item .booking-photo-thumb {
+  width: 50px;
+  height: 50px;
 }
 
 .booking-photo-strip {

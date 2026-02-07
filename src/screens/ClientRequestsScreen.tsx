@@ -319,9 +319,6 @@ export const ClientRequestsScreen = ({
     Record<number, string>
   >({})
   const depositInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
-  const [expandedBookingDetails, setExpandedBookingDetails] = useState<
-    Record<number, boolean>
-  >({})
   const requestsRequestIdRef = useRef(0)
   const bookingsRequestIdRef = useRef(0)
   const bookingListRef = useRef<HTMLDivElement | null>(null)
@@ -2388,11 +2385,14 @@ export const ClientRequestsScreen = ({
                   const photoItems = Array.isArray(booking.photoUrls)
                     ? booking.photoUrls
                     : []
+                  const cityDistrictLabel = [booking.cityName, booking.districtName]
+                    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+                    .filter(Boolean)
+                    .join(' • ')
                   const hasExtraDetails =
-                    Boolean(booking.cityName || booking.districtName || booking.address) ||
+                    Boolean(cityDistrictLabel || booking.address) ||
                     Boolean(booking.comment) ||
                     photoItems.length > 0
-                  const isDetailsOpen = Boolean(expandedBookingDetails[booking.id])
                   const reviewDraft = reviewDrafts[booking.id] ?? {
                     rating: 0,
                     comment: '',
@@ -2411,7 +2411,6 @@ export const ClientRequestsScreen = ({
                     : 'booking-item-meta--highlight'
                   const showActions =
                     Boolean(booking.chatId) ||
-                    hasExtraDetails ||
                     reschedulePending ||
                     actionVariant !== null
                   const hasChips =
@@ -2553,39 +2552,59 @@ export const ClientRequestsScreen = ({
                           }
                         />
                       )}
+                      {hasExtraDetails && (
+                        <div className="booking-item-details">
+                          {cityDistrictLabel && (
+                            <div className="booking-item-detail-row">
+                              <span className="booking-item-detail-label">Локация</span>
+                              <span className="booking-item-detail-value">
+                                {cityDistrictLabel}
+                              </span>
+                            </div>
+                          )}
+                          {booking.locationType === 'client' && booking.address && (
+                            <div className="booking-item-detail-row">
+                              <span className="booking-item-detail-label">Адрес</span>
+                              <span className="booking-item-detail-value">
+                                {booking.address}
+                              </span>
+                            </div>
+                          )}
+                          {booking.comment && (
+                            <div className="booking-item-comment">{booking.comment}</div>
+                          )}
+                          {photoItems.length > 0 && (
+                            <div className="booking-photo-strip" role="list">
+                              {photoItems.map((url, index) => (
+                                <span
+                                  className="booking-photo-thumb"
+                                  key={`${booking.id}-${index}`}
+                                  role="listitem"
+                                >
+                                  <img src={url} alt="" loading="lazy" />
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {showActions && (
                         <div className="booking-item-actions">
-                          {(booking.chatId || hasExtraDetails) && (
+                          {booking.chatId && (
                             <div className="booking-action-row">
-                              {booking.chatId && (
-                                <button
-                                  className="booking-action-icon is-chat"
-                                  type="button"
-                                  onClick={() => onOpenChat(booking.chatId!)}
+                              <button
+                                className="booking-action-icon is-chat"
+                                type="button"
+                                onClick={() => onOpenChat(booking.chatId!)}
+                              >
+                                <span
+                                  className="booking-action-icon-symbol"
+                                  aria-hidden="true"
                                 >
-                                  <span
-                                    className="booking-action-icon-symbol"
-                                    aria-hidden="true"
-                                  >
-                                    <IconChat />
-                                  </span>
-                                  Чат
-                                </button>
-                              )}
-                              {hasExtraDetails && (
-                                <button
-                                  className="booking-action-icon is-ghost"
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedBookingDetails((current) => ({
-                                      ...current,
-                                      [booking.id]: !isDetailsOpen,
-                                    }))
-                                  }
-                                >
-                                  {isDetailsOpen ? 'Скрыть' : 'Подробнее'}
-                                </button>
-                              )}
+                                  <IconChat />
+                                </span>
+                                Чат
+                              </button>
                             </div>
                           )}
                           {reschedulePending && (
@@ -2739,21 +2758,6 @@ export const ClientRequestsScreen = ({
                           )}
                         </div>
                       )}
-                      {isDetailsOpen && (booking.cityName || booking.districtName) && (
-                        <div className="booking-item-meta">
-                          {booking.cityName ? booking.cityName : ''}
-                          {booking.districtName
-                            ? `${booking.cityName ? ' • ' : ''}${booking.districtName}`
-                            : ''}
-                        </div>
-                      )}
-                      {isDetailsOpen &&
-                        booking.locationType === 'client' &&
-                        booking.address && (
-                          <div className="booking-item-meta">
-                            Адрес: {booking.address}
-                          </div>
-                        )}
                       {showDepositPay && (
                         <div className="booking-deposit-pay">
                           <div className="booking-deposit-row">
@@ -2875,22 +2879,6 @@ export const ClientRequestsScreen = ({
                               {depositCopyStatus[booking.id]}
                             </p>
                           )}
-                        </div>
-                      )}
-                      {isDetailsOpen && booking.comment && (
-                        <div className="booking-item-comment">{booking.comment}</div>
-                      )}
-                      {isDetailsOpen && photoItems.length > 0 && (
-                        <div className="booking-photo-strip" role="list">
-                          {photoItems.map((url, index) => (
-                            <span
-                              className="booking-photo-thumb"
-                              key={`${booking.id}-${index}`}
-                              role="listitem"
-                            >
-                              <img src={url} alt="" loading="lazy" />
-                            </span>
-                          ))}
                         </div>
                       )}
                       {reviewOpenId === booking.id && (
