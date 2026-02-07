@@ -2830,6 +2830,15 @@ export const ProRequestsScreen = ({
       : Boolean(expandedBookingDetails[booking.id])
     const showQuickActions = !isCompact && (booking.chatId || hasExtraDetails)
     const nextAction = booking.nextAction ?? null
+    const hasPrimaryBookingActions =
+      reschedulePending ||
+      canConfirmDeposit ||
+      canPropose ||
+      canAccept ||
+      canDecline ||
+      canMarkOutcome
+    const showNextActionPill =
+      Boolean(nextAction) && !isCompact && !hasPrimaryBookingActions
     const hasChips =
       Boolean(rescheduleMetaLabel) ||
       Boolean(promotionLabel) ||
@@ -2946,7 +2955,7 @@ export const ProRequestsScreen = ({
             )}
           </div>
         )}
-        {nextAction && !isCompact && (
+        {showNextActionPill && nextAction && (
           <NextActionPill
             action={nextAction}
             className="booking-action-pill"

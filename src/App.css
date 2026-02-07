@@ -2357,7 +2357,7 @@
 
 .booking-item .booking-item-aside {
   gap: 4px;
-  max-width: min(45vw, 170px);
+  max-width: min(48vw, 210px);
 }
 
 .screen--requests .booking-item-aside,
@@ -2607,9 +2607,10 @@
 }
 
 .booking-item .booking-item-head .booking-status {
-  max-width: min(100%, 164px);
+  max-width: min(100%, 190px);
   justify-self: end;
   text-align: center;
+  white-space: normal;
 }
 
 .booking-item .booking-status::before {
@@ -2912,17 +2913,31 @@
     grid-area: aside;
     width: 100%;
     max-width: none;
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'price status'
+      'trust trust';
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
     padding-top: 6px;
     border-top: 1px dashed rgba(var(--shadow-rgb), 0.12);
     text-align: left;
   }
 
+  .booking-item .booking-item-price {
+    grid-area: price;
+  }
+
   .booking-item .booking-item-head .booking-status {
-    max-width: 62%;
+    grid-area: status;
+    max-width: none;
+    justify-self: end;
+  }
+
+  .booking-item .booking-item-trust {
+    grid-area: trust;
+    justify-self: start;
   }
 
   .booking-item .booking-item-meta--primary {

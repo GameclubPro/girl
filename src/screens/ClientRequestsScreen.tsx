@@ -2425,6 +2425,10 @@ export const ClientRequestsScreen = ({
                     (depositAmount > 0 && Boolean(depositStatusLabel)) ||
                     Boolean(criticalHoldLabel)
                   const nextAction = booking.nextAction ?? null
+                  const hasPrimaryBookingActions =
+                    reschedulePending || actionVariant !== null
+                  const showNextActionPill =
+                    Boolean(nextAction) && !hasPrimaryBookingActions
 
                   return (
                     <div
@@ -2540,7 +2544,7 @@ export const ClientRequestsScreen = ({
                           )}
                         </div>
                       )}
-                      {nextAction && (
+                      {showNextActionPill && nextAction && (
                         <NextActionPill
                           action={nextAction}
                           className="booking-action-pill"
