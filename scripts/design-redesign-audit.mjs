@@ -99,6 +99,24 @@ try {
   }
 
   const capture = async (name) => {
+    await page.evaluate(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+      const selectors = [
+        '.screen',
+        '.chat-shell',
+        '.requests-shell',
+        '.pro-shell',
+      ]
+      selectors.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((node) => {
+          if (node instanceof HTMLElement) {
+            node.scrollTop = 0
+            node.scrollLeft = 0
+          }
+        })
+      })
+    })
+    await wait(220)
     await wait(500)
     await page.screenshot({ path: `${outDir}/${name}.png` })
     console.log(`saved ${name}.png`)

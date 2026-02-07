@@ -632,6 +632,20 @@ export const ClientRequestsScreen = ({
       ).length,
     [bookingItems]
   )
+  const nextBookingSummary = useMemo(() => {
+    const upcoming = bookingItems
+      .map((booking) => {
+        const timeMs = new Date(booking.scheduledAt).getTime()
+        return Number.isNaN(timeMs) ? null : { booking, timeMs }
+      })
+      .filter((item): item is { booking: Booking; timeMs: number } => item !== null)
+      .sort((a, b) => a.timeMs - b.timeMs)
+
+    const now = Date.now()
+    const next = upcoming.find((item) => item.timeMs >= now) ?? upcoming[0]
+    if (!next) return 'Нет ближайших записей'
+    return `${next.booking.serviceName} · ${formatDateTime(next.booking.scheduledAt)}`
+  }, [bookingItems])
   const depositAttentionBookings = useMemo(() => {
     const list = bookingItems.filter((booking) => {
       const usesServerActions = hasServerActions(booking)
@@ -687,6 +701,18 @@ export const ClientRequestsScreen = ({
     typeof nextDepositHoldMsLeft === 'number' &&
     nextDepositHoldMsLeft > 0 &&
     nextDepositHoldMsLeft <= CRITICAL_HOLD_MINUTES * 60 * 1000
+  const hasSyncIssues = Boolean(loadError || bookingsError)
+  const isSyncing = isLoading || isBookingsLoading
+  const requestsOverviewSubtitle =
+    activeTab === 'requests'
+      ? 'Отслеживайте отклики и быстро запускайте новые заявки.'
+      : 'Держите записи, депозиты и календарь под контролем.'
+  const requestsOverviewStatusLabel = hasSyncIssues
+    ? 'Нужна синхронизация'
+    : isSyncing
+      ? 'Синхронизируем'
+      : 'Данные актуальны'
+  const requestsOverviewPending = openRequestsCount + depositAttentionCount
   const depositSheetBooking = useMemo(
     () =>
       depositSheetBookingId === null
@@ -1680,6 +1706,60 @@ export const ClientRequestsScreen = ({
   return (
     <div className="screen screen--requests">
       <div className="requests-shell animate delay-2">
+          <section className="client-requests-overview animate delay-1">
+            <div className="client-requests-overview-copy">
+              <p className="client-requests-overview-kicker">Мои заявки</p>
+              <h1 className="client-requests-overview-title">
+                Заявки и записи
+              </h1>
+              <p className="client-requests-overview-subtitle">
+                {requestsOverviewSubtitle}
+              </p>
+            </div>
+            <div className="client-requests-overview-stats">
+              <div className="client-requests-overview-stat">
+                <span className="client-requests-overview-stat-value">
+                  {openRequestsCount}
+                </span>
+                <span className="client-requests-overview-stat-label">
+                  Активные
+                </span>
+              </div>
+              <div className="client-requests-overview-stat">
+                <span className="client-requests-overview-stat-value">
+                  {activeBookingsCount}
+                </span>
+                <span className="client-requests-overview-stat-label">
+                  Записи
+                </span>
+              </div>
+              <div className="client-requests-overview-stat">
+                <span className="client-requests-overview-stat-value">
+                  {requestsOverviewPending}
+                </span>
+                <span className="client-requests-overview-stat-label">
+                  Действия
+                </span>
+              </div>
+            </div>
+            <div className="client-requests-overview-meta">
+              <span className="client-requests-overview-meta-pill">
+                Ближайшая: {nextBookingSummary}
+              </span>
+              <span
+                className={`client-requests-overview-meta-pill${
+                  hasSyncIssues
+                    ? ' is-error'
+                    : isSyncing
+                      ? ' is-loading'
+                      : ' is-ok'
+                }`}
+              >
+                {requestsOverviewStatusLabel}
+              </span>
+            </div>
+          </section>
+
           <div className="requests-tabs" role="tablist" aria-label="Разделы">
             <button
               className={`requests-tab${activeTab === 'requests' ? ' is-active' : ''}`}
@@ -1888,6 +1968,22 @@ export const ClientRequestsScreen = ({
                     onClick={() => void loadRequests()}
                   >
                     Повторить
+                  </button>
+                </div>
+              )}
+              {loadError && items.length === 0 && (
+                <div className="requests-state-card is-empty" role="status">
+                  <p className="requests-state-title">Продолжайте поиск мастера</p>
+                  <p className="requests-state-text">
+                    Пока нет данных по откликам. Можно создать новую заявку и вернуться
+                    к ленте позже.
+                  </p>
+                  <button
+                    className="requests-state-action"
+                    type="button"
+                    onClick={onCreateRequest}
+                  >
+                    Создать заявку
                   </button>
                 </div>
               )}
@@ -2328,6 +2424,15 @@ export const ClientRequestsScreen = ({
                   >
                     Повторить
                   </button>
+                </div>
+              )}
+              {bookingsError && bookingItems.length === 0 && (
+                <div className="requests-state-card is-empty" role="status">
+                  <p className="requests-state-title">Записи появятся здесь</p>
+                  <p className="requests-state-text">
+                    Проверьте соединение и обновите экран позже. Новые подтверждения
+                    от мастеров отобразятся автоматически.
+                  </p>
                 </div>
               )}
 

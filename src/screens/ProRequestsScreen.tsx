@@ -3872,6 +3872,27 @@ export const ProRequestsScreen = ({
   const pendingActionsTotal = pendingBookingItems.length + attentionFromRequests
   const hasSyncIssues = Boolean(loadError || bookingsError)
   const isSyncing = isLoading || isBookingsLoading
+  const requestsTabLoadTitle =
+    isLoading && isBookingsLoading
+      ? 'Обновляем заявки и записи'
+      : isLoading
+        ? 'Загружаем заявки'
+        : 'Загружаем записи'
+  const requestsTabLoadText =
+    isLoading && isBookingsLoading
+      ? 'Синхронизируем отклики, календарь и статусы депозитов.'
+      : isLoading
+        ? 'Обновляем входящие заявки и отклики.'
+        : 'Сверяем записи и доступные слоты.'
+  const requestsTabErrorTitle =
+    loadError && bookingsError
+      ? 'Не удалось загрузить заявки и записи'
+      : loadError
+        ? 'Не удалось загрузить заявки'
+        : 'Не удалось загрузить записи'
+  const requestsTabErrorText = loadError && bookingsError
+    ? 'Проверьте соединение и повторите синхронизацию потока.'
+    : loadError || bookingsError
   const requestsOverviewSubtitle =
     activeTab === 'requests'
       ? 'Входящие заявки, отклики и срочные действия в одном потоке.'
@@ -4003,43 +4024,27 @@ export const ProRequestsScreen = ({
 
         {activeTab === 'requests' && (
           <>
-            {isLoading && (
+            {isSyncing && (
               <div className="requests-state-card is-loading" role="status">
-                <p className="requests-state-title">Загружаем заявки</p>
-                <p className="requests-state-text">
-                  Обновляем входящие запросы и отклики.
-                </p>
+                <p className="requests-state-title">{requestsTabLoadTitle}</p>
+                <p className="requests-state-text">{requestsTabLoadText}</p>
               </div>
             )}
-            {loadError && (
+            {hasSyncIssues && (
               <div className="requests-state-card is-error" role="alert">
-                <p className="requests-state-title">Не удалось загрузить заявки</p>
-                <p className="requests-state-text">{loadError}</p>
+                <p className="requests-state-title">{requestsTabErrorTitle}</p>
+                <p className="requests-state-text">{requestsTabErrorText}</p>
                 <button
                   className="requests-state-action"
                   type="button"
-                  onClick={() => void loadRequests({ force: true })}
-                >
-                  Повторить
-                </button>
-              </div>
-            )}
-            {isBookingsLoading && (
-              <div className="requests-state-card is-loading" role="status">
-                <p className="requests-state-title">Загружаем записи</p>
-                <p className="requests-state-text">
-                  Сверяем календарь и подтвержденные слоты.
-                </p>
-              </div>
-            )}
-            {bookingsError && (
-              <div className="requests-state-card is-error" role="alert">
-                <p className="requests-state-title">Не удалось загрузить записи</p>
-                <p className="requests-state-text">{bookingsError}</p>
-                <button
-                  className="requests-state-action"
-                  type="button"
-                  onClick={() => void loadBookings({ force: true })}
+                  onClick={() => {
+                    if (loadError) {
+                      void loadRequests({ force: true })
+                    }
+                    if (bookingsError) {
+                      void loadBookings({ force: true })
+                    }
+                  }}
                 >
                   Повторить
                 </button>
@@ -4064,7 +4069,7 @@ export const ProRequestsScreen = ({
                 </p>
               </div>
             )}
-            {showRequestsEmpty && renderShareCard()}
+            {(showRequestsEmpty || hasSyncIssues) && renderShareCard()}
 
             {items.length > 0 && (
               <div className="requests-section">
