@@ -418,6 +418,22 @@ const resolveBookingDepositStatus = (booking: Booking, depositAmount: number) =>
   booking.depositStatus ??
   (booking.status === 'confirmed' && depositAmount > 0 ? 'pending' : 'not_required')
 
+const isBookingAwaitingDepositConfirmation = (booking: Booking) => {
+  if (booking.status !== 'confirmed') return false
+  const depositAmount = resolveBookingDepositAmount(booking)
+  if (depositAmount <= 0) return false
+  const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
+  return (
+    depositStatus === 'pending' ||
+    depositStatus === 'submitted' ||
+    depositStatus === 'rejected'
+  )
+}
+
+const isBookingInRequestsPipeline = (booking: Booking) =>
+  ['pending', 'price_pending', 'price_proposed'].includes(booking.status) ||
+  isBookingAwaitingDepositConfirmation(booking)
+
 type ProRequest = ServiceRequest & {
   responseId?: number | null
   responseStatus?: string | null
@@ -842,9 +858,23 @@ export const ProRequestsScreen = ({
       autoSwitchHandledRef.current = true
       return
     }
+    const hasPipelineBookings = bookings.some((booking) =>
+      isBookingInRequestsPipeline(booking)
+    )
+    if (hasPipelineBookings) {
+      autoSwitchHandledRef.current = true
+      return
+    }
     autoSwitchHandledRef.current = true
     setActiveTab('bookings')
-  }, [activeTab, focusRequestId, loadError, requests.length, requestsFetched])
+  }, [
+    activeTab,
+    bookings,
+    focusRequestId,
+    loadError,
+    requests.length,
+    requestsFetched,
+  ])
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
     const scheduleKey = buildSlotScheduleKey(userId)
@@ -1232,11 +1262,15 @@ export const ProRequestsScreen = ({
   const items = useMemo(() => requests, [requests])
   const bookingItems = useMemo(() => bookings, [bookings])
   const pendingBookingItems = useMemo(
-    () =>
-      bookingItems.filter((booking) =>
-        ['pending', 'price_pending', 'price_proposed'].includes(booking.status)
-      ),
+    () => bookingItems.filter((booking) => isBookingInRequestsPipeline(booking)),
     [bookingItems]
+  )
+  const depositPipelineBookingsCount = useMemo(
+    () =>
+      pendingBookingItems.filter((booking) =>
+        isBookingAwaitingDepositConfirmation(booking)
+      ).length,
+    [pendingBookingItems]
   )
   const confirmedBookingItems = useMemo(
     () => bookingItems.filter((booking) => booking.status === 'confirmed'),
@@ -3705,7 +3739,7 @@ export const ProRequestsScreen = ({
                   ? 'Вы на паузе. Включите прием заявок.'
                   : missingFields.some((field) => field !== 'displayName')
                   ? 'Заполните профиль, чтобы видеть заявки рядом.'
-                  : 'Пока нет заявок и записей на подтверждении.'}
+                  : 'Пока нет заявок и записей в работе.'}
               </p>
             )}
             {showRequestsEmpty && renderShareCard()}
@@ -4119,12 +4153,17 @@ export const ProRequestsScreen = ({
               {pendingBookingItems.length > 0 && (
                 <div className="requests-section">
                   <div className="requests-section-head">
-                    <span className="requests-section-title">
-                      Записи на подтверждении
-                    </span>
-                    <span className="requests-section-count">
-                      {pendingBookingItems.length}
-                    </span>
+                    <div className="requests-section-title-group">
+                      <span className="requests-section-title">Записи в работе</span>
+                      <span className="requests-section-count">
+                        {pendingBookingItems.length}
+                      </span>
+                      {depositPipelineBookingsCount > 0 && (
+                        <span className="requests-section-count">
+                          Депозит: {depositPipelineBookingsCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <VirtualStack
                     ref={pendingBookingsVirtualRef}
