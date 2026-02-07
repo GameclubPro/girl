@@ -278,6 +278,9 @@ const hasBookingAction = (booking: Booking, actionId: BookingActionId) =>
   Array.isArray(booking.availableActions) &&
   booking.availableActions.includes(actionId)
 
+const hasServerActions = (booking: Booking) =>
+  Array.isArray(booking.availableActions)
+
 type ClientRequestsScreenProps = {
   apiBase: string
   userId: string
@@ -625,11 +628,13 @@ export const ClientRequestsScreen = ({
   )
   const depositAttentionBookings = useMemo(() => {
     const list = bookingItems.filter((booking) => {
+      const usesServerActions = hasServerActions(booking)
       const depositAmount = resolveBookingDepositAmount(booking)
       const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
       const needsDepositAction =
         hasBookingAction(booking, 'client-deposit-submit') ||
-        (booking.status === 'confirmed' &&
+        (!usesServerActions &&
+          booking.status === 'confirmed' &&
           depositAmount > 0 &&
           (depositStatus === 'pending' || depositStatus === 'rejected'))
       const isActive =
@@ -696,9 +701,11 @@ export const ClientRequestsScreen = ({
   )
   const depositSheetCanSubmit =
     depositSheetBooking !== null &&
-    depositSheetBooking.status === 'confirmed' &&
-    depositSheetAmount > 0 &&
-    (depositSheetStatus === 'pending' || depositSheetStatus === 'rejected')
+    (hasBookingAction(depositSheetBooking, 'client-deposit-submit') ||
+      (!hasServerActions(depositSheetBooking) &&
+        depositSheetBooking.status === 'confirmed' &&
+        depositSheetAmount > 0 &&
+        (depositSheetStatus === 'pending' || depositSheetStatus === 'rejected')))
   const depositSheetHoldExpiresMs = useMemo(() => {
     if (!depositSheetBooking?.depositHoldExpiresAt) return null
     const expiresMs = new Date(depositSheetBooking.depositHoldExpiresAt).getTime()
@@ -778,30 +785,33 @@ export const ClientRequestsScreen = ({
   )
   const selectedBookingsAction = useMemo(() => {
     const list = selectedBookings.filter((booking) => {
+      const usesServerActions = hasServerActions(booking)
       const depositAmount = resolveBookingDepositAmount(booking)
       const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
       const needsDeposit =
         hasBookingAction(booking, 'client-deposit-submit') ||
-        (booking.status === 'confirmed' &&
+        (!usesServerActions &&
+          booking.status === 'confirmed' &&
           depositAmount > 0 &&
           (depositStatus === 'pending' || depositStatus === 'rejected'))
       const needsPriceDecision =
         hasBookingAction(booking, 'client-accept-price') ||
-        booking.status === 'price_proposed'
+        (!usesServerActions && booking.status === 'price_proposed')
       const needsConfirmation =
         hasBookingAction(booking, 'client-cancel') ||
-        booking.status === 'pending' ||
-        booking.status === 'price_pending'
+        (!usesServerActions &&
+          (booking.status === 'pending' || booking.status === 'price_pending'))
       const needsRescheduleDecision =
         hasBookingAction(booking, 'reschedule-accept') ||
         hasBookingAction(booking, 'reschedule-decline') ||
-        Boolean(booking.rescheduleProposedTime) &&
-        booking.rescheduleProposedBy === 'master'
+        (!usesServerActions &&
+          Boolean(booking.rescheduleProposedTime) &&
+          booking.rescheduleProposedBy === 'master')
       const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
       const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
       const needsReview =
         hasBookingAction(booking, 'leave_review') ||
-        (booking.status === 'confirmed' && isPast && !booking.reviewId)
+        (!usesServerActions && booking.status === 'confirmed' && isPast && !booking.reviewId)
       return (
         needsDeposit ||
         needsPriceDecision ||
@@ -1305,6 +1315,8 @@ export const ClientRequestsScreen = ({
           ? 'Время оплаты депозита вышло, слот снят.'
           : errorCode === 'status_invalid'
             ? 'Депозит можно отправить только после подтверждения записи.'
+            : errorCode === 'deposit_proof_required'
+              ? 'Сначала загрузите чек оплаты.'
             : errorCode === 'deposit_not_required'
               ? 'Для этой записи депозит не требуется.'
               : errorCode === 'deposit_already_confirmed'
@@ -1321,6 +1333,8 @@ export const ClientRequestsScreen = ({
             ? 'Не удалось удалить запись.'
             : action === 'client-deposit-submit'
               ? depositErrorMessage
+            : action === 'client-cancel' && errorCode === 'cancel_window_open'
+              ? 'Сейчас отмена недоступна. Предложите перенос или дождитесь окна отмены.'
             : 'Не удалось обновить запись.',
       }))
     } finally {
@@ -2411,17 +2425,19 @@ export const ClientRequestsScreen = ({
                           discountPriceBefore
                         )}`
                       : ''
+                  const usesServerActions = hasServerActions(booking)
                   const canAcceptPrice =
                     hasBookingAction(booking, 'client-accept-price') ||
-                    booking.status === 'price_proposed'
+                    (!usesServerActions && booking.status === 'price_proposed')
                   const canDeclinePrice =
                     hasBookingAction(booking, 'client-decline-price') ||
-                    booking.status === 'price_proposed'
+                    (!usesServerActions && booking.status === 'price_proposed')
                   const canCancel =
                     hasBookingAction(booking, 'client-cancel') ||
-                    ['pending', 'price_pending', 'price_proposed'].includes(
-                      booking.status
-                    )
+                    (!usesServerActions &&
+                      ['pending', 'price_pending', 'price_proposed'].includes(
+                        booking.status
+                      ))
                   const timeUntilMs = getTimeUntilMs(booking.scheduledAt)
                   const isPast = typeof timeUntilMs === 'number' && timeUntilMs <= 0
                   const freeCancelUntilMs =
@@ -2435,30 +2451,39 @@ export const ClientRequestsScreen = ({
                       : ''
                   const canReschedule =
                     hasBookingAction(booking, 'reschedule-propose') ||
-                    (booking.status === 'confirmed' &&
+                    (!usesServerActions &&
+                      booking.status === 'confirmed' &&
                       typeof timeUntilMs === 'number' &&
                       timeUntilMs >= cancelWindowMs)
-                  const reschedulePending =
+                  const isFinalStatus =
+                    booking.status === 'cancelled' || booking.status === 'declined'
+                  const legacyReschedulePending =
+                    !isFinalStatus &&
                     Boolean(booking.rescheduleProposedTime) &&
                     Boolean(booking.rescheduleProposedBy)
                   const rescheduleByClient = booking.rescheduleProposedBy === 'client'
                   const canRespondReschedule =
                     hasBookingAction(booking, 'reschedule-accept') ||
                     hasBookingAction(booking, 'reschedule-decline') ||
-                    (reschedulePending && !rescheduleByClient)
+                    (!usesServerActions && legacyReschedulePending && !rescheduleByClient)
                   const canCancelReschedule =
                     hasBookingAction(booking, 'reschedule-cancel') ||
-                    (reschedulePending && rescheduleByClient)
+                    (!usesServerActions && legacyReschedulePending && rescheduleByClient)
+                  const reschedulePending = canRespondReschedule || canCancelReschedule
                   const canCancelConfirmed =
                     (hasBookingAction(booking, 'client-cancel') &&
                       booking.status === 'confirmed') ||
-                    (booking.status === 'confirmed' &&
+                    (!usesServerActions &&
+                      booking.status === 'confirmed' &&
                       typeof timeUntilMs === 'number' &&
                       timeUntilMs > 0 &&
                       (cancelWindowMs === 0 || timeUntilMs < cancelWindowMs))
                   const canLeaveReview =
                     hasBookingAction(booking, 'leave_review') ||
-                    (booking.status === 'confirmed' && isPast && !booking.reviewId)
+                    (!usesServerActions &&
+                      booking.status === 'confirmed' &&
+                      isPast &&
+                      !booking.reviewId)
                   const hasReview =
                     booking.status === 'confirmed' && isPast && Boolean(booking.reviewId)
                   const depositPercent =
@@ -2494,7 +2519,8 @@ export const ClientRequestsScreen = ({
                       : 'booking-item-meta--highlight'
                   const canSubmitDeposit =
                     hasBookingAction(booking, 'client-deposit-submit') ||
-                    (booking.status === 'confirmed' &&
+                    (!usesServerActions &&
+                      booking.status === 'confirmed' &&
                       (depositStatus === 'pending' || depositStatus === 'rejected'))
                   const showDepositPay = depositAmount > 0 && canSubmitDeposit
                   const depositHoldTimeLeft = booking.depositHoldExpiresAt
@@ -2518,8 +2544,8 @@ export const ClientRequestsScreen = ({
                       : ''
                   const canDelete =
                     hasBookingAction(booking, 'client-delete') ||
-                    booking.status === 'cancelled' ||
-                    booking.status === 'declined'
+                    (!usesServerActions &&
+                      (booking.status === 'cancelled' || booking.status === 'declined'))
                   const canRescheduleAction = canReschedule && !reschedulePending
                   const actionVariant = canDelete
                     ? 'delete'

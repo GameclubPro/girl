@@ -3071,6 +3071,12 @@ const buildBookingAvailableActions = (booking, viewerRole) => {
   if (!status) return []
 
   const actions = []
+  if (status === 'cancelled' || status === 'declined') {
+    if (role === 'client') {
+      actions.push('client-delete')
+    }
+    return actions
+  }
   const hasServicePrice =
     typeof booking.servicePrice === 'number' ||
     typeof booking.proposedPrice === 'number'
@@ -3137,9 +3143,6 @@ const buildBookingAvailableActions = (booking, viewerRole) => {
       if (cancelWindowMs === 0 || timeUntilMs < cancelWindowMs) {
         actions.push('client-cancel')
       }
-    }
-    if (status === 'cancelled' || status === 'declined') {
-      actions.push('client-delete')
     }
     const hasReviewField =
       Object.prototype.hasOwnProperty.call(booking, 'reviewId')
@@ -4007,6 +4010,10 @@ const runDepositHoldCycle = async () => {
                 cancelled_at = NOW(),
                 deposit_status = 'expired',
                 deposit_hold_expires_at = NULL,
+                reschedule_proposed_at = NULL,
+                reschedule_proposed_by = NULL,
+                reschedule_proposed_time = NULL,
+                reschedule_note = NULL,
                 updated_at = NOW()
             WHERE id = $1
           `,
@@ -10433,6 +10440,14 @@ app.patch('/api/bookings/:id', async (req, res) => {
         res.status(403).json({ error: 'forbidden' })
         return
       }
+      if (booking.status === 'declined') {
+        res.json(await withActorWorkflow({ ok: true, status: 'declined' }))
+        return
+      }
+      if (!['pending', 'price_pending', 'price_proposed'].includes(booking.status)) {
+        res.status(409).json({ error: 'status_invalid' })
+        return
+      }
 
       await pool.query(
         `
@@ -10440,6 +10455,11 @@ app.patch('/api/bookings/:id', async (req, res) => {
           SET status = 'declined',
               cancelled_by = 'master',
               cancelled_at = NOW(),
+              outcome = NULL,
+              reschedule_proposed_at = NULL,
+              reschedule_proposed_by = NULL,
+              reschedule_proposed_time = NULL,
+              reschedule_note = NULL,
               updated_at = NOW()
           WHERE id = $1
         `,
@@ -10903,6 +10923,11 @@ app.patch('/api/bookings/:id', async (req, res) => {
           SET status = 'cancelled',
               cancelled_by = 'client',
               cancelled_at = $2,
+              outcome = NULL,
+              reschedule_proposed_at = NULL,
+              reschedule_proposed_by = NULL,
+              reschedule_proposed_time = NULL,
+              reschedule_note = NULL,
               updated_at = NOW()
           WHERE id = $1
         `,
@@ -11027,12 +11052,14 @@ app.patch('/api/bookings/:id', async (req, res) => {
           return
         }
       }
-      if (normalizedDepositProofPath) {
-        const safeUserId = sanitizePathSegment(normalizedUserId)
-        if (!isSafeRequestUploadPath(safeUserId, normalizedDepositProofPath)) {
-          res.status(403).json({ error: 'deposit_proof_forbidden' })
-          return
-        }
+      if (!normalizedDepositProofPath) {
+        res.status(400).json({ error: 'deposit_proof_required' })
+        return
+      }
+      const safeUserId = sanitizePathSegment(normalizedUserId)
+      if (!isSafeRequestUploadPath(safeUserId, normalizedDepositProofPath)) {
+        res.status(403).json({ error: 'deposit_proof_forbidden' })
+        return
       }
 
       const updateResult = await pool.query(
@@ -11042,14 +11069,14 @@ app.patch('/api/bookings/:id', async (req, res) => {
               deposit_status = 'submitted',
               deposit_hold_expires_at = NULL,
               deposit_paid_at = NOW(),
-              deposit_proof_path = COALESCE($3, deposit_proof_path),
+              deposit_proof_path = $3,
               updated_at = NOW()
           WHERE id = $1
             AND status = 'confirmed'
             AND (deposit_status IN ('pending', 'rejected') OR deposit_status IS NULL)
             AND (deposit_hold_expires_at IS NULL OR deposit_hold_expires_at > NOW())
         `,
-        [bookingId, depositAmount, normalizedDepositProofPath || null]
+        [bookingId, depositAmount, normalizedDepositProofPath]
       )
       if (updateResult.rowCount === 0) {
         res.status(409).json({ error: 'hold_expired' })
@@ -11151,20 +11178,36 @@ app.patch('/api/bookings/:id', async (req, res) => {
         res.status(409).json({ error: 'status_invalid' })
         return
       }
+      if (booking.depositStatus === 'confirmed') {
+        res.json(
+          await withActorWorkflow({
+            ok: true,
+            depositStatus: 'confirmed',
+            depositHoldExpiresAt: null,
+          })
+        )
+        return
+      }
       if (booking.depositStatus !== 'submitted') {
         res.status(409).json({ error: 'deposit_status_invalid' })
         return
       }
-      await pool.query(
+      const confirmResult = await pool.query(
         `
           UPDATE service_bookings
           SET deposit_status = 'confirmed',
               deposit_hold_expires_at = NULL,
               updated_at = NOW()
           WHERE id = $1
+            AND status = 'confirmed'
+            AND deposit_status = 'submitted'
         `,
         [bookingId]
       )
+      if (confirmResult.rowCount === 0) {
+        res.status(409).json({ error: 'deposit_status_invalid' })
+        return
+      }
       try {
         const chatPayload = await createChatForBooking(
           {
@@ -11251,21 +11294,37 @@ app.patch('/api/bookings/:id', async (req, res) => {
         res.status(409).json({ error: 'status_invalid' })
         return
       }
+      if (booking.depositStatus === 'rejected') {
+        res.json(
+          await withActorWorkflow({
+            ok: true,
+            depositStatus: 'rejected',
+            depositHoldExpiresAt: booking.depositHoldExpiresAt ?? null,
+          })
+        )
+        return
+      }
       if (booking.depositStatus !== 'submitted') {
         res.status(409).json({ error: 'deposit_status_invalid' })
         return
       }
       const nextHoldExpiresAt = buildDepositHoldExpiresAt()
-      await pool.query(
+      const rejectResult = await pool.query(
         `
           UPDATE service_bookings
           SET deposit_status = 'rejected',
               deposit_hold_expires_at = $2,
               updated_at = NOW()
           WHERE id = $1
+            AND status = 'confirmed'
+            AND deposit_status = 'submitted'
         `,
         [bookingId, nextHoldExpiresAt]
       )
+      if (rejectResult.rowCount === 0) {
+        res.status(409).json({ error: 'deposit_status_invalid' })
+        return
+      }
       try {
         const chatPayload = await createChatForBooking(
           {
@@ -11860,6 +11919,21 @@ app.patch('/api/bookings/:id', async (req, res) => {
         0,
         72
       )
+      if (booking.status === 'confirmed') {
+        const scheduledMs = booking.scheduledAt
+          ? new Date(booking.scheduledAt).getTime()
+          : NaN
+        const timeUntilMs = Number.isFinite(scheduledMs) ? scheduledMs - Date.now() : NaN
+        const cancelWindowMs = cancelWindowHours * 60 * 60 * 1000
+        const canCancelConfirmed =
+          Number.isFinite(timeUntilMs) &&
+          timeUntilMs > 0 &&
+          (cancelWindowMs === 0 || timeUntilMs < cancelWindowMs)
+        if (!canCancelConfirmed) {
+          res.status(409).json({ error: 'cancel_window_open', cancelWindowHours })
+          return
+        }
+      }
       const depositPercent = clampValue(parseOptionalInt(booking.depositPercent) ?? 0, 0, 100)
       const cancelledDate = new Date()
       const cancelledAt = cancelledDate.toISOString()
@@ -11871,6 +11945,10 @@ app.patch('/api/bookings/:id', async (req, res) => {
               cancelled_by = 'client',
               cancelled_at = $2,
               outcome = NULL,
+              reschedule_proposed_at = NULL,
+              reschedule_proposed_by = NULL,
+              reschedule_proposed_time = NULL,
+              reschedule_note = NULL,
               updated_at = NOW()
           WHERE id = $1
         `,
@@ -11998,6 +12076,10 @@ app.patch('/api/bookings/:id', async (req, res) => {
                 cancelled_by = COALESCE(cancelled_by, 'client'),
                 cancelled_at = COALESCE(cancelled_at, $2),
                 outcome = NULL,
+                reschedule_proposed_at = NULL,
+                reschedule_proposed_by = NULL,
+                reschedule_proposed_time = NULL,
+                reschedule_note = NULL,
                 updated_at = NOW()
             WHERE id = $1
           `,

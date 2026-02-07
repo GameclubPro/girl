@@ -423,6 +423,9 @@ const hasBookingAction = (booking: Booking, actionId: BookingActionId) =>
   Array.isArray(booking.availableActions) &&
   booking.availableActions.includes(actionId)
 
+const hasServerActions = (booking: Booking) =>
+  Array.isArray(booking.availableActions)
+
 const isBookingAwaitingDepositConfirmation = (booking: Booking) => {
   if (
     booking.workflowStage === 'confirmed_deposit_pending' ||
@@ -2866,16 +2869,19 @@ export const ProRequestsScreen = ({
             discountPriceBefore
           )}`
         : ''
+    const usesServerActions = hasServerActions(booking)
     const canAccept =
       hasBookingAction(booking, 'master-accept') ||
-      (booking.status === 'pending' && hasServicePrice)
+      (!usesServerActions && booking.status === 'pending' && hasServicePrice)
     const canPropose =
       hasBookingAction(booking, 'master-propose-price') ||
-      (!hasServicePrice &&
+      (!usesServerActions &&
+        !hasServicePrice &&
         ['pending', 'price_pending', 'price_proposed'].includes(booking.status))
     const canDecline =
       hasBookingAction(booking, 'master-decline') ||
-      ['pending', 'price_pending', 'price_proposed'].includes(booking.status)
+      (!usesServerActions &&
+        ['pending', 'price_pending', 'price_proposed'].includes(booking.status))
     const isActionLoading = bookingActionId !== null
     const isCurrentActionLoading = bookingActionId === booking.id
     const draftPrice = bookingDrafts[booking.id] ?? ''
@@ -2883,7 +2889,8 @@ export const ProRequestsScreen = ({
     const clientInitials = getInitials(clientName)
     const outcomeLabel = formatOutcomeLabel(booking.outcome, booking.lateMinutes)
     const canMarkOutcome =
-      hasBookingAction(booking, 'set-outcome') || isOutcomePending(booking)
+      hasBookingAction(booking, 'set-outcome') ||
+      (!usesServerActions && isOutcomePending(booking))
     const depositPercent =
       typeof booking.depositPercent === 'number'
         ? Math.max(0, Math.round(booking.depositPercent))
@@ -2908,7 +2915,7 @@ export const ProRequestsScreen = ({
                   : ''
     const canConfirmDeposit =
       hasBookingAction(booking, 'master-deposit-confirm') ||
-      depositStatus === 'submitted'
+      (!usesServerActions && depositStatus === 'submitted')
     const photoItems = Array.isArray(booking.photoUrls)
       ? booking.photoUrls
       : []
@@ -2920,12 +2927,21 @@ export const ProRequestsScreen = ({
       Boolean(cityDistrictLabel || booking.address) ||
       Boolean(booking.comment) ||
       photoItems.length > 0
-    const reschedulePending =
+    const isFinalStatus =
+      booking.status === 'cancelled' || booking.status === 'declined'
+    const legacyReschedulePending =
+      !isFinalStatus &&
       Boolean(booking.rescheduleProposedTime) &&
       Boolean(booking.rescheduleProposedBy)
     const rescheduleByMaster = booking.rescheduleProposedBy === 'master'
-    const canRespondReschedule = reschedulePending && !rescheduleByMaster
-    const canCancelReschedule = reschedulePending && rescheduleByMaster
+    const canRespondReschedule =
+      hasBookingAction(booking, 'reschedule-accept') ||
+      hasBookingAction(booking, 'reschedule-decline') ||
+      (!usesServerActions && legacyReschedulePending && !rescheduleByMaster)
+    const canCancelReschedule =
+      hasBookingAction(booking, 'reschedule-cancel') ||
+      (!usesServerActions && legacyReschedulePending && rescheduleByMaster)
+    const reschedulePending = canRespondReschedule || canCancelReschedule
     const rescheduleMetaLabel = reschedulePending
       ? rescheduleByMaster
         ? rescheduleLabel
@@ -3443,18 +3459,31 @@ export const ProRequestsScreen = ({
     } catch (error) {
       const errorCode = error instanceof Error ? error.message : ''
       const shouldResyncBookings =
-        action === 'master-accept' &&
-        (errorCode === 'status_invalid' || errorCode === 'server_error')
+        (action === 'master-accept' &&
+          (errorCode === 'status_invalid' || errorCode === 'server_error')) ||
+        ((action === 'master-deposit-confirm' || action === 'master-deposit-reject') &&
+          (errorCode === 'status_invalid' ||
+            errorCode === 'deposit_status_invalid' ||
+            errorCode === 'server_error'))
       if (shouldResyncBookings) {
         void loadBookings({ silent: true, force: true })
       }
       const message =
-        errorCode === 'deposit_status_invalid'
-          ? 'Чек уже обработан. Обновите список.'
+        errorCode === 'deposit_status_invalid' &&
+        (action === 'master-deposit-confirm' || action === 'master-deposit-reject')
+          ? 'Чек уже обработан. Синхронизируем список.'
+          : errorCode === 'deposit_status_invalid'
+            ? 'Депозит уже обновлён. Проверьте карточку.'
           : errorCode === 'status_invalid' && action === 'master-accept'
             ? 'Запись уже обновлена. Синхронизируем список.'
+            : errorCode === 'status_invalid' &&
+                (action === 'master-deposit-confirm' || action === 'master-deposit-reject')
+              ? 'Статус депозита уже изменился. Синхронизируем список.'
             : errorCode === 'server_error' && action === 'master-accept'
               ? 'Проверяем статус подтверждения...'
+              : errorCode === 'server_error' &&
+                  (action === 'master-deposit-confirm' || action === 'master-deposit-reject')
+                ? 'Проверяем обновление депозита...'
           : errorCode === 'status_invalid'
             ? 'Действие недоступно в текущем статусе.'
             : 'Не удалось обновить запись.'
