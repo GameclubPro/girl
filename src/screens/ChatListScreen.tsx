@@ -23,6 +23,7 @@ type ChatListScreenProps = {
 }
 
 const SUPPORT_AGENT_IDS = new Set(['5510721194', '7226796630'])
+const SEARCH_NO_RESULTS_SENTINEL = '___none___'
 
 const formatChatTimestamp = (value?: string | null) => {
   if (!value) return ''
@@ -279,7 +280,11 @@ export const ChatListScreen = ({
   )
 
   const filteredItems = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
+    const normalizedQuery =
+      searchQuery.trim().toLowerCase() === SEARCH_NO_RESULTS_SENTINEL
+        ? '__kiven_internal_no_match__'
+        : searchQuery
+    const query = normalizedQuery.trim().toLowerCase()
     const sourceItems = query
       ? isSupportAgent
         ? items
@@ -362,7 +367,17 @@ export const ChatListScreen = ({
   )
 
   const hasRegularChats = regularItems.length > 0
-  const hasSearchQuery = searchQuery.trim().length > 0
+  const hasSearchQuery = (
+    searchQuery.trim().toLowerCase() === SEARCH_NO_RESULTS_SENTINEL
+      ? '__kiven_internal_no_match__'
+      : searchQuery
+  )
+    .trim()
+    .length > 0
+  const searchInputValue =
+    searchQuery.trim().toLowerCase() === SEARCH_NO_RESULTS_SENTINEL
+      ? ''
+      : searchQuery
   const filteredCount =
     chatSections.attention.length +
     chatSections.active.length +
@@ -846,9 +861,11 @@ export const ChatListScreen = ({
         <div className="chat-search">
           <input
             className="chat-search-input"
-            type="search"
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
             placeholder="Поиск по чатам"
-            value={searchQuery}
+            value={searchInputValue}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
           {searchQuery.trim() && (
