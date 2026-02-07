@@ -90,6 +90,38 @@ npm run screenshot:design-redesign -- --width 430 --height 932 --outDir .logs/de
 
 Аналогично для `after` с отдельными директориями.
 
+### 5.1) Fullscreen visual-audit пайплайн (обязательно для сложных UI-итераций)
+- Для ускорения отладки агент должен использовать автоматизированный fullscreen-пайплайн Telegram Mini App (matrix + compare + cleanup).
+- Базовый цикл:
+```bash
+npm run visual:setup
+npm run visual:capture:baseline -- --session pro-cabinet --userId 5510721194
+# ...внести изменения...
+npm run visual:capture:after -- --session pro-cabinet --userId 5510721194
+npm run visual:compare -- --session pro-cabinet
+```
+- Где смотреть результат:
+  - baseline: `.logs/visual-audit/<session>/baseline`
+  - after: `.logs/visual-audit/<session>/after`
+  - отчеты и side-by-side compare: `.logs/visual-audit/<session>/report/SUMMARY.md`
+- Скрипт сравнения сохраняет:
+  - `summary.json` с метриками визуальной дельты;
+  - side-by-side PNG для каждого экрана и размера.
+- Для быстрого smoke-прохода допускается:
+```bash
+npm run visual:workflow -- --session smoke-pro-cabinet --userId 5510721194
+```
+
+### 5.2) Очистка старых скриншотов (обязательно)
+- Чтобы `.logs` не разрастался, после итераций запускать cleanup:
+```bash
+npm run visual:cleanup -- --maxAgeDays 7 --keepLatest 30
+```
+- Для безопасной проверки без удаления:
+```bash
+npm run visual:cleanup -- --dryRun 1 --maxAgeDays 7 --keepLatest 30
+```
+
 ## 6) Правила оценки качества дизайна (0–100, строго)
 Оценка делается по взвешенной модели:
 - 25 баллов: визуальная иерархия, читаемость и ясность CTA;

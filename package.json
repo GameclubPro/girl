@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup:visual": "npm install && npx playwright install chromium && ./scripts/install-runtime-libs.sh",
+    "visual:setup": "npx playwright install chromium && ./scripts/install-runtime-libs.sh",
     "dev": "vite",
     "api": "node server/index.js",
     "build": "tsc -b && vite build",
@@ -16,7 +17,12 @@
     "screenshot:booking-item:matrix": "node scripts/booking-item-autoshot-suite.mjs",
     "screenshot:deposit-sheet": "node scripts/deposit-sheet-autoshot.mjs",
     "screenshot:deposit-sheet:matrix": "node scripts/deposit-sheet-autoshot-suite.mjs",
-    "screenshot:design-redesign": "node scripts/design-redesign-audit.mjs"
+    "screenshot:design-redesign": "node scripts/design-redesign-audit.mjs",
+    "visual:capture:baseline": "node scripts/miniapp-visual-audit.mjs --mode capture --stage baseline",
+    "visual:capture:after": "node scripts/miniapp-visual-audit.mjs --mode capture --stage after",
+    "visual:compare": "node scripts/miniapp-visual-audit.mjs --mode compare",
+    "visual:workflow": "node scripts/miniapp-visual-audit.mjs --mode workflow",
+    "visual:cleanup": "node scripts/cleanup-visual-logs.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",

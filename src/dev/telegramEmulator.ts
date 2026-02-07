@@ -226,6 +226,11 @@ export const setupTelegramEmulator = () => {
 
   const targetWidth = clamp(parseNumber(params.get('tgWidth'), 393), 320, 430)
   const targetHeight = clamp(parseNumber(params.get('tgHeight'), 852), 640, 1080)
+  const expandedToggle = parseBoolean(params.get('tgExpanded'))
+  const fullscreenToggle = parseBoolean(params.get('tgFullscreen'))
+  const shouldStartFullscreen = fullscreenToggle ?? false
+  const shouldStartExpanded = expandedToggle ?? true
+  const shouldStartExpandedState = shouldStartExpanded || shouldStartFullscreen
   const statusHeight = platformMode === 'ios' ? 20 : 24
   const topBarHeight = platformMode === 'ios' ? 44 : 48
   const safeDefaults =
@@ -537,7 +542,7 @@ export const setupTelegramEmulator = () => {
     platform: platformMode,
     version: '9.9',
     colorScheme: themePreset.mode,
-    isExpanded: true,
+    isExpanded: shouldStartExpandedState,
     isClosingConfirmationEnabled: false,
     viewportHeight: window.innerHeight,
     viewportStableHeight: window.innerHeight,
@@ -571,6 +576,13 @@ export const setupTelegramEmulator = () => {
     offEvent: (eventType, callback) => {
       eventListeners.get(eventType)?.delete(callback)
     },
+  }
+
+  if (shouldStartExpandedState) {
+    body.classList.add('tg-emulator-expanded')
+  }
+  if (shouldStartFullscreen) {
+    body.classList.add('tg-emulator-fullscreen')
   }
 
   const updateViewportMetrics = () => {
