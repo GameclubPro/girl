@@ -383,6 +383,12 @@ export const ProCabinetScreen = ({
   )
   const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
+  const roadmapCoachmarkStorageKey = useMemo(
+    () => `kiven-pro-roadmap-coachmark:${userId}`,
+    [userId]
+  )
+  const [isRoadmapCoachmarkVisible, setIsRoadmapCoachmarkVisible] =
+    useState(false)
   const profileMissingFields = profileData?.missingFields ?? []
   const hasProfileBasicsGap = profileMissingFields.some((field) =>
     ['displayName', 'categories', 'workFormat', 'cityId', 'districtId'].includes(
@@ -692,6 +698,28 @@ export const ProCabinetScreen = ({
     : hasScheduleConfigured
       ? 'Окна открыты, записей пока нет'
       : 'Подключите график'
+  useEffect(() => {
+    if (!userId) return
+    try {
+      const isSeen = window.localStorage.getItem(roadmapCoachmarkStorageKey) === '1'
+      setIsRoadmapCoachmarkVisible(!isSeen)
+    } catch (error) {
+      setIsRoadmapCoachmarkVisible(false)
+    }
+  }, [roadmapCoachmarkStorageKey, userId])
+  useEffect(() => {
+    if (completedJourneySteps >= journeySteps.length) {
+      setIsRoadmapCoachmarkVisible(false)
+    }
+  }, [completedJourneySteps, journeySteps.length])
+  const dismissRoadmapCoachmark = () => {
+    setIsRoadmapCoachmarkVisible(false)
+    try {
+      window.localStorage.setItem(roadmapCoachmarkStorageKey, '1')
+    } catch (error) {
+      // ignore storage errors
+    }
+  }
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -739,9 +767,6 @@ export const ProCabinetScreen = ({
               <span className="pro-cabinet-overview-meta-short">
                 Запись: {nextBookingCompactLabel}
               </span>
-            </span>
-            <span className="pro-cabinet-overview-meta-pill">
-              Дорожка: {completedJourneySteps}/{journeySteps.length}
             </span>
           </div>
           <div className="pro-cabinet-overview-actions">
@@ -873,6 +898,20 @@ export const ProCabinetScreen = ({
               {activeJourneyStep.subtitle}
             </p>
           </div>
+          {isRoadmapCoachmarkVisible ? (
+            <div className="pro-cabinet-roadmap-coachmark" role="status">
+              <span className="pro-cabinet-roadmap-coachmark-text">
+                Двигайтесь по шагам слева направо, чтобы стабилизировать поток.
+              </span>
+              <button
+                className="pro-cabinet-roadmap-coachmark-action"
+                type="button"
+                onClick={dismissRoadmapCoachmark}
+              >
+                Понятно
+              </button>
+            </div>
+          ) : null}
           <div className="pro-cabinet-roadmap-meter" aria-hidden="true">
             <span
               className="pro-cabinet-roadmap-meter-fill"
@@ -881,21 +920,17 @@ export const ProCabinetScreen = ({
           </div>
           <div className="pro-cabinet-roadmap-steps">
             {journeySteps.map((step) => (
-              <div
+              <button
                 className={`pro-cabinet-roadmap-step is-${step.status}${
                   step.id === activeJourneyStep.id ? ' is-current' : ''
                 }`}
                 key={step.id}
+                type="button"
+                onClick={step.onAction}
               >
                 <span className="pro-cabinet-roadmap-step-label">{step.chipLabel}</span>
-                <span className="pro-cabinet-roadmap-step-state">
-                  {step.status === 'done'
-                    ? 'Готово'
-                    : step.status === 'active'
-                      ? 'Сейчас'
-                      : 'Далее'}
-                </span>
-              </div>
+                <span className="pro-cabinet-roadmap-step-dot" aria-hidden="true" />
+              </button>
             ))}
           </div>
           <div className="pro-cabinet-next-step-actions">
