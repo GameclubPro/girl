@@ -261,6 +261,9 @@ export const ProCabinetScreen = ({
   const nextBookingLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
     : 'Нет ближайших слотов'
+  const nextBookingCompactLabel = bookingStats.nextBookingTime
+    ? formatShortDate(new Date(bookingStats.nextBookingTime))
+    : 'нет'
   const overviewStatusLabel = isOfflineFallback
     ? 'Оффлайн режим'
     : combinedError
@@ -419,7 +422,12 @@ export const ProCabinetScreen = ({
           </div>
           <div className="pro-cabinet-overview-meta">
             <span className="pro-cabinet-overview-meta-pill">
-              Ближайший слот: {nextBookingLabel}
+              <span className="pro-cabinet-overview-meta-long">
+                Ближайший слот: {nextBookingLabel}
+              </span>
+              <span className="pro-cabinet-overview-meta-short">
+                Слот: {nextBookingCompactLabel}
+              </span>
             </span>
           </div>
           <div className="pro-cabinet-overview-actions">
