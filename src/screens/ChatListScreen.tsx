@@ -280,28 +280,34 @@ export const ChatListScreen = ({
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    const byQuery = query
-      ? regularItems.filter((item) => {
-          const latestContext = getLatestContext(item)
-          const serviceName =
-            latestContext?.serviceName ||
-            item.request?.serviceName ||
-            item.booking?.serviceName ||
-            ''
-          const contextNames = Array.isArray(item.contexts)
-            ? item.contexts
-                .map((context) => context.serviceName)
-                .filter(Boolean)
-                .join(' ')
-            : ''
-          const lastMessage = item.lastMessage?.body ?? ''
-          const haystack =
-            `${item.counterpart.name} ${serviceName} ${contextNames} ${lastMessage}`.toLowerCase()
-          return haystack.includes(query)
-        })
+    const sourceItems = query
+      ? isSupportAgent
+        ? items
+        : supportChat
+          ? [supportChat, ...regularItems]
+          : regularItems
       : regularItems
-    return byQuery
-  }, [regularItems, searchQuery])
+    if (!query) return sourceItems
+    return sourceItems.filter((item) => {
+      const latestContext = getLatestContext(item)
+      const serviceName =
+        latestContext?.serviceName ||
+        item.request?.serviceName ||
+        item.booking?.serviceName ||
+        ''
+      const contextNames = Array.isArray(item.contexts)
+        ? item.contexts
+            .map((context) => context.serviceName)
+            .filter(Boolean)
+            .join(' ')
+        : ''
+      const supportLabel = item.contextType === 'support' ? 'поддержка kiven' : ''
+      const lastMessage = item.lastMessage?.body ?? ''
+      const haystack =
+        `${item.counterpart.name} ${supportLabel} ${serviceName} ${contextNames} ${lastMessage}`.toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [isSupportAgent, items, regularItems, searchQuery, supportChat])
 
   const chatSections = useMemo(() => {
     const attention: ChatSummary[] = []
@@ -356,6 +362,7 @@ export const ChatListScreen = ({
   )
 
   const hasRegularChats = regularItems.length > 0
+  const hasSearchQuery = searchQuery.trim().length > 0
   const filteredCount =
     chatSections.attention.length +
     chatSections.active.length +
@@ -363,12 +370,12 @@ export const ChatListScreen = ({
     chatSections.archived.length
   const attentionCount = chatSections.attention.length
   const showSupportPinned = Boolean(
-    !isSupportAgent && !searchQuery.trim() && (supportChat || onOpenSupport)
+    !isSupportAgent && !hasSearchQuery && (supportChat || onOpenSupport)
   )
   const chatOverviewSubtitle =
     filteredCount > 0
       ? `${filteredCount} ${filteredCount === 1 ? 'диалог' : filteredCount < 5 ? 'диалога' : 'диалогов'} в работе`
-      : 'Диалоги появятся после подтверждения заявки или записи'
+      : 'Чаты появятся после подтверждения заявки или записи'
 
   const loadChats = useCallback(
     async (options?: { silent?: boolean; includeContexts?: boolean }) => {
@@ -881,14 +888,14 @@ export const ChatListScreen = ({
             ))}
           </div>
         )}
-        {!isLoading && !loadError && !hasRegularChats && (
+        {!isLoading && !loadError && !hasSearchQuery && !hasRegularChats && (
           <div className="chat-empty">
             <div className="chat-empty-icon">
               <IconChat />
             </div>
             <h2>Диалоги появятся после подтверждения</h2>
             <p>
-              Поддержка доступна всегда, а чаты с клиентами появятся после
+              Поддержка доступна всегда. Чаты с клиентами появятся после
               подтверждения заявки или записи.
             </p>
             {onViewRequests && (
@@ -906,11 +913,11 @@ export const ChatListScreen = ({
         )}
         {!isLoading &&
           !loadError &&
-          hasRegularChats &&
+          hasSearchQuery &&
           filteredCount === 0 && (
             <div className="chat-empty is-compact">
               <h2>Ничего не найдено</h2>
-              <p>Попробуйте изменить фильтр или запрос.</p>
+              <p>Измените запрос или откройте все чаты.</p>
             </div>
           )}
 
