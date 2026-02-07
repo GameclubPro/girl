@@ -643,6 +643,14 @@ export const ClientScreen = ({
     : undefined
   const storyAvatarWidths = useMemo(() => [58, 116], [])
   const storyAvatarQuality = 72
+  const storiesCount = storyGroups.length
+  const homeSummaryLabel = activeCategoryId
+    ? `Категория: ${categoryPillLabel}`
+    : 'Выберите категорию услуг'
+  const storiesSummaryLabel =
+    storiesCount > 0
+      ? `${storiesCount} ${storiesCount === 1 ? 'мастер' : storiesCount < 5 ? 'мастера' : 'мастеров'} со сторис`
+      : 'Пока нет сторис рядом'
 
   const formatStoryRole = (categories: string[] | undefined) => {
     const primary = categories?.[0]
@@ -713,6 +721,20 @@ export const ClientScreen = ({
         <div className="client-brand">KIVEN</div>
       </header>
       <div className="client-shell">
+        <section className="client-home-hero animate delay-1">
+          <div className="client-home-hero-head">
+            <p className="client-home-kicker">{greetingText}</p>
+            <h1 className="client-home-title">Подбор мастеров на сегодня</h1>
+            <p className="client-home-subtitle">
+              Быстрый доступ к категориям, витрине и актуальным сторис.
+            </p>
+          </div>
+          <div className="client-home-meta">
+            <span className="client-home-meta-pill">{homeSummaryLabel}</span>
+            <span className="client-home-meta-pill">{storiesSummaryLabel}</span>
+          </div>
+        </section>
+
         <div className="client-category-row">
           <button
             className={`client-category-pill${
@@ -743,7 +765,7 @@ export const ClientScreen = ({
           </button>
         </div>
 
-        <section className="client-section">
+        <section className="client-section animate delay-2">
           <div className="client-showcase-card">
             <div className="client-showcase-content">
               <span className="client-showcase-badge">✨ Вдохновение</span>
@@ -796,7 +818,7 @@ export const ClientScreen = ({
           </div>
         </section>
 
-        <section className="client-section">
+        <section className="client-section animate delay-3">
           <div className="section-header">
             <h3>Подборки для вас</h3>
             <button
@@ -811,7 +833,7 @@ export const ClientScreen = ({
           <CollectionCarousel onSelect={handleCollectionSelect} />
         </section>
 
-        <section className="client-section">
+        <section className="client-section animate delay-4">
           <div className="cta-row">
             <button className="cta cta--secondary" type="button" onClick={onViewMasters}>
               <span className="cta-icon cta-icon--ghost" aria-hidden="true">
@@ -832,7 +854,7 @@ export const ClientScreen = ({
           </div>
         </section>
 
-        <section className="client-section client-section--stories">
+        <section className="client-section client-section--stories animate delay-5">
           <div className="section-header">
             <h3>Сторис от мастеров</h3>
           </div>

@@ -361,9 +361,14 @@ export const ChatListScreen = ({
     chatSections.active.length +
     chatSections.waiting.length +
     chatSections.archived.length
+  const attentionCount = chatSections.attention.length
   const showSupportPinned = Boolean(
     !isSupportAgent && !searchQuery.trim() && (supportChat || onOpenSupport)
   )
+  const chatOverviewSubtitle =
+    filteredCount > 0
+      ? `${filteredCount} ${filteredCount === 1 ? 'диалог' : filteredCount < 5 ? 'диалога' : 'диалогов'} в работе`
+      : 'Диалоги появятся после подтверждения заявки или записи'
 
   const loadChats = useCallback(
     async (options?: { silent?: boolean; includeContexts?: boolean }) => {
@@ -774,6 +779,21 @@ export const ChatListScreen = ({
   return (
     <div className="screen screen--chat-list">
       <div className="chat-shell">
+        <header className="chat-overview">
+          <div className="chat-overview-copy">
+            <p className="chat-overview-kicker">
+              {role === 'pro' ? 'Кабинет мастера' : 'Клиентский кабинет'}
+            </p>
+            <h1 className="chat-overview-title">Чаты</h1>
+            <p className="chat-overview-subtitle">{chatOverviewSubtitle}</p>
+          </div>
+          {attentionCount > 0 && (
+            <span className="chat-overview-badge">
+              Нужен ответ: {attentionCount}
+            </span>
+          )}
+        </header>
+
         {showSupportPinned && supportChat && (
           <div className="chat-pinned">
             {renderChatCard(supportChat)}
