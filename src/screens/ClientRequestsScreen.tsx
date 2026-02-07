@@ -2360,9 +2360,9 @@ export const ClientRequestsScreen = ({
                     className="requests-list booking-list"
                     getItemKey={(item: Booking) => item.id}
                     renderItem={(booking: Booking) => {
-                  const statusLabel =
+                  const statusLabelBase =
                     bookingStatusLabelMap[booking.status] ?? booking.status
-                  const statusTone =
+                  const statusToneBase =
                     bookingStatusToneMap[booking.status] ?? 'is-waiting'
                   const locationLabel =
                     locationLabelMap[booking.locationType] ?? 'Не важно'
@@ -2548,6 +2548,56 @@ export const ClientRequestsScreen = ({
                     isHoldCritical && depositHoldTimeLeft
                       ? `Критично: осталось ${depositHoldTimeLeft}`
                       : ''
+                  const showDepositStage =
+                    depositAmount > 0 &&
+                    booking.status === 'confirmed' &&
+                    ['pending', 'rejected', 'submitted'].includes(depositStatus)
+                  const depositStageTone =
+                    depositStatus === 'submitted'
+                      ? 'is-waiting'
+                      : depositStatus === 'rejected'
+                        ? 'is-alert'
+                        : 'is-alert'
+                  const depositStageStepLabel =
+                    depositStatus === 'submitted' ? 'Шаг 3 из 3' : 'Шаг 2 из 3'
+                  const depositStageTitle =
+                    depositStatus === 'submitted'
+                      ? 'Чек на проверке у мастера'
+                      : depositStatus === 'rejected'
+                        ? 'Чек отклонён, нужна повторная отправка'
+                        : 'Нужно оплатить депозит'
+                  const depositStageDescription =
+                    depositStatus === 'submitted'
+                      ? 'Ожидайте подтверждения. Запись остаётся в активных до проверки.'
+                      : depositStatus === 'rejected'
+                        ? depositHoldTimeLeft
+                          ? `Загрузите новый чек. Слот удерживается ещё ${depositHoldTimeLeft}.`
+                          : 'Загрузите новый чек, чтобы мастер подтвердил запись.'
+                        : depositHoldTimeLeft
+                          ? `Оплатите депозит и загрузите чек. Слот удерживается ещё ${depositHoldTimeLeft}.`
+                          : 'Оплатите депозит и загрузите чек, после этого мастер подтвердит запись.'
+                  const statusLabel =
+                    booking.status === 'confirmed' && depositAmount > 0
+                      ? depositStatus === 'submitted'
+                        ? 'Чек на проверке'
+                        : depositStatus === 'rejected'
+                          ? 'Нужен новый чек'
+                          : depositStatus === 'pending'
+                            ? 'Ожидает депозит'
+                            : statusLabelBase
+                      : statusLabelBase
+                  const statusTone =
+                    booking.status === 'confirmed' && depositAmount > 0
+                      ? depositStatus === 'submitted' ||
+                        depositStatus === 'rejected' ||
+                        depositStatus === 'pending'
+                        ? 'is-waiting'
+                        : statusToneBase
+                      : statusToneBase
+                  const depositPrimaryActionLabel =
+                    depositStatus === 'rejected'
+                      ? 'Отправить чек повторно'
+                      : 'Оплатить и отправить чек'
                   const canDelete =
                     hasBookingAction(booking, 'client-delete') ||
                     (!usesServerActions &&
@@ -2682,6 +2732,21 @@ export const ClientRequestsScreen = ({
                               {distanceLabel}
                             </span>
                           )}
+                        </div>
+                      )}
+                      {showDepositStage && (
+                        <div className={`booking-deposit-stage ${depositStageTone}`}>
+                          <div className="booking-deposit-stage-head">
+                            <span className="booking-deposit-stage-title">
+                              {depositStageTitle}
+                            </span>
+                            <span className="booking-deposit-stage-step">
+                              {depositStageStepLabel}
+                            </span>
+                          </div>
+                          <p className="booking-deposit-stage-text">
+                            {depositStageDescription}
+                          </p>
                         </div>
                       )}
                       {hasChips && (
@@ -2946,7 +3011,7 @@ export const ClientRequestsScreen = ({
                             onClick={() => handleOpenDepositSheet(booking)}
                             disabled={isActionLoading}
                           >
-                            Оплатить депозит
+                            {depositPrimaryActionLabel}
                           </button>
                           {booking.chatId && (
                             <button

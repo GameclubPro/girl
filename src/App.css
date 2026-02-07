@@ -2787,6 +2787,80 @@
   max-width: 100%;
 }
 
+.booking-deposit-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--surface-muted-rgb), 0.72);
+  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.72);
+}
+
+.booking-deposit-stage.is-waiting {
+  border-color: rgba(var(--accent-rgb), 0.28);
+  background: linear-gradient(
+    130deg,
+    rgba(var(--accent-rgb), 0.16),
+    rgba(var(--surface-muted-rgb), 0.7)
+  );
+}
+
+.booking-deposit-stage.is-alert {
+  border-color: rgba(var(--warning-rgb), 0.32);
+  background: linear-gradient(
+    130deg,
+    rgba(var(--warning-rgb), 0.16),
+    rgba(var(--surface-muted-rgb), 0.7)
+  );
+}
+
+.booking-deposit-stage.is-success {
+  border-color: rgba(var(--success-rgb), 0.28);
+  background: linear-gradient(
+    130deg,
+    rgba(var(--success-rgb), 0.16),
+    rgba(var(--surface-muted-rgb), 0.7)
+  );
+}
+
+.booking-deposit-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.booking-deposit-stage-title {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.booking-deposit-stage-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--paper-rgb), 0.68);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--muted);
+}
+
+.booking-deposit-stage-text {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
 .booking-item-meta--secondary {
   font-size: 11px;
   gap: 4px;
@@ -3062,6 +3136,10 @@
 
   .booking-item .booking-item-meta--primary {
     width: 100%;
+  }
+
+  .booking-deposit-stage {
+    padding: 7px 9px;
   }
 
   .booking-item-chat-corner {

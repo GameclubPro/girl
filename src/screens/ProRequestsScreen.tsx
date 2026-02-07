@@ -2799,9 +2799,9 @@ export const ProRequestsScreen = ({
     booking: Booking,
     options?: { archived?: boolean; compact?: boolean }
   ) => {
-    const statusLabel =
+    const statusLabelBase =
       bookingStatusLabelMap[booking.status] ?? booking.status
-    const statusTone =
+    const statusToneBase =
       bookingStatusToneMap[booking.status] ?? 'is-waiting'
     const locationLabel =
       locationLabelMap[booking.locationType] ?? 'Не важно'
@@ -2897,12 +2897,14 @@ export const ProRequestsScreen = ({
     const canMarkOutcome =
       hasBookingAction(booking, 'set-outcome') ||
       (!usesServerActions && isOutcomePending(booking))
+    const isCompact = Boolean(options?.compact)
     const depositPercent =
       typeof booking.depositPercent === 'number'
         ? Math.max(0, Math.round(booking.depositPercent))
         : 0
     const depositAmount = resolveBookingDepositAmount(booking)
     const depositStatus = resolveBookingDepositStatus(booking, depositAmount)
+    const depositHoldTimeLeft = formatTimeLeft(booking.depositHoldExpiresAt)
     const depositStatusLabel =
       depositAmount > 0 &&
       booking.status !== 'confirmed' &&
@@ -2919,6 +2921,53 @@ export const ProRequestsScreen = ({
                 : depositStatus === 'pending'
                   ? 'Ожидает оплаты депозита'
                   : ''
+    const showDepositStage =
+      !isCompact &&
+      depositAmount > 0 &&
+      booking.status === 'confirmed' &&
+      ['pending', 'rejected', 'submitted'].includes(depositStatus)
+    const depositStageTone =
+      depositStatus === 'submitted'
+        ? 'is-waiting'
+        : depositStatus === 'rejected'
+          ? 'is-alert'
+          : 'is-alert'
+    const depositStageStepLabel =
+      depositStatus === 'submitted' ? 'Шаг 3 из 3' : 'Шаг 2 из 3'
+    const depositStageTitle =
+      depositStatus === 'submitted'
+        ? 'Проверьте чек клиента'
+        : depositStatus === 'rejected'
+          ? 'Чек отклонён, ждём повторную отправку'
+          : 'Ожидаем оплату от клиента'
+    const depositStageDescription =
+      depositStatus === 'submitted'
+        ? 'Откройте чек и подтвердите или отклоните оплату.'
+        : depositStatus === 'rejected'
+          ? depositHoldTimeLeft
+            ? `Клиент должен отправить новый чек. Слот удерживается ещё ${depositHoldTimeLeft}.`
+            : 'Клиент должен отправить новый чек для повторной проверки.'
+          : depositHoldTimeLeft
+            ? `Клиенту нужно оплатить депозит и отправить чек. Осталось ${depositHoldTimeLeft}.`
+            : 'Клиенту нужно оплатить депозит и отправить чек. После этого появится проверка.'
+    const statusLabel =
+      booking.status === 'confirmed' && depositAmount > 0
+        ? depositStatus === 'submitted'
+          ? 'Чек на проверке'
+          : depositStatus === 'rejected'
+            ? 'Нужен новый чек'
+            : depositStatus === 'pending'
+              ? 'Ждём депозит'
+              : statusLabelBase
+        : statusLabelBase
+    const statusTone =
+      booking.status === 'confirmed' && depositAmount > 0
+        ? depositStatus === 'submitted' ||
+          depositStatus === 'rejected' ||
+          depositStatus === 'pending'
+          ? 'is-waiting'
+          : statusToneBase
+        : statusToneBase
     const canConfirmDeposit =
       hasBookingAction(booking, 'master-deposit-confirm') ||
       (!usesServerActions && depositStatus === 'submitted')
@@ -2960,7 +3009,6 @@ export const ProRequestsScreen = ({
     const rescheduleMetaTone = canRespondReschedule
       ? 'booking-item-meta--warning'
       : 'booking-item-meta--highlight'
-    const isCompact = Boolean(options?.compact)
     const showCornerChat = !isCompact && Boolean(booking.chatId)
     const nextAction = booking.nextAction ?? null
     const hasPrimaryBookingActions =
@@ -3060,6 +3108,21 @@ export const ProRequestsScreen = ({
                 {distanceLabel}
               </span>
             )}
+          </div>
+        )}
+        {showDepositStage && (
+          <div className={`booking-deposit-stage ${depositStageTone}`}>
+            <div className="booking-deposit-stage-head">
+              <span className="booking-deposit-stage-title">
+                {depositStageTitle}
+              </span>
+              <span className="booking-deposit-stage-step">
+                {depositStageStepLabel}
+              </span>
+            </div>
+            <p className="booking-deposit-stage-text">
+              {depositStageDescription}
+            </p>
           </div>
         )}
         {hasChips && (
