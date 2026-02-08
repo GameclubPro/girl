@@ -2724,7 +2724,11 @@ export const ProRequestsScreen = ({
     return labels
   }, [missingFields])
   const missingSummary =
-    missingLabels.length > 0 ? missingLabels.join(', ') : 'минимум профиля'
+    missingLabels.length === 0
+      ? 'минимум профиля'
+      : missingLabels.length <= 2
+        ? missingLabels.join(', ')
+        : `${missingLabels.slice(0, 2).join(', ')} и еще ${missingLabels.length - 2}`
   const hasActiveRequests = items.length > 0
   const hasPendingBookings = pendingBookingItems.length > 0
   const showRequestsEmpty =
@@ -3895,12 +3899,16 @@ export const ProRequestsScreen = ({
     : loadError || bookingsError
   const requestsOverviewSubtitle =
     activeTab === 'requests'
-      ? 'Входящие заявки, отклики и срочные действия в одном потоке.'
-      : 'Подтвержденные записи, календарь и депозиты под контролем.'
+      ? 'Отклики и срочные действия в одном потоке.'
+      : 'Записи, календарь и депозиты под контролем.'
   const requestsOverviewContext =
     activeTab === 'requests'
-      ? `Отклики в работе: ${items.length}`
-      : `Слотов в работе: ${confirmedBookingItems.length}`
+      ? items.length > 0
+        ? `Отклики в работе: ${items.length}`
+        : null
+      : confirmedBookingItems.length > 0
+        ? `Слотов в работе: ${confirmedBookingItems.length}`
+        : null
   const requestsSyncLabel = hasSyncIssues
     ? 'Нужна проверка синхронизации'
     : isSyncing
@@ -3941,12 +3949,16 @@ export const ProRequestsScreen = ({
             </div>
           </div>
           <div className="pro-requests-overview-meta">
-            <span className="pro-requests-overview-meta-pill">
-              {requestsOverviewContext}
-            </span>
-            <span className="pro-requests-overview-meta-pill">
-              Депозиты: {depositPipelineBookingsCount}
-            </span>
+            {requestsOverviewContext && (
+              <span className="pro-requests-overview-meta-pill">
+                {requestsOverviewContext}
+              </span>
+            )}
+            {depositPipelineBookingsCount > 0 && (
+              <span className="pro-requests-overview-meta-pill">
+                Депозиты: {depositPipelineBookingsCount}
+              </span>
+            )}
             <span
               className={`pro-requests-overview-meta-pill${
                 hasSyncIssues ? ' is-error' : isSyncing ? ' is-loading' : ' is-ok'

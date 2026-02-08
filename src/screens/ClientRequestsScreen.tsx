@@ -643,7 +643,7 @@ export const ClientRequestsScreen = ({
 
     const now = Date.now()
     const next = upcoming.find((item) => item.timeMs >= now) ?? upcoming[0]
-    if (!next) return 'Нет ближайших записей'
+    if (!next) return null
     return `${next.booking.serviceName} · ${formatDateTime(next.booking.scheduledAt)}`
   }, [bookingItems])
   const depositAttentionBookings = useMemo(() => {
@@ -705,8 +705,8 @@ export const ClientRequestsScreen = ({
   const isSyncing = isLoading || isBookingsLoading
   const requestsOverviewSubtitle =
     activeTab === 'requests'
-      ? 'Отслеживайте отклики и быстро запускайте новые заявки.'
-      : 'Держите записи, депозиты и календарь под контролем.'
+      ? 'Отклики и запуск новых заявок в одном месте.'
+      : 'Записи, депозиты и календарь под рукой.'
   const requestsOverviewStatusLabel = hasSyncIssues
     ? 'Нужна синхронизация'
     : isSyncing
@@ -1743,9 +1743,11 @@ export const ClientRequestsScreen = ({
               </div>
             </div>
             <div className="client-requests-overview-meta">
-              <span className="client-requests-overview-meta-pill">
-                Ближайшая: {nextBookingSummary}
-              </span>
+              {nextBookingSummary && (
+                <span className="client-requests-overview-meta-pill">
+                  Ближайшая: {nextBookingSummary}
+                </span>
+              )}
               <span
                 className={`client-requests-overview-meta-pill${
                   hasSyncIssues
@@ -1788,15 +1790,9 @@ export const ClientRequestsScreen = ({
             </button>
           </div>
           <div className="requests-explainer">
-            {activeTab === 'requests' ? (
-              <>
-                <strong>Заявки</strong> — вы ищете мастера и ждёте отклики.
-              </>
-            ) : (
-              <>
-                <strong>Записи</strong> — подтверждённые слоты и депозиты.
-              </>
-            )}
+            {activeTab === 'requests'
+              ? 'Отклики по заявкам и быстрый запуск новой заявки.'
+              : 'Подтвержденные слоты, календарь и депозиты.'}
           </div>
           {activeTab === 'requests' && (
             <div className="requests-top">
