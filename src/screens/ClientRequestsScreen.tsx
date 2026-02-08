@@ -72,12 +72,9 @@ const MAX_DEPOSIT_PROOF_BYTES = 6 * 1024 * 1024
 const DEPOSIT_HOLD_MINUTES = 20
 const CRITICAL_HOLD_MINUTES = 10
 const HOLD_TICK_INTERVAL_MS = 30_000
-const PRIORITY_SHEET_COOLDOWN_MS = 6 * 60 * 60 * 1000
 
 const buildClientSeenOpenRequestKey = (userId: string) =>
   `client-requests-seen-open-id:${userId}`
-const buildClientPrioritySheetAtKey = (userId: string) =>
-  `client-requests-priority-sheet-at:${userId}`
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -330,7 +327,7 @@ export const ClientRequestsScreen = ({
   onOpenChat,
 }: ClientRequestsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'bookings'>(
-    initialTab ?? 'requests'
+    initialTab ?? 'bookings'
   )
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -392,10 +389,7 @@ export const ClientRequestsScreen = ({
   const pendingBookingFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusFilterRef = useRef<'all' | 'action' | 'keep'>('all')
   const manualTabSelectionRef = useRef(false)
-  const priorityEntryCheckRef = useRef(false)
   const [seenOpenRequestId, setSeenOpenRequestId] = useState(0)
-  const [lastPrioritySheetAt, setLastPrioritySheetAt] = useState(0)
-  const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false)
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
   )
@@ -433,41 +427,17 @@ export const ClientRequestsScreen = ({
     [userId]
   )
 
-  const persistPrioritySheetShownAt = useCallback(
-    (value: number) => {
-      if (!userId || typeof window === 'undefined') return
-      try {
-        window.localStorage.setItem(
-          buildClientPrioritySheetAtKey(userId),
-          String(Math.max(0, value))
-        )
-      } catch {
-        // ignore storage errors
-      }
-    },
-    [userId]
-  )
-
   useEffect(() => {
-    priorityEntryCheckRef.current = false
-    setIsPrioritySheetOpen(false)
     if (!userId || typeof window === 'undefined') {
       setSeenOpenRequestId(0)
-      setLastPrioritySheetAt(0)
       return
     }
     try {
       const rawSeen = window.localStorage.getItem(buildClientSeenOpenRequestKey(userId))
-      const rawShownAt = window.localStorage.getItem(
-        buildClientPrioritySheetAtKey(userId)
-      )
       const seen = Number.parseInt(rawSeen ?? '0', 10)
-      const shownAt = Number.parseInt(rawShownAt ?? '0', 10)
       setSeenOpenRequestId(Number.isFinite(seen) ? Math.max(0, seen) : 0)
-      setLastPrioritySheetAt(Number.isFinite(shownAt) ? Math.max(0, shownAt) : 0)
     } catch {
       setSeenOpenRequestId(0)
-      setLastPrioritySheetAt(0)
     }
   }, [userId])
 
@@ -805,11 +775,7 @@ export const ClientRequestsScreen = ({
       ? 'Синхронизируем'
       : 'Данные актуальны'
   const requestsOverviewPending = openRequestsCount + depositAttentionCount
-  const preferredTab = useMemo<'requests' | 'bookings'>(() => {
-    if (activeBookingsCount > 0 || depositAttentionCount > 0) return 'bookings'
-    if (openRequestsCount > 0) return 'requests'
-    return 'requests'
-  }, [activeBookingsCount, depositAttentionCount, openRequestsCount])
+  const preferredTab = 'bookings' as const
   useEffect(() => {
     if (initialTab) return
     if (manualTabSelectionRef.current) return
@@ -829,28 +795,8 @@ export const ClientRequestsScreen = ({
   )
   useEffect(() => {
     if (activeTab !== 'requests') return
-    setIsPrioritySheetOpen(false)
     markOpenRequestsSeen()
   }, [activeTab, markOpenRequestsSeen])
-  useEffect(() => {
-    if (priorityEntryCheckRef.current) return
-    if (isLoading || isBookingsLoading) return
-    priorityEntryCheckRef.current = true
-    if (activeTab !== 'bookings') return
-    if (freshOpenRequestsCount <= 0) return
-    const now = Date.now()
-    if (now - lastPrioritySheetAt < PRIORITY_SHEET_COOLDOWN_MS) return
-    setIsPrioritySheetOpen(true)
-    setLastPrioritySheetAt(now)
-    persistPrioritySheetShownAt(now)
-  }, [
-    activeTab,
-    freshOpenRequestsCount,
-    isBookingsLoading,
-    isLoading,
-    lastPrioritySheetAt,
-    persistPrioritySheetShownAt,
-  ])
   const depositSheetBooking = useMemo(
     () =>
       depositSheetBookingId === null
@@ -1236,15 +1182,6 @@ export const ClientRequestsScreen = ({
     void loadRequests()
     void loadBookings()
   }, [loadBookings, loadRequests])
-
-  const handlePrioritySheetStay = useCallback(() => {
-    setIsPrioritySheetOpen(false)
-  }, [])
-
-  const handlePrioritySheetOpenRequests = useCallback(() => {
-    setIsPrioritySheetOpen(false)
-    handleOverviewRequestsPress()
-  }, [handleOverviewRequestsPress])
 
   const handleRequestActionFocus = useCallback(
     (requestId: number) => {
@@ -3621,54 +3558,6 @@ export const ClientRequestsScreen = ({
             </>
           )}
       </div>
-
-      {isPrioritySheetOpen &&
-        activeTab === 'bookings' &&
-        freshOpenRequestsCount > 0 &&
-        !depositSheetBooking &&
-        !rescheduleBooking && (
-          <div
-            className="requests-priority-sheet-overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="client-priority-sheet-title"
-            onClick={handlePrioritySheetStay}
-          >
-            <div
-              className="requests-priority-sheet"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <span className="requests-priority-sheet-handle" aria-hidden="true" />
-              <div className="requests-priority-sheet-head">
-                <p className="requests-priority-sheet-kicker">Приоритет заявок</p>
-                <h3 className="requests-priority-sheet-title" id="client-priority-sheet-title">
-                  {freshOpenRequestsCount === 1
-                    ? 'Появилась новая заявка'
-                    : `Новых заявок: ${freshOpenRequestsCount}`}
-                </h3>
-                <p className="requests-priority-sheet-text">
-                  Календарь остается под рукой, но лучше сначала проверить новые отклики.
-                </p>
-              </div>
-              <div className="requests-priority-sheet-actions">
-                <button
-                  className="requests-priority-sheet-action"
-                  type="button"
-                  onClick={handlePrioritySheetOpenRequests}
-                >
-                  Открыть заявки
-                </button>
-                <button
-                  className="requests-priority-sheet-action is-secondary"
-                  type="button"
-                  onClick={handlePrioritySheetStay}
-                >
-                  Остаться в календаре
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
       {depositSheetBooking && (
         <div
