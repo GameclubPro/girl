@@ -477,7 +477,7 @@ function App() {
   )
   const [requestsInitialTab, setRequestsInitialTab] = useState<
     'requests' | 'bookings'
-  >('requests')
+  >('bookings')
   const [requestsFocusRequestId, setRequestsFocusRequestId] = useState<
     number | null
   >(null)
@@ -486,7 +486,7 @@ function App() {
   >(null)
   const [proRequestsInitialTab, setProRequestsInitialTab] = useState<
     'requests' | 'bookings'
-  >('requests')
+  >('bookings')
   const [proRequestsFocusRequestId, setProRequestsFocusRequestId] = useState<
     number | null
   >(null)
@@ -1271,7 +1271,7 @@ function App() {
     (input?: 'requests' | 'bookings' | RequestsNavOptions) => {
       const options =
         typeof input === 'string' ? { tab: input } : input ?? {}
-      setRequestsInitialTab(options.tab ?? 'requests')
+      setRequestsInitialTab(options.tab ?? 'bookings')
       setRequestsFocusRequestId(options.focusRequestId ?? null)
       setRequestsFocusBookingId(options.focusBookingId ?? null)
       navigate('requests')
@@ -1283,7 +1283,7 @@ function App() {
     (input?: 'requests' | 'bookings' | RequestsNavOptions) => {
       const options =
         typeof input === 'string' ? { tab: input } : input ?? {}
-      setProRequestsInitialTab(options.tab ?? 'requests')
+      setProRequestsInitialTab(options.tab ?? 'bookings')
       setProRequestsFocusRequestId(options.focusRequestId ?? null)
       setProRequestsFocusBookingId(options.focusBookingId ?? null)
       navigate('pro-requests')
