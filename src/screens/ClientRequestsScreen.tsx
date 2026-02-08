@@ -385,6 +385,7 @@ export const ClientRequestsScreen = ({
   const pendingRequestFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusFilterRef = useRef<'all' | 'action' | 'keep'>('all')
+  const manualTabSelectionRef = useRef(false)
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
   )
@@ -397,9 +398,15 @@ export const ClientRequestsScreen = ({
 
   useEffect(() => {
     if (initialTab) {
+      manualTabSelectionRef.current = true
       setActiveTab(initialTab)
     }
   }, [initialTab])
+
+  const setActiveTabByUser = useCallback((next: 'requests' | 'bookings') => {
+    manualTabSelectionRef.current = true
+    setActiveTab(next)
+  }, [])
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -633,7 +640,7 @@ export const ClientRequestsScreen = ({
       ).length,
     [bookingItems]
   )
-  const nextBookingSummary = useMemo(() => {
+  const nextBookingInfo = useMemo(() => {
     const upcoming = bookingItems
       .map((booking) => {
         const timeMs = new Date(booking.scheduledAt).getTime()
@@ -645,8 +652,17 @@ export const ClientRequestsScreen = ({
     const now = Date.now()
     const next = upcoming.find((item) => item.timeMs >= now) ?? upcoming[0]
     if (!next) return null
-    return `${next.booking.serviceName} · ${formatDateTime(next.booking.scheduledAt)}`
+    return {
+      booking: next.booking,
+      summary: `${next.booking.serviceName} · ${formatDateTime(next.booking.scheduledAt)}`,
+    }
   }, [bookingItems])
+  const nextBookingSummary = nextBookingInfo?.summary ?? null
+  const nextBookingForFocus = nextBookingInfo?.booking ?? null
+  const firstOpenRequest = useMemo(
+    () => items.find((request) => request.status === 'open') ?? null,
+    [items]
+  )
   const depositAttentionBookings = useMemo(() => {
     const list = bookingItems.filter((booking) => {
       const usesServerActions = hasServerActions(booking)
@@ -720,6 +736,19 @@ export const ClientRequestsScreen = ({
       ? 'Синхронизируем'
       : 'Данные актуальны'
   const requestsOverviewPending = openRequestsCount + depositAttentionCount
+  const preferredTab = useMemo<'requests' | 'bookings'>(() => {
+    if (openRequestsCount > 0) return 'requests'
+    if (activeBookingsCount > 0 || depositAttentionCount > 0) return 'bookings'
+    return 'requests'
+  }, [activeBookingsCount, depositAttentionCount, openRequestsCount])
+  useEffect(() => {
+    if (initialTab) return
+    if (manualTabSelectionRef.current) return
+    if (typeof focusRequestId === 'number' || typeof focusBookingId === 'number') {
+      return
+    }
+    setActiveTab((current) => (current === preferredTab ? current : preferredTab))
+  }, [focusBookingId, focusRequestId, initialTab, preferredTab])
   const depositSheetBooking = useMemo(
     () =>
       depositSheetBookingId === null
@@ -1030,16 +1059,88 @@ export const ClientRequestsScreen = ({
     [bookingItems, focusBooking, onFocusHandled]
   )
 
+  const handleOverviewRequestsPress = useCallback(() => {
+    if (firstOpenRequest) {
+      if (activeTab !== 'requests') {
+        pendingRequestFocusIdRef.current = firstOpenRequest.id
+        setActiveTabByUser('requests')
+        return
+      }
+      resolveRequestFocus(firstOpenRequest.id)
+      return
+    }
+    setActiveTabByUser('requests')
+  }, [activeTab, firstOpenRequest, resolveRequestFocus, setActiveTabByUser])
+
+  const handleOverviewBookingsPress = useCallback(
+    (options?: { filter?: 'all' | 'action' | 'keep' }) => {
+      const nextFilter = options?.filter ?? 'all'
+      if (nextBookingForFocus) {
+        if (activeTab !== 'bookings') {
+          pendingBookingFocusIdRef.current = nextBookingForFocus.id
+          pendingBookingFocusFilterRef.current = nextFilter
+          setActiveTabByUser('bookings')
+          return
+        }
+        resolveBookingFocus(nextBookingForFocus.id, { filter: nextFilter })
+        return
+      }
+      setActiveTabByUser('bookings')
+    },
+    [activeTab, nextBookingForFocus, resolveBookingFocus, setActiveTabByUser]
+  )
+
+  const handleOverviewActionsPress = useCallback(() => {
+    if (firstOpenRequest) {
+      if (activeTab !== 'requests') {
+        pendingRequestFocusIdRef.current = firstOpenRequest.id
+        setActiveTabByUser('requests')
+        return
+      }
+      resolveRequestFocus(firstOpenRequest.id)
+      return
+    }
+    if (nextDepositBooking) {
+      if (activeTab !== 'bookings') {
+        pendingBookingFocusIdRef.current = nextDepositBooking.id
+        pendingBookingFocusFilterRef.current = 'action'
+        setActiveTabByUser('bookings')
+        return
+      }
+      resolveBookingFocus(nextDepositBooking.id, { filter: 'action' })
+      return
+    }
+    if (activeBookingsCount > 0) {
+      handleOverviewBookingsPress()
+      return
+    }
+    setActiveTabByUser('requests')
+  }, [
+    activeBookingsCount,
+    activeTab,
+    firstOpenRequest,
+    handleOverviewBookingsPress,
+    nextDepositBooking,
+    resolveBookingFocus,
+    resolveRequestFocus,
+    setActiveTabByUser,
+  ])
+
+  const handleOverviewSyncPress = useCallback(() => {
+    void loadRequests()
+    void loadBookings()
+  }, [loadBookings, loadRequests])
+
   const handleRequestActionFocus = useCallback(
     (requestId: number) => {
       if (activeTab !== 'requests') {
         pendingRequestFocusIdRef.current = requestId
-        setActiveTab('requests')
+        setActiveTabByUser('requests')
         return
       }
       resolveRequestFocus(requestId)
     },
-    [activeTab, resolveRequestFocus]
+    [activeTab, resolveRequestFocus, setActiveTabByUser]
   )
 
   const handleBookingActionFocus = useCallback(
@@ -1055,12 +1156,12 @@ export const ClientRequestsScreen = ({
       if (activeTab !== 'bookings') {
         pendingBookingFocusIdRef.current = booking.id
         pendingBookingFocusFilterRef.current = nextFilter
-        setActiveTab('bookings')
+        setActiveTabByUser('bookings')
         return
       }
       resolveBookingFocus(booking.id, { filter: nextFilter })
     },
-    [activeTab, resolveBookingFocus]
+    [activeTab, resolveBookingFocus, setActiveTabByUser]
   )
 
   const handleOpenDepositSheet = useCallback(
@@ -1724,48 +1825,77 @@ export const ClientRequestsScreen = ({
               </p>
             </div>
             <div className="client-requests-overview-stats">
-              <div className="client-requests-overview-stat">
+              <button
+                className={`client-requests-overview-stat${
+                  openRequestsCount > 0 ? ' is-actionable' : ''
+                }${activeTab === 'requests' ? ' is-active-view' : ''}`}
+                type="button"
+                onClick={handleOverviewRequestsPress}
+                aria-label="Открыть заявки"
+              >
                 <span className="client-requests-overview-stat-value">
                   {openRequestsCount}
                 </span>
                 <span className="client-requests-overview-stat-label">
                   Активные
                 </span>
-              </div>
-              <div className="client-requests-overview-stat">
+              </button>
+              <button
+                className={`client-requests-overview-stat${
+                  activeBookingsCount > 0 ? ' is-actionable' : ''
+                }${activeTab === 'bookings' ? ' is-active-view' : ''}`}
+                type="button"
+                onClick={() => handleOverviewBookingsPress()}
+                aria-label="Открыть записи"
+              >
                 <span className="client-requests-overview-stat-value">
                   {activeBookingsCount}
                 </span>
                 <span className="client-requests-overview-stat-label">
                   Записи
                 </span>
-              </div>
-              <div className="client-requests-overview-stat">
+              </button>
+              <button
+                className={`client-requests-overview-stat${
+                  requestsOverviewPending > 0 ? ' is-actionable' : ''
+                }`}
+                type="button"
+                onClick={handleOverviewActionsPress}
+                aria-label="Открыть действия"
+              >
                 <span className="client-requests-overview-stat-value">
                   {requestsOverviewPending}
                 </span>
                 <span className="client-requests-overview-stat-label">
                   Действия
                 </span>
-              </div>
+              </button>
             </div>
             <div className="client-requests-overview-meta">
               {nextBookingSummary && (
-                <span className="client-requests-overview-meta-pill">
+                <button
+                  className="client-requests-overview-meta-pill is-actionable"
+                  type="button"
+                  onClick={() => handleOverviewBookingsPress()}
+                >
                   Ближайшая: {nextBookingSummary}
-                </span>
+                </button>
               )}
-              <span
+              <button
                 className={`client-requests-overview-meta-pill${
                   hasSyncIssues
                     ? ' is-error'
                     : isSyncing
                       ? ' is-loading'
                       : ' is-ok'
-                }`}
+                } is-actionable`}
+                type="button"
+                onClick={handleOverviewSyncPress}
+                disabled={isSyncing}
+                aria-label="Обновить синхронизацию"
               >
                 {requestsOverviewStatusLabel}
-              </span>
+              </button>
             </div>
           </section>
 
@@ -1775,7 +1905,7 @@ export const ClientRequestsScreen = ({
               type="button"
               role="tab"
               aria-selected={activeTab === 'requests'}
-              onClick={() => setActiveTab('requests')}
+              onClick={() => setActiveTabByUser('requests')}
             >
               Заявки
               <span className="requests-tab-count">{openRequestsCount}</span>
@@ -1785,7 +1915,7 @@ export const ClientRequestsScreen = ({
               type="button"
               role="tab"
               aria-selected={activeTab === 'bookings'}
-              onClick={() => setActiveTab('bookings')}
+              onClick={() => setActiveTabByUser('bookings')}
             >
               Записи
               <span className="requests-tab-count">{activeBookingsCount}</span>

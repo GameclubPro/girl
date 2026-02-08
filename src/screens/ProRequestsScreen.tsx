@@ -731,6 +731,7 @@ export const ProRequestsScreen = ({
   const pendingRequestFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusIdRef = useRef<number | null>(null)
   const pendingDepositReviewBookingIdRef = useRef<number | null>(null)
+  const manualTabSelectionRef = useRef(false)
   const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const pendingBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const archivedBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
@@ -815,11 +816,13 @@ export const ProRequestsScreen = ({
   const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
 
   const handleUserTabChange = useCallback((next: 'requests' | 'bookings') => {
+    manualTabSelectionRef.current = true
     setActiveTab(next)
   }, [])
 
   useEffect(() => {
     if (!initialTab) return
+    manualTabSelectionRef.current = true
     setActiveTab(initialTab)
   }, [initialTab])
   useEffect(() => {
@@ -3879,6 +3882,152 @@ export const ProRequestsScreen = ({
     : isSyncing
       ? 'Синхронизация...'
       : 'Синхронизировано'
+  const firstIncomingRequest = items[0] ?? null
+  const firstPendingBooking = pendingBookingItems[0] ?? null
+  const firstActionableRequest =
+    items.find((item) => item.nextAction && item.nextAction.tone !== 'neutral') ??
+    firstIncomingRequest
+  const firstActionablePendingBooking =
+    pendingBookingItems.find((booking) => {
+      if (isBookingAwaitingDepositConfirmation(booking)) return true
+      return Boolean(booking.nextAction && booking.nextAction.tone !== 'neutral')
+    }) ?? firstPendingBooking
+  const nextConfirmedBooking = useMemo(() => {
+    const upcoming =
+      bookingCalendarItems.find((item) => item.timeMs >= Date.now()) ??
+      bookingCalendarItems[0]
+    return upcoming?.booking ?? null
+  }, [bookingCalendarItems])
+  const preferredTab = useMemo<'requests' | 'bookings'>(() => {
+    if (totalIncoming > 0) return 'requests'
+    if (confirmedBookingItems.length > 0) return 'bookings'
+    return 'requests'
+  }, [confirmedBookingItems, totalIncoming])
+
+  useEffect(() => {
+    if (initialTab) return
+    if (manualTabSelectionRef.current) return
+    if (typeof focusRequestId === 'number' || typeof focusBookingId === 'number') {
+      return
+    }
+    setActiveTab((current) => (current === preferredTab ? current : preferredTab))
+  }, [focusBookingId, focusRequestId, initialTab, preferredTab])
+
+  const openRequestsOverview = useCallback(
+    (options?: { requestId?: number | null; bookingId?: number | null }) => {
+      const requestId = options?.requestId ?? null
+      const bookingId = options?.bookingId ?? null
+      if (typeof requestId === 'number') {
+        if (activeTab !== 'requests') {
+          pendingRequestFocusIdRef.current = requestId
+          handleUserTabChange('requests')
+          return
+        }
+        focusRequest(requestId)
+        return
+      }
+      if (typeof bookingId === 'number') {
+        if (activeTab !== 'requests') {
+          pendingBookingFocusIdRef.current = bookingId
+          handleUserTabChange('requests')
+          return
+        }
+        focusPendingBooking(bookingId)
+        return
+      }
+      handleUserTabChange('requests')
+    },
+    [activeTab, focusPendingBooking, focusRequest, handleUserTabChange]
+  )
+
+  const openBookingsOverview = useCallback(
+    (booking?: Booking | null) => {
+      if (booking) {
+        if (activeTab !== 'bookings') {
+          pendingBookingFocusIdRef.current = booking.id
+          handleUserTabChange('bookings')
+          return
+        }
+        focusBookingInCalendar(booking)
+        return
+      }
+      handleUserTabChange('bookings')
+    },
+    [activeTab, focusBookingInCalendar, handleUserTabChange]
+  )
+
+  const handleOverviewIncomingPress = useCallback(() => {
+    if (firstIncomingRequest) {
+      openRequestsOverview({ requestId: firstIncomingRequest.id })
+      return
+    }
+    if (firstPendingBooking) {
+      openRequestsOverview({ bookingId: firstPendingBooking.id })
+      return
+    }
+    handleUserTabChange('requests')
+  }, [
+    firstIncomingRequest,
+    firstPendingBooking,
+    handleUserTabChange,
+    openRequestsOverview,
+  ])
+
+  const handleOverviewConfirmedPress = useCallback(() => {
+    if (nextConfirmedBooking) {
+      openBookingsOverview(nextConfirmedBooking)
+      return
+    }
+    handleUserTabChange('bookings')
+  }, [handleUserTabChange, nextConfirmedBooking, openBookingsOverview])
+
+  const handleOverviewActionsPress = useCallback(() => {
+    if (firstActionableRequest) {
+      openRequestsOverview({ requestId: firstActionableRequest.id })
+      return
+    }
+    if (firstActionablePendingBooking) {
+      openRequestsOverview({ bookingId: firstActionablePendingBooking.id })
+      return
+    }
+    if (nextConfirmedBooking) {
+      openBookingsOverview(nextConfirmedBooking)
+      return
+    }
+    handleUserTabChange('requests')
+  }, [
+    firstActionablePendingBooking,
+    firstActionableRequest,
+    handleUserTabChange,
+    nextConfirmedBooking,
+    openBookingsOverview,
+    openRequestsOverview,
+  ])
+
+  const handleOverviewContextPress = useCallback(() => {
+    if (activeTab === 'requests') {
+      handleOverviewIncomingPress()
+      return
+    }
+    handleOverviewConfirmedPress()
+  }, [activeTab, handleOverviewConfirmedPress, handleOverviewIncomingPress])
+
+  const handleOverviewDepositsPress = useCallback(() => {
+    if (firstActionablePendingBooking) {
+      openRequestsOverview({ bookingId: firstActionablePendingBooking.id })
+      return
+    }
+    handleOverviewIncomingPress()
+  }, [
+    firstActionablePendingBooking,
+    handleOverviewIncomingPress,
+    openRequestsOverview,
+  ])
+
+  const handleOverviewSyncPress = useCallback(() => {
+    void loadRequests({ force: true })
+    void loadBookings({ force: true })
+  }, [loadBookings, loadRequests])
 
   return (
     <div className="screen screen--pro screen--pro-requests">
@@ -3892,45 +4041,78 @@ export const ProRequestsScreen = ({
             </p>
           </div>
           <div className="pro-requests-overview-stats">
-            <div className="pro-requests-overview-stat">
+            <button
+              className={`pro-requests-overview-stat${
+                totalIncoming > 0 ? ' is-actionable' : ''
+              }${activeTab === 'requests' ? ' is-active-view' : ''}`}
+              type="button"
+              onClick={handleOverviewIncomingPress}
+              aria-label="Открыть входящие заявки"
+            >
               <span className="pro-requests-overview-stat-value">
                 {totalIncoming}
               </span>
               <span className="pro-requests-overview-stat-label">Входящие</span>
-            </div>
-            <div className="pro-requests-overview-stat">
+            </button>
+            <button
+              className={`pro-requests-overview-stat${
+                confirmedBookingItems.length > 0 ? ' is-actionable' : ''
+              }${activeTab === 'bookings' ? ' is-active-view' : ''}`}
+              type="button"
+              onClick={handleOverviewConfirmedPress}
+              aria-label="Открыть подтвержденные записи"
+            >
               <span className="pro-requests-overview-stat-value">
                 {confirmedBookingItems.length}
               </span>
               <span className="pro-requests-overview-stat-label">Подтверждены</span>
-            </div>
-            <div className="pro-requests-overview-stat">
+            </button>
+            <button
+              className={`pro-requests-overview-stat${
+                pendingActionsTotal > 0 ? ' is-actionable' : ''
+              }`}
+              type="button"
+              onClick={handleOverviewActionsPress}
+              aria-label="Открыть нужные действия"
+            >
               <span className="pro-requests-overview-stat-value">
                 {pendingActionsTotal}
               </span>
               <span className="pro-requests-overview-stat-label">
                 Нужны действия
               </span>
-            </div>
+            </button>
           </div>
           <div className="pro-requests-overview-meta">
             {requestsOverviewContext && (
-              <span className="pro-requests-overview-meta-pill">
+              <button
+                className="pro-requests-overview-meta-pill is-actionable"
+                type="button"
+                onClick={handleOverviewContextPress}
+              >
                 {requestsOverviewContext}
-              </span>
+              </button>
             )}
             {depositPipelineBookingsCount > 0 && (
-              <span className="pro-requests-overview-meta-pill">
+              <button
+                className="pro-requests-overview-meta-pill is-actionable"
+                type="button"
+                onClick={handleOverviewDepositsPress}
+              >
                 Депозиты: {depositPipelineBookingsCount}
-              </span>
+              </button>
             )}
-            <span
+            <button
               className={`pro-requests-overview-meta-pill${
                 hasSyncIssues ? ' is-error' : isSyncing ? ' is-loading' : ' is-ok'
-              }`}
+              } is-actionable`}
+              type="button"
+              onClick={handleOverviewSyncPress}
+              disabled={isSyncing}
+              aria-label="Обновить синхронизацию потока"
             >
               {requestsSyncLabel}
-            </span>
+            </button>
           </div>
         </section>
 
