@@ -371,6 +371,7 @@ export const ClientRequestsScreen = ({
   const requestsRequestIdRef = useRef(0)
   const bookingsRequestIdRef = useRef(0)
   const bookingListRef = useRef<HTMLDivElement | null>(null)
+  const bookingCalendarRef = useRef<HTMLElement | null>(null)
   const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const bookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const reloadTimerRef = useRef<number | null>(null)
@@ -662,6 +663,13 @@ export const ClientRequestsScreen = ({
 
   const items = useMemo(() => requests, [requests])
   const bookingItems = useMemo(() => bookings, [bookings])
+  const activeBookingItems = useMemo(
+    () =>
+      bookingItems.filter(
+        (booking) => booking.status !== 'cancelled' && booking.status !== 'declined'
+      ),
+    [bookingItems]
+  )
   const openRequestItems = useMemo(
     () => items.filter((request) => request.status === 'open'),
     [items]
@@ -675,15 +683,9 @@ export const ClientRequestsScreen = ({
     () => openRequestItems.filter((request) => request.id > seenOpenRequestId).length,
     [openRequestItems, seenOpenRequestId]
   )
-  const activeBookingsCount = useMemo(
-    () =>
-      bookingItems.filter(
-        (booking) => booking.status !== 'cancelled' && booking.status !== 'declined'
-      ).length,
-    [bookingItems]
-  )
+  const activeBookingsCount = activeBookingItems.length
   const nextBookingInfo = useMemo(() => {
-    const upcoming = bookingItems
+    const upcoming = activeBookingItems
       .map((booking) => {
         const timeMs = new Date(booking.scheduledAt).getTime()
         return Number.isNaN(timeMs) ? null : { booking, timeMs }
@@ -698,7 +700,7 @@ export const ClientRequestsScreen = ({
       booking: next.booking,
       summary: `${next.booking.serviceName} · ${formatDateTime(next.booking.scheduledAt)}`,
     }
-  }, [bookingItems])
+  }, [activeBookingItems])
   const nextBookingSummary = nextBookingInfo?.summary ?? null
   const nextBookingForFocus = nextBookingInfo?.booking ?? null
   const firstOpenRequest = openRequestItems[0] ?? null
@@ -858,7 +860,7 @@ export const ClientRequestsScreen = ({
   const depositSheetCopyStatus =
     (depositSheetBooking && depositCopyStatus[depositSheetBooking.id]) || ''
   const bookingCalendarItems = useMemo(() => {
-    return bookingItems
+    return activeBookingItems
       .map((booking): BookingCalendarItem | null => {
         const date = parseDateOnly(booking.scheduledAt)
         if (!date) return null
@@ -872,7 +874,7 @@ export const ClientRequestsScreen = ({
       })
       .filter((item): item is BookingCalendarItem => item !== null)
       .sort((a, b) => a.timeMs - b.timeMs)
-  }, [bookingItems])
+  }, [activeBookingItems])
   const bookingSummaryByDate = useMemo(() => {
     const map = new Map<string, { count: number }>()
     bookingCalendarItems.forEach((item) => {
@@ -1037,6 +1039,18 @@ export const ClientRequestsScreen = ({
     []
   )
 
+  const scrollToBookingCalendar = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const node = bookingCalendarRef.current
+    if (!node) return
+    requestAnimationFrame(() => {
+      node.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }, [])
+
   const loadResponses = useCallback(
     async (requestId: number) => {
       try {
@@ -1127,19 +1141,24 @@ export const ClientRequestsScreen = ({
   const handleOverviewBookingsPress = useCallback(
     (options?: { filter?: 'all' | 'action' | 'keep' }) => {
       const nextFilter = options?.filter ?? 'all'
+      if (activeTab === 'bookings') {
+        scrollToBookingCalendar()
+        return
+      }
       if (nextBookingForFocus) {
-        if (activeTab !== 'bookings') {
-          pendingBookingFocusIdRef.current = nextBookingForFocus.id
-          pendingBookingFocusFilterRef.current = nextFilter
-          setActiveTabByUser('bookings')
-          return
-        }
-        resolveBookingFocus(nextBookingForFocus.id, { filter: nextFilter })
+        pendingBookingFocusIdRef.current = nextBookingForFocus.id
+        pendingBookingFocusFilterRef.current = nextFilter
+        setActiveTabByUser('bookings')
         return
       }
       setActiveTabByUser('bookings')
     },
-    [activeTab, nextBookingForFocus, resolveBookingFocus, setActiveTabByUser]
+    [
+      activeTab,
+      nextBookingForFocus,
+      scrollToBookingCalendar,
+      setActiveTabByUser,
+    ]
   )
 
   const handleOverviewActionsPress = useCallback(() => {
@@ -2114,6 +2133,7 @@ export const ClientRequestsScreen = ({
               <section
                 className="booking-calendar-card"
                 aria-label="Календарь записей"
+                ref={bookingCalendarRef}
               >
                 <div className="booking-calendar-top">
                   <button

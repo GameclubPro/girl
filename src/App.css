@@ -18169,7 +18169,7 @@
   --metal-inset: var(--glass-inset);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 4px;
   padding: 4px;
   border-radius: 14px;
@@ -18177,6 +18177,13 @@
   background: var(--glass-bg-soft);
   box-shadow: var(--glass-inset);
   backdrop-filter: var(--glass-frost-soft);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pro-slots-filters::-webkit-scrollbar {
+  display: none;
 }
 
 .pro-slots-filter {
@@ -18200,7 +18207,8 @@
   line-height: 1.15;
   transition: color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease,
     border-color 0.2s ease;
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  min-width: 90px;
 }
 
 .pro-slots-filters .pro-slots-filter {

@@ -762,6 +762,7 @@ export const ProRequestsScreen = ({
   const shareTimerRef = useRef<number | null>(null)
   const slotNoticeTimerRef = useRef<number | null>(null)
   const slotsSectionRef = useRef<HTMLDivElement | null>(null)
+  const bookingCalendarRef = useRef<HTMLElement | null>(null)
   const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const shareConfigured = Boolean(shareBase)
   const [profileScheduleDays, setProfileScheduleDays] = useState<string[]>([])
@@ -1643,9 +1644,7 @@ export const ProRequestsScreen = ({
   const filteredSlotViews = useMemo(() => {
     if (slotFilter === 'all') return selectedSlotViews
     if (slotFilter === 'booked') {
-      return selectedSlotViews.filter(
-        (slot) => slot.status === 'booked' || slot.status === 'pending'
-      )
+      return selectedSlotViews.filter((slot) => slot.status === 'booked')
     }
     return selectedSlotViews.filter((slot) => slot.status === slotFilter)
   }, [selectedSlotViews, slotFilter])
@@ -1668,9 +1667,17 @@ export const ProRequestsScreen = ({
     () => ({
       all: selectedSlotViews.length,
       free: slotStats.free,
-      booked: slotStats.booked + slotStats.pending,
+      booked: slotStats.booked,
+      pending: slotStats.pending,
+      closed: slotStats.closed,
     }),
-    [selectedSlotViews.length, slotStats.booked, slotStats.free, slotStats.pending]
+    [
+      selectedSlotViews.length,
+      slotStats.booked,
+      slotStats.closed,
+      slotStats.free,
+      slotStats.pending,
+    ]
   )
   const slotDetails = useMemo(() => {
     if (!slotDetailsId) return null
@@ -2127,6 +2134,15 @@ export const ProRequestsScreen = ({
       node.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }
+
+  const scrollToBookingCalendar = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const node = bookingCalendarRef.current
+    if (!node) return
+    window.requestAnimationFrame(() => {
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
 
   const handleSelectDate = (date: Date, options?: { scroll?: boolean }) => {
     setSelectedDate(date)
@@ -4054,18 +4070,18 @@ export const ProRequestsScreen = ({
 
   const openBookingsOverview = useCallback(
     (booking?: Booking | null) => {
+      if (activeTab === 'bookings') {
+        scrollToBookingCalendar()
+        return
+      }
       if (booking) {
-        if (activeTab !== 'bookings') {
-          pendingBookingFocusIdRef.current = booking.id
-          handleUserTabChange('bookings')
-          return
-        }
-        focusBookingInCalendar(booking)
+        pendingBookingFocusIdRef.current = booking.id
+        handleUserTabChange('bookings')
         return
       }
       handleUserTabChange('bookings')
     },
-    [activeTab, focusBookingInCalendar, handleUserTabChange]
+    [activeTab, handleUserTabChange, scrollToBookingCalendar]
   )
 
   const handleOverviewIncomingPress = useCallback(() => {
@@ -4228,7 +4244,7 @@ export const ProRequestsScreen = ({
           </div>
         </section>
 
-        {!isActive && (
+        {activeTab === 'requests' && !isActive && (
           <div className="pro-banner">
             <div>
               <div className="pro-banner-title">Вы на паузе</div>
@@ -4245,7 +4261,7 @@ export const ProRequestsScreen = ({
             </button>
           </div>
         )}
-        {missingFields.length > 0 && (
+        {activeTab === 'requests' && missingFields.length > 0 && (
           <div className="pro-banner">
             <div>
               <div className="pro-banner-title">Чтобы откликаться</div>
@@ -4899,6 +4915,7 @@ export const ProRequestsScreen = ({
               <section
                 className="booking-calendar-card"
                 aria-label="Календарь записей"
+                ref={bookingCalendarRef}
               >
                 <div className="booking-calendar-top">
                   <button
@@ -5006,13 +5023,19 @@ export const ProRequestsScreen = ({
                       ['all', 'Все'],
                       ['free', 'Свободно'],
                       ['booked', 'Записи'],
+                      ['pending', 'Ожидают'],
+                      ['closed', 'Закрыты'],
                     ] as const).map(([value, label]) => {
                       const count =
                         value === 'all'
                           ? slotFilterCounts.all
                           : value === 'free'
                             ? slotFilterCounts.free
-                            : slotFilterCounts.booked
+                            : value === 'booked'
+                              ? slotFilterCounts.booked
+                              : value === 'pending'
+                                ? slotFilterCounts.pending
+                                : slotFilterCounts.closed
                       return (
                         <button
                           key={value}

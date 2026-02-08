@@ -1061,6 +1061,11 @@ body {
   gap: 2px;
 }
 
+.booking-calendar-month-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
 .booking-calendar-day {
   min-height: 44px;
   padding: 7px 4px 6px;
@@ -1077,6 +1082,10 @@ body {
 
 .booking-calendar-day-number {
   font-size: 15px;
+}
+
+.booking-calendar-summary-pill {
+  font-size: 10px;
 }
 
 .booking-calendar-nav {
