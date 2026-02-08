@@ -732,6 +732,8 @@ export const ProRequestsScreen = ({
   const pendingBookingFocusIdRef = useRef<number | null>(null)
   const pendingDepositReviewBookingIdRef = useRef<number | null>(null)
   const manualTabSelectionRef = useRef(false)
+  const lastSeenIncomingCountRef = useRef(0)
+  const [freshIncomingCount, setFreshIncomingCount] = useState(0)
   const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const pendingBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const archivedBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
@@ -3898,6 +3900,13 @@ export const ProRequestsScreen = ({
       bookingCalendarItems[0]
     return upcoming?.booking ?? null
   }, [bookingCalendarItems])
+  const nextConfirmedBookingSummary = nextConfirmedBooking
+    ? `${nextConfirmedBooking.serviceName} · ${formatDateTime(nextConfirmedBooking.scheduledAt)}`
+    : ''
+  const todayConfirmedCount = useMemo(
+    () => bookingSummaryByDate.get(todayKey)?.count ?? 0,
+    [bookingSummaryByDate, todayKey]
+  )
   const preferredTab = useMemo<'requests' | 'bookings'>(() => {
     if (totalIncoming > 0) return 'requests'
     if (confirmedBookingItems.length > 0) return 'bookings'
@@ -3912,6 +3921,17 @@ export const ProRequestsScreen = ({
     }
     setActiveTab((current) => (current === preferredTab ? current : preferredTab))
   }, [focusBookingId, focusRequestId, initialTab, preferredTab])
+  useEffect(() => {
+    if (activeTab === 'requests') {
+      lastSeenIncomingCountRef.current = totalIncoming
+      setFreshIncomingCount(0)
+      return
+    }
+    const seenCount = lastSeenIncomingCountRef.current
+    setFreshIncomingCount(
+      totalIncoming > seenCount ? totalIncoming - seenCount : 0
+    )
+  }, [activeTab, totalIncoming])
 
   const openRequestsOverview = useCallback(
     (options?: { requestId?: number | null; bookingId?: number | null }) => {
@@ -4180,9 +4200,67 @@ export const ProRequestsScreen = ({
             </span>
           </button>
         </div>
+        {activeTab === 'bookings' && freshIncomingCount > 0 && (
+          <div className="requests-priority-banner is-pro" role="status">
+            <div className="requests-priority-banner-body">
+              <span className="requests-priority-banner-dot" aria-hidden="true" />
+              <div>
+                <p className="requests-priority-banner-title">
+                  {freshIncomingCount === 1
+                    ? 'Появилась новая заявка'
+                    : `Новых входящих: ${freshIncomingCount}`}
+                </p>
+                <p className="requests-priority-banner-text">
+                  Перейдите в поток заявок, чтобы быстро ответить клиенту.
+                </p>
+              </div>
+            </div>
+            <button
+              className="requests-priority-banner-action"
+              type="button"
+              onClick={handleOverviewIncomingPress}
+            >
+              Открыть
+            </button>
+          </div>
+        )}
 
         {activeTab === 'requests' && (
           <>
+            {confirmedBookingItems.length > 0 && (
+              <section
+                className="requests-calendar-preview is-pro"
+                aria-label="Быстрый доступ к календарю"
+              >
+                <div className="requests-calendar-preview-copy">
+                  <p className="requests-calendar-preview-kicker">
+                    Календарь и слоты
+                  </p>
+                  <h3 className="requests-calendar-preview-title">
+                    {nextConfirmedBookingSummary
+                      ? `Ближайшая: ${nextConfirmedBookingSummary}`
+                      : 'Подтвержденные записи уже в календаре'}
+                  </h3>
+                  <div className="requests-calendar-preview-meta">
+                    <span className="requests-calendar-preview-pill">
+                      Подтверждены: {confirmedBookingItems.length}
+                    </span>
+                    {todayConfirmedCount > 0 && (
+                      <span className="requests-calendar-preview-pill">
+                        Сегодня: {todayConfirmedCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  className="requests-calendar-preview-action"
+                  type="button"
+                  onClick={handleOverviewConfirmedPress}
+                >
+                  К календарю
+                </button>
+              </section>
+            )}
             {showRequestsLoadingCard && (
               <div className="requests-state-card is-loading" role="status">
                 <p className="requests-state-title">{requestsTabLoadTitle}</p>

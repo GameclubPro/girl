@@ -386,6 +386,8 @@ export const ClientRequestsScreen = ({
   const pendingBookingFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusFilterRef = useRef<'all' | 'action' | 'keep'>('all')
   const manualTabSelectionRef = useRef(false)
+  const lastSeenOpenRequestsRef = useRef(0)
+  const [freshOpenRequestsCount, setFreshOpenRequestsCount] = useState(0)
   const [weekStartDate, setWeekStartDate] = useState(() =>
     startOfWeek(new Date())
   )
@@ -749,6 +751,17 @@ export const ClientRequestsScreen = ({
     }
     setActiveTab((current) => (current === preferredTab ? current : preferredTab))
   }, [focusBookingId, focusRequestId, initialTab, preferredTab])
+  useEffect(() => {
+    if (activeTab === 'requests') {
+      lastSeenOpenRequestsRef.current = openRequestsCount
+      setFreshOpenRequestsCount(0)
+      return
+    }
+    const seenCount = lastSeenOpenRequestsRef.current
+    setFreshOpenRequestsCount(
+      openRequestsCount > seenCount ? openRequestsCount - seenCount : 0
+    )
+  }, [activeTab, openRequestsCount])
   const depositSheetBooking = useMemo(
     () =>
       depositSheetBookingId === null
@@ -938,6 +951,10 @@ export const ClientRequestsScreen = ({
     today.setHours(0, 0, 0, 0)
     return toDateKey(today)
   }, [])
+  const todayBookingsCount = useMemo(
+    () => bookingSummaryByDate.get(todayKey)?.count ?? 0,
+    [bookingSummaryByDate, todayKey]
+  )
 
   useEffect(() => {
     if (calendarInitialized || bookingCalendarItems.length === 0) return
@@ -1931,6 +1948,30 @@ export const ClientRequestsScreen = ({
               ? 'Отклики по заявкам и быстрый запуск новой заявки.'
               : 'Подтвержденные слоты, календарь и депозиты.'}
           </div>
+          {activeTab === 'bookings' && freshOpenRequestsCount > 0 && (
+            <div className="requests-priority-banner" role="status">
+              <div className="requests-priority-banner-body">
+                <span className="requests-priority-banner-dot" aria-hidden="true" />
+                <div>
+                  <p className="requests-priority-banner-title">
+                    {freshOpenRequestsCount === 1
+                      ? 'Появилась новая заявка'
+                      : `Новых заявок: ${freshOpenRequestsCount}`}
+                  </p>
+                  <p className="requests-priority-banner-text">
+                    Приоритетно проверьте отклики, чтобы не упустить мастера.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="requests-priority-banner-action"
+                type="button"
+                onClick={handleOverviewRequestsPress}
+              >
+                Открыть
+              </button>
+            </div>
+          )}
           {activeTab === 'requests' && (
             <div className="requests-top">
               <h2 className="requests-title">Активные</h2>
@@ -1942,6 +1983,35 @@ export const ClientRequestsScreen = ({
                 + Новая заявка
               </button>
             </div>
+          )}
+          {activeTab === 'requests' && activeBookingsCount > 0 && (
+            <section className="requests-calendar-preview" aria-label="Ближайшие записи">
+              <div className="requests-calendar-preview-copy">
+                <p className="requests-calendar-preview-kicker">Календарь под рукой</p>
+                <h3 className="requests-calendar-preview-title">
+                  {nextBookingSummary
+                    ? `Ближайшая: ${nextBookingSummary}`
+                    : 'У вас есть подтвержденные записи'}
+                </h3>
+                <div className="requests-calendar-preview-meta">
+                  <span className="requests-calendar-preview-pill">
+                    Записей: {activeBookingsCount}
+                  </span>
+                  {todayBookingsCount > 0 && (
+                    <span className="requests-calendar-preview-pill">
+                      Сегодня: {todayBookingsCount}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                className="requests-calendar-preview-action"
+                type="button"
+                onClick={() => handleOverviewBookingsPress()}
+              >
+                К календарю
+              </button>
+            </section>
           )}
 
           {activeTab === 'bookings' && (
