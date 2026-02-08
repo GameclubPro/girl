@@ -21,6 +21,8 @@ type ThemePreset = {
   params: TelegramThemeParams
 }
 
+type PartialInsets = Partial<Insets>
+
 const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on'])
 const FALSE_VALUES = new Set(['0', 'false', 'no', 'off'])
 const THEME_KEYS = new Set<ThemeMode>(['light', 'dark'])
@@ -131,11 +133,36 @@ const runCallbacks = (callbacks: Set<EventCallback>, ...args: unknown[]) => {
   })
 }
 
-const readInsets = (params: URLSearchParams, defaults: Insets): Insets => ({
-  top: clamp(parseNumber(params.get('tgTopInset'), defaults.top), 0, 64),
-  bottom: clamp(parseNumber(params.get('tgBottomInset'), defaults.bottom), 0, 64),
-  left: clamp(parseNumber(params.get('tgLeftInset'), defaults.left), 0, 24),
-  right: clamp(parseNumber(params.get('tgRightInset'), defaults.right), 0, 24),
+const readInsetOverride = (
+  params: URLSearchParams,
+  key: string,
+  min: number,
+  max: number
+): number | undefined => {
+  const raw = params.get(key)
+  if (raw == null || raw.trim() === '') return undefined
+  return clamp(parseNumber(raw, min), min, max)
+}
+
+const readInsetOverrides = (
+  params: URLSearchParams,
+  prefix: 'tg' | 'tgContent'
+): PartialInsets => ({
+  top: readInsetOverride(params, `${prefix}TopInset`, 0, 64),
+  bottom: readInsetOverride(params, `${prefix}BottomInset`, 0, 64),
+  left: readInsetOverride(params, `${prefix}LeftInset`, 0, 24),
+  right: readInsetOverride(params, `${prefix}RightInset`, 0, 24),
+})
+
+const resolveInsets = (
+  defaults: Insets,
+  primary: PartialInsets,
+  fallback?: PartialInsets
+): Insets => ({
+  top: primary.top ?? fallback?.top ?? defaults.top,
+  bottom: primary.bottom ?? fallback?.bottom ?? defaults.bottom,
+  left: primary.left ?? fallback?.left ?? defaults.left,
+  right: primary.right ?? fallback?.right ?? defaults.right,
 })
 
 const canUseColor = (value: string) =>
@@ -228,15 +255,26 @@ export const setupTelegramEmulator = () => {
   const targetHeight = clamp(parseNumber(params.get('tgHeight'), 852), 640, 1080)
   const expandedToggle = parseBoolean(params.get('tgExpanded'))
   const fullscreenToggle = parseBoolean(params.get('tgFullscreen'))
-  const shouldStartFullscreen = fullscreenToggle ?? false
+  const shouldStartFullscreen = fullscreenToggle ?? true
   const shouldStartExpanded = expandedToggle ?? true
   const shouldStartExpandedState = shouldStartExpanded || shouldStartFullscreen
   const statusHeight = platformMode === 'ios' ? 20 : 24
   const topBarHeight = platformMode === 'ios' ? 44 : 48
-  const safeDefaults =
+  const collapsedSafeDefaults: Insets =
     platformMode === 'ios'
       ? { top: 0, bottom: 34, left: 0, right: 0 }
       : { top: 0, bottom: 16, left: 0, right: 0 }
+  const fullscreenSafeDefaults: Insets =
+    platformMode === 'ios'
+      ? { top: 47, bottom: 34, left: 0, right: 0 }
+      : { top: 24, bottom: 16, left: 0, right: 0 }
+  const collapsedContentSafeDefaults: Insets = {
+    top: 0,
+    bottom: collapsedSafeDefaults.bottom,
+    left: collapsedSafeDefaults.left,
+    right: collapsedSafeDefaults.right,
+  }
+  const fullscreenContentSafeDefaults: Insets = { ...fullscreenSafeDefaults }
 
   document.documentElement.style.setProperty('--tg-emulator-width', `${targetWidth}px`)
   document.documentElement.style.setProperty('--tg-emulator-height', `${targetHeight}px`)
@@ -249,8 +287,24 @@ export const setupTelegramEmulator = () => {
     `${topBarHeight}px`
   )
 
-  const safeAreaInset = readInsets(params, safeDefaults)
-  const contentSafeAreaInset = readInsets(params, safeDefaults)
+  const safeInsetOverrides = readInsetOverrides(params, 'tg')
+  const contentInsetOverrides = readInsetOverrides(params, 'tgContent')
+
+  const resolveSafeAreaByState = (isFullscreen: boolean) =>
+    resolveInsets(
+      isFullscreen ? fullscreenSafeDefaults : collapsedSafeDefaults,
+      safeInsetOverrides
+    )
+
+  const resolveContentSafeAreaByState = (isFullscreen: boolean) =>
+    resolveInsets(
+      isFullscreen ? fullscreenContentSafeDefaults : collapsedContentSafeDefaults,
+      contentInsetOverrides,
+      safeInsetOverrides
+    )
+
+  let safeAreaInset = resolveSafeAreaByState(shouldStartFullscreen)
+  let contentSafeAreaInset = resolveContentSafeAreaByState(shouldStartFullscreen)
   const eventListeners = new Map<string, Set<EventCallback>>()
 
   const emitEvent = (eventType: string, ...args: unknown[]) => {
@@ -479,15 +533,28 @@ export const setupTelegramEmulator = () => {
     expand: () => {
       webApp.isExpanded = true
       body.classList.add('tg-emulator-expanded')
-      emitEvent('viewportChanged')
+      updateViewportMetrics()
     },
     close: () => {
       if (webApp.isClosingConfirmationEnabled) return
     },
     requestFullscreen: () => {
+      if (webApp.isFullscreen) return
       webApp.isExpanded = true
+      webApp.isFullscreen = true
+      body.classList.add('tg-emulator-expanded')
       body.classList.add('tg-emulator-fullscreen')
-      emitEvent('viewportChanged')
+      syncInsets()
+      updateViewportMetrics()
+      emitEvent('fullscreenChanged', { is_fullscreen: true })
+    },
+    exitFullscreen: () => {
+      if (!webApp.isFullscreen) return
+      webApp.isFullscreen = false
+      body.classList.remove('tg-emulator-fullscreen')
+      syncInsets()
+      updateViewportMetrics()
+      emitEvent('fullscreenChanged', { is_fullscreen: false })
     },
     openLink: (url) => {
       window.open(url, '_blank', 'noopener,noreferrer')
@@ -543,6 +610,7 @@ export const setupTelegramEmulator = () => {
     version: '9.9',
     colorScheme: themePreset.mode,
     isExpanded: shouldStartExpandedState,
+    isFullscreen: shouldStartFullscreen,
     isClosingConfirmationEnabled: false,
     viewportHeight: window.innerHeight,
     viewportStableHeight: window.innerHeight,
@@ -585,9 +653,23 @@ export const setupTelegramEmulator = () => {
     body.classList.add('tg-emulator-fullscreen')
   }
 
+  const syncInsets = (emitChanges = true) => {
+    safeAreaInset = resolveSafeAreaByState(Boolean(webApp.isFullscreen))
+    contentSafeAreaInset = resolveContentSafeAreaByState(Boolean(webApp.isFullscreen))
+    webApp.safeAreaInset = { ...safeAreaInset }
+    webApp.contentSafeAreaInset = { ...contentSafeAreaInset }
+    if (emitChanges) {
+      emitEvent('safeAreaChanged')
+      emitEvent('contentSafeAreaChanged')
+    }
+  }
+
   const updateViewportMetrics = () => {
-    const bottomOffset = mainButtonState.visible ? 58 : 0
-    const height = Math.max(0, window.innerHeight - bottomOffset)
+    const topOffset = webApp.isFullscreen ? 0 : statusHeight + topBarHeight
+    const safeBottomInset =
+      webApp.contentSafeAreaInset?.bottom ?? webApp.safeAreaInset?.bottom ?? 0
+    const bottomOffset = mainButtonState.visible ? 74 + safeBottomInset : 0
+    const height = Math.max(0, window.innerHeight - topOffset - bottomOffset)
     webApp.viewportHeight = height
     webApp.viewportStableHeight = height
     emitEvent('viewportChanged')
@@ -640,15 +722,13 @@ export const setupTelegramEmulator = () => {
   renderMainButton()
 
   const handleResize = () => {
+    syncInsets()
     updateViewportMetrics()
-    emitEvent('safeAreaChanged')
-    emitEvent('contentSafeAreaChanged')
   }
 
   window.addEventListener('resize', handleResize)
   emitEvent('themeChanged')
-  emitEvent('safeAreaChanged')
-  emitEvent('contentSafeAreaChanged')
+  syncInsets()
   updateViewportMetrics()
 
   window.Telegram = {

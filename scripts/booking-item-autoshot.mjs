@@ -40,7 +40,8 @@ const apiBase = args.get('apiBase') ?? 'https://third.play-team.online'
 const scenario = args.get('scenario') ?? 'master-pending'
 const tab = args.get('tab') ?? 'requests'
 const url =
-  args.get('url') ?? `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}`
+  args.get('url') ??
+  `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}&tgPlatform=ios&tgTheme=light&tgExpanded=1&tgFullscreen=1&tgTopInset=47&tgBottomInset=34&tgContentTopInset=47&tgContentBottomInset=34`
 const output = resolve(
   args.get('out') ?? `.logs/booking-item-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
 )

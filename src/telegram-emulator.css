@@ -16,6 +16,12 @@ body.tg-emulator-mode #root {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 22px 48px rgba(0, 0, 0, 0.42);
 }
 
+body.tg-emulator-mode.tg-emulator-fullscreen #root {
+  --tg-emulator-top-offset: 0px;
+  min-height: 100dvh;
+  margin-top: 0;
+}
+
 .tg-emulator-overlay {
   position: fixed;
   inset: 0 auto 0 50%;
@@ -39,6 +45,11 @@ body.tg-emulator-mode #root {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+body.tg-emulator-mode.tg-emulator-fullscreen .tg-emulator-status {
+  background: color-mix(in srgb, var(--tg-emulator-app-bg, #ffffff) 82%, transparent);
+  border-bottom: none;
 }
 
 .tg-emulator-status-icons {
@@ -110,6 +121,10 @@ body.tg-emulator-mode #root {
   background: var(--tg-emulator-header-bg, #ffffff);
   color: var(--tg-emulator-header-text, #111827);
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.tg-emulator-mode.tg-emulator-fullscreen .tg-emulator-topbar {
+  display: none;
 }
 
 .tg-emulator-header-back {

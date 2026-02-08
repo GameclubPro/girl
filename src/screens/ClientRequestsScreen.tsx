@@ -428,9 +428,10 @@ export const ClientRequestsScreen = ({
         })
         if (requestsRequestIdRef.current === requestId) {
           setRequests(Array.isArray(data) ? data : [])
+          setLoadError('')
         }
       } catch (error) {
-        if (requestsRequestIdRef.current === requestId && !silent) {
+        if (requestsRequestIdRef.current === requestId) {
           setLoadError('Не удалось загрузить заявки.')
         }
       } finally {
@@ -476,10 +477,10 @@ export const ClientRequestsScreen = ({
         })
         if (bookingsRequestIdRef.current === requestId) {
           setBookings(Array.isArray(data) ? data : [])
+          setBookingsError('')
         }
       } catch (error) {
         if (bookingsRequestIdRef.current === requestId) {
-          setBookings([])
           setBookingsError('Не удалось загрузить записи.')
         }
       } finally {
@@ -703,6 +704,12 @@ export const ClientRequestsScreen = ({
     nextDepositHoldMsLeft <= CRITICAL_HOLD_MINUTES * 60 * 1000
   const hasSyncIssues = Boolean(loadError || bookingsError)
   const isSyncing = isLoading || isBookingsLoading
+  const showRequestsLoadingCard = isLoading && items.length === 0
+  const showRequestsHardError = Boolean(loadError) && items.length === 0
+  const showRequestsSoftError = Boolean(loadError) && items.length > 0
+  const showBookingsLoadingCard = isBookingsLoading && bookingItems.length === 0
+  const showBookingsHardError = Boolean(bookingsError) && bookingItems.length === 0
+  const showBookingsSoftError = Boolean(bookingsError) && bookingItems.length > 0
   const requestsOverviewSubtitle =
     activeTab === 'requests'
       ? 'Отклики и запуск новых заявок в одном месте.'
@@ -1946,7 +1953,7 @@ export const ClientRequestsScreen = ({
 
           {activeTab === 'requests' && (
             <>
-              {isLoading && (
+              {showRequestsLoadingCard && (
                 <div className="requests-state-card is-loading" role="status">
                   <p className="requests-state-title">Загружаем заявки</p>
                   <p className="requests-state-text">
@@ -1954,32 +1961,43 @@ export const ClientRequestsScreen = ({
                   </p>
                 </div>
               )}
-              {loadError && (
+              {showRequestsHardError && (
                 <div className="requests-state-card is-error" role="alert">
                   <p className="requests-state-title">Не удалось загрузить заявки</p>
-                  <p className="requests-state-text">{loadError}</p>
+                  <p className="requests-state-text">
+                    Не получилось синхронизировать отклики. Можно повторить запрос
+                    или сразу создать новую заявку.
+                  </p>
+                  <div className="requests-state-actions">
+                    <button
+                      className="requests-state-action"
+                      type="button"
+                      onClick={() => void loadRequests()}
+                    >
+                      Повторить
+                    </button>
+                    <button
+                      className="requests-state-action is-secondary"
+                      type="button"
+                      onClick={onCreateRequest}
+                    >
+                      Создать заявку
+                    </button>
+                  </div>
+                </div>
+              )}
+              {showRequestsSoftError && (
+                <div className="requests-sync-banner is-error" role="status">
+                  <p className="requests-sync-banner-text">
+                    Не удалось обновить отклики. Показываем последние сохраненные
+                    данные.
+                  </p>
                   <button
-                    className="requests-state-action"
+                    className="requests-sync-banner-action"
                     type="button"
                     onClick={() => void loadRequests()}
                   >
-                    Повторить
-                  </button>
-                </div>
-              )}
-              {loadError && items.length === 0 && (
-                <div className="requests-state-card is-empty" role="status">
-                  <p className="requests-state-title">Продолжайте поиск мастера</p>
-                  <p className="requests-state-text">
-                    Пока нет данных по откликам. Можно создать новую заявку и вернуться
-                    к ленте позже.
-                  </p>
-                  <button
-                    className="requests-state-action"
-                    type="button"
-                    onClick={onCreateRequest}
-                  >
-                    Создать заявку
+                    Обновить
                   </button>
                 </div>
               )}
@@ -2401,7 +2419,7 @@ export const ClientRequestsScreen = ({
 
           {activeTab === 'bookings' && (
             <>
-              {isBookingsLoading && (
+              {showBookingsLoadingCard && (
                 <div className="requests-state-card is-loading" role="status">
                   <p className="requests-state-title">Загружаем записи</p>
                   <p className="requests-state-text">
@@ -2409,7 +2427,7 @@ export const ClientRequestsScreen = ({
                   </p>
                 </div>
               )}
-              {bookingsError && (
+              {showBookingsHardError && (
                 <div className="requests-state-card is-error" role="alert">
                   <p className="requests-state-title">Не удалось загрузить записи</p>
                   <p className="requests-state-text">{bookingsError}</p>
@@ -2422,13 +2440,19 @@ export const ClientRequestsScreen = ({
                   </button>
                 </div>
               )}
-              {bookingsError && bookingItems.length === 0 && (
-                <div className="requests-state-card is-empty" role="status">
-                  <p className="requests-state-title">Записи появятся здесь</p>
-                  <p className="requests-state-text">
-                    Проверьте соединение и обновите экран позже. Новые подтверждения
-                    от мастеров отобразятся автоматически.
+              {showBookingsSoftError && (
+                <div className="requests-sync-banner is-error" role="status">
+                  <p className="requests-sync-banner-text">
+                    Не удалось обновить записи. Показываем последние сохраненные
+                    встречи.
                   </p>
+                  <button
+                    className="requests-sync-banner-action"
+                    type="button"
+                    onClick={() => void loadBookings()}
+                  >
+                    Обновить
+                  </button>
                 </div>
               )}
 

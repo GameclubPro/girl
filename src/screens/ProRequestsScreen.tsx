@@ -707,7 +707,6 @@ export const ProRequestsScreen = ({
     () => initialTab ?? 'requests'
   )
   const [requests, setRequests] = useState<ProRequest[]>([])
-  const [requestsFetched, setRequestsFetched] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [submitError, setSubmitError] = useState<Record<number, string>>({})
@@ -732,8 +731,6 @@ export const ProRequestsScreen = ({
   const pendingRequestFocusIdRef = useRef<number | null>(null)
   const pendingBookingFocusIdRef = useRef<number | null>(null)
   const pendingDepositReviewBookingIdRef = useRef<number | null>(null)
-  const autoSwitchHandledRef = useRef(false)
-  const autoSwitchLockedRef = useRef(false)
   const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const pendingBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const archivedBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
@@ -818,7 +815,6 @@ export const ProRequestsScreen = ({
   const stream = useMemo(() => getChatStream(apiBase, userId), [apiBase, userId])
 
   const handleUserTabChange = useCallback((next: 'requests' | 'bookings') => {
-    autoSwitchLockedRef.current = true
     setActiveTab(next)
   }, [])
 
@@ -859,47 +855,6 @@ export const ProRequestsScreen = ({
   useEffect(() => {
     onTabChange?.(activeTab)
   }, [activeTab, onTabChange])
-  useEffect(() => {
-    if (!requestsFetched) return
-    if (autoSwitchHandledRef.current) return
-    if (autoSwitchLockedRef.current) {
-      autoSwitchHandledRef.current = true
-      return
-    }
-    if (activeTab !== 'requests') {
-      autoSwitchHandledRef.current = true
-      return
-    }
-    if (typeof focusRequestId === 'number') {
-      autoSwitchHandledRef.current = true
-      return
-    }
-    if (pendingRequestFocusIdRef.current !== null) {
-      autoSwitchHandledRef.current = true
-      return
-    }
-    if (loadError) return
-    if (requests.length > 0) {
-      autoSwitchHandledRef.current = true
-      return
-    }
-    const hasPipelineBookings = bookings.some((booking) =>
-      isBookingInRequestsPipeline(booking)
-    )
-    if (hasPipelineBookings) {
-      autoSwitchHandledRef.current = true
-      return
-    }
-    autoSwitchHandledRef.current = true
-    setActiveTab('bookings')
-  }, [
-    activeTab,
-    bookings,
-    focusRequestId,
-    loadError,
-    requests.length,
-    requestsFetched,
-  ])
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return
     const scheduleKey = buildSlotScheduleKey(userId)
@@ -960,7 +915,6 @@ export const ProRequestsScreen = ({
     async (options?: { silent?: boolean; force?: boolean }) => {
       if (!userId) return
       const requestId = (requestsRequestIdRef.current += 1)
-      setRequestsFetched(false)
       const silent = options?.silent ?? false
       if (!silent) {
         setIsLoading(true)
@@ -988,14 +942,14 @@ export const ProRequestsScreen = ({
         })
         if (requestsRequestIdRef.current === requestId) {
           applyRequestsPayload(data)
+          setLoadError('')
         }
       } catch (error) {
-        if (requestsRequestIdRef.current === requestId && !silent) {
+        if (requestsRequestIdRef.current === requestId) {
           setLoadError('Не удалось загрузить заявки.')
         }
       } finally {
         if (requestsRequestIdRef.current === requestId) {
-          setRequestsFetched(true)
           if (!silent) {
             setIsLoading(false)
           }
@@ -1040,10 +994,10 @@ export const ProRequestsScreen = ({
         })
         if (bookingsRequestIdRef.current === requestId) {
           applyBookingsPayload(data)
+          setBookingsError('')
         }
       } catch (error) {
-        if (bookingsRequestIdRef.current === requestId && !silent) {
-          setBookings([])
+        if (bookingsRequestIdRef.current === requestId) {
           setBookingsError('Не удалось загрузить записи.')
         }
       } finally {
@@ -2731,6 +2685,8 @@ export const ProRequestsScreen = ({
         : `${missingLabels.slice(0, 2).join(', ')} и еще ${missingLabels.length - 2}`
   const hasActiveRequests = items.length > 0
   const hasPendingBookings = pendingBookingItems.length > 0
+  const hasProfileBlockers =
+    !isActive || missingFields.some((field) => field !== 'displayName')
   const showRequestsEmpty =
     !isLoading &&
     !isBookingsLoading &&
@@ -2738,6 +2694,7 @@ export const ProRequestsScreen = ({
     !hasPendingBookings &&
     !loadError &&
     !bookingsError
+  const showRequestsEmptyCard = showRequestsEmpty && !hasProfileBlockers
   const historySectionId = 'pro-requests-history'
   const historyToggleLabel = isHistoryOpen ? 'Свернуть' : 'Показать'
   const renderShareCard = () => (
@@ -3876,6 +3833,14 @@ export const ProRequestsScreen = ({
   const pendingActionsTotal = pendingBookingItems.length + attentionFromRequests
   const hasSyncIssues = Boolean(loadError || bookingsError)
   const isSyncing = isLoading || isBookingsLoading
+  const hasRequestsContent = items.length > 0 || pendingBookingItems.length > 0
+  const hasBookingsContent = confirmedBookingItems.length > 0
+  const showRequestsLoadingCard = isSyncing && !hasRequestsContent
+  const showRequestsHardError = hasSyncIssues && !isSyncing && !hasRequestsContent
+  const showRequestsSoftError = hasSyncIssues && hasRequestsContent
+  const showBookingsLoadingCard = isBookingsLoading && !hasBookingsContent
+  const showBookingsHardError = Boolean(bookingsError) && !hasBookingsContent
+  const showBookingsSoftError = Boolean(bookingsError) && hasBookingsContent
   const requestsTabLoadTitle =
     isLoading && isBookingsLoading
       ? 'Обновляем заявки и записи'
@@ -4036,13 +4001,13 @@ export const ProRequestsScreen = ({
 
         {activeTab === 'requests' && (
           <>
-            {isSyncing && (
+            {showRequestsLoadingCard && (
               <div className="requests-state-card is-loading" role="status">
                 <p className="requests-state-title">{requestsTabLoadTitle}</p>
                 <p className="requests-state-text">{requestsTabLoadText}</p>
               </div>
             )}
-            {hasSyncIssues && (
+            {showRequestsHardError && (
               <div className="requests-state-card is-error" role="alert">
                 <p className="requests-state-title">{requestsTabErrorTitle}</p>
                 <p className="requests-state-text">{requestsTabErrorText}</p>
@@ -4062,26 +4027,40 @@ export const ProRequestsScreen = ({
                 </button>
               </div>
             )}
+            {showRequestsSoftError && (
+              <div className="requests-sync-banner is-error" role="status">
+                <p className="requests-sync-banner-text">
+                  Синхронизация потока прервалась. Показываем последние сохраненные
+                  данные.
+                </p>
+                <button
+                  className="requests-sync-banner-action"
+                  type="button"
+                  onClick={() => {
+                    if (loadError) {
+                      void loadRequests({ force: true })
+                    }
+                    if (bookingsError) {
+                      void loadBookings({ force: true })
+                    }
+                  }}
+                >
+                  Обновить
+                </button>
+              </div>
+            )}
 
-            {showRequestsEmpty && (
+            {showRequestsEmptyCard && (
               <div className="requests-state-card is-empty" role="status">
                 <p className="requests-state-title">
-                  {!isActive
-                    ? 'Вы на паузе'
-                    : missingFields.some((field) => field !== 'displayName')
-                      ? 'Профиль требует обновления'
-                      : 'Пока нет заявок и записей в работе'}
+                  Пока нет заявок и записей в работе
                 </p>
                 <p className="requests-state-text">
-                  {!isActive
-                    ? 'Включите прием заявок в профиле, чтобы получать новые отклики.'
-                    : missingFields.some((field) => field !== 'displayName')
-                      ? 'Заполните ключевые поля профиля, и заявки снова появятся.'
-                      : 'Ссылка для записи ниже поможет привлечь новых клиентов быстрее.'}
+                  Ссылка для записи ниже поможет привлечь новых клиентов быстрее.
                 </p>
               </div>
             )}
-            {(showRequestsEmpty || hasSyncIssues) && renderShareCard()}
+            {(showRequestsEmpty || showRequestsHardError) && renderShareCard()}
 
             {items.length > 0 && (
               <div className="requests-section">
@@ -4971,7 +4950,7 @@ export const ProRequestsScreen = ({
                 </div>
               </section>
 
-              {isBookingsLoading && (
+              {showBookingsLoadingCard && (
                 <div className="requests-state-card is-loading" role="status">
                   <p className="requests-state-title">Загружаем записи</p>
                   <p className="requests-state-text">
@@ -4979,7 +4958,7 @@ export const ProRequestsScreen = ({
                   </p>
                 </div>
               )}
-              {bookingsError && (
+              {showBookingsHardError && (
                 <div className="requests-state-card is-error" role="alert">
                   <p className="requests-state-title">Не удалось загрузить записи</p>
                   <p className="requests-state-text">{bookingsError}</p>
@@ -4992,7 +4971,22 @@ export const ProRequestsScreen = ({
                   </button>
                 </div>
               )}
-              {renderShareCard()}
+              {showBookingsSoftError && (
+                <div className="requests-sync-banner is-error" role="status">
+                  <p className="requests-sync-banner-text">
+                    Не удалось обновить записи. В календаре отображены последние
+                    доступные данные.
+                  </p>
+                  <button
+                    className="requests-sync-banner-action"
+                    type="button"
+                    onClick={() => void loadBookings({ force: true })}
+                  >
+                    Обновить
+                  </button>
+                </div>
+              )}
+              {(!hasBookingsContent || showBookingsHardError) && renderShareCard()}
             </>
           )}
       </div>

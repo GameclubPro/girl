@@ -38,7 +38,8 @@ const args = parseArgs(process.argv.slice(2))
 const userId = args.get('userId') ?? '100001'
 const apiBase = args.get('apiBase') ?? 'https://third.play-team.online'
 const url =
-  args.get('url') ?? `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}`
+  args.get('url') ??
+  `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}&tgPlatform=ios&tgTheme=light&tgExpanded=1&tgFullscreen=1&tgTopInset=47&tgBottomInset=34&tgContentTopInset=47&tgContentBottomInset=34`
 const output = resolve(
   args.get('out') ?? `.logs/deposit-sheet-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
 )

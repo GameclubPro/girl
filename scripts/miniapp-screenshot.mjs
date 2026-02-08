@@ -40,7 +40,9 @@ const toBoolean = (value) => {
 }
 
 const args = parseArgs(process.argv.slice(2))
-const url = args.get('url') ?? 'http://127.0.0.1:5173/?tgEmu=1'
+const url =
+  args.get('url') ??
+  'http://127.0.0.1:5173/?tgEmu=1&tgPlatform=ios&tgTheme=light&tgExpanded=1&tgFullscreen=1&tgTopInset=47&tgBottomInset=34&tgContentTopInset=47&tgContentBottomInset=34'
 const output = resolve(
   args.get('out') ?? `.logs/miniapp-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
 )

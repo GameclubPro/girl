@@ -48,6 +48,7 @@ declare global {
     expand: () => void
     close?: () => void
     requestFullscreen?: () => void
+    exitFullscreen?: () => void
     openLink?: (url: string, options?: { try_instant_view?: boolean }) => void
     openTelegramLink?: (url: string) => void
     disableVerticalSwipes?: () => void
@@ -60,6 +61,7 @@ declare global {
     version?: string
     colorScheme?: 'light' | 'dark'
     isExpanded?: boolean
+    isFullscreen?: boolean
     isClosingConfirmationEnabled?: boolean
     viewportHeight?: number
     viewportStableHeight?: number
