@@ -88,6 +88,14 @@ const BOOKING_DURATION_MIN = 60
 const PRICE_OFFER_HOURS = 12
 const FREE_CANCEL_HOURS = 12
 const LIVE_REFRESH_INTERVAL_MS = 20_000
+const PRIORITY_SHEET_COOLDOWN_MS = 6 * 60 * 60 * 1000
+
+const buildProSeenRequestIdKey = (userId: string) =>
+  `pro-requests-seen-request-id:${userId}`
+const buildProSeenPipelineBookingIdKey = (userId: string) =>
+  `pro-requests-seen-pipeline-booking-id:${userId}`
+const buildProPrioritySheetAtKey = (userId: string) =>
+  `pro-requests-priority-sheet-at:${userId}`
 
 const getDayKey = (date: Date) => dayKeyOrder[date.getDay()] ?? 'mon'
 
@@ -732,8 +740,11 @@ export const ProRequestsScreen = ({
   const pendingBookingFocusIdRef = useRef<number | null>(null)
   const pendingDepositReviewBookingIdRef = useRef<number | null>(null)
   const manualTabSelectionRef = useRef(false)
-  const lastSeenIncomingCountRef = useRef(0)
-  const [freshIncomingCount, setFreshIncomingCount] = useState(0)
+  const priorityEntryCheckRef = useRef(false)
+  const [seenIncomingRequestId, setSeenIncomingRequestId] = useState(0)
+  const [seenIncomingBookingId, setSeenIncomingBookingId] = useState(0)
+  const [lastPrioritySheetAt, setLastPrioritySheetAt] = useState(0)
+  const [isPrioritySheetOpen, setIsPrioritySheetOpen] = useState(false)
   const requestsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const pendingBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
   const archivedBookingsVirtualRef = useRef<VirtualStackHandle | null>(null)
@@ -821,6 +832,83 @@ export const ProRequestsScreen = ({
     manualTabSelectionRef.current = true
     setActiveTab(next)
   }, [])
+
+  const persistSeenIncomingRequestId = useCallback(
+    (value: number) => {
+      if (!userId || typeof window === 'undefined') return
+      try {
+        window.localStorage.setItem(
+          buildProSeenRequestIdKey(userId),
+          String(Math.max(0, value))
+        )
+      } catch {
+        // ignore storage errors
+      }
+    },
+    [userId]
+  )
+
+  const persistSeenIncomingBookingId = useCallback(
+    (value: number) => {
+      if (!userId || typeof window === 'undefined') return
+      try {
+        window.localStorage.setItem(
+          buildProSeenPipelineBookingIdKey(userId),
+          String(Math.max(0, value))
+        )
+      } catch {
+        // ignore storage errors
+      }
+    },
+    [userId]
+  )
+
+  const persistPrioritySheetShownAt = useCallback(
+    (value: number) => {
+      if (!userId || typeof window === 'undefined') return
+      try {
+        window.localStorage.setItem(
+          buildProPrioritySheetAtKey(userId),
+          String(Math.max(0, value))
+        )
+      } catch {
+        // ignore storage errors
+      }
+    },
+    [userId]
+  )
+
+  useEffect(() => {
+    priorityEntryCheckRef.current = false
+    setIsPrioritySheetOpen(false)
+    if (!userId || typeof window === 'undefined') {
+      setSeenIncomingRequestId(0)
+      setSeenIncomingBookingId(0)
+      setLastPrioritySheetAt(0)
+      return
+    }
+    try {
+      const rawRequestId = window.localStorage.getItem(buildProSeenRequestIdKey(userId))
+      const rawBookingId = window.localStorage.getItem(
+        buildProSeenPipelineBookingIdKey(userId)
+      )
+      const rawShownAt = window.localStorage.getItem(buildProPrioritySheetAtKey(userId))
+      const requestId = Number.parseInt(rawRequestId ?? '0', 10)
+      const bookingId = Number.parseInt(rawBookingId ?? '0', 10)
+      const shownAt = Number.parseInt(rawShownAt ?? '0', 10)
+      setSeenIncomingRequestId(
+        Number.isFinite(requestId) ? Math.max(0, requestId) : 0
+      )
+      setSeenIncomingBookingId(
+        Number.isFinite(bookingId) ? Math.max(0, bookingId) : 0
+      )
+      setLastPrioritySheetAt(Number.isFinite(shownAt) ? Math.max(0, shownAt) : 0)
+    } catch {
+      setSeenIncomingRequestId(0)
+      setSeenIncomingBookingId(0)
+      setLastPrioritySheetAt(0)
+    }
+  }, [userId])
 
   useEffect(() => {
     if (!initialTab) return
@@ -3831,6 +3919,21 @@ export const ProRequestsScreen = ({
     }
   }
 
+  const newestIncomingRequestId = useMemo(
+    () => items.reduce((max, item) => Math.max(max, item.id), 0),
+    [items]
+  )
+  const newestIncomingBookingId = useMemo(
+    () => pendingBookingItems.reduce((max, booking) => Math.max(max, booking.id), 0),
+    [pendingBookingItems]
+  )
+  const freshIncomingCount = useMemo(
+    () =>
+      items.filter((item) => item.id > seenIncomingRequestId).length +
+      pendingBookingItems.filter((booking) => booking.id > seenIncomingBookingId)
+        .length,
+    [items, pendingBookingItems, seenIncomingBookingId, seenIncomingRequestId]
+  )
   const totalIncoming = items.length + pendingBookingItems.length
   const attentionFromRequests = items.filter(
     (item) => item.nextAction && item.nextAction.tone !== 'neutral'
@@ -3908,8 +4011,8 @@ export const ProRequestsScreen = ({
     [bookingSummaryByDate, todayKey]
   )
   const preferredTab = useMemo<'requests' | 'bookings'>(() => {
-    if (totalIncoming > 0) return 'requests'
     if (confirmedBookingItems.length > 0) return 'bookings'
+    if (totalIncoming > 0) return 'requests'
     return 'requests'
   }, [confirmedBookingItems, totalIncoming])
 
@@ -3921,17 +4024,58 @@ export const ProRequestsScreen = ({
     }
     setActiveTab((current) => (current === preferredTab ? current : preferredTab))
   }, [focusBookingId, focusRequestId, initialTab, preferredTab])
+  const markIncomingSeen = useCallback(
+    (options?: { requestId?: number; bookingId?: number }) => {
+      const nextRequestId = Math.max(
+        options?.requestId ?? newestIncomingRequestId,
+        seenIncomingRequestId
+      )
+      const nextBookingId = Math.max(
+        options?.bookingId ?? newestIncomingBookingId,
+        seenIncomingBookingId
+      )
+      if (nextRequestId > seenIncomingRequestId) {
+        setSeenIncomingRequestId(nextRequestId)
+        persistSeenIncomingRequestId(nextRequestId)
+      }
+      if (nextBookingId > seenIncomingBookingId) {
+        setSeenIncomingBookingId(nextBookingId)
+        persistSeenIncomingBookingId(nextBookingId)
+      }
+    },
+    [
+      newestIncomingBookingId,
+      newestIncomingRequestId,
+      persistSeenIncomingBookingId,
+      persistSeenIncomingRequestId,
+      seenIncomingBookingId,
+      seenIncomingRequestId,
+    ]
+  )
   useEffect(() => {
-    if (activeTab === 'requests') {
-      lastSeenIncomingCountRef.current = totalIncoming
-      setFreshIncomingCount(0)
-      return
-    }
-    const seenCount = lastSeenIncomingCountRef.current
-    setFreshIncomingCount(
-      totalIncoming > seenCount ? totalIncoming - seenCount : 0
-    )
-  }, [activeTab, totalIncoming])
+    if (activeTab !== 'requests') return
+    setIsPrioritySheetOpen(false)
+    markIncomingSeen()
+  }, [activeTab, markIncomingSeen])
+  useEffect(() => {
+    if (priorityEntryCheckRef.current) return
+    if (isLoading || isBookingsLoading) return
+    priorityEntryCheckRef.current = true
+    if (activeTab !== 'bookings') return
+    if (freshIncomingCount <= 0) return
+    const now = Date.now()
+    if (now - lastPrioritySheetAt < PRIORITY_SHEET_COOLDOWN_MS) return
+    setIsPrioritySheetOpen(true)
+    setLastPrioritySheetAt(now)
+    persistPrioritySheetShownAt(now)
+  }, [
+    activeTab,
+    freshIncomingCount,
+    isBookingsLoading,
+    isLoading,
+    lastPrioritySheetAt,
+    persistPrioritySheetShownAt,
+  ])
 
   const openRequestsOverview = useCallback(
     (options?: { requestId?: number | null; bookingId?: number | null }) => {
@@ -4048,6 +4192,15 @@ export const ProRequestsScreen = ({
     void loadRequests({ force: true })
     void loadBookings({ force: true })
   }, [loadBookings, loadRequests])
+
+  const handlePrioritySheetStay = useCallback(() => {
+    setIsPrioritySheetOpen(false)
+  }, [])
+
+  const handlePrioritySheetOpenRequests = useCallback(() => {
+    setIsPrioritySheetOpen(false)
+    handleOverviewIncomingPress()
+  }, [handleOverviewIncomingPress])
 
   return (
     <div className="screen screen--pro screen--pro-requests">
@@ -5250,6 +5403,57 @@ export const ProRequestsScreen = ({
             </>
           )}
       </div>
+
+      {isPrioritySheetOpen &&
+        activeTab === 'bookings' &&
+        freshIncomingCount > 0 &&
+        !depositReviewBooking &&
+        !slotDetailsBooking &&
+        !isAddSlotsOpen &&
+        !isPasteSlotsOpen && (
+          <div
+            className="requests-priority-sheet-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pro-priority-sheet-title"
+            onClick={handlePrioritySheetStay}
+          >
+            <div
+              className="requests-priority-sheet is-pro"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <span className="requests-priority-sheet-handle" aria-hidden="true" />
+              <div className="requests-priority-sheet-head">
+                <p className="requests-priority-sheet-kicker">Приоритет входящих</p>
+                <h3 className="requests-priority-sheet-title" id="pro-priority-sheet-title">
+                  {freshIncomingCount === 1
+                    ? 'Появилась новая заявка'
+                    : `Новых входящих: ${freshIncomingCount}`}
+                </h3>
+                <p className="requests-priority-sheet-text">
+                  Календарь открыт по умолчанию, но сейчас лучше сначала ответить на
+                  новые заявки.
+                </p>
+              </div>
+              <div className="requests-priority-sheet-actions">
+                <button
+                  className="requests-priority-sheet-action"
+                  type="button"
+                  onClick={handlePrioritySheetOpenRequests}
+                >
+                  Открыть заявки
+                </button>
+                <button
+                  className="requests-priority-sheet-action is-secondary"
+                  type="button"
+                  onClick={handlePrioritySheetStay}
+                >
+                  Остаться в календаре
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       {depositReviewBooking && (
         <div
