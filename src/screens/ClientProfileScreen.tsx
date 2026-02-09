@@ -757,33 +757,23 @@ export const ClientProfileScreen = ({
         )}
 
         <section className="cp26-hero animate delay-1">
-          <div className="cp26-hero-headline">
-            <div className="cp26-hero-headline-copy">
-              <p className="cp26-eyebrow">Профиль клиента</p>
-              <h1 className="cp26-title">Личный кабинет</h1>
-              {updatedLabel && (
-                <p className={`cp26-updated${isRefreshing ? ' is-loading' : ''}`}>
-                  {updatedLabel}
-                </p>
-              )}
-            </div>
-            <button
-              className={`cp26-icon-btn${isRefreshing ? ' is-loading' : ''}`}
-              type="button"
-              onClick={handleRefresh}
-              aria-label="Обновить данные"
-              disabled={isRefreshing}
-            >
-              <IconRefresh />
-            </button>
-          </div>
-
           <div className="cp26-hero-top">
             <div className="cp26-avatar" aria-hidden="true">
               {initials}
             </div>
             <div className="cp26-hero-main">
-              <h2 className="cp26-name">{displayName}</h2>
+              <div className="cp26-identity-row">
+                <h2 className="cp26-name">{displayName}</h2>
+                <button
+                  className={`cp26-icon-btn${isRefreshing ? ' is-loading' : ''}`}
+                  type="button"
+                  onClick={handleRefresh}
+                  aria-label="Обновить данные"
+                  disabled={isRefreshing}
+                >
+                  <IconRefresh />
+                </button>
+              </div>
               <div className="cp26-status-row">
                 <span className={`cp26-status-pill${isProfileComplete ? ' is-ready' : ''}`}>
                   {isProfileComplete
@@ -791,6 +781,14 @@ export const ClientProfileScreen = ({
                     : `Прогресс ${completionPercent}%`}
                 </span>
                 <span className="cp26-subline">{locationLabel}</span>
+              </div>
+              <div className="cp26-meta-row">
+                <span className="cp26-meta-chip">Профиль клиента</span>
+                {updatedLabel && (
+                  <span className={`cp26-meta-chip${isRefreshing ? ' is-loading' : ''}`}>
+                    {updatedLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>
