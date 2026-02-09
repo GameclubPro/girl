@@ -2486,16 +2486,16 @@ body {
   gap: 12px;
 }
 
-.cp26-header {
+.cp26-hero-headline {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
 
-.cp26-header-copy {
+.cp26-hero-headline-copy {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .cp26-eyebrow {

@@ -724,27 +724,6 @@ export const ClientProfileScreen = ({
   return (
     <div className="screen screen--client screen--client-profile cp26-screen">
       <div className="client-shell cp26-shell">
-        <header className="cp26-header">
-          <div className="cp26-header-copy">
-            <p className="cp26-eyebrow">Профиль клиента</p>
-            <h1 className="cp26-title">Личный кабинет</h1>
-            {updatedLabel && (
-              <p className={`cp26-updated${isRefreshing ? ' is-loading' : ''}`}>
-                {updatedLabel}
-              </p>
-            )}
-          </div>
-          <button
-            className={`cp26-icon-btn${isRefreshing ? ' is-loading' : ''}`}
-            type="button"
-            onClick={handleRefresh}
-            aria-label="Обновить данные"
-            disabled={isRefreshing}
-          >
-            <IconRefresh />
-          </button>
-        </header>
-
         {hasSyncIssues && (
           <div className={`cp26-alert${isErrorDetailsOpen ? ' is-expanded' : ''}`} role="alert">
             <div className="cp26-alert-main">
@@ -778,6 +757,27 @@ export const ClientProfileScreen = ({
         )}
 
         <section className="cp26-hero animate delay-1">
+          <div className="cp26-hero-headline">
+            <div className="cp26-hero-headline-copy">
+              <p className="cp26-eyebrow">Профиль клиента</p>
+              <h1 className="cp26-title">Личный кабинет</h1>
+              {updatedLabel && (
+                <p className={`cp26-updated${isRefreshing ? ' is-loading' : ''}`}>
+                  {updatedLabel}
+                </p>
+              )}
+            </div>
+            <button
+              className={`cp26-icon-btn${isRefreshing ? ' is-loading' : ''}`}
+              type="button"
+              onClick={handleRefresh}
+              aria-label="Обновить данные"
+              disabled={isRefreshing}
+            >
+              <IconRefresh />
+            </button>
+          </div>
+
           <div className="cp26-hero-top">
             <div className="cp26-avatar" aria-hidden="true">
               {initials}
