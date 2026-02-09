@@ -24,7 +24,7 @@ export const AddressScreen = ({
   onContinue,
   onRequestLocation,
   onClearLocation,
-  onBack,
+  onBack: _onBack,
 }: {
   role: Role
   cities: City[]
@@ -100,14 +100,6 @@ export const AddressScreen = ({
     <div className="screen screen--address">
       <div className="address-shell">
         <div className="address-top">
-          {onBack && (
-            <button className="back-pill" type="button" onClick={onBack}>
-              <span className="chev" aria-hidden="true">
-                ‹
-              </span>
-              Назад
-            </button>
-          )}
           <span className="address-role">{roleLabel}</span>
         </div>
 

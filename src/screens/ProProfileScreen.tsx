@@ -15,6 +15,7 @@ import {
   IconFormat,
   IconHomeMaster,
   IconPin,
+  IconPhoto,
   IconProfileAbout,
   IconPrice,
   IconServices,
@@ -280,6 +281,7 @@ const isCategoryId = (value: string): value is CategoryId =>
   categoryItems.some((item) => item.id === value)
 
 const profileSettingsItems = [
+  { id: 'media', label: 'Фото профиля', icon: IconPhoto },
   { id: 'basic', label: 'О себе', icon: IconProfileAbout },
   { id: 'location', label: 'Локация', icon: IconPin },
   { id: 'availability', label: 'График', icon: IconSchedule },
@@ -993,14 +995,17 @@ export const ProProfileScreen = ({
     aboutSummary ||
     [experienceSummary, servicesPriceLabel].filter(Boolean).join(' · ') ||
     'Имя, опыт, статус'
-  const settingsStatusLabel = isActive ? 'Принимаете заявки' : 'Пауза'
-  const settingsHeroMetaParts = [settingsStatusLabel]
-  if (locationLabel && locationLabel !== 'Город не указан') {
-    settingsHeroMetaParts.push(locationLabel)
-  }
-  const settingsHeroMeta = settingsHeroMetaParts.join(' · ')
-  const settingsAvatarActionLabel = avatarDisplayUrl ? 'Сменить фото' : 'Добавить фото'
+  const hasCover = Boolean(coverUrl.trim())
+  const mediaSummary =
+    hasAvatar && hasCover
+      ? 'Аватар и шапка добавлены'
+      : hasAvatar
+        ? 'Добавьте шапку профиля'
+        : hasCover
+          ? 'Добавьте фото профиля'
+          : 'Добавьте аватар и шапку'
   const settingsHints: Record<SettingsItemId, string> = {
+    media: mediaSummary,
     basic: basicSummary,
     location: locationLabel,
     availability: availabilitySummary,
@@ -1012,6 +1017,12 @@ export const ProProfileScreen = ({
     SettingsItemId,
     { label: string; tone: 'ready' | 'required' | 'optional' }
   > = {
+    media:
+      hasAvatar && hasCover
+        ? { label: 'Готово', tone: 'ready' }
+        : hasAvatar || hasCover
+          ? { label: 'Почти', tone: 'optional' }
+          : { label: 'Нужно', tone: 'required' },
     basic: displayName.trim()
       ? { label: 'Готово', tone: 'ready' }
       : { label: 'Нужно', tone: 'required' },
@@ -1035,6 +1046,9 @@ export const ProProfileScreen = ({
         ? { label: 'Добавлено', tone: 'ready' }
         : { label: 'Опционально', tone: 'optional' },
   }
+  const settingsReadyCount = profileSettingsItems.filter(
+    (item) => settingsItemStatus[item.id].tone === 'ready'
+  ).length
   const hasPartialTimeRange = Boolean(scheduleStartValue) !== Boolean(scheduleEndValue)
   const scheduleStartMinutes = scheduleStartValue
     ? parseTimeToMinutes(scheduleStartValue)
@@ -1065,6 +1079,31 @@ export const ProProfileScreen = ({
       : scheduleTimeLabel
         ? `Рабочее окно: ${scheduleTimeLabel}.`
         : 'Оставьте пусто, если время подтверждается в чате.'
+  const availabilityTimelineHasRange =
+    scheduleStartMinutes !== null &&
+    scheduleEndMinutes !== null &&
+    scheduleEndMinutes > scheduleStartMinutes &&
+    !hasInvalidTimeRange
+  const availabilityTimelineStartPercent = availabilityTimelineHasRange
+    ? clampUnit(scheduleStartMinutes / (24 * 60)) * 100
+    : 0
+  const availabilityTimelineWidthPercent = availabilityTimelineHasRange
+    ? clampUnit((scheduleEndMinutes - scheduleStartMinutes) / (24 * 60)) * 100
+    : 0
+  const availabilityTimelineStyle = {
+    '--availability-start': `${availabilityTimelineStartPercent.toFixed(2)}%`,
+    '--availability-width': `${availabilityTimelineWidthPercent.toFixed(2)}%`,
+  } as CSSProperties & Record<string, string>
+  const availabilityDurationMinutes = availabilityTimelineHasRange
+    ? (scheduleEndMinutes ?? 0) - (scheduleStartMinutes ?? 0)
+    : 0
+  const availabilityDurationHours = availabilityDurationMinutes / 60
+  const availabilityDurationLabel =
+    availabilityDurationMinutes > 0
+      ? `${(Number.isInteger(availabilityDurationHours)
+          ? availabilityDurationHours.toString()
+          : availabilityDurationHours.toFixed(1).replace('.', ','))} ч/день`
+      : 'Время по договоренности'
   const hasServicesWithoutPrice = serviceItems.some((service) => {
     if (!service.name.trim()) return false
     return typeof service.price !== 'number' || service.price <= 0
@@ -4953,63 +4992,27 @@ export const ProProfileScreen = ({
           aria-labelledby="pro-profile-settings-title"
         >
           <div className="pro-profile-editor-shell pro-profile-settings-shell">
-            <section className="pro-profile-settings-hero animate">
-              <div className="pro-profile-settings-toolbar">
-                <h2
-                  className="pro-profile-settings-title"
-                  id="pro-profile-settings-title"
-                >
-                  Настройки профиля
-                </h2>
+            <div className="pro-profile-settings-head animate">
+              <h2
+                className="pro-profile-settings-title"
+                id="pro-profile-settings-title"
+              >
+                Настройки профиля
+              </h2>
+              <div className="pro-profile-settings-head-meta">
+                <span className={`pro-profile-settings-status ${profileStatusTone}`}>
+                  {profileStatusSummary.isResponseReady ? 'Готов к заявкам' : 'Черновик'}
+                </span>
+                <span className="pro-profile-settings-progress-label">
+                  {settingsReadyCount}/{profileSettingsItems.length}
+                </span>
               </div>
-              <div className="pro-profile-settings-identity">
-                <button
-                  className="pro-profile-settings-avatar-button"
-                  type="button"
-                  onClick={() =>
-                    openEditor('media', { returnToSettings: true })
-                  }
-                  disabled={isAvatarUploading || isCoverUploading}
-                  aria-label="Редактировать фото профиля"
-                >
-                  <span
-                    className={`pro-profile-settings-avatar${
-                      isAvatarUploading ? ' is-loading' : ''
-                    }`}
-                  >
-                    {avatarDisplayUrl ? (
-                      <img
-                        src={avatarDisplayUrl}
-                        alt={`Аватар ${displayNameValue}`}
-                      />
-                    ) : (
-                      <span
-                        className="pro-profile-settings-avatar-initials"
-                        aria-hidden="true"
-                      >
-                        {profileInitials}
-                      </span>
-                    )}
-                  </span>
-                  <span className="pro-profile-settings-avatar-label">
-                    {settingsAvatarActionLabel}
-                  </span>
-                </button>
-                <div className="pro-profile-settings-identity-body">
-                  <p className="pro-profile-settings-name">{displayNameValue}</p>
-                  <p className="pro-profile-settings-meta">{settingsHeroMeta}</p>
-                </div>
-              </div>
-            </section>
+            </div>
             <section className="pro-profile-settings-group animate delay-2">
               <div className="pro-profile-settings-group-head">
                 <p className="pro-profile-settings-group-title">Разделы</p>
-                <span
-                  className={`pro-profile-settings-status ${profileStatusTone}`}
-                >
-                  {profileStatusSummary.isResponseReady
-                    ? 'Готов к заявкам'
-                    : 'Черновик'}
+                <span className="pro-profile-settings-progress-label">
+                  {profileStatusSummary.completeness}%
                 </span>
               </div>
               <div className="pro-profile-settings-list" role="list">
@@ -5061,23 +5064,6 @@ export const ProProfileScreen = ({
               </div>
             </section>
           </div>
-          <ProBottomNav
-            active="profile"
-            allowActiveClick
-            onCabinet={() => {
-              closeSettings()
-              ;(onViewCabinet ?? onBack)()
-            }}
-            onRequests={() => {
-              closeSettings()
-              onViewRequests()
-            }}
-            onChats={() => {
-              closeSettings()
-              onViewChats()
-            }}
-            onProfile={closeSettings}
-          />
         </div>
       )}
 
@@ -5094,7 +5080,6 @@ export const ProProfileScreen = ({
           <div className="pro-profile-editor-shell">
             <div className="pro-profile-editor-head">
               <div className="pro-profile-editor-title-block">
-                <p className="pro-profile-editor-kicker">Редактирование</p>
                 <h2 className="pro-profile-editor-title">{editorTitle}</h2>
               </div>
             </div>
@@ -5529,42 +5514,6 @@ export const ProProfileScreen = ({
 
               {editingSection === 'availability' && (
                 <div className="pro-profile-editor-stack pro-profile-editor-stack--availability">
-                  <div className="pro-profile-editor-section pro-profile-editor-section--summary pro-availability-summary">
-                    <div className="pro-profile-editor-section-head">
-                      <p className="pro-profile-editor-section-kicker">Сводка</p>
-                      <h3 className="pro-profile-editor-section-title">
-                        Видимость графика
-                      </h3>
-                      <p className="pro-profile-editor-section-subtitle">
-                        {availabilityStatusHint}
-                      </p>
-                    </div>
-                    <div className="pro-availability-summary-status">
-                      <span
-                        className={`pro-availability-status-pill${
-                          isActive ? ' is-active' : ' is-paused'
-                        }`}
-                      >
-                        {availabilityStatusLabel}
-                      </span>
-                    </div>
-                    <div className="pro-availability-metrics">
-                      <div className="pro-availability-metric">
-                        <span className="pro-availability-metric-label">Дни</span>
-                        <span className="pro-availability-metric-value">
-                          {scheduleDaysCountLabel}
-                        </span>
-                      </div>
-                      <div className="pro-availability-metric">
-                        <span className="pro-availability-metric-label">
-                          Время
-                        </span>
-                        <span className="pro-availability-metric-value">
-                          {scheduleTimeLabel || 'По договоренности'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                   <div className="pro-profile-editor-section pro-availability-section">
                     <div className="pro-profile-editor-section-head">
                       <p className="pro-profile-editor-section-kicker">Статус</p>
@@ -5602,6 +5551,51 @@ export const ProProfileScreen = ({
                         ✓
                       </span>
                     </label>
+                    <div className="pro-availability-overview" style={availabilityTimelineStyle}>
+                      <div className="pro-availability-overview-top">
+                        <span
+                          className={`pro-availability-status-pill${
+                            isActive ? ' is-active' : ' is-paused'
+                          }`}
+                        >
+                          {availabilityStatusLabel}
+                        </span>
+                        <span className="pro-availability-overview-summary">
+                          {scheduleDaysCountLabel} • {availabilityDurationLabel}
+                        </span>
+                      </div>
+                      <div className="pro-availability-overview-days">
+                        {scheduleDayOptions.map((day) => (
+                          <span
+                            className={`pro-availability-overview-day${
+                              scheduleDaysSet.has(day.id) ? ' is-active' : ''
+                            }`}
+                            key={day.id}
+                          >
+                            {day.label}
+                          </span>
+                        ))}
+                      </div>
+                      <div
+                        className={`pro-availability-overview-timeline${
+                          availabilityTimelineHasRange ? '' : ' is-empty'
+                        }`}
+                      >
+                        <div className="pro-availability-overview-track">
+                          <span className="pro-availability-overview-fill" />
+                        </div>
+                        <div className="pro-availability-overview-scale">
+                          <span>00</span>
+                          <span>12</span>
+                          <span>24</span>
+                        </div>
+                        <p className="pro-availability-overview-meta">
+                          {availabilityTimelineHasRange
+                            ? `${scheduleTimeLabel} • ${availabilityStatusHint}`
+                            : 'Время не задано — подтвердите слот в чате.'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <div className="pro-profile-editor-section pro-availability-section">
                     <div className="pro-profile-editor-section-head">
