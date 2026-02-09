@@ -167,6 +167,9 @@ try {
 
   let openedAddress = await safeClickButton('Изменить город и район', false)
   if (!openedAddress) {
+    openedAddress = await safeClickButton('Город и район', false)
+  }
+  if (!openedAddress) {
     const addressButton = page.locator('button:has-text("Адрес")').first()
     if (
       (await addressButton.count()) > 0 &&

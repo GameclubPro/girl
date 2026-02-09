@@ -204,6 +204,8 @@ export const ClientProfileScreen = ({
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState('')
   const [activeTab, setActiveTab] = useState<ProfileTabId>('overview')
+  const [isRoadmapExpanded, setIsRoadmapExpanded] = useState(false)
+  const [isErrorDetailsOpen, setIsErrorDetailsOpen] = useState(false)
 
   const displayName = displayNameFallback.trim() || 'Клиент'
   const initials = getInitials(displayName)
@@ -436,6 +438,7 @@ export const ClientProfileScreen = ({
     setLoadError('')
     setMetaError('')
     setShareError('')
+    setIsErrorDetailsOpen(false)
     await Promise.allSettled([refreshSummary(), refreshMeta()])
     setIsRefreshing(false)
   }, [isRefreshing, refreshMeta, refreshSummary])
@@ -692,6 +695,10 @@ export const ClientProfileScreen = ({
   const nextSteps = profileChecklist.filter((item) => !item.done).slice(0, 3)
 
   const trustTips = useMemo(() => buildTrustTips(trust), [trust])
+  const primaryFocusItem = focusItems[0] ?? null
+  const focusItemsPreview = focusItems.slice(0, 2)
+  const hiddenFocusItemsCount = Math.max(focusItems.length - focusItemsPreview.length, 0)
+  const hiddenRoadmapItemsCount = Math.max(nextSteps.length - 1, 0)
 
   const showSkeleton = isLoading && requests.length === 0 && bookings.length === 0
   const lastUpdatedLabel = lastUpdated
@@ -703,7 +710,16 @@ export const ClientProfileScreen = ({
       ? `Обновлено в ${lastUpdatedLabel}`
       : ''
 
-  const errorMessage = [loadError, metaError, shareError].filter(Boolean).join(' ')
+  const errorParts = [loadError, metaError, shareError].filter(Boolean)
+  const hasSyncIssues = errorParts.length > 0
+  const errorSummary =
+    errorParts.length <= 1 ? (errorParts[0] ?? '') : 'Часть данных не синхронизировалась'
+
+  useEffect(() => {
+    if (!hasSyncIssues) {
+      setIsErrorDetailsOpen(false)
+    }
+  }, [hasSyncIssues])
 
   return (
     <div className="screen screen--client screen--client-profile cp26-screen">
@@ -729,12 +745,35 @@ export const ClientProfileScreen = ({
           </button>
         </header>
 
-        {errorMessage && (
-          <div className="cp26-alert" role="alert">
-            <span>{errorMessage}</span>
-            <button type="button" onClick={handleRefresh}>
-              Повторить
-            </button>
+        {hasSyncIssues && (
+          <div className={`cp26-alert${isErrorDetailsOpen ? ' is-expanded' : ''}`} role="alert">
+            <div className="cp26-alert-main">
+              <span className="cp26-alert-dot" aria-hidden="true" />
+              <span className="cp26-alert-summary">
+                {errorSummary.length > 52 ? `${errorSummary.slice(0, 52)}...` : errorSummary}
+              </span>
+            </div>
+            <div className="cp26-alert-actions">
+              <button type="button" onClick={handleRefresh}>
+                Обновить
+              </button>
+              {errorParts.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setIsErrorDetailsOpen((current) => !current)}
+                  aria-expanded={isErrorDetailsOpen}
+                >
+                  {isErrorDetailsOpen ? 'Скрыть' : 'Детали'}
+                </button>
+              )}
+            </div>
+            {isErrorDetailsOpen && (
+              <div className="cp26-alert-details">
+                {errorParts.map((item, index) => (
+                  <span key={`${item}-${index}`}>{item}</span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -757,41 +796,85 @@ export const ClientProfileScreen = ({
           </div>
 
           <div className="cp26-actions-main">
-            <button className="cp26-btn cp26-btn--primary" type="button" onClick={onCreateRequest}>
+            <button
+              className="cp26-btn cp26-btn--primary"
+              type="button"
+              onClick={onCreateRequest}
+            >
               Создать заявку
             </button>
-            <button className="cp26-btn cp26-btn--secondary" type="button" onClick={onViewMasters}>
+            <button
+              className="cp26-btn cp26-btn--secondary"
+              type="button"
+              onClick={onViewMasters}
+            >
               Найти мастера
             </button>
           </div>
 
-          <div className="cp26-actions-sub">
-            <button className="cp26-btn cp26-btn--ghost" type="button" onClick={onEditAddress}>
-              Изменить город и район
+          <div className="cp26-quick-row">
+            <button className="cp26-quick-pill" type="button" onClick={onEditAddress}>
+              Город и район
             </button>
-            <button className="cp26-btn cp26-btn--ghost" type="button" onClick={onOpenSupport}>
+            <button className="cp26-quick-pill" type="button" onClick={onOpenSupport}>
               Поддержка
             </button>
           </div>
 
-          <div className="cp26-kpi-row">
-            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('activity')}>
-              <span className="cp26-kpi-value">{openRequests.length}</span>
-              <span className="cp26-kpi-label">Заявки</span>
+          <div className="cp26-metric-row">
+            <button
+              className="cp26-metric-pill"
+              type="button"
+              onClick={() => handleTabChange('activity')}
+            >
+              <span className="cp26-metric-value">{openRequests.length}</span>
+              <span className="cp26-metric-label">заявки</span>
             </button>
-            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('activity')}>
-              <span className="cp26-kpi-value">{upcomingBookings.length}</span>
-              <span className="cp26-kpi-label">Записи</span>
+            <button
+              className="cp26-metric-pill"
+              type="button"
+              onClick={() => handleTabChange('activity')}
+            >
+              <span className="cp26-metric-value">{upcomingBookings.length}</span>
+              <span className="cp26-metric-label">записи</span>
             </button>
-            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('activity')}>
-              <span className="cp26-kpi-value">{focusTotal}</span>
-              <span className="cp26-kpi-label">Фокус</span>
+            <button
+              className="cp26-metric-pill"
+              type="button"
+              onClick={() => handleTabChange('activity')}
+            >
+              <span className="cp26-metric-value">{focusTotal}</span>
+              <span className="cp26-metric-label">фокус</span>
             </button>
-            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('favorites')}>
-              <span className="cp26-kpi-value">{favorites.length}</span>
-              <span className="cp26-kpi-label">Избранное</span>
+            <button
+              className="cp26-metric-pill"
+              type="button"
+              onClick={() => handleTabChange('favorites')}
+            >
+              <span className="cp26-metric-value">{favorites.length}</span>
+              <span className="cp26-metric-label">избранное</span>
             </button>
           </div>
+
+          <button
+            className={`cp26-next-action${primaryFocusItem ? '' : ' is-calm'}`}
+            type="button"
+            onClick={primaryFocusItem ? primaryFocusItem.onClick : onCreateRequest}
+          >
+            <span className="cp26-next-copy">
+              <span className="cp26-next-title">
+                {primaryFocusItem ? primaryFocusItem.title : 'Срочных задач нет'}
+              </span>
+              <span className="cp26-next-subtitle">
+                {primaryFocusItem
+                  ? `${primaryFocusItem.count} • ${primaryFocusItem.subtitle}`
+                  : 'Создайте новую заявку или выберите мастера'}
+              </span>
+            </span>
+            <span className="cp26-next-cta" aria-hidden="true">
+              {primaryFocusItem ? 'Открыть' : 'Старт'}
+            </span>
+          </button>
         </section>
 
         <div className="cp26-tabs" role="tablist" aria-label="Разделы профиля клиента">
@@ -844,36 +927,40 @@ export const ClientProfileScreen = ({
                     )}
                   </div>
                   {focusItems.length > 0 ? (
-                    <div className="cp26-focus-list" role="list">
-                      {focusItems.map((item) => (
+                    <>
+                      <div className="cp26-focus-list" role="list">
+                        {focusItemsPreview.map((item) => (
+                          <button
+                            className={`cp26-focus-item is-${item.tone}`}
+                            type="button"
+                            key={item.id}
+                            onClick={item.onClick}
+                            role="listitem"
+                          >
+                            <span className="cp26-focus-count">{item.count}</span>
+                            <span className="cp26-focus-copy">
+                              <span className="cp26-focus-title">{item.title}</span>
+                              <span className="cp26-focus-subtitle">{item.subtitle}</span>
+                            </span>
+                            <span className="cp26-arrow" aria-hidden="true">
+                              →
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      {hiddenFocusItemsCount > 0 && (
                         <button
-                          className={`cp26-focus-item is-${item.tone}`}
+                          className="cp26-inline-link"
                           type="button"
-                          key={item.id}
-                          onClick={item.onClick}
-                          role="listitem"
+                          onClick={() => handleTabChange('activity')}
                         >
-                          <span className="cp26-focus-count">{item.count}</span>
-                          <span className="cp26-focus-copy">
-                            <span className="cp26-focus-title">{item.title}</span>
-                            <span className="cp26-focus-subtitle">{item.subtitle}</span>
-                          </span>
-                          <span className="cp26-arrow" aria-hidden="true">
-                            →
-                          </span>
+                          Еще {hiddenFocusItemsCount}
                         </button>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   ) : (
                     <div className="cp26-empty">
                       <p>Срочных задач нет. Можно планировать следующую запись.</p>
-                      <button
-                        className="cp26-btn cp26-btn--primary"
-                        type="button"
-                        onClick={onCreateRequest}
-                      >
-                        Создать заявку
-                      </button>
                     </div>
                   )}
                 </section>
@@ -889,16 +976,32 @@ export const ClientProfileScreen = ({
                     <span style={{ width: `${completionPercent}%` }} />
                   </div>
                   {remainingSteps > 0 ? (
-                    <div className="cp26-step-list">
-                      {nextSteps.map((item) => (
-                        <div className="cp26-step" key={item.id}>
-                          <span className="cp26-step-label">{item.label}</span>
-                          <button type="button" onClick={item.onAction}>
-                            {item.actionLabel}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      <div className="cp26-step-list">
+                        {(isRoadmapExpanded ? nextSteps : nextSteps.slice(0, 1)).map(
+                          (item) => (
+                            <div className="cp26-step" key={item.id}>
+                              <span className="cp26-step-label">{item.label}</span>
+                              <button type="button" onClick={item.onAction}>
+                                {item.actionLabel}
+                              </button>
+                            </div>
+                          )
+                        )}
+                      </div>
+                      {hiddenRoadmapItemsCount > 0 && (
+                        <button
+                          className="cp26-inline-link"
+                          type="button"
+                          onClick={() => setIsRoadmapExpanded((current) => !current)}
+                          aria-expanded={isRoadmapExpanded}
+                        >
+                          {isRoadmapExpanded
+                            ? 'Скрыть лишние шаги'
+                            : `Еще ${hiddenRoadmapItemsCount}`}
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <div className="cp26-empty is-compact">
                       <p>Профиль полностью готов к быстрому бронированию.</p>
