@@ -101,6 +101,7 @@ const reportDir = resolve(args.get('reportDir') ?? join(rootDir, 'report'))
 const userId = args.get('userId') ?? '100001'
 const urlBase = args.get('urlBase') ?? args.get('url') ?? 'http://127.0.0.1:4173/'
 const runtimeLibs = args.get('runtimeLibs')
+const browserExecutable = args.get('browserExecutable')
 const cleanCapture = toBoolean(args.get('clean'), true)
 const cleanReport = toBoolean(args.get('cleanReport'), true)
 const pixelThreshold = toInt(args.get('pixelThreshold'), 14, 0, 255)
@@ -162,6 +163,9 @@ const runCapture = (targetDir, stageName) => {
     ]
     if (runtimeLibs) {
       cliArgs.push('--runtimeLibs', runtimeLibs)
+    }
+    if (browserExecutable) {
+      cliArgs.push('--browserExecutable', browserExecutable)
     }
 
     console.log(

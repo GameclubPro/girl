@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { chromium, devices } from 'playwright'
+import { applyRuntimeLibs, launchChromium } from './playwright-launch.mjs'
 
 const parseArgs = (tokens) => {
   const values = new Map()
@@ -35,19 +36,16 @@ const url =
   `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}&tgPlatform=ios&tgTheme=light&tgExpanded=1&tgFullscreen=1&tgTopInset=47&tgBottomInset=34&tgContentTopInset=47&tgContentBottomInset=34`
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '')
 const outDir = resolve(args.get('outDir') ?? `.logs/design-redesign-${stamp}`)
-const runtimeLibsDir = resolve(
-  args.get('runtimeLibs') ?? '.local/runtime-libs/root/usr/lib/x86_64-linux-gnu'
-)
-
-if (existsSync(runtimeLibsDir)) {
-  process.env.LD_LIBRARY_PATH = process.env.LD_LIBRARY_PATH
-    ? `${runtimeLibsDir}:${process.env.LD_LIBRARY_PATH}`
-    : runtimeLibsDir
-}
+applyRuntimeLibs(args.get('runtimeLibs'))
 
 mkdirSync(outDir, { recursive: true })
 
-const browser = await chromium.launch({ headless: true })
+const launch = await launchChromium(chromium, {
+  headless: true,
+  browserExecutable: args.get('browserExecutable'),
+})
+const browser = launch.browser
+console.log(`[design-redesign-audit] launch=${launch.launchLabel}`)
 
 try {
   const context = await browser.newContext({

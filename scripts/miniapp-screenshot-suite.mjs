@@ -32,6 +32,8 @@ const wait = args.get('wait')
 const selector = args.get('selector')
 const fullPage = args.get('fullPage')
 const height = args.get('height')
+const runtimeLibs = args.get('runtimeLibs')
+const browserExecutable = args.get('browserExecutable')
 const outPrefix = resolve(
   args.get('outPrefix') ?? `.logs/miniapp-${new Date().toISOString().replace(/[:.]/g, '-')}`
 )
@@ -49,6 +51,8 @@ for (const width of widths) {
   if (selector) cliArgs.push('--selector', selector)
   if (fullPage) cliArgs.push('--fullPage', fullPage)
   if (height) cliArgs.push('--height', height)
+  if (runtimeLibs) cliArgs.push('--runtimeLibs', runtimeLibs)
+  if (browserExecutable) cliArgs.push('--browserExecutable', browserExecutable)
 
   const result = spawnSync('node', cliArgs, { stdio: 'inherit' })
   if (result.status !== 0) {

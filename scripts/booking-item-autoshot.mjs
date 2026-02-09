@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { chromium, devices } from 'playwright'
+import { applyRuntimeLibs, launchChromium } from './playwright-launch.mjs'
 
 const parseArgs = (tokens) => {
   const values = new Map()
@@ -48,17 +49,11 @@ const output = resolve(
 const width = toNumber(args.get('width'), 390, 320, 430)
 const height = toNumber(args.get('height'), 844, 640, 2000)
 const waitMs = toNumber(args.get('wait'), 1200, 0, 30000)
-const runtimeLibsDir = resolve(
-  args.get('runtimeLibs') ?? '.local/runtime-libs/root/usr/lib/x86_64-linux-gnu'
-)
+const runtimeLibsDir = args.get('runtimeLibs')
 
 mkdirSync(dirname(output), { recursive: true })
 
-if (existsSync(runtimeLibsDir)) {
-  process.env.LD_LIBRARY_PATH = process.env.LD_LIBRARY_PATH
-    ? `${runtimeLibsDir}:${process.env.LD_LIBRARY_PATH}`
-    : runtimeLibsDir
-}
+applyRuntimeLibs(runtimeLibsDir)
 
 const STORAGE_PREFIX = 'kiven:data-cache'
 
@@ -151,7 +146,12 @@ const cacheEntries = [
   },
 ]
 
-const browser = await chromium.launch({ headless: true })
+const launch = await launchChromium(chromium, {
+  headless: true,
+  browserExecutable: args.get('browserExecutable'),
+})
+const browser = launch.browser
+console.log(`[booking-item-autoshot] launch=${launch.launchLabel}`)
 try {
   const context = await browser.newContext({
     ...devices['iPhone 14 Pro'],

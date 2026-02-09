@@ -32,6 +32,8 @@ const wait = args.get('wait')
 const userId = args.get('userId')
 const apiBase = args.get('apiBase')
 const height = args.get('height')
+const runtimeLibs = args.get('runtimeLibs')
+const browserExecutable = args.get('browserExecutable')
 const outPrefix = resolve(
   args.get('outPrefix') ?? `.logs/deposit-sheet-${new Date().toISOString().replace(/[:.]/g, '-')}`
 )
@@ -52,6 +54,8 @@ for (const width of [360, 390, 430]) {
   if (userId) cliArgs.push('--userId', userId)
   if (apiBase) cliArgs.push('--apiBase', apiBase)
   if (height) cliArgs.push('--height', height)
+  if (runtimeLibs) cliArgs.push('--runtimeLibs', runtimeLibs)
+  if (browserExecutable) cliArgs.push('--browserExecutable', browserExecutable)
 
   const result = spawnSync('node', cliArgs, { stdio: 'inherit' })
   if (result.status !== 0) {

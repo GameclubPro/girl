@@ -33,6 +33,8 @@ const userId = args.get('userId')
 const apiBase = args.get('apiBase')
 const height = args.get('height')
 const scenario = args.get('scenario')
+const runtimeLibs = args.get('runtimeLibs')
+const browserExecutable = args.get('browserExecutable')
 const outPrefix = resolve(
   args.get('outPrefix') ?? `.logs/booking-item-${new Date().toISOString().replace(/[:.]/g, '-')}`
 )
@@ -54,6 +56,8 @@ for (const width of [360, 390, 430]) {
   if (apiBase) cliArgs.push('--apiBase', apiBase)
   if (height) cliArgs.push('--height', height)
   if (scenario) cliArgs.push('--scenario', scenario)
+  if (runtimeLibs) cliArgs.push('--runtimeLibs', runtimeLibs)
+  if (browserExecutable) cliArgs.push('--browserExecutable', browserExecutable)
 
   const result = spawnSync('node', cliArgs, { stdio: 'inherit' })
   if (result.status !== 0) {

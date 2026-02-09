@@ -22,7 +22,8 @@
     "visual:capture:after": "node scripts/miniapp-visual-audit.mjs --mode capture --stage after",
     "visual:compare": "node scripts/miniapp-visual-audit.mjs --mode compare",
     "visual:workflow": "node scripts/miniapp-visual-audit.mjs --mode workflow",
-    "visual:cleanup": "node scripts/cleanup-visual-logs.mjs"
+    "visual:cleanup": "node scripts/cleanup-visual-logs.mjs",
+    "visual:doctor": "node scripts/visual-doctor.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",

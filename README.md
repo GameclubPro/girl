@@ -1,73 +1,103 @@
-# React + TypeScript + Vite
+# KIVEN GIRL — Telegram Mini App (Fullscreen)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Быстрый старт
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Локальный запуск API:
+```bash
+npm run api
 ```
+
+Сборка и линт:
+```bash
+npm run lint
+npm run build
+```
+
+## Fullscreen эмуляция Telegram Mini App
+Все скриншот-скрипты уже используют параметры fullscreen и safe-area:
+- `tgFullscreen=1`
+- `tgTopInset=47`
+- `tgBottomInset=34`
+- `tgContentTopInset=47`
+- `tgContentBottomInset=34`
+
+Основной скрипт:
+```bash
+npm run screenshot:design-redesign -- --width 390 --height 844
+```
+
+## Visual Audit Pipeline
+Подготовка:
+```bash
+npm run visual:setup
+```
+
+Полный цикл:
+```bash
+npm run visual:capture:baseline -- --session pro-cabinet --userId 5510721194
+# ...внести изменения...
+npm run visual:capture:after -- --session pro-cabinet --userId 5510721194
+npm run visual:compare -- --session pro-cabinet
+```
+
+One-shot:
+```bash
+npm run visual:workflow -- --session smoke-pro --userId 5510721194
+```
+
+Очистка логов:
+```bash
+npm run visual:cleanup -- --maxAgeDays 7 --keepLatest 30
+```
+
+## Диагностика окружения
+Если скриншоты не стартуют, сначала прогоните:
+```bash
+npm run visual:doctor
+```
+
+Строгий режим (упадет с кодом 1, если нет рабочего браузера):
+```bash
+npm run visual:doctor -- --strict 1
+```
+
+Сохранить JSON-отчет:
+```bash
+npm run visual:doctor -- --json .logs/visual-doctor.json
+```
+
+## Выбор браузера для Playwright
+По умолчанию скрипты пробуют:
+1. `PW_BROWSER_EXECUTABLE` / `--browserExecutable`
+2. системный Chromium/Chrome (`/usr/bin/google-chrome`, `/usr/bin/chromium`, ...)
+3. bundled Playwright Chromium
+
+Можно явно указать браузер:
+```bash
+PW_BROWSER_EXECUTABLE=/usr/bin/google-chrome npm run screenshot:design-redesign -- --width 390 --height 844
+```
+
+Либо через аргумент:
+```bash
+npm run screenshot:design-redesign -- --browserExecutable /usr/bin/google-chrome --width 390 --height 844
+```
+
+Параметр `--browserExecutable` также поддержан в:
+- `screenshot:miniapp`
+- `screenshot:miniapp:matrix`
+- `screenshot:booking-item`
+- `screenshot:booking-item:matrix`
+- `screenshot:deposit-sheet`
+- `screenshot:deposit-sheet:matrix`
+- `visual:capture:baseline`
+- `visual:capture:after`
+- `visual:workflow`
+
+## Важно про sandbox-ошибки
+Если `visual:doctor` показывает `sandbox_host_linux.cc:41` или crashpad `Operation not permitted`, это проблема окружения запуска Chromium (seccomp/sandbox), а не проблема UI-кода или Telegram fullscreen-параметров.
+
+В таком случае visual-аудит лучше запускать в хостовой ОС или в менее ограниченном контейнере.

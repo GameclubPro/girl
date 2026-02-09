@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { chromium, devices } from 'playwright'
+import { applyRuntimeLibs, launchChromium } from './playwright-launch.mjs'
 
 const parseArgs = (tokens) => {
   const values = new Map()
@@ -51,28 +52,23 @@ const height = toNumber(args.get('height'), 844, 640, 2000)
 const waitMs = toNumber(args.get('wait'), 1200, 0, 30000)
 const selector = args.get('selector') ?? ''
 const fullPage = toBoolean(args.get('fullPage'))
-const runtimeLibsDir = resolve(
-  args.get('runtimeLibs') ?? '.local/runtime-libs/root/usr/lib/x86_64-linux-gnu'
-)
-
-if (existsSync(runtimeLibsDir)) {
-  process.env.LD_LIBRARY_PATH = process.env.LD_LIBRARY_PATH
-    ? `${runtimeLibsDir}:${process.env.LD_LIBRARY_PATH}`
-    : runtimeLibsDir
-}
+applyRuntimeLibs(args.get('runtimeLibs'))
 
 mkdirSync(dirname(output), { recursive: true })
 
-let browser
+let launch
 try {
-  browser = await chromium.launch({ headless: true })
-} catch {
+  launch = await launchChromium(chromium, {
+    headless: true,
+    browserExecutable: args.get('browserExecutable'),
+  })
+} catch (error) {
   console.error('Failed to launch Playwright Chromium.')
-  console.error(
-    'Run: npx playwright install --with-deps chromium (or install missing system libs).'
-  )
+  console.error(error?.message ?? error)
   process.exit(1)
 }
+const browser = launch.browser
+console.log(`[miniapp-screenshot] launch=${launch.launchLabel}`)
 
 let context
 try {
@@ -100,5 +96,5 @@ try {
   if (context) {
     await context.close()
   }
-  await browser.close()
+  await browser.close().catch(() => {})
 }
