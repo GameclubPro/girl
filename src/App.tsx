@@ -201,6 +201,8 @@ type ChatReturnView =
   | 'pro-cabinet'
   | 'pro-requests'
 
+type AddressReturnView = 'start' | 'client' | 'client-profile' | 'pro-profile'
+
 const ScreenPerfMarker = ({
   screenView,
   children,
@@ -475,6 +477,8 @@ function App() {
   const [chatReturnView, setChatReturnView] = useState<ChatReturnView | null>(
     null
   )
+  const [addressReturnView, setAddressReturnView] =
+    useState<AddressReturnView>('start')
   const [requestsInitialTab, setRequestsInitialTab] = useState<
     'requests' | 'bookings'
   >('bookings')
@@ -845,13 +849,20 @@ function App() {
       }
 
       setAddress(address.trim())
-      navigate(role === 'pro' ? 'pro-profile' : 'client', { reset: true })
+      const nextView: View =
+        role === 'pro'
+          ? 'pro-profile'
+          : addressReturnView === 'client-profile'
+            ? 'client-profile'
+            : 'client'
+      setAddressReturnView(role === 'pro' ? 'pro-profile' : 'client')
+      navigate(nextView, { reset: true })
     } catch (error) {
       setSaveError('Не удалось сохранить город и район. Попробуйте еще раз.')
     } finally {
       setIsSaving(false)
     }
-  }, [address, cityId, districtId, navigate, role, userId])
+  }, [address, addressReturnView, cityId, districtId, navigate, role, userId])
 
   useEffect(() => {
     if (!telegramUser?.id) return
@@ -1543,7 +1554,10 @@ function App() {
             returnView: 'client-profile',
           })
         }
-        onEditAddress={() => navigate('address')}
+        onEditAddress={() => {
+          setAddressReturnView('client-profile')
+          navigate('address')
+        }}
         onViewMasterProfile={(masterId) => {
           setSelectedMasterId(masterId)
           navigate('client-master-profile')
@@ -1991,6 +2005,15 @@ function App() {
         onContinue={handleSaveAddress}
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}
+        onBack={() =>
+          goBack(
+            role === 'pro'
+              ? 'pro-profile'
+              : addressReturnView === 'start'
+                ? 'start'
+                : 'client'
+          )
+        }
       />
     )
   }
@@ -2002,6 +2025,9 @@ function App() {
         setRole(nextRole)
         if (nextRole === 'pro') {
           setProProfileSection(null)
+          setAddressReturnView('pro-profile')
+        } else {
+          setAddressReturnView('start')
         }
         navigate(nextRole === 'pro' ? 'pro-profile' : 'address', { reset: true })
       }}

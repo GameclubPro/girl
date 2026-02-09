@@ -24,6 +24,7 @@ export const AddressScreen = ({
   onContinue,
   onRequestLocation,
   onClearLocation,
+  onBack,
 }: {
   role: Role
   cities: City[]
@@ -45,12 +46,22 @@ export const AddressScreen = ({
   onContinue: () => void
   onRequestLocation: () => void
   onClearLocation: () => void
+  onBack?: () => void
 }) => {
   const [isCityFocused, setIsCityFocused] = useState(false)
   const roleLabel = role === 'client' ? 'Заказчик' : 'Исполнительница'
   const hasCity = cityId !== null
   const hasDistrict = districtId !== null
-  const canContinue = hasCity && hasDistrict && !isSaving && !isLoading
+  const selectedCity = cityId !== null ? cities.find((city) => city.id === cityId) : null
+  const isSelectedCityUnavailable = selectedCity
+    ? !isCityAvailable(selectedCity.name)
+    : false
+  const canContinue =
+    hasCity &&
+    hasDistrict &&
+    !isSelectedCityUnavailable &&
+    !isSaving &&
+    !isLoading
   const normalizedQuery = cityQuery.trim().toLowerCase()
   const matchedCity = cities.find(
     (city) => city.name.toLowerCase() === normalizedQuery
@@ -81,11 +92,22 @@ export const AddressScreen = ({
       : ''
   const isLowAccuracy =
     typeof location?.accuracy === 'number' && location.accuracy > 1500
+  const continueHint = isSelectedCityUnavailable
+    ? 'Выберите город, который уже доступен в KIVEN.'
+    : ''
 
   return (
     <div className="screen screen--address">
       <div className="address-shell">
         <div className="address-top">
+          {onBack && (
+            <button className="back-pill" type="button" onClick={onBack}>
+              <span className="chev" aria-hidden="true">
+                ‹
+              </span>
+              Назад
+            </button>
+          )}
           <span className="address-role">{roleLabel}</span>
         </div>
 
@@ -279,6 +301,7 @@ export const AddressScreen = ({
           >
             {isSaving ? 'Сохраняем...' : 'Сохранить'}
           </button>
+          {continueHint && <p className="address-error">{continueHint}</p>}
         </div>
 
         {saveError && <p className="address-error">{saveError}</p>}

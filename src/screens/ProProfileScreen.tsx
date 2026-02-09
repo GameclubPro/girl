@@ -11,6 +11,7 @@ import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
   IconClientVisit,
+  IconClose,
   IconExperience,
   IconFormat,
   IconHomeMaster,
@@ -68,6 +69,24 @@ const parseNumber = (value: string) => {
   if (!value.trim()) return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+const parseTimeToMinutes = (value: string) => {
+  if (!/^\d{2}:\d{2}$/.test(value)) return null
+  const [hoursRaw, minutesRaw] = value.split(':')
+  const hours = Number(hoursRaw)
+  const minutes = Number(minutesRaw)
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return null
+  }
+  return hours * 60 + minutes
 }
 
 const getServicePriceRange = (items: ServiceItem[]) => {
@@ -700,7 +719,7 @@ export const ProProfileScreen = ({
   }, [displayNameValue])
   const experienceValue = parseNumber(experienceYears)
   const saveButtonLabel = isSaving ? 'Сохраняем...' : 'Готово'
-  const canSave = Boolean(profilePayload) && !isSaving
+  const canSaveBase = Boolean(profilePayload) && !isSaving
   const editorTitle = editingSection ? editorTitleMap[editingSection] : ''
   const priceLabel =
     priceFromValue !== null && priceToValue !== null
@@ -823,7 +842,7 @@ export const ProProfileScreen = ({
       : ''
     return [cityLabel, districtLabel].filter(Boolean).join(', ') || 'Город не указан'
   }, [cities, cityId, districts, districtId])
-  const hasLocation = cityId !== null || districtId !== null
+  const hasLocationComplete = cityId !== null && districtId !== null
   const hasWorkFormat = worksAtClient || worksAtMaster
   const hasPrice = priceFromValue !== null || priceToValue !== null
   const hasExperience = experienceValue !== null
@@ -848,7 +867,7 @@ export const ProProfileScreen = ({
       label: 'Локация',
       value: locationLabel,
       icon: <IconPin />,
-      isMuted: !hasLocation,
+      isMuted: !hasLocationComplete,
       section: 'location',
     },
     {
@@ -1011,7 +1030,7 @@ export const ProProfileScreen = ({
       ? { label: 'Готово', tone: 'ready' }
       : { label: 'Нужно', tone: 'required' },
     location:
-      hasLocation && hasWorkFormat
+      hasLocationComplete && hasWorkFormat
         ? { label: 'Готово', tone: 'ready' }
         : { label: 'Нужно', tone: 'required' },
     availability:
@@ -1030,6 +1049,127 @@ export const ProProfileScreen = ({
         ? { label: 'Добавлено', tone: 'ready' }
         : { label: 'Опционально', tone: 'optional' },
   }
+  const hasPartialTimeRange = Boolean(scheduleStartValue) !== Boolean(scheduleEndValue)
+  const scheduleStartMinutes = scheduleStartValue
+    ? parseTimeToMinutes(scheduleStartValue)
+    : null
+  const scheduleEndMinutes = scheduleEndValue ? parseTimeToMinutes(scheduleEndValue) : null
+  const hasInvalidTimeRange =
+    scheduleStartMinutes !== null &&
+    scheduleEndMinutes !== null &&
+    scheduleEndMinutes <= scheduleStartMinutes
+  const hasServicesWithoutPrice = serviceItems.some((service) => {
+    if (!service.name.trim()) return false
+    return typeof service.price !== 'number' || service.price <= 0
+  })
+  const hasServicesWithoutDuration = serviceItems.some((service) => {
+    if (!service.name.trim()) return false
+    if (service.duration === null || service.duration === undefined) return false
+    return service.duration <= 0
+  })
+  const hasCertificateDraftWithoutImage = certificates.some((certificate) => {
+    const hasMeta =
+      Boolean(certificate.title?.trim()) ||
+      Boolean(certificate.issuer?.trim()) ||
+      Boolean(certificate.verifyUrl?.trim()) ||
+      typeof certificate.year === 'number'
+    return hasMeta && !certificate.url?.trim()
+  })
+  const editorValidationError = useMemo(() => {
+    if (!editingSection) return ''
+    if (editingSection === 'basic') {
+      if (displayName.trim().length < 3) {
+        return 'Укажите имя и специализацию (минимум 3 символа).'
+      }
+      if (about.trim().length > 220) {
+        return 'Сократите раздел «Коротко о вас» до 220 символов.'
+      }
+      return ''
+    }
+    if (editingSection === 'location') {
+      if (!hasLocationComplete) {
+        return 'Выберите город и район.'
+      }
+      if (!hasWorkFormat) {
+        return 'Отметьте хотя бы один формат работы.'
+      }
+      return ''
+    }
+    if (editingSection === 'availability') {
+      if (isActive && scheduleDays.length === 0) {
+        return 'Выберите хотя бы один рабочий день.'
+      }
+      if (hasPartialTimeRange) {
+        return 'Укажите и начало, и окончание рабочего времени.'
+      }
+      if (hasInvalidTimeRange) {
+        return 'Окончание должно быть позже начала.'
+      }
+      return ''
+    }
+    if (editingSection === 'policies') {
+      if (cancelWindowValue !== null && (cancelWindowValue < 0 || cancelWindowValue > 72)) {
+        return 'Окно бесплатной отмены должно быть от 0 до 72 часов.'
+      }
+      if (depositType === 'percent') {
+        if (depositPercentValue === null || depositPercentValue < 5 || depositPercentValue > 100) {
+          return 'Депозит в процентах должен быть от 5% до 100%.'
+        }
+        if (!depositDetails.trim() && !depositQrUrl) {
+          return 'Добавьте реквизиты или QR-код для депозита.'
+        }
+      }
+      if (depositType === 'fixed') {
+        if (depositFixedValue === null || depositFixedValue < 100) {
+          return 'Фиксированный депозит должен быть не меньше 100 ₽.'
+        }
+        if (!depositDetails.trim() && !depositQrUrl) {
+          return 'Добавьте реквизиты или QR-код для депозита.'
+        }
+      }
+      return ''
+    }
+    if (editingSection === 'services') {
+      if (serviceItems.length === 0) {
+        return 'Добавьте хотя бы одну услугу.'
+      }
+      if (hasServicesWithoutPrice) {
+        return 'Для каждой услуги укажите цену больше 0 ₽.'
+      }
+      if (hasServicesWithoutDuration) {
+        return 'Длительность услуги должна быть больше 0 минут.'
+      }
+      return ''
+    }
+    if (editingSection === 'certificates') {
+      if (hasCertificateDraftWithoutImage) {
+        return 'Для заполненного сертификата загрузите изображение.'
+      }
+      return ''
+    }
+    return ''
+  }, [
+    about,
+    cancelWindowValue,
+    depositDetails,
+    depositFixedValue,
+    depositPercentValue,
+    depositQrUrl,
+    depositType,
+    displayName,
+    editingSection,
+    hasCertificateDraftWithoutImage,
+    hasInvalidTimeRange,
+    hasLocationComplete,
+    hasPartialTimeRange,
+    hasServicesWithoutDuration,
+    hasServicesWithoutPrice,
+    hasWorkFormat,
+    isActive,
+    scheduleDays.length,
+    serviceItems.length,
+  ])
+  const canSave = canSaveBase && !editorValidationError
   const portfolioGridItems = useMemo(
     () =>
       portfolioItems
@@ -1184,8 +1324,12 @@ export const ProProfileScreen = ({
   }, [availableServiceOptions, isServiceCatalogExpanded])
   const hasMoreServiceOptions = availableServiceOptions.length > 6
   const parsedServiceAddPrice = parseNumber(serviceAddPrice)
+  const parsedServiceAddDuration = parseNumber(serviceAddDuration)
   const isServiceAddReady =
-    parsedServiceAddPrice !== null && parsedServiceAddPrice > 0
+    parsedServiceAddPrice !== null &&
+    parsedServiceAddPrice > 0 &&
+    parsedServiceAddDuration !== null &&
+    parsedServiceAddDuration > 0
   const selectedServicesCount = serviceItems.length
   const selectedServicesLabel =
     selectedServicesCount > 0
@@ -1252,6 +1396,7 @@ export const ProProfileScreen = ({
       return
     }
     settingsReturnRef.current = false
+    setSaveError('')
     setIsAvatarActionsOpen(false)
     setIsSettingsOpen(true)
   }
@@ -1274,6 +1419,7 @@ export const ProProfileScreen = ({
     } else if (!editingSection) {
       settingsReturnRef.current = false
     }
+    setSaveError('')
     setIsSettingsOpen(false)
     if (section === 'portfolio') {
       portfolioPanelRef.current?.scrollIntoView({
@@ -1290,6 +1436,7 @@ export const ProProfileScreen = ({
       returnAfterEditorRef.current &&
       !settingsReturnRef.current
     setEditingSection(null)
+    setSaveError('')
     if (settingsReturnRef.current) {
       settingsReturnRef.current = false
       setIsSettingsOpen(true)
@@ -1318,7 +1465,7 @@ export const ProProfileScreen = ({
           onClick: () => openEditor('media', { returnToSettings: true }),
         }
       : null,
-    !hasLocation || !hasWorkFormat
+    !hasLocationComplete || !hasWorkFormat
       ? {
           id: 'location',
           label: 'Указать локацию',
@@ -1790,6 +1937,7 @@ export const ProProfileScreen = ({
     if (!profilePayload) return
     if (!hasLoadedRef.current) return
     if (isPortfolioUploading || isShowcaseUploading) return
+    if (editorValidationError) return
     if (profileAutosaveTimerRef.current) {
       window.clearTimeout(profileAutosaveTimerRef.current)
     }
@@ -1801,7 +1949,7 @@ export const ProProfileScreen = ({
         window.clearTimeout(profileAutosaveTimerRef.current)
       }
     }
-  }, [profilePayload, isPortfolioUploading, isShowcaseUploading])
+  }, [editorValidationError, profilePayload, isPortfolioUploading, isShowcaseUploading])
 
   useEffect(() => {
     hasLoadedRef.current = false
@@ -2183,6 +2331,10 @@ export const ProProfileScreen = ({
 
   const handleSave = async () => {
     if (!profilePayload) return
+    if (editorValidationError) {
+      setSaveError(editorValidationError)
+      return
+    }
     const saved = await saveProfile(profilePayload)
     if (saved) {
       closeEditor()
@@ -2247,7 +2399,11 @@ export const ProProfileScreen = ({
       setServiceAddError('Укажите цену услуги.')
       return
     }
-    const parsedDuration = parseNumber(serviceAddDuration)
+    const parsedDuration = parsedServiceAddDuration
+    if (parsedDuration === null || parsedDuration <= 0) {
+      setServiceAddError('Укажите длительность услуги в минутах.')
+      return
+    }
     const targetName = serviceAddTarget
 
     setServiceItems((current) => {
@@ -4827,12 +4983,30 @@ export const ProProfileScreen = ({
           <div className="pro-profile-editor-shell pro-profile-settings-shell">
             <section className="pro-profile-settings-hero animate">
               <div className="pro-profile-settings-toolbar">
+                <button
+                  className="pro-profile-toolbar-back"
+                  type="button"
+                  onClick={closeSettings}
+                >
+                  <span className="chev" aria-hidden="true">
+                    ‹
+                  </span>
+                  Назад
+                </button>
                 <h2
                   className="pro-profile-settings-title"
                   id="pro-profile-settings-title"
                 >
                   Настройки профиля
                 </h2>
+                <button
+                  className="pro-profile-toolbar-close"
+                  type="button"
+                  onClick={closeSettings}
+                  aria-label="Закрыть настройки профиля"
+                >
+                  <IconClose />
+                </button>
               </div>
               <div className="pro-profile-settings-identity">
                 <button
@@ -5008,6 +5182,30 @@ export const ProProfileScreen = ({
           aria-label={editorTitle}
         >
           <div className="pro-profile-editor-shell">
+            <div className="pro-profile-editor-head">
+              <button
+                className="pro-profile-toolbar-back"
+                type="button"
+                onClick={closeEditor}
+              >
+                <span className="chev" aria-hidden="true">
+                  ‹
+                </span>
+                Назад
+              </button>
+              <div className="pro-profile-editor-title-block">
+                <p className="pro-profile-editor-kicker">Редактирование</p>
+                <h2 className="pro-profile-editor-title">{editorTitle}</h2>
+              </div>
+              <button
+                className="pro-profile-toolbar-close"
+                type="button"
+                onClick={closeEditor}
+                aria-label="Закрыть редактор профиля"
+              >
+                <IconClose />
+              </button>
+            </div>
             <section className="pro-profile-editor-card">
               {editingSection === 'media' && (
                 <div className="pro-profile-editor-media">
@@ -6380,8 +6578,9 @@ export const ProProfileScreen = ({
               )}
 
             </section>
-            {(saveError || saveSuccess) && (
+            {(editorValidationError || saveError || saveSuccess) && (
               <div className="pro-profile-editor-messages">
+                {editorValidationError && <p className="pro-error">{editorValidationError}</p>}
                 {saveError && <p className="pro-error">{saveError}</p>}
                 {saveSuccess && <p className="pro-success">{saveSuccess}</p>}
               </div>
