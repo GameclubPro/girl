@@ -57,14 +57,14 @@ try {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ id: 1, name: 'Москва' }]),
+      body: JSON.stringify([{ id: 1, name: 'Краснодар' }]),
     })
   })
   await context.route('**/api/cities/1/districts', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ id: 1, cityId: 1, name: 'ЦАО' }]),
+      body: JSON.stringify([{ id: 1, cityId: 1, name: 'Центральный' }]),
     })
   })
   await context.route('**/api/address?userId=*', async (route) => {
@@ -72,7 +72,7 @@ try {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        address: 'Тверская, 1',
+        address: 'Красная, 1',
         cityId: 1,
         districtId: 1,
       }),

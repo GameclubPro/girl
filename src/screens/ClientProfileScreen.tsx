@@ -43,7 +43,16 @@ type ClientProfileScreenProps = {
   favorites: FavoriteMaster[]
 }
 
-type BookingChipTone = 'is-waiting' | 'is-warning' | 'is-confirmed' | 'is-muted'
+type BookingChipTone = 'waiting' | 'warning' | 'confirmed' | 'muted'
+
+type ProfileTabId = 'overview' | 'activity' | 'location' | 'favorites'
+
+const profileTabs: Array<{ id: ProfileTabId; label: string }> = [
+  { id: 'overview', label: 'Обзор' },
+  { id: 'activity', label: 'Активность' },
+  { id: 'location', label: 'Локация' },
+  { id: 'favorites', label: 'Избранное' },
+]
 
 const bookingStatusLabelMap: Record<Booking['status'], string> = {
   pending: 'Ожидает',
@@ -55,12 +64,12 @@ const bookingStatusLabelMap: Record<Booking['status'], string> = {
 }
 
 const bookingStatusToneMap: Record<Booking['status'], BookingChipTone> = {
-  pending: 'is-waiting',
-  price_pending: 'is-waiting',
-  price_proposed: 'is-warning',
-  confirmed: 'is-confirmed',
-  declined: 'is-muted',
-  cancelled: 'is-muted',
+  pending: 'waiting',
+  price_pending: 'waiting',
+  price_proposed: 'warning',
+  confirmed: 'confirmed',
+  declined: 'muted',
+  cancelled: 'muted',
 }
 
 const upcomingBookingStatuses = new Set<Booking['status']>([
@@ -69,6 +78,11 @@ const upcomingBookingStatuses = new Set<Booking['status']>([
   'price_proposed',
   'confirmed',
 ])
+
+const categoryLabelOverrides: Record<string, string> = {
+  'beauty-nails': 'Ногти',
+  'cosmetology-care': 'Уход за лицом',
+}
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return ''
@@ -110,11 +124,6 @@ const formatRating = (average?: number | null, count?: number | null) => {
   return `★ ${safeAverage.toFixed(1)} (${safeCount})`
 }
 
-const categoryLabelOverrides: Record<string, string> = {
-  'beauty-nails': 'Ногти',
-  'cosmetology-care': 'Уход за лицом',
-}
-
 const getCategoryLabel = (categoryId: string) =>
   categoryLabelOverrides[categoryId] ??
   categoryItems.find((item) => item.id === categoryId)?.label ??
@@ -136,7 +145,7 @@ const buildLocationLabel = (cityName: string, districtName: string) => {
 }
 
 const formatLocationMeta = (location: UserLocation | null) => {
-  if (!location) return ''
+  if (!location) return [] as string[]
   const updatedLabel = location.updatedAt
     ? new Date(location.updatedAt).toLocaleString('ru-RU', {
         day: '2-digit',
@@ -149,19 +158,17 @@ const formatLocationMeta = (location: UserLocation | null) => {
     typeof location.accuracy === 'number'
       ? `Точность ~${Math.round(location.accuracy)} м`
       : ''
-  return [updatedLabel ? `Обновлено ${updatedLabel}` : '', accuracyLabel]
-    .filter(Boolean)
-    .join(' • ')
+  return [updatedLabel ? `Обновлено ${updatedLabel}` : '', accuracyLabel].filter(
+    Boolean
+  )
 }
 
-const profileTabs = [
-  { id: 'summary', label: 'Сводка' },
-  { id: 'activity', label: 'Активность' },
-  { id: 'location', label: 'Локация' },
-  { id: 'favorites', label: 'Избранное' },
-] as const
-
-type ProfileTabId = (typeof profileTabs)[number]['id']
+const getBadgeTone = (tone: BookingChipTone) => {
+  if (tone === 'waiting') return 'is-waiting'
+  if (tone === 'warning') return 'is-warning'
+  if (tone === 'confirmed') return 'is-confirmed'
+  return 'is-muted'
+}
 
 export const ClientProfileScreen = ({
   apiBase,
@@ -196,179 +203,45 @@ export const ClientProfileScreen = ({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isSharing, setIsSharing] = useState(false)
   const [shareError, setShareError] = useState('')
-  const [activeTab, setActiveTab] = useState<ProfileTabId>('summary')
+  const [activeTab, setActiveTab] = useState<ProfileTabId>('overview')
+
   const displayName = displayNameFallback.trim() || 'Клиент'
   const initials = getInitials(displayName)
-  const showSkeleton = isLoading && requests.length === 0 && bookings.length === 0
-  const handleTabChange = useCallback((tabId: ProfileTabId) => {
-    setActiveTab(tabId)
-    if (typeof window === 'undefined') return
-    const prefersReducedMotion =
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    const panel = document.getElementById('profile-panel')
-    if (!panel) return
-    panel.scrollIntoView({
-      behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      block: 'start',
-    })
-  }, [])
 
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-
-    const loadRequests = async () => {
-      const response = await fetch(
-        `${apiBase}/api/requests?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load requests failed')
-      }
-      const data = (await response.json().catch(() => null)) as
-        | ServiceRequest[]
-        | { requests?: ServiceRequest[] }
-        | null
-      return Array.isArray(data) ? data : data?.requests ?? []
+  const fetchRequests = useCallback(async () => {
+    const response = await fetch(
+      `${apiBase}/api/requests?userId=${encodeURIComponent(userId)}`
+    )
+    if (!response.ok) {
+      throw new Error('Load requests failed')
     }
-
-    const loadBookings = async () => {
-      const response = await fetch(
-        `${apiBase}/api/bookings?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load bookings failed')
-      }
-      const data = (await response.json().catch(() => null)) as Booking[] | null
-      return Array.isArray(data) ? data : []
-    }
-
-    const loadTrust = async () => {
-      const response = await fetch(
-        `${apiBase}/api/clients/${encodeURIComponent(userId)}/trust?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load trust failed')
-      }
-      const data = (await response.json().catch(() => null)) as ClientTrust | null
-      return data ?? null
-    }
-
-    const loadSummary = async () => {
-      setIsLoading(true)
-      setLoadError('')
-      setTrustError('')
-      const [requestsResult, bookingsResult, trustResult] =
-        await Promise.allSettled([loadRequests(), loadBookings(), loadTrust()])
-
-      if (cancelled) return
-
-      if (requestsResult.status === 'fulfilled') {
-        setRequests(requestsResult.value)
-      }
-      if (bookingsResult.status === 'fulfilled') {
-        setBookings(bookingsResult.value)
-      }
-      if (trustResult.status === 'fulfilled') {
-        setTrust(trustResult.value)
-      }
-      if (trustResult.status === 'rejected') {
-        setTrustError('Не удалось загрузить добросовестность.')
-      }
-
-      const nextError = [
-        requestsResult.status === 'rejected' ? 'Не удалось загрузить заявки.' : '',
-        bookingsResult.status === 'rejected' ? 'Не удалось загрузить записи.' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')
-      setLoadError(nextError)
-      if (
-        requestsResult.status === 'fulfilled' ||
-        bookingsResult.status === 'fulfilled' ||
-        trustResult.status === 'fulfilled'
-      ) {
-        setLastUpdated(new Date())
-      }
-      setIsLoading(false)
-    }
-
-    void loadSummary()
-
-    return () => {
-      cancelled = true
-    }
+    const data = (await response.json().catch(() => null)) as
+      | ServiceRequest[]
+      | { requests?: ServiceRequest[] }
+      | null
+    return Array.isArray(data) ? data : data?.requests ?? []
   }, [apiBase, userId])
 
-  const refreshSummary = useCallback(async () => {
-    if (!userId) return
-    setTrustError('')
-    const loadRequests = async () => {
-      const response = await fetch(
-        `${apiBase}/api/requests?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load requests failed')
-      }
-      const data = (await response.json().catch(() => null)) as
-        | ServiceRequest[]
-        | { requests?: ServiceRequest[] }
-        | null
-      return Array.isArray(data) ? data : data?.requests ?? []
+  const fetchBookings = useCallback(async () => {
+    const response = await fetch(
+      `${apiBase}/api/bookings?userId=${encodeURIComponent(userId)}`
+    )
+    if (!response.ok) {
+      throw new Error('Load bookings failed')
     }
+    const data = (await response.json().catch(() => null)) as Booking[] | null
+    return Array.isArray(data) ? data : []
+  }, [apiBase, userId])
 
-    const loadBookings = async () => {
-      const response = await fetch(
-        `${apiBase}/api/bookings?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load bookings failed')
-      }
-      const data = (await response.json().catch(() => null)) as Booking[] | null
-      return Array.isArray(data) ? data : []
+  const fetchTrust = useCallback(async () => {
+    const response = await fetch(
+      `${apiBase}/api/clients/${encodeURIComponent(userId)}/trust?userId=${encodeURIComponent(userId)}`
+    )
+    if (!response.ok) {
+      throw new Error('Load trust failed')
     }
-
-    const loadTrust = async () => {
-      const response = await fetch(
-        `${apiBase}/api/clients/${encodeURIComponent(userId)}/trust?userId=${encodeURIComponent(userId)}`
-      )
-      if (!response.ok) {
-        throw new Error('Load trust failed')
-      }
-      const data = (await response.json().catch(() => null)) as ClientTrust | null
-      return data ?? null
-    }
-
-    const [requestsResult, bookingsResult, trustResult] =
-      await Promise.allSettled([loadRequests(), loadBookings(), loadTrust()])
-
-    if (requestsResult.status === 'fulfilled') {
-      setRequests(requestsResult.value)
-    }
-    if (bookingsResult.status === 'fulfilled') {
-      setBookings(bookingsResult.value)
-    }
-    if (trustResult.status === 'fulfilled') {
-      setTrust(trustResult.value)
-      setTrustError('')
-    }
-    if (trustResult.status === 'rejected') {
-      setTrustError('Не удалось загрузить добросовестность.')
-    }
-
-    const nextError = [
-      requestsResult.status === 'rejected' ? 'Не удалось загрузить заявки.' : '',
-      bookingsResult.status === 'rejected' ? 'Не удалось загрузить записи.' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-    setLoadError(nextError)
-    if (
-      requestsResult.status === 'fulfilled' ||
-      bookingsResult.status === 'fulfilled' ||
-      trustResult.status === 'fulfilled'
-    ) {
-      setLastUpdated(new Date())
-    }
+    const data = (await response.json().catch(() => null)) as ClientTrust | null
+    return data ?? null
   }, [apiBase, userId])
 
   const fetchAddress = useCallback(async () => {
@@ -386,20 +259,21 @@ export const ClientProfileScreen = ({
     if (!response.ok) {
       throw new Error('Load address failed')
     }
-    const data = (await response.json()) as {
+
+    const data = (await response.json().catch(() => null)) as {
       cityId?: number | null
       districtId?: number | null
       address?: string | null
       updatedAt?: string | null
-    }
+    } | null
 
-    if (!data.cityId) {
+    if (!data?.cityId) {
       return {
         cityName: '',
         districtName: '',
-        addressLine: typeof data.address === 'string' ? data.address : '',
+        addressLine: typeof data?.address === 'string' ? data.address : '',
         addressUpdatedAt:
-          typeof data.updatedAt === 'string' ? data.updatedAt : null,
+          typeof data?.updatedAt === 'string' ? data.updatedAt : null,
       }
     }
 
@@ -413,18 +287,21 @@ export const ClientProfileScreen = ({
     let resolvedCityName = ''
     let resolvedDistrictName = ''
 
-    if (citiesResponse?.ok) {
-      const cities = (await citiesResponse.json()) as { id: number; name: string }[]
-      const matchedCity = cities.find((city) => city.id === data.cityId)
-      resolvedCityName = matchedCity?.name ?? ''
+    if (citiesResponse.ok) {
+      const cities = (await citiesResponse.json().catch(() => [])) as Array<{
+        id: number
+        name: string
+      }>
+      resolvedCityName = cities.find((item) => item.id === data.cityId)?.name ?? ''
     }
 
     if (districtsResponse?.ok && data.districtId) {
-      const districts = (await districtsResponse.json()) as { id: number; name: string }[]
-      const matchedDistrict = districts.find(
-        (district) => district.id === data.districtId
-      )
-      resolvedDistrictName = matchedDistrict?.name ?? ''
+      const districts = (await districtsResponse.json().catch(() => [])) as Array<{
+        id: number
+        name: string
+      }>
+      resolvedDistrictName =
+        districts.find((item) => item.id === data.districtId)?.name ?? ''
     }
 
     return {
@@ -445,48 +322,120 @@ export const ClientProfileScreen = ({
     if (!response.ok) {
       throw new Error('Load location failed')
     }
-    const data = (await response.json()) as UserLocation
-    return data
+    const data = (await response.json().catch(() => null)) as UserLocation | null
+    return data ?? null
   }, [apiBase, userId])
+
+  const refreshSummary = useCallback(
+    async (isCancelled?: () => boolean) => {
+      setTrustError('')
+      const [requestsResult, bookingsResult, trustResult] =
+        await Promise.allSettled([fetchRequests(), fetchBookings(), fetchTrust()])
+
+      if (isCancelled?.()) return false
+
+      if (requestsResult.status === 'fulfilled') {
+        setRequests(requestsResult.value)
+      }
+      if (bookingsResult.status === 'fulfilled') {
+        setBookings(bookingsResult.value)
+      }
+      if (trustResult.status === 'fulfilled') {
+        setTrust(trustResult.value)
+        setTrustError('')
+      } else {
+        setTrustError('Не удалось загрузить добросовестность.')
+      }
+
+      const nextError = [
+        requestsResult.status === 'rejected' ? 'Не удалось загрузить заявки.' : '',
+        bookingsResult.status === 'rejected' ? 'Не удалось загрузить записи.' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+
+      setLoadError(nextError)
+
+      const hasSuccess =
+        requestsResult.status === 'fulfilled' ||
+        bookingsResult.status === 'fulfilled' ||
+        trustResult.status === 'fulfilled'
+
+      if (hasSuccess) {
+        setLastUpdated(new Date())
+      }
+
+      return hasSuccess
+    },
+    [fetchBookings, fetchRequests, fetchTrust]
+  )
 
   const refreshMeta = useCallback(
     async (isCancelled?: () => boolean) => {
-      if (!userId) return
-      if (isCancelled?.()) return
-      setMetaError('')
       const [addressResult, locationResult] = await Promise.allSettled([
         fetchAddress(),
         fetchLocation(),
       ])
-      if (isCancelled?.()) return
+
+      if (isCancelled?.()) return false
+
       if (addressResult.status === 'fulfilled') {
         setCityName(addressResult.value.cityName)
         setDistrictName(addressResult.value.districtName)
         setAddressLine(addressResult.value.addressLine)
         setAddressUpdatedAt(addressResult.value.addressUpdatedAt)
       }
+
       if (locationResult.status === 'fulfilled') {
         setLocation(locationResult.value)
       }
+
       const nextError = [
         addressResult.status === 'rejected' ? 'Не удалось загрузить адрес.' : '',
-        locationResult.status === 'rejected'
-          ? 'Не удалось загрузить геолокацию.'
-          : '',
+        locationResult.status === 'rejected' ? 'Не удалось загрузить геолокацию.' : '',
       ]
         .filter(Boolean)
         .join(' ')
-      if (isCancelled?.()) return
+
       setMetaError(nextError)
+
+      return (
+        addressResult.status === 'fulfilled' || locationResult.status === 'fulfilled'
+      )
     },
-    [fetchAddress, fetchLocation, userId]
+    [fetchAddress, fetchLocation]
   )
+
+  useEffect(() => {
+    if (!userId) return
+
+    let cancelled = false
+    const isCancelled = () => cancelled
+
+    const load = async () => {
+      setIsLoading(true)
+      setLoadError('')
+      setMetaError('')
+      setShareError('')
+      await Promise.allSettled([refreshSummary(isCancelled), refreshMeta(isCancelled)])
+      if (!isCancelled()) {
+        setIsLoading(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [refreshMeta, refreshSummary, userId])
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return
     setIsRefreshing(true)
     setLoadError('')
     setMetaError('')
+    setShareError('')
     await Promise.allSettled([refreshSummary(), refreshMeta()])
     setIsRefreshing(false)
   }, [isRefreshing, refreshMeta, refreshSummary])
@@ -497,7 +446,7 @@ export const ClientProfileScreen = ({
     try {
       await onRequestLocation()
       await refreshMeta()
-    } catch (error) {
+    } catch {
       setShareError('Не удалось обновить геолокацию.')
     } finally {
       setIsSharing(false)
@@ -510,7 +459,7 @@ export const ClientProfileScreen = ({
     try {
       await onClearLocation()
       await refreshMeta()
-    } catch (error) {
+    } catch {
       setShareError('Не удалось удалить геолокацию.')
     } finally {
       setIsSharing(false)
@@ -522,6 +471,7 @@ export const ClientProfileScreen = ({
       if (!userId || !location) return
       setIsSharing(true)
       setShareError('')
+
       try {
         const response = await fetch(`${apiBase}/api/location/share`, {
           method: 'PATCH',
@@ -539,12 +489,13 @@ export const ClientProfileScreen = ({
         const data = (await response.json().catch(() => null)) as {
           location?: UserLocation | null
         } | null
+
         if (data?.location) {
           setLocation(data.location)
         } else {
           await refreshMeta()
         }
-      } catch (error) {
+      } catch {
         setShareError('Не удалось обновить настройки приватности.')
       } finally {
         setIsSharing(false)
@@ -553,21 +504,21 @@ export const ClientProfileScreen = ({
     [apiBase, location, refreshMeta, userId]
   )
 
-  useEffect(() => {
-    if (!userId) return
-    let cancelled = false
-    const isCancelled = () => cancelled
-    void refreshMeta(isCancelled)
-    return () => {
-      cancelled = true
-    }
-  }, [refreshMeta, userId])
+  const handleTabChange = useCallback((tab: ProfileTabId) => {
+    setActiveTab(tab)
+    if (typeof window === 'undefined') return
+    const prefersReducedMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    document
+      .getElementById('client-profile-panel')
+      ?.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
+  }, [])
 
   const openRequests = useMemo(
     () => requests.filter((request) => request.status === 'open'),
     [requests]
   )
-  const openRequestsCount = openRequests.length
+
   const responseCount = useMemo(
     () =>
       openRequests.reduce(
@@ -576,10 +527,12 @@ export const ClientProfileScreen = ({
       ),
     [openRequests]
   )
+
   const priceOfferCount = useMemo(
     () => bookings.filter((booking) => booking.status === 'price_proposed').length,
     [bookings]
   )
+
   const pendingBookingCount = useMemo(
     () =>
       bookings.filter(
@@ -588,40 +541,7 @@ export const ClientProfileScreen = ({
       ).length,
     [bookings]
   )
-  const attentionItems = useMemo(
-    () =>
-      [
-        {
-          id: 'responses',
-          count: responseCount,
-          label: 'Новые отклики',
-          meta: 'Нужен ответ мастеру',
-          tone: 'accent',
-          onClick: () => onViewRequests('requests'),
-        },
-        {
-          id: 'prices',
-          count: priceOfferCount,
-          label: 'Цена от мастера',
-          meta: 'Есть предложения по записи',
-          tone: 'warning',
-          onClick: () => onViewRequests('bookings'),
-        },
-        {
-          id: 'pending',
-          count: pendingBookingCount,
-          label: 'Подтвердите запись',
-          meta: 'Ожидают подтверждения',
-          tone: 'neutral',
-          onClick: () => onViewRequests('bookings'),
-        },
-      ].filter((item) => item.count > 0),
-    [pendingBookingCount, priceOfferCount, responseCount, onViewRequests]
-  )
-  const attentionTotal = useMemo(
-    () => attentionItems.reduce((total, item) => total + item.count, 0),
-    [attentionItems]
-  )
+
   const upcomingBookings = useMemo(() => {
     const now = Date.now()
     return bookings.filter((booking) => {
@@ -631,6 +551,7 @@ export const ClientProfileScreen = ({
       return scheduledAt.getTime() >= now
     })
   }, [bookings])
+
   const nextBooking = useMemo(() => {
     if (upcomingBookings.length === 0) return null
     return [...upcomingBookings].sort(
@@ -638,51 +559,97 @@ export const ClientProfileScreen = ({
         new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
     )[0]
   }, [upcomingBookings])
+
   const recentBookings = useMemo(() => {
-    const sorted = [...bookings].sort((a, b) => {
-      const aDate = new Date(a.scheduledAt).getTime()
-      const bDate = new Date(b.scheduledAt).getTime()
-      return (Number.isNaN(bDate) ? 0 : bDate) - (Number.isNaN(aDate) ? 0 : aDate)
-    })
-    return sorted.slice(0, 3)
+    return [...bookings]
+      .sort(
+        (a, b) =>
+          new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()
+      )
+      .slice(0, 4)
   }, [bookings])
+
   const recentRequests = useMemo(() => {
-    const sorted = [...openRequests].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
-    return sorted.slice(0, 3)
+    return [...openRequests]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 4)
   }, [openRequests])
-  const favoritesPreview = useMemo(() => favorites.slice(0, 2), [favorites])
-  const favoriteCount = favorites.length
-  const nextBookingTime = nextBooking ? formatDateTime(nextBooking.scheduledAt) : ''
-  const nextBookingStatus = nextBooking
+
+  const focusItems = useMemo(
+    () =>
+      [
+        {
+          id: 'responses',
+          count: responseCount,
+          title: 'Новые отклики',
+          subtitle: 'Нужен ответ мастеру',
+          tone: 'accent',
+          onClick: () => onViewRequests('requests'),
+        },
+        {
+          id: 'offers',
+          count: priceOfferCount,
+          title: 'Предложения цены',
+          subtitle: 'Проверьте условия',
+          tone: 'warning',
+          onClick: () => onViewRequests('bookings'),
+        },
+        {
+          id: 'pending',
+          count: pendingBookingCount,
+          title: 'Ожидают подтверждения',
+          subtitle: 'Завершите запись',
+          tone: 'neutral',
+          onClick: () => onViewRequests('bookings'),
+        },
+      ].filter((item) => item.count > 0),
+    [onViewRequests, pendingBookingCount, priceOfferCount, responseCount]
+  )
+
+  const focusTotal = useMemo(
+    () => focusItems.reduce((total, item) => total + item.count, 0),
+    [focusItems]
+  )
+
+  const nextBookingStatusLabel = nextBooking
     ? bookingStatusLabelMap[nextBooking.status] ?? ''
     : ''
   const nextBookingTone = nextBooking
-    ? bookingStatusToneMap[nextBooking.status] ?? 'is-muted'
-    : 'is-muted'
+    ? bookingStatusToneMap[nextBooking.status] ?? 'muted'
+    : 'muted'
+
+  const locationLabel = buildLocationLabel(cityName, districtName)
+  const locationMetaItems = formatLocationMeta(location)
+  const locationStatusLabel = location ? 'Геолокация включена' : 'Геолокация выключена'
+  const addressLabel = addressLine.trim() || 'Адрес не указан'
+  const addressMeta = addressUpdatedAt
+    ? `Обновлено ${formatShortDate(addressUpdatedAt)}`
+    : ''
+  const locationShareLabel = !location
+    ? 'Геолокация не задана'
+    : location.shareToMasters === false
+      ? 'Расстояние скрыто'
+      : 'Мастера видят только расстояние'
+
   const profileChecklist = useMemo(
     () => [
       {
         id: 'address',
         label: 'Город и район',
-        hint: 'Для точного подбора мастеров',
         done: Boolean(cityName && districtName),
-        actionLabel: 'Указать',
+        actionLabel: 'Заполнить',
         onAction: onEditAddress,
       },
       {
         id: 'location',
         label: 'Геолокация',
-        hint: 'Чтобы видеть мастеров рядом',
         done: Boolean(location),
-        actionLabel: 'Поделиться',
+        actionLabel: 'Включить',
         onAction: handleRequestLocation,
       },
       {
         id: 'request',
         label: 'Первая заявка',
-        hint: 'Получите отклики быстрее',
         done: requests.length > 0,
         actionLabel: 'Создать',
         onAction: onCreateRequest,
@@ -690,17 +657,15 @@ export const ClientProfileScreen = ({
       {
         id: 'booking',
         label: 'Первая запись',
-        hint: 'Выберите мастера под себя',
         done: bookings.length > 0,
         actionLabel: 'Найти мастера',
         onAction: onViewMasters,
       },
       {
         id: 'favorite',
-        label: 'Избранное',
-        hint: 'Сохраните лучших мастеров',
-        done: favoriteCount > 0,
-        actionLabel: 'Смотреть мастеров',
+        label: 'Избранные мастера',
+        done: favorites.length > 0,
+        actionLabel: 'Открыть витрину',
         onAction: onViewMasters,
       },
     ],
@@ -708,7 +673,7 @@ export const ClientProfileScreen = ({
       bookings.length,
       cityName,
       districtName,
-      favoriteCount,
+      favorites.length,
       handleRequestLocation,
       location,
       onCreateRequest,
@@ -717,6 +682,7 @@ export const ClientProfileScreen = ({
       requests.length,
     ]
   )
+
   const completedSteps = profileChecklist.filter((item) => item.done).length
   const completionPercent = Math.round(
     (completedSteps / profileChecklist.length) * 100
@@ -724,1134 +690,408 @@ export const ClientProfileScreen = ({
   const remainingSteps = Math.max(profileChecklist.length - completedSteps, 0)
   const isProfileComplete = completionPercent >= 100
   const nextSteps = profileChecklist.filter((item) => !item.done).slice(0, 3)
-  const remainingStepsLabel = remainingSteps
-    ? `Осталось ${formatCount(remainingSteps, 'шаг', 'шага', 'шагов')}`
-    : 'Профиль готов'
-  const profileStatusLabel = isProfileComplete ? 'Профиль готов' : 'Следующие шаги'
+
   const trustTips = useMemo(() => buildTrustTips(trust), [trust])
-  const locationLabel = buildLocationLabel(cityName, districtName)
-  const locationMeta = formatLocationMeta(location)
-  const locationMetaItems = locationMeta ? locationMeta.split(' • ') : []
-  const locationStatusLabel = location ? 'Геолокация включена' : 'Геолокация выключена'
-  const addressLabel = addressLine.trim() || 'Адрес не указан'
-  const addressMeta = addressUpdatedAt ? `Обновлено ${formatShortDate(addressUpdatedAt)}` : ''
-  const locationShareLabel = !location
-    ? 'Геолокация не задана'
-    : location.shareToMasters === false
-      ? 'Расстояние скрыто'
-      : 'Мастера видят только расстояние'
+
+  const showSkeleton = isLoading && requests.length === 0 && bookings.length === 0
   const lastUpdatedLabel = lastUpdated
     ? lastUpdated.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
     : ''
   const updatedLabel = isRefreshing
-    ? 'Обновляем…'
+    ? 'Обновляем...'
     : lastUpdatedLabel
       ? `Обновлено в ${lastUpdatedLabel}`
       : ''
+
   const errorMessage = [loadError, metaError, shareError].filter(Boolean).join(' ')
 
   return (
-    <div className="screen screen--client screen--client-profile">
-      <div className="client-shell client-profile-shell">
-        <header className="client-profile-header">
-          <div>
-            <p className="client-profile-kicker">Профиль</p>
-            <h1 className="client-profile-title">Мой кабинет</h1>
+    <div className="screen screen--client screen--client-profile cp26-screen">
+      <div className="client-shell cp26-shell">
+        <header className="cp26-header">
+          <div className="cp26-header-copy">
+            <p className="cp26-eyebrow">Профиль клиента</p>
+            <h1 className="cp26-title">Личный кабинет</h1>
             {updatedLabel && (
-              <p
-                className={`client-profile-updated${
-                  isRefreshing ? ' is-refreshing' : ''
-                }`}
-              >
+              <p className={`cp26-updated${isRefreshing ? ' is-loading' : ''}`}>
                 {updatedLabel}
               </p>
             )}
           </div>
-          <div className="client-profile-header-actions">
-            <button
-              className={`client-profile-header-action${
-                isRefreshing ? ' is-loading' : ''
-              }`}
-              type="button"
-              onClick={handleRefresh}
-              aria-label="Обновить данные"
-              disabled={isRefreshing}
-            >
-              <IconRefresh />
-            </button>
-            <button
-              className="client-profile-header-action"
-              type="button"
-              onClick={onEditAddress}
-              aria-label="Изменить город и район"
-            >
-              <IconPin />
-            </button>
-          </div>
+          <button
+            className={`cp26-icon-btn${isRefreshing ? ' is-loading' : ''}`}
+            type="button"
+            onClick={handleRefresh}
+            aria-label="Обновить данные"
+            disabled={isRefreshing}
+          >
+            <IconRefresh />
+          </button>
         </header>
 
         {errorMessage && (
-          <div className="client-profile-banner" role="alert">
+          <div className="cp26-alert" role="alert">
             <span>{errorMessage}</span>
-            <button
-              className="client-profile-banner-action"
-              type="button"
-              onClick={handleRefresh}
-            >
+            <button type="button" onClick={handleRefresh}>
               Повторить
             </button>
           </div>
         )}
 
-        <section className="client-profile-hero animate delay-1">
-          <div className="client-profile-identity">
-            <div className="client-profile-avatar" aria-hidden="true">
+        <section className="cp26-hero animate delay-1">
+          <div className="cp26-hero-top">
+            <div className="cp26-avatar" aria-hidden="true">
               {initials}
             </div>
-            <div className="client-profile-title-group">
-              <h2 className="client-profile-name">{displayName}</h2>
-              <div className="client-profile-hero-meta">
-                <span
-                  className={`client-profile-badge${
-                    isProfileComplete ? ' is-ready' : ''
-                  }`}
-                >
-                  {profileStatusLabel}
+            <div className="cp26-hero-main">
+              <h2 className="cp26-name">{displayName}</h2>
+              <div className="cp26-status-row">
+                <span className={`cp26-status-pill${isProfileComplete ? ' is-ready' : ''}`}>
+                  {isProfileComplete
+                    ? 'Профиль готов'
+                    : `Прогресс ${completionPercent}%`}
                 </span>
-                <span className="client-profile-subtitle">Клиент KIVEN</span>
+                <span className="cp26-subline">{locationLabel}</span>
               </div>
             </div>
           </div>
 
-          <div className="client-profile-primary-action">
-            <button
-              className="cta cta--primary cta--wide client-profile-cta"
-              type="button"
-              onClick={onCreateRequest}
-            >
-              Новая заявка
+          <div className="cp26-actions-main">
+            <button className="cp26-btn cp26-btn--primary" type="button" onClick={onCreateRequest}>
+              Создать заявку
             </button>
-            <div className="client-profile-hero-actions">
-              <button
-                className="client-profile-ghost"
-                type="button"
-                onClick={onViewMasters}
-              >
-                Найти мастера
-              </button>
-              <button
-                className="client-profile-ghost is-muted"
-                type="button"
-                onClick={onOpenSupport}
-              >
-                Поддержка
-              </button>
-            </div>
+            <button className="cp26-btn cp26-btn--secondary" type="button" onClick={onViewMasters}>
+              Найти мастера
+            </button>
           </div>
 
-          <div className="client-profile-stats">
-            <button
-              className="client-profile-stat-button"
-              type="button"
-              onClick={() => handleTabChange('activity')}
-            >
-              <span className="client-profile-stat-value">{openRequestsCount}</span>
-              <span className="client-profile-stat-label">Открытых заявок</span>
+          <div className="cp26-actions-sub">
+            <button className="cp26-btn cp26-btn--ghost" type="button" onClick={onEditAddress}>
+              Изменить город и район
             </button>
-            <button
-              className="client-profile-stat-button"
-              type="button"
-              onClick={() => handleTabChange('activity')}
-            >
-              <span className="client-profile-stat-value">
-                {upcomingBookings.length}
-              </span>
-              <span className="client-profile-stat-label">Активных записей</span>
+            <button className="cp26-btn cp26-btn--ghost" type="button" onClick={onOpenSupport}>
+              Поддержка
             </button>
-            <button
-              className="client-profile-stat-button"
-              type="button"
-              onClick={() => handleTabChange('favorites')}
-            >
-              <span className="client-profile-stat-value">{favoriteCount}</span>
-              <span className="client-profile-stat-label">Избранное</span>
+          </div>
+
+          <div className="cp26-kpi-row">
+            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('activity')}>
+              <span className="cp26-kpi-value">{openRequests.length}</span>
+              <span className="cp26-kpi-label">Заявки</span>
+            </button>
+            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('activity')}>
+              <span className="cp26-kpi-value">{upcomingBookings.length}</span>
+              <span className="cp26-kpi-label">Записи</span>
+            </button>
+            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('activity')}>
+              <span className="cp26-kpi-value">{focusTotal}</span>
+              <span className="cp26-kpi-label">Фокус</span>
+            </button>
+            <button className="cp26-kpi" type="button" onClick={() => handleTabChange('favorites')}>
+              <span className="cp26-kpi-value">{favorites.length}</span>
+              <span className="cp26-kpi-label">Избранное</span>
             </button>
           </div>
         </section>
 
-        <div className="client-profile-tabs" role="tablist" aria-label="Разделы профиля">
+        <div className="cp26-tabs" role="tablist" aria-label="Разделы профиля клиента">
           {profileTabs.map((tab) => (
             <button
-              className={`client-profile-tab${activeTab === tab.id ? ' is-active' : ''}`}
-              type="button"
+              className={`cp26-tab${activeTab === tab.id ? ' is-active' : ''}`}
               key={tab.id}
-              id={`profile-tab-${tab.id}`}
+              id={`cp26-tab-${tab.id}`}
               role="tab"
               aria-selected={activeTab === tab.id}
-              aria-controls="profile-panel"
+              aria-controls="client-profile-panel"
+              type="button"
               onClick={() => handleTabChange(tab.id)}
             >
               <span>{tab.label}</span>
-              {tab.id === 'activity' && attentionTotal > 0 && (
-                <span className="client-profile-tab-badge" aria-hidden="true">
-                  {attentionTotal}
-                </span>
+              {tab.id === 'activity' && focusTotal > 0 && (
+                <span className="cp26-tab-count">{focusTotal}</span>
               )}
             </button>
           ))}
         </div>
 
         {showSkeleton ? (
-          <div className="client-profile-skeleton" aria-hidden="true">
-            <div className="client-profile-skeleton-card">
-              <span className="client-profile-skeleton-line is-xl" />
-              <span className="client-profile-skeleton-line is-lg" />
-              <span className="client-profile-skeleton-line is-sm" />
-            </div>
-            <div className="client-profile-skeleton-card">
-              <span className="client-profile-skeleton-line is-lg" />
-              <span className="client-profile-skeleton-line is-md" />
-              <span className="client-profile-skeleton-line is-xs" />
-            </div>
-            <div className="client-profile-skeleton-row">
-              <span className="client-profile-skeleton-pill" />
-              <span className="client-profile-skeleton-pill" />
-              <span className="client-profile-skeleton-pill" />
+          <div className="cp26-skeleton" aria-hidden="true">
+            <div className="cp26-skeleton-card" />
+            <div className="cp26-skeleton-card" />
+            <div className="cp26-skeleton-row">
+              <span />
+              <span />
+              <span />
             </div>
           </div>
         ) : (
           <div
-            id="profile-panel"
-            className="client-profile-panel animate"
+            id="client-profile-panel"
+            className="cp26-panel animate"
             role="tabpanel"
-            aria-labelledby={`profile-tab-${activeTab}`}
+            aria-labelledby={`cp26-tab-${activeTab}`}
             key={activeTab}
           >
-            {activeTab === 'summary' && (
+            {activeTab === 'overview' && (
               <>
-                <section className="client-section client-profile-section animate delay-1">
-                  <div className="section-header">
-                    <h3>Action Center</h3>
-                    {attentionTotal > 0 && (
-                      <span className="client-profile-attention-badge">
-                        {formatCount(attentionTotal, 'задача', 'задачи', 'задач')}
+                <section className="cp26-card animate delay-1">
+                  <div className="cp26-card-head">
+                    <h3>Фокус на сегодня</h3>
+                    {focusTotal > 0 && (
+                      <span className="cp26-pill">
+                        {formatCount(focusTotal, 'задача', 'задачи', 'задач')}
                       </span>
                     )}
                   </div>
-                  <div className="client-profile-action-center">
-                    <div className="client-profile-card client-profile-action-card">
-                      <div className="client-profile-action-head">
-                        <div>
-                          <p className="client-profile-action-kicker">Приоритеты</p>
-                          <p className="client-profile-action-subtitle">
-                            {attentionItems.length > 0
-                              ? 'Ответы и подтверждения'
-                              : 'Нет срочных задач'}
-                          </p>
-                        </div>
+                  {focusItems.length > 0 ? (
+                    <div className="cp26-focus-list" role="list">
+                      {focusItems.map((item) => (
                         <button
-                          className="client-profile-card-action"
+                          className={`cp26-focus-item is-${item.tone}`}
                           type="button"
-                          onClick={() => handleTabChange('activity')}
+                          key={item.id}
+                          onClick={item.onClick}
+                          role="listitem"
                         >
-                          Все
-                        </button>
-                      </div>
-                      {attentionItems.length > 0 ? (
-                        <div className="client-profile-priority-list" role="list">
-                          {attentionItems.map((item) => (
-                            <button
-                              className={`client-profile-priority-item is-${item.tone}`}
-                              type="button"
-                              key={item.id}
-                              onClick={item.onClick}
-                              role="listitem"
-                            >
-                              <span className="client-profile-priority-count">
-                                {item.count}
-                              </span>
-                              <span className="client-profile-priority-body">
-                                <span className="client-profile-priority-label">
-                                  {item.label}
-                                </span>
-                                <span className="client-profile-priority-meta">
-                                  {item.meta}
-                                </span>
-                              </span>
-                              <span
-                                className="client-profile-priority-chevron"
-                                aria-hidden="true"
-                              >
-                                →
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="client-profile-empty-block">
-                          <p className="client-profile-empty">
-                            Все спокойно — можно планировать следующую запись.
-                          </p>
-                          <button
-                            className="client-profile-action is-primary"
-                            type="button"
-                            onClick={onCreateRequest}
-                          >
-                            Создать заявку
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div
-                      className={`client-profile-card client-profile-action-card${
-                        isProfileComplete ? ' is-ready' : ''
-                      }`}
-                    >
-                      <div className="client-profile-action-head">
-                        <div>
-                          <p className="client-profile-action-kicker">
-                            {isProfileComplete ? 'Профиль' : 'Следующие шаги'}
-                          </p>
-                          <p className="client-profile-action-subtitle">
-                            {isProfileComplete
-                              ? 'Все готово для поиска мастеров'
-                              : remainingStepsLabel}
-                          </p>
-                        </div>
-                        {!isProfileComplete && (
-                          <span className="client-profile-action-count">
-                            {completedSteps}/{profileChecklist.length}
+                          <span className="cp26-focus-count">{item.count}</span>
+                          <span className="cp26-focus-copy">
+                            <span className="cp26-focus-title">{item.title}</span>
+                            <span className="cp26-focus-subtitle">{item.subtitle}</span>
                           </span>
-                        )}
-                      </div>
-                      {isProfileComplete ? (
-                        <div className="client-profile-ready">
-                          <p className="client-profile-ready-text">
-                            Проверьте приватность и настройки геолокации.
-                          </p>
-                          <button
-                            className="client-profile-action is-ghost"
-                            type="button"
-                            onClick={() => handleTabChange('location')}
-                          >
-                            Приватность и безопасность
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="client-profile-steps">
-                          {nextSteps.map((item) => (
-                            <div className="client-profile-step" key={item.id}>
-                              <div className="client-profile-step-info">
-                                <span className="client-profile-step-label">
-                                  {item.label}
-                                </span>
-                                {item.hint && (
-                                  <span className="client-profile-step-meta">
-                                    {item.hint}
-                                  </span>
-                                )}
-                              </div>
-                              <button
-                                className="client-profile-step-action"
-                                type="button"
-                                onClick={item.onAction}
-                              >
-                                {item.actionLabel}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                          <span className="cp26-arrow" aria-hidden="true">
+                            →
+                          </span>
+                        </button>
+                      ))}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="cp26-empty">
+                      <p>Срочных задач нет. Можно планировать следующую запись.</p>
+                      <button
+                        className="cp26-btn cp26-btn--primary"
+                        type="button"
+                        onClick={onCreateRequest}
+                      >
+                        Создать заявку
+                      </button>
+                    </div>
+                  )}
                 </section>
 
-                <section className="client-section client-profile-section animate delay-2">
-                  <div className="section-header">
+                <section className="cp26-card animate delay-2">
+                  <div className="cp26-card-head">
+                    <h3>Путь профиля</h3>
+                    <span className="cp26-pill is-progress">
+                      {completedSteps}/{profileChecklist.length}
+                    </span>
+                  </div>
+                  <div className="cp26-progress-track" aria-hidden="true">
+                    <span style={{ width: `${completionPercent}%` }} />
+                  </div>
+                  {remainingSteps > 0 ? (
+                    <div className="cp26-step-list">
+                      {nextSteps.map((item) => (
+                        <div className="cp26-step" key={item.id}>
+                          <span className="cp26-step-label">{item.label}</span>
+                          <button type="button" onClick={item.onAction}>
+                            {item.actionLabel}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="cp26-empty is-compact">
+                      <p>Профиль полностью готов к быстрому бронированию.</p>
+                      <button
+                        className="cp26-btn cp26-btn--ghost"
+                        type="button"
+                        onClick={() => handleTabChange('location')}
+                      >
+                        Проверить приватность
+                      </button>
+                    </div>
+                  )}
+                </section>
+
+                <section className="cp26-card animate delay-3">
+                  <div className="cp26-card-head">
+                    <h3>Ближайшая запись</h3>
+                    <button type="button" onClick={() => onViewRequests('bookings')}>
+                      Все
+                    </button>
+                  </div>
+                  {nextBooking ? (
+                    <button
+                      className="cp26-booking-main"
+                      type="button"
+                      onClick={() => onViewRequests('bookings')}
+                    >
+                      <span className="cp26-booking-copy">
+                        <span className="cp26-booking-title">
+                          {nextBooking.serviceName || 'Услуга'}
+                        </span>
+                        <span className="cp26-booking-meta">
+                          {nextBooking.masterName || 'Мастер'}
+                          {nextBooking.scheduledAt
+                            ? ` • ${formatDateTime(nextBooking.scheduledAt)}`
+                            : ''}
+                        </span>
+                      </span>
+                      <span className={`cp26-chip ${getBadgeTone(nextBookingTone)}`}>
+                        {nextBookingStatusLabel}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="cp26-empty">
+                      <p>Активных записей пока нет.</p>
+                      <div className="cp26-empty-actions">
+                        <button
+                          className="cp26-btn cp26-btn--primary"
+                          type="button"
+                          onClick={onViewMasters}
+                        >
+                          Найти мастера
+                        </button>
+                        <button
+                          className="cp26-btn cp26-btn--ghost"
+                          type="button"
+                          onClick={onCreateRequest}
+                        >
+                          Создать заявку
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section className="animate delay-3">
+                  <div className="cp26-card-head cp26-card-head--plain">
                     <h3>Добросовестность</h3>
                   </div>
                   {trustError ? (
-                    <div className="trust-meter-card is-error" role="alert">
+                    <div className="cp26-card cp26-inline-error" role="alert">
                       Не удалось загрузить шкалу добросовестности.
                     </div>
                   ) : (
                     <TrustMeter trust={trust} tips={trustTips} />
                   )}
                 </section>
-
-                <section className="client-section client-profile-section animate delay-3">
-                  <div className="section-header">
-                    <h3>Следующая запись</h3>
-                  </div>
-                  <div className="client-profile-card is-highlight">
-                    <div className="client-profile-card-head">
-                      <div className="client-profile-card-title">
-                        <span className="client-profile-card-icon" aria-hidden="true">
-                          <IconClock />
-                        </span>
-                        <span>Ближайшая запись</span>
-                      </div>
-                      <button
-                        className="client-profile-card-action"
-                        type="button"
-                        onClick={() => onViewRequests('bookings')}
-                      >
-                        Все
-                      </button>
-                    </div>
-                    {nextBooking ? (
-                      <div className="client-profile-booking">
-                        <div className="client-profile-booking-info">
-                          <span className="client-profile-booking-title">
-                            {nextBooking.serviceName || 'Услуга'}
-                          </span>
-                          <span className="client-profile-booking-meta">
-                            {nextBooking.masterName || 'Мастер'}
-                            {nextBookingTime ? ` • ${nextBookingTime}` : ''}
-                          </span>
-                          {(nextBooking.cityName || nextBooking.districtName) && (
-                            <span className="client-profile-booking-meta">
-                              {[nextBooking.cityName, nextBooking.districtName]
-                                .filter(Boolean)
-                                .join(', ')}
-                            </span>
-                          )}
-                        </div>
-                        <span className={`client-profile-chip ${nextBookingTone}`}>
-                          {nextBookingStatus}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="client-profile-empty-block">
-                        <p className="client-profile-empty">
-                          Пока нет активных записей. Найдите мастера или создайте заявку.
-                        </p>
-                        <div className="client-profile-empty-actions">
-                          <button
-                            className="client-profile-action is-primary"
-                            type="button"
-                            onClick={onViewMasters}
-                          >
-                            Найти мастера
-                          </button>
-                          <button
-                            className="client-profile-link"
-                            type="button"
-                            onClick={onCreateRequest}
-                          >
-                            Создать заявку <span aria-hidden="true">→</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="client-section client-profile-section animate delay-4">
-                  <div className="section-header">
-                    <h3>Активные заявки</h3>
-                    {openRequestsCount > 0 && (
-                      <span className="client-profile-attention-badge">
-                        {formatCount(openRequestsCount, 'заявка', 'заявки', 'заявок')}
-                      </span>
-                    )}
-                  </div>
-                  <div className="client-profile-card">
-                    <div className="client-profile-card-head">
-                      <div className="client-profile-card-title">
-                        <span className="client-profile-card-icon" aria-hidden="true">
-                          <IconList />
-                        </span>
-                        <span>Ваши заявки</span>
-                      </div>
-                      <button
-                        className="client-profile-card-action"
-                        type="button"
-                        onClick={() => onViewRequests('requests')}
-                      >
-                        Все
-                      </button>
-                    </div>
-                    {recentRequests.length > 0 ? (
-                      <div className="client-profile-requests">
-                        {recentRequests.map((request) => (
-                          <button
-                            className="client-profile-request"
-                            key={request.id}
-                            type="button"
-                            onClick={() => onViewRequests('requests')}
-                          >
-                            <div className="client-profile-request-info">
-                              <span className="client-profile-request-title">
-                                {request.serviceName || 'Услуга'}
-                              </span>
-                              <span className="client-profile-request-meta">
-                                {getCategoryLabel(request.categoryId)}
-                                {request.createdAt
-                                  ? ` • ${formatShortDate(request.createdAt)}`
-                                  : ''}
-                              </span>
-                            </div>
-                            <span
-                              className={`client-profile-chip${
-                                (request.responsesCount ?? 0) > 0
-                                  ? ' is-warning'
-                                  : ' is-muted'
-                              }`}
-                            >
-                              {(request.responsesCount ?? 0) > 0
-                                ? formatCount(
-                                    request.responsesCount ?? 0,
-                                    'отклик',
-                                    'отклика',
-                                    'откликов'
-                                  )
-                                : 'Без откликов'}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="client-profile-empty-block">
-                        <p className="client-profile-empty">
-                          Открытых заявок пока нет. Создайте первую и получите отклики.
-                        </p>
-                        <button
-                          className="client-profile-action is-primary"
-                          type="button"
-                          onClick={onCreateRequest}
-                        >
-                          Создать заявку
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="client-section client-profile-section animate delay-4">
-                  <div className="section-header">
-                    <h3>Избранное</h3>
-                    <button
-                      className="client-profile-card-action"
-                      type="button"
-                      onClick={() => handleTabChange('favorites')}
-                    >
-                      Все
-                    </button>
-                  </div>
-                  <div className="client-profile-card">
-                    {favoritesPreview.length > 0 ? (
-                      <div className="client-profile-favorites">
-                        {favoritesPreview.map((favorite) => {
-                          const categoryLabels = Array.isArray(favorite.categories)
-                            ? favorite.categories.slice(0, 2).map(getCategoryLabel)
-                            : []
-                          const ratingLabel = formatRating(
-                            favorite.reviewsAverage,
-                            favorite.reviewsCount
-                          )
-                          const locationLine = [favorite.cityName, favorite.districtName]
-                            .filter(Boolean)
-                            .join(', ')
-                          return (
-                            <button
-                              className="client-profile-favorite"
-                              key={favorite.masterId}
-                              type="button"
-                              onClick={() => onViewMasterProfile(favorite.masterId)}
-                            >
-                              <span
-                                className="client-profile-favorite-avatar"
-                                aria-hidden="true"
-                              >
-                                {favorite.avatarUrl ? (
-                                  <img src={favorite.avatarUrl} alt="" loading="lazy" />
-                                ) : (
-                                  <span>{getInitials(favorite.displayName)}</span>
-                                )}
-                              </span>
-                              <span className="client-profile-favorite-body">
-                                <span className="client-profile-favorite-head">
-                                  <span className="client-profile-favorite-name">
-                                    {favorite.displayName}
-                                  </span>
-                                  <span className="client-profile-favorite-rating">
-                                    {ratingLabel}
-                                  </span>
-                                </span>
-                                <span className="client-profile-favorite-meta">
-                                  {categoryLabels.join(' • ') ||
-                                    'Категории не указаны'}
-                                </span>
-                                <span className="client-profile-favorite-meta">
-                                  {locationLine || 'Локация не указана'}
-                                </span>
-                              </span>
-                              <span
-                                className="client-profile-favorite-chevron"
-                                aria-hidden="true"
-                              >
-                                →
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div className="client-profile-empty-block">
-                        <p className="client-profile-empty">
-                          Пока нет сохраненных мастеров. Откройте витрину и добавьте
-                          тех, кто понравился.
-                        </p>
-                        <button
-                          className="client-profile-action"
-                          type="button"
-                          onClick={onViewMasters}
-                        >
-                          Найти мастера
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="client-section client-profile-section animate delay-5">
-                  <div className="section-header">
-                    <h3>Локация</h3>
-                    <button
-                      className="client-profile-card-action"
-                      type="button"
-                      onClick={() => handleTabChange('location')}
-                    >
-                      Управлять
-                    </button>
-                  </div>
-                  <div className="client-profile-card">
-                    <div className="client-profile-location-preview">
-                      <div className="client-profile-location">
-                        <div className="client-profile-location-map" aria-hidden="true">
-                          <span className="client-profile-location-map-pin">
-                            <IconPin />
-                          </span>
-                          <span className="client-profile-location-map-dot" />
-                          <span className="client-profile-location-map-dot is-secondary" />
-                        </div>
-                        <div className="client-profile-location-info">
-                          <span className="client-profile-location-title">
-                            {locationLabel}
-                          </span>
-                          <span className="client-profile-location-subtitle">
-                            Данные для подбора мастеров
-                          </span>
-                          <span className="client-profile-location-address">
-                            {addressLabel}
-                          </span>
-                          {addressMeta && (
-                            <span className="client-profile-location-chip">
-                              {addressMeta}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="client-profile-location-status">
-                        <span
-                          className={`client-profile-location-label${
-                            location ? ' is-active' : ''
-                          }`}
-                        >
-                          {locationStatusLabel}
-                        </span>
-                        <div className="client-profile-location-chips">
-                          <span className="client-profile-location-chip">
-                            {locationShareLabel}
-                          </span>
-                          {locationMetaItems.map((item, index) => (
-                            <span
-                              className="client-profile-location-chip"
-                              key={`${item}-${index}`}
-                            >
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
               </>
             )}
 
             {activeTab === 'activity' && (
               <>
-                <section className="client-section client-profile-section animate delay-1">
-                  <div className="section-header">
-                    <h3>Требуют внимания</h3>
-                    {attentionTotal > 0 && (
-                      <span className="client-profile-attention-badge">
-                        {formatCount(attentionTotal, 'событие', 'события', 'событий')}
-                      </span>
-                    )}
-                  </div>
-                  <div className="client-profile-card client-profile-attention-card">
-                    {attentionItems.length > 0 ? (
-                      <div className="client-profile-attention-list" role="list">
-                        {attentionItems.map((item) => (
-                          <button
-                            className={`client-profile-attention-item is-${item.tone} is-pulse`}
-                            type="button"
-                            key={item.id}
-                            onClick={item.onClick}
-                            role="listitem"
-                          >
-                            <span className="client-profile-attention-count">
-                              {item.count}
-                            </span>
-                            <span className="client-profile-attention-body">
-                              <span className="client-profile-attention-label">
-                                {item.label}
-                              </span>
-                              <span className="client-profile-attention-meta">
-                                {item.meta}
-                              </span>
-                            </span>
-                            <span
-                              className="client-profile-attention-chevron"
-                              aria-hidden="true"
-                            >
-                              →
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="client-profile-empty-block">
-                        <p className="client-profile-empty">
-                          Все спокойно — нет задач, которые требуют срочного ответа.
-                        </p>
-                        <button
-                          className="client-profile-action is-primary"
-                          type="button"
-                          onClick={onCreateRequest}
-                        >
-                          Создать заявку
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="client-section client-profile-section animate delay-2">
-                  <div className="section-header">
-                    <h3>Ближайшее</h3>
-                  </div>
-                  <div className="client-profile-card is-highlight">
-                    <div className="client-profile-card-head">
-                      <div className="client-profile-card-title">
-                        <span className="client-profile-card-icon" aria-hidden="true">
-                          <IconClock />
-                        </span>
-                        <span>Ближайшая запись</span>
-                      </div>
-                      <button
-                        className="client-profile-card-action"
-                        type="button"
-                        onClick={() => onViewRequests('bookings')}
-                      >
-                        Все
-                      </button>
-                    </div>
-                    {nextBooking ? (
-                      <div className="client-profile-booking">
-                        <div className="client-profile-booking-info">
-                          <span className="client-profile-booking-title">
-                            {nextBooking.serviceName || 'Услуга'}
-                          </span>
-                          <span className="client-profile-booking-meta">
-                            {nextBooking.masterName || 'Мастер'}
-                            {nextBookingTime ? ` • ${nextBookingTime}` : ''}
-                          </span>
-                          {(nextBooking.cityName || nextBooking.districtName) && (
-                            <span className="client-profile-booking-meta">
-                              {[nextBooking.cityName, nextBooking.districtName]
-                                .filter(Boolean)
-                                .join(', ')}
-                            </span>
-                          )}
-                        </div>
-                        <span className={`client-profile-chip ${nextBookingTone}`}>
-                          {nextBookingStatus}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="client-profile-empty-block">
-                        <p className="client-profile-empty">
-                          Пока нет активных записей. Найдите мастера или создайте заявку.
-                        </p>
-                        <div className="client-profile-empty-actions">
-                          <button
-                            className="client-profile-action is-primary"
-                            type="button"
-                            onClick={onViewMasters}
-                          >
-                            Найти мастера
-                          </button>
-                          <button
-                            className="client-profile-link"
-                            type="button"
-                            onClick={onCreateRequest}
-                          >
-                            Создать заявку <span aria-hidden="true">→</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="client-section client-profile-section animate delay-3">
-                  <div className="section-header">
-                    <h3>Последние записи</h3>
-                  </div>
-                  <div className="client-profile-card">
-                    <div className="client-profile-card-head">
-                      <div className="client-profile-card-title">
-                        <span className="client-profile-card-icon" aria-hidden="true">
-                          <IconClock />
-                        </span>
-                        <span>Недавние визиты</span>
-                      </div>
-                      <button
-                        className="client-profile-card-action"
-                        type="button"
-                        onClick={() => onViewRequests('bookings')}
-                      >
-                        Все
-                      </button>
-                    </div>
-                    {recentBookings.length > 0 ? (
-                      <div className="client-profile-bookings">
-                        {recentBookings.map((booking) => {
-                          const bookingDate = formatShortDate(booking.scheduledAt)
-                          const bookingStatus =
-                            bookingStatusLabelMap[booking.status] ?? booking.status
-                          const bookingTone =
-                            bookingStatusToneMap[booking.status] ?? 'is-muted'
-                          return (
-                            <button
-                              className="client-profile-booking-row"
-                              type="button"
-                              key={booking.id}
-                              onClick={() =>
-                                onCreateBooking({
-                                  masterId: booking.masterId,
-                                  categoryId: booking.categoryId,
-                                  serviceName: booking.serviceName,
-                                  locationType: booking.locationType,
-                                  details: booking.comment ?? null,
-                                  photoUrls: booking.photoUrls,
-                                })
-                              }
-                            >
-                              <div className="client-profile-booking-info">
-                                <span className="client-profile-booking-title">
-                                  {booking.serviceName || 'Услуга'}
-                                </span>
-                                <span className="client-profile-booking-meta">
-                                  {booking.masterName || 'Мастер'}
-                                  {bookingDate ? ` • ${bookingDate}` : ''}
-                                </span>
-                              </div>
-                              <span className={`client-profile-chip ${bookingTone}`}>
-                                {bookingStatus}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div className="client-profile-empty-block">
-                        <p className="client-profile-empty">
-                          История появится после первой записи.
-                        </p>
-                        <button
-                          className="client-profile-action"
-                          type="button"
-                          onClick={onViewMasters}
-                        >
-                          Найти мастера
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="client-section client-profile-section animate delay-4">
-                  <div className="section-header">
+                <section className="cp26-card animate delay-1">
+                  <div className="cp26-card-head">
                     <h3>Активные заявки</h3>
+                    <button type="button" onClick={() => onViewRequests('requests')}>
+                      Все
+                    </button>
                   </div>
-                  <div className="client-profile-card">
-                    <div className="client-profile-card-head">
-                      <div className="client-profile-card-title">
-                        <span className="client-profile-card-icon" aria-hidden="true">
-                          <IconList />
-                        </span>
-                        <span>Ваши заявки</span>
-                      </div>
-                      <button
-                        className="client-profile-card-action"
-                        type="button"
-                        onClick={() => onViewRequests('requests')}
-                      >
-                        Все
-                      </button>
-                    </div>
-                    {recentRequests.length > 0 ? (
-                      <div className="client-profile-requests">
-                        {recentRequests.map((request) => (
-                          <button
-                            className="client-profile-request"
-                            key={request.id}
-                            type="button"
-                            onClick={() => onViewRequests('requests')}
-                          >
-                            <div className="client-profile-request-info">
-                              <span className="client-profile-request-title">
-                                {request.serviceName || 'Услуга'}
-                              </span>
-                              <span className="client-profile-request-meta">
-                                {getCategoryLabel(request.categoryId)}
-                                {request.createdAt
-                                  ? ` • ${formatShortDate(request.createdAt)}`
-                                  : ''}
-                              </span>
-                            </div>
-                            <span
-                              className={`client-profile-chip${
-                                (request.responsesCount ?? 0) > 0
-                                  ? ' is-warning'
-                                  : ' is-muted'
-                              }`}
-                            >
-                              {(request.responsesCount ?? 0) > 0
-                                ? formatCount(
-                                    request.responsesCount ?? 0,
-                                    'отклик',
-                                    'отклика',
-                                    'откликов'
-                                  )
-                                : 'Без откликов'}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="client-profile-empty-block">
-                        <p className="client-profile-empty">
-                          Открытых заявок пока нет. Создайте первую и получите отклики.
-                        </p>
+                  {recentRequests.length > 0 ? (
+                    <div className="cp26-list" role="list">
+                      {recentRequests.map((request) => (
                         <button
-                          className="client-profile-action is-primary"
+                          className="cp26-list-item"
                           type="button"
-                          onClick={onCreateRequest}
+                          key={request.id}
+                          onClick={() => onViewRequests('requests')}
+                          role="listitem"
                         >
-                          Создать заявку
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              </>
-            )}
-
-            {activeTab === 'location' && (
-              <section className="client-section client-profile-section animate delay-1">
-                <div className="section-header">
-                  <h3>Локация</h3>
-                </div>
-                <div className="client-profile-card">
-                  <div className="client-profile-card-head">
-                    <div className="client-profile-card-title">
-                      <span className="client-profile-card-icon" aria-hidden="true">
-                        <IconPin />
-                      </span>
-                      <span>Город и район</span>
-                    </div>
-                    <button
-                      className="client-profile-card-action"
-                      type="button"
-                      onClick={onEditAddress}
-                    >
-                      Изменить
-                    </button>
-                  </div>
-                  <div className="client-profile-location">
-                    <div className="client-profile-location-map" aria-hidden="true">
-                      <span className="client-profile-location-map-pin">
-                        <IconPin />
-                      </span>
-                      <span className="client-profile-location-map-dot" />
-                      <span className="client-profile-location-map-dot is-secondary" />
-                    </div>
-                    <div className="client-profile-location-info">
-                      <span className="client-profile-location-title">{locationLabel}</span>
-                      <span className="client-profile-location-subtitle">
-                        Данные для подбора мастеров
-                      </span>
-                      <span className="client-profile-location-address">{addressLabel}</span>
-                      {addressMeta && (
-                        <span className="client-profile-location-chip">{addressMeta}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="client-profile-location-status">
-                    <span
-                      className={`client-profile-location-label${
-                        location ? ' is-active' : ''
-                      }`}
-                    >
-                      {locationStatusLabel}
-                    </span>
-                    {locationMetaItems.length > 0 && (
-                      <div className="client-profile-location-chips">
-                        {locationMetaItems.map((item, index) => (
-                          <span
-                            className="client-profile-location-chip"
-                            key={`${item}-${index}`}
-                          >
-                            {item}
+                          <span className="cp26-list-copy">
+                            <span className="cp26-list-title">
+                              {request.serviceName || 'Услуга'}
+                            </span>
+                            <span className="cp26-list-meta">
+                              {getCategoryLabel(request.categoryId)}
+                              {request.createdAt
+                                ? ` • ${formatShortDate(request.createdAt)}`
+                                : ''}
+                            </span>
                           </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="client-profile-location-privacy">
-                    <button
-                      className={`client-profile-toggle${
-                        location?.shareToMasters === false ? '' : ' is-active'
-                      }`}
-                      type="button"
-                      onClick={() => handleShareToggle(location?.shareToMasters === false)}
-                      disabled={!location || isSharing}
-                      aria-pressed={location?.shareToMasters !== false}
-                    >
-                      {location?.shareToMasters === false
-                        ? 'Расстояние скрыто'
-                        : 'Расстояние видно'}
-                    </button>
-                    <span className="client-profile-location-help">
-                      {locationShareLabel}
-                    </span>
-                  </div>
-                  <div className="client-profile-location-actions">
-                    <button
-                      className="client-profile-action is-primary"
-                      type="button"
-                      onClick={handleRequestLocation}
-                      disabled={isSharing}
-                    >
-                      {location ? 'Обновить геолокацию' : 'Поделиться геолокацией'}
-                    </button>
-                    {location && (
-                      <button
-                        className="client-profile-action is-ghost"
-                        type="button"
-                        onClick={handleClearLocation}
-                        disabled={isSharing}
-                      >
-                        Удалить
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {activeTab === 'favorites' && (
-              <section className="client-section client-profile-section animate delay-1">
-                <div className="section-header">
-                  <h3>Избранное</h3>
-                </div>
-                <div className="client-profile-card">
-                  <div className="client-profile-card-head">
-                    <div className="client-profile-card-title">
-                      <span className="client-profile-card-icon" aria-hidden="true">
-                        <IconStar />
-                      </span>
-                      <span>Сохраненные мастера</span>
+                          <span
+                            className={`cp26-chip ${(request.responsesCount ?? 0) > 0 ? 'is-warning' : 'is-muted'}`}
+                          >
+                            {(request.responsesCount ?? 0) > 0
+                              ? formatCount(
+                                  request.responsesCount ?? 0,
+                                  'отклик',
+                                  'отклика',
+                                  'откликов'
+                                )
+                              : 'Без откликов'}
+                          </span>
+                        </button>
+                      ))}
                     </div>
-                    <button
-                      className="client-profile-card-action"
-                      type="button"
-                      onClick={onViewMasters}
-                    >
-                      Найти
+                  ) : (
+                    <div className="cp26-empty">
+                      <p>Открытых заявок нет.</p>
+                      <button
+                        className="cp26-btn cp26-btn--primary"
+                        type="button"
+                        onClick={onCreateRequest}
+                      >
+                        Создать заявку
+                      </button>
+                    </div>
+                  )}
+                </section>
+
+                <section className="cp26-card animate delay-2">
+                  <div className="cp26-card-head">
+                    <h3>Последние записи</h3>
+                    <button type="button" onClick={() => onViewRequests('bookings')}>
+                      Все
                     </button>
                   </div>
-                  {favorites.length > 0 ? (
-                    <div className="client-profile-favorites">
-                      {favorites.map((favorite) => {
-                        const categoryLabels = Array.isArray(favorite.categories)
-                          ? favorite.categories.slice(0, 2).map(getCategoryLabel)
-                          : []
-                        const ratingLabel = formatRating(
-                          favorite.reviewsAverage,
-                          favorite.reviewsCount
-                        )
-                        const locationLine = [favorite.cityName, favorite.districtName]
-                          .filter(Boolean)
-                          .join(', ')
+                  {recentBookings.length > 0 ? (
+                    <div className="cp26-list" role="list">
+                      {recentBookings.map((booking) => {
+                        const bookingStatus =
+                          bookingStatusLabelMap[booking.status] ?? booking.status
+                        const bookingTone = bookingStatusToneMap[booking.status] ?? 'muted'
+
                         return (
                           <button
-                            className="client-profile-favorite"
-                            key={favorite.masterId}
+                            className="cp26-list-item"
                             type="button"
-                            onClick={() => onViewMasterProfile(favorite.masterId)}
+                            key={booking.id}
+                            onClick={() =>
+                              onCreateBooking({
+                                masterId: booking.masterId,
+                                categoryId: booking.categoryId,
+                                serviceName: booking.serviceName,
+                                locationType: booking.locationType,
+                                details: booking.comment ?? null,
+                                photoUrls: booking.photoUrls,
+                              })
+                            }
+                            role="listitem"
                           >
-                            <span
-                              className="client-profile-favorite-avatar"
-                              aria-hidden="true"
-                            >
-                              {favorite.avatarUrl ? (
-                                <img src={favorite.avatarUrl} alt="" loading="lazy" />
-                              ) : (
-                                <span>{getInitials(favorite.displayName)}</span>
-                              )}
-                            </span>
-                            <span className="client-profile-favorite-body">
-                              <span className="client-profile-favorite-head">
-                                <span className="client-profile-favorite-name">
-                                  {favorite.displayName}
-                                </span>
-                                <span className="client-profile-favorite-rating">
-                                  {ratingLabel}
-                                </span>
+                            <span className="cp26-list-copy">
+                              <span className="cp26-list-title">
+                                {booking.serviceName || 'Услуга'}
                               </span>
-                              <span className="client-profile-favorite-meta">
-                                {categoryLabels.join(' • ') || 'Категории не указаны'}
-                              </span>
-                              <span className="client-profile-favorite-meta">
-                                {locationLine || 'Локация не указана'}
+                              <span className="cp26-list-meta">
+                                {booking.masterName || 'Мастер'}
+                                {booking.scheduledAt
+                                  ? ` • ${formatShortDate(booking.scheduledAt)}`
+                                  : ''}
                               </span>
                             </span>
-                            <span
-                              className="client-profile-favorite-chevron"
-                              aria-hidden="true"
-                            >
-                              →
+                            <span className={`cp26-chip ${getBadgeTone(bookingTone)}`}>
+                              {bookingStatus}
                             </span>
                           </button>
                         )
                       })}
                     </div>
                   ) : (
-                    <div className="client-profile-empty-block">
-                      <p className="client-profile-empty">
-                        Пока нет сохраненных мастеров. Откройте витрину и добавьте тех,
-                        кто понравился.
-                      </p>
+                    <div className="cp26-empty">
+                      <p>История появится после первой записи.</p>
                       <button
-                        className="client-profile-action"
+                        className="cp26-btn cp26-btn--ghost"
                         type="button"
                         onClick={onViewMasters}
                       >
@@ -1859,6 +1099,178 @@ export const ClientProfileScreen = ({
                       </button>
                     </div>
                   )}
+                </section>
+              </>
+            )}
+
+            {activeTab === 'location' && (
+              <section className="cp26-card animate delay-1">
+                <div className="cp26-card-head">
+                  <h3>Локация и приватность</h3>
+                  <button type="button" onClick={onEditAddress}>
+                    Изменить
+                  </button>
+                </div>
+
+                <div className="cp26-location-main">
+                  <div className="cp26-location-icon" aria-hidden="true">
+                    <IconPin />
+                  </div>
+                  <div className="cp26-location-copy">
+                    <span className="cp26-location-title">{locationLabel}</span>
+                    <span className="cp26-location-address">{addressLabel}</span>
+                    {addressMeta && <span className="cp26-location-meta">{addressMeta}</span>}
+                  </div>
+                </div>
+
+                <div className="cp26-location-state">
+                  <span className={`cp26-pill${location ? ' is-success' : ''}`}>
+                    {locationStatusLabel}
+                  </span>
+                  <span className="cp26-location-help">{locationShareLabel}</span>
+                </div>
+
+                {locationMetaItems.length > 0 && (
+                  <div className="cp26-meta-chips">
+                    {locationMetaItems.map((item, index) => (
+                      <span key={`${item}-${index}`} className="cp26-meta-chip">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="cp26-location-controls">
+                  <button
+                    className={`cp26-toggle${location?.shareToMasters === false ? '' : ' is-active'}`}
+                    type="button"
+                    onClick={() => handleShareToggle(location?.shareToMasters === false)}
+                    disabled={!location || isSharing}
+                    aria-pressed={location?.shareToMasters !== false}
+                  >
+                    {location?.shareToMasters === false
+                      ? 'Расстояние скрыто'
+                      : 'Расстояние видно'}
+                  </button>
+                </div>
+
+                <div className="cp26-location-actions">
+                  <button
+                    className="cp26-btn cp26-btn--primary"
+                    type="button"
+                    onClick={handleRequestLocation}
+                    disabled={isSharing}
+                  >
+                    {location ? 'Обновить геолокацию' : 'Поделиться геолокацией'}
+                  </button>
+                  {location && (
+                    <button
+                      className="cp26-btn cp26-btn--ghost"
+                      type="button"
+                      onClick={handleClearLocation}
+                      disabled={isSharing}
+                    >
+                      Удалить геолокацию
+                    </button>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {activeTab === 'favorites' && (
+              <section className="cp26-card animate delay-1">
+                <div className="cp26-card-head">
+                  <h3>Сохраненные мастера</h3>
+                  <button type="button" onClick={onViewMasters}>
+                    Витрина
+                  </button>
+                </div>
+
+                {favorites.length > 0 ? (
+                  <div className="cp26-favorites" role="list">
+                    {favorites.map((favorite) => {
+                      const categoryLabels = Array.isArray(favorite.categories)
+                        ? favorite.categories.slice(0, 2).map(getCategoryLabel)
+                        : []
+                      const ratingLabel = formatRating(
+                        favorite.reviewsAverage,
+                        favorite.reviewsCount
+                      )
+                      const locationLine = [favorite.cityName, favorite.districtName]
+                        .filter(Boolean)
+                        .join(', ')
+
+                      return (
+                        <button
+                          className="cp26-favorite"
+                          type="button"
+                          key={favorite.masterId}
+                          onClick={() => onViewMasterProfile(favorite.masterId)}
+                          role="listitem"
+                        >
+                          <span className="cp26-favorite-avatar" aria-hidden="true">
+                            {favorite.avatarUrl ? (
+                              <img src={favorite.avatarUrl} alt="" loading="lazy" />
+                            ) : (
+                              <span>{getInitials(favorite.displayName)}</span>
+                            )}
+                          </span>
+                          <span className="cp26-favorite-copy">
+                            <span className="cp26-favorite-head">
+                              <span className="cp26-favorite-name">{favorite.displayName}</span>
+                              <span className="cp26-favorite-rating">{ratingLabel}</span>
+                            </span>
+                            <span className="cp26-favorite-meta">
+                              {categoryLabels.join(' • ') || 'Категории не указаны'}
+                            </span>
+                            <span className="cp26-favorite-meta">
+                              {locationLine || 'Локация не указана'}
+                            </span>
+                          </span>
+                          <span className="cp26-arrow" aria-hidden="true">
+                            →
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="cp26-empty">
+                    <p>Пока нет сохраненных мастеров.</p>
+                    <button
+                      className="cp26-btn cp26-btn--primary"
+                      type="button"
+                      onClick={onViewMasters}
+                    >
+                      Открыть витрину
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {(activeTab === 'overview' || activeTab === 'activity') && (
+              <section className="cp26-card cp26-card--compact animate delay-4">
+                <div className="cp26-card-head">
+                  <h3>Быстрые переходы</h3>
+                </div>
+                <div className="cp26-shortcuts">
+                  <button type="button" onClick={() => onViewRequests('requests')}>
+                    <IconList />
+                    <span>Заявки</span>
+                  </button>
+                  <button type="button" onClick={() => onViewRequests('bookings')}>
+                    <IconClock />
+                    <span>Записи</span>
+                  </button>
+                  <button type="button" onClick={() => handleTabChange('favorites')}>
+                    <IconStar />
+                    <span>Избранное</span>
+                  </button>
+                  <button type="button" onClick={() => handleTabChange('location')}>
+                    <IconPin />
+                    <span>Локация</span>
+                  </button>
                 </div>
               </section>
             )}
