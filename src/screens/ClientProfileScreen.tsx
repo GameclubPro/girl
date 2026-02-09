@@ -3,7 +3,7 @@ import {
   IconClock,
   IconList,
   IconPin,
-  IconRefresh,
+  IconSettings,
   IconStar,
 } from '../components/icons'
 import { ClientBottomNav } from '../components/ClientBottomNav'
@@ -28,6 +28,7 @@ type ClientProfileScreenProps = {
   onViewChats: () => void
   onCreateRequest: () => void
   onOpenSupport: () => void
+  onOpenSettings: () => void
   onCreateBooking: (payload: {
     masterId: string
     categoryId?: string | null
@@ -180,6 +181,7 @@ export const ClientProfileScreen = ({
   onViewChats,
   onCreateRequest,
   onOpenSupport,
+  onOpenSettings,
   onCreateBooking,
   onEditAddress,
   onViewMasterProfile,
@@ -733,8 +735,11 @@ export const ClientProfileScreen = ({
               </span>
             </div>
             <div className="cp26-alert-actions">
-              <button type="button" onClick={handleRefresh}>
-                Обновить
+              <button type="button" onClick={onOpenSettings}>
+                Настройки
+              </button>
+              <button type="button" onClick={handleRefresh} disabled={isRefreshing}>
+                {isRefreshing ? 'Обновляем...' : 'Повторить'}
               </button>
               {errorParts.length > 1 && (
                 <button
@@ -765,13 +770,12 @@ export const ClientProfileScreen = ({
               <div className="cp26-identity-row">
                 <h2 className="cp26-name">{displayName}</h2>
                 <button
-                  className={`cp26-icon-btn${isRefreshing ? ' is-loading' : ''}`}
+                  className="cp26-icon-btn"
                   type="button"
-                  onClick={handleRefresh}
-                  aria-label="Обновить данные"
-                  disabled={isRefreshing}
+                  onClick={onOpenSettings}
+                  aria-label="Настройки профиля"
                 >
-                  <IconRefresh />
+                  <IconSettings />
                 </button>
               </div>
               <div className="cp26-status-row">

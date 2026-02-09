@@ -71,6 +71,12 @@ const ClientProfileScreen = lazy(() =>
     default: module.ClientProfileScreen,
   }))
 )
+const loadClientSettingsScreen = () => import('./screens/ClientSettingsScreen')
+const ClientSettingsScreen = lazy(() =>
+  loadClientSettingsScreen().then((module) => ({
+    default: module.ClientSettingsScreen,
+  }))
+)
 const loadClientScreen = () => import('./screens/ClientScreen')
 const ClientScreen = lazy(() =>
   loadClientScreen().then((module) => ({
@@ -165,6 +171,7 @@ type View =
   | 'address'
   | 'client'
   | 'client-profile'
+  | 'client-settings'
   | 'client-showcase'
   | 'client-gallery'
   | 'client-gallery-detail'
@@ -198,10 +205,16 @@ type ChatReturnView =
   | 'requests'
   | 'client'
   | 'client-profile'
+  | 'client-settings'
   | 'pro-cabinet'
   | 'pro-requests'
 
-type AddressReturnView = 'start' | 'client' | 'client-profile' | 'pro-profile'
+type AddressReturnView =
+  | 'start'
+  | 'client'
+  | 'client-profile'
+  | 'client-settings'
+  | 'pro-profile'
 
 const ScreenPerfMarker = ({
   screenView,
@@ -255,6 +268,7 @@ const viewLoaders: Partial<Record<View, () => Promise<unknown>>> = {
   'chat-thread': loadChatThreadScreen,
   requests: loadClientRequestsScreen,
   'client-profile': loadClientProfileScreen,
+  'client-settings': loadClientSettingsScreen,
   client: loadClientScreen,
   'client-showcase': loadClientShowcase,
   'client-gallery': loadClientShowcase,
@@ -281,6 +295,7 @@ const clientWarmViews: View[] = [
   'request',
   'requests',
   'client-profile',
+  'client-settings',
   'chats',
   'chat-thread',
 ]
@@ -854,6 +869,8 @@ function App() {
           ? 'pro-profile'
           : addressReturnView === 'client-profile'
             ? 'client-profile'
+            : addressReturnView === 'client-settings'
+              ? 'client-settings'
             : 'client'
       setAddressReturnView(role === 'pro' ? 'pro-profile' : 'client')
       navigate(nextView, { reset: true })
@@ -1132,6 +1149,9 @@ function App() {
         case 'request':
         case 'requests':
           goBack('client')
+          break
+        case 'client-settings':
+          goBack('client-profile')
           break
         case 'client-showcase':
         case 'client-gallery':
@@ -1544,6 +1564,7 @@ function App() {
           navigate('request')
         }}
         onOpenSupport={() => void openSupportChat('client-profile')}
+        onOpenSettings={() => navigate('client-settings')}
         onCreateBooking={(payload) =>
           openBooking(payload.masterId, {
             photoUrls: payload.photoUrls ?? [],
@@ -1565,6 +1586,29 @@ function App() {
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}
         favorites={favorites}
+      />
+    )
+  }
+
+  if (view === 'client-settings') {
+    return renderScreen(
+      'client-settings',
+      <ClientSettingsScreen
+        apiBase={apiBase}
+        userId={userId}
+        displayNameFallback={clientName}
+        favoritesCount={favorites.length}
+        onBack={() => goBack('client-profile')}
+        onViewHome={() => navigate('client', { reset: true })}
+        onViewChats={openChatList}
+        onViewRequests={(tab) => openRequests(tab)}
+        onEditAddress={() => {
+          setAddressReturnView('client-settings')
+          navigate('address')
+        }}
+        onOpenSupport={() => void openSupportChat('client-settings')}
+        onRequestLocation={handleRequestLocation}
+        onClearLocation={handleClearLocation}
       />
     )
   }
@@ -2011,6 +2055,10 @@ function App() {
               ? 'pro-profile'
               : addressReturnView === 'start'
                 ? 'start'
+                : addressReturnView === 'client-profile'
+                  ? 'client-profile'
+                  : addressReturnView === 'client-settings'
+                    ? 'client-settings'
                 : 'client'
           )
         }
