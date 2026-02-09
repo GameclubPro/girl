@@ -744,25 +744,12 @@ export const ProProfileScreen = ({
     () => getProfileStatusSummary(profilePayload),
     [profilePayload]
   )
-  const profileCompletion = Math.min(
-    100,
-    Math.max(0, profileStatusSummary.completeness)
-  )
-  const profileStatusLabel =
-    profileStatusSummary.profileStatus === 'complete'
-      ? 'Профиль готов'
-      : profileStatusSummary.profileStatus === 'ready'
-        ? 'Почти готов'
-        : 'Черновик'
   const profileStatusTone =
     profileStatusSummary.profileStatus === 'complete'
       ? 'is-complete'
       : profileStatusSummary.profileStatus === 'ready'
         ? 'is-ready'
         : 'is-draft'
-  const progressStyle = {
-    '--progress-value': `${profileCompletion}%`,
-  } as CSSProperties
   const coverPreviewStyle = coverUrl
     ? ({ backgroundImage: `url(${coverUrl})` } as CSSProperties)
     : undefined
@@ -1477,41 +1464,6 @@ export const ProProfileScreen = ({
       setSaveSuccess('')
     }, 2000)
   }
-  const settingsQuickActions = [
-    !avatarDisplayUrl
-      ? {
-          id: 'avatar',
-          label: 'Добавить фото',
-          onClick: () => openEditor('media', { returnToSettings: true }),
-        }
-      : null,
-    !hasLocationComplete || !hasWorkFormat
-      ? {
-          id: 'location',
-          label: 'Указать локацию',
-          onClick: () => openEditor('location', { returnToSettings: true }),
-        }
-      : null,
-    serviceItems.length === 0
-      ? {
-          id: 'services',
-          label: 'Добавить услуги',
-          onClick: () => openEditor('services', { returnToSettings: true }),
-        }
-      : null,
-    scheduleDays.length === 0 && !scheduleStartValue && !scheduleEndValue
-      ? {
-          id: 'availability',
-          label: 'Настроить график',
-          onClick: () => openEditor('availability', { returnToSettings: true }),
-        }
-      : null,
-  ]
-    .filter(
-      (item): item is { id: string; label: string; onClick: () => void } =>
-        Boolean(item)
-    )
-    .slice(0, 2)
   const openFollowersSheet = useCallback(() => {
     setFollowersTotal((current) => (current > 0 ? current : followersCount))
     setIsFollowersOpen(true)
@@ -5048,50 +5000,6 @@ export const ProProfileScreen = ({
                   <p className="pro-profile-settings-meta">{settingsHeroMeta}</p>
                 </div>
               </div>
-            </section>
-            <section className="pro-profile-settings-summary animate delay-1">
-              <div className="pro-profile-settings-summary-head">
-                <div className="pro-profile-settings-summary-info">
-                  <p className="pro-profile-settings-kicker">Готовность профиля</p>
-                  <div className="pro-profile-settings-progress-row">
-                    <span
-                      className={`pro-profile-settings-status ${profileStatusTone}`}
-                    >
-                      {profileStatusLabel}
-                    </span>
-                  </div>
-                </div>
-                <div
-                  className="pro-profile-settings-progress-ring"
-                  style={progressStyle}
-                >
-                  <span className="pro-profile-settings-progress-value">
-                    {profileCompletion}%
-                  </span>
-                </div>
-              </div>
-              <div
-                className="pro-profile-settings-progress-bar"
-                style={progressStyle}
-                aria-hidden="true"
-              >
-                <span />
-              </div>
-              {settingsQuickActions.length > 0 && (
-                <div className="pro-profile-settings-actions" role="list">
-                  {settingsQuickActions.map((action) => (
-                    <button
-                      className="pro-profile-settings-action"
-                      type="button"
-                      key={action.id}
-                      role="listitem"
-                      onClick={action.onClick}
-                    >
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </section>
             <section className="pro-profile-settings-group animate delay-2">
               <div className="pro-profile-settings-group-head">
