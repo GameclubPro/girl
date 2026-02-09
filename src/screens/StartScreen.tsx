@@ -11,8 +11,10 @@ import { hapticSelection } from '../utils/haptics'
 
 export const StartScreen = ({
   onRoleSelect,
+  isSubmittingRole = false,
 }: {
-  onRoleSelect: (role: Role) => void
+  onRoleSelect: (role: Role) => Promise<void> | void
+  isSubmittingRole?: boolean
 }) => {
   const preload = useNavPreload()
   return (
@@ -61,8 +63,10 @@ export const StartScreen = ({
             className="role-card role-card--client"
             type="button"
             aria-label="Мне нужна услуга"
+            disabled={isSubmittingRole}
             onPointerDown={() => preload?.('address')}
             onClick={() => {
+              if (isSubmittingRole) return
               hapticSelection()
               onRoleSelect('client')
             }}
@@ -78,8 +82,10 @@ export const StartScreen = ({
             className="role-card role-card--pro"
             type="button"
             aria-label="Я мастер"
+            disabled={isSubmittingRole}
             onPointerDown={() => preload?.('pro-profile')}
             onClick={() => {
+              if (isSubmittingRole) return
               hapticSelection()
               onRoleSelect('pro')
             }}
@@ -94,7 +100,9 @@ export const StartScreen = ({
         </div>
 
         <p className="footer-copy animate delay-5">
-          Зарегистрируйтесь как заказчик или мастер
+          {isSubmittingRole
+            ? 'Сохраняем выбор роли...'
+            : 'Зарегистрируйтесь как заказчик или мастер'}
         </p>
 
         <div className="footer-decor" aria-hidden="true">

@@ -3894,6 +3894,26 @@ body {
   color: rgba(var(--ink-rgb), 0.58);
 }
 
+.cs26-role-note {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(var(--ink-rgb), 0.66);
+}
+
+.cs26-role-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+}
+
+.cs26-role-error {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #c04444;
+}
+
 .cs26-location-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

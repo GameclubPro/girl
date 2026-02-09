@@ -20683,6 +20683,11 @@ h2 {
   transform: translateY(1px) scale(0.98);
 }
 
+.role-card:disabled {
+  opacity: 0.56;
+  pointer-events: none;
+}
+
 .role-card:focus-visible {
   outline: 3px solid rgba(var(--accent-rgb), 0.6);
   outline-offset: 4px;
@@ -33493,6 +33498,27 @@ h2 {
     rgba(var(--paper-rgb), 0.98) 0%,
     rgba(var(--warning-rgb), 0.06) 100%
   );
+}
+
+.pro-profile-settings-item.pro-profile-settings-item--role-switch {
+  background: linear-gradient(
+    145deg,
+    rgba(var(--accent-rgb), 0.08),
+    rgba(var(--paper-rgb), 0.98)
+  );
+}
+
+.pro-profile-settings-item:disabled {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.pro-profile-settings-role-error {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c04444;
 }
 
 .pro-profile-settings-icon {

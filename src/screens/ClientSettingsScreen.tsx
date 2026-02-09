@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { IconBell, IconPin } from '../components/icons'
-import type { Booking, ServiceRequest, UserLocation } from '../types/app'
+import type { Booking, Role, ServiceRequest, UserLocation } from '../types/app'
 
 type ClientSettingsScreenProps = {
   apiBase: string
   userId: string
+  role: Role
   displayNameFallback: string
   favoritesCount: number
   onBack: () => void
@@ -16,6 +17,7 @@ type ClientSettingsScreenProps = {
   onOpenSupport: () => void
   onRequestLocation: () => Promise<void>
   onClearLocation: () => Promise<void>
+  onSwitchRole: (nextRole: Role) => Promise<boolean>
 }
 
 type SettingsPrefs = {
@@ -133,6 +135,7 @@ const formatLocationMeta = (location: UserLocation | null) => {
 export const ClientSettingsScreen = ({
   apiBase,
   userId,
+  role,
   displayNameFallback,
   favoritesCount,
   onBack,
@@ -143,6 +146,7 @@ export const ClientSettingsScreen = ({
   onOpenSupport,
   onRequestLocation,
   onClearLocation,
+  onSwitchRole,
 }: ClientSettingsScreenProps) => {
   const [prefs, setPrefs] = useState<SettingsPrefs>(() => loadPrefs())
   const [requestsCount, setRequestsCount] = useState(0)
@@ -155,6 +159,8 @@ export const ClientSettingsScreen = ({
   const [isSharing, setIsSharing] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [shareError, setShareError] = useState('')
+  const [roleSwitchError, setRoleSwitchError] = useState('')
+  const [isRoleSwitching, setIsRoleSwitching] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const displayName = displayNameFallback.trim() || 'Клиент'
@@ -369,6 +375,17 @@ export const ClientSettingsScreen = ({
     }
   }, [onClearLocation, refreshAll])
 
+  const handleRoleSwitch = useCallback(async () => {
+    const targetRole: Role = role === 'pro' ? 'client' : 'pro'
+    setRoleSwitchError('')
+    setIsRoleSwitching(true)
+    const switched = await onSwitchRole(targetRole)
+    if (!switched) {
+      setRoleSwitchError('Не удалось переключить режим. Попробуйте еще раз.')
+    }
+    setIsRoleSwitching(false)
+  }, [onSwitchRole, role])
+
   const locationLabel = buildLocationLabel(cityName, districtName)
   const locationMeta = formatLocationMeta(location)
   const locationShareLabel = !location
@@ -538,6 +555,31 @@ export const ClientSettingsScreen = ({
               Мои заявки
             </button>
           </div>
+        </section>
+
+        <section className="cs26-card animate delay-4">
+          <div className="cs26-card-head">
+            <h3>Режим аккаунта</h3>
+            <span>{role === 'pro' ? 'Мастер' : 'Клиент'}</span>
+          </div>
+          <p className="cs26-role-note">
+            После первого входа режим меняется только в настройках.
+          </p>
+          <div className="cs26-role-actions">
+            <button
+              className="cs26-action is-primary"
+              type="button"
+              onClick={handleRoleSwitch}
+              disabled={isRoleSwitching}
+            >
+              {isRoleSwitching
+                ? 'Переключаем...'
+                : role === 'pro'
+                  ? 'Перейти в режим клиента'
+                  : 'Перейти в режим мастера'}
+            </button>
+          </div>
+          {roleSwitchError && <p className="cs26-role-error">{roleSwitchError}</p>}
         </section>
 
         <section className="cs26-note animate delay-4">

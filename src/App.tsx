@@ -216,6 +216,13 @@ type AddressReturnView =
   | 'client-settings'
   | 'pro-profile'
 
+type RoleUpdateSource = 'onboarding' | 'settings'
+
+type UserRoleStateResponse = {
+  role?: Role | null
+  selectedOnce?: boolean
+}
+
 const ScreenPerfMarker = ({
   screenView,
   children,
@@ -371,6 +378,9 @@ const formatGeoError = (error: unknown) => {
   }
 }
 
+const parseRole = (value: unknown): Role | null =>
+  value === 'client' || value === 'pro' ? value : null
+
 function App() {
   const [nav, dispatchNav] = useReducer(navReducer, {
     view: 'start',
@@ -434,6 +444,9 @@ function App() {
     dispatchNav({ type: 'BACK', fallback })
   }, [])
   const [role, setRole] = useState<Role>('client')
+  const [isRoleStateLoading, setIsRoleStateLoading] = useState(true)
+  const [isRoleSelectedOnce, setIsRoleSelectedOnce] = useState(false)
+  const [isRoleSelectionPending, setIsRoleSelectionPending] = useState(false)
   const [proProfileSection, setProProfileSection] =
     useState<ProProfileSection | null>(null)
   const [proProfilePortfolioView, setProProfilePortfolioView] = useState<
@@ -528,6 +541,64 @@ function App() {
       .trim() || telegramUser?.username?.trim() || ''
   const telegramAvatarUrl = telegramUser?.photo_url ?? null
 
+  const applyRoleState = useCallback((payload: UserRoleStateResponse | null) => {
+    const nextRole = parseRole(payload?.role)
+    const nextSelectedOnce = Boolean(payload?.selectedOnce && nextRole)
+    if (nextRole) {
+      setRole(nextRole)
+    }
+    setIsRoleSelectedOnce(nextSelectedOnce)
+  }, [])
+
+  const updateRole = useCallback(
+    async (nextRole: Role, source: RoleUpdateSource) => {
+      try {
+        const response = await fetch(`${apiBase}/api/user/role`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            role: nextRole,
+            source,
+          }),
+        })
+
+        const payload = (await response.json().catch(() => null)) as
+          | UserRoleStateResponse
+          | { error?: string; role?: Role | null; selectedOnce?: boolean }
+          | null
+
+        if (!response.ok) {
+          const errorCode =
+            payload && typeof payload === 'object' && 'error' in payload
+              ? payload.error
+              : undefined
+          if (errorCode === 'role_already_selected') {
+            applyRoleState(payload)
+            return {
+              ok: false as const,
+              message: 'Роль уже выбрана. Сменить можно только в настройках.',
+            }
+          }
+          return {
+            ok: false as const,
+            message: 'Не удалось сохранить роль. Попробуйте еще раз.',
+          }
+        }
+
+        applyRoleState(payload)
+        const savedRole = parseRole(payload?.role) ?? nextRole
+        return { ok: true as const, role: savedRole }
+      } catch (error) {
+        return {
+          ok: false as const,
+          message: 'Не удалось сохранить роль. Проверьте соединение и повторите.',
+        }
+      }
+    },
+    [apiBase, applyRoleState, userId]
+  )
+
   const prefetchViewData = useCallback(
     (target: View) => {
       if (!apiBase) return
@@ -588,12 +659,70 @@ function App() {
   }, [prefetchViewData])
 
   useEffect(() => {
+    let cancelled = false
+    const controller = new AbortController()
+
+    const loadRoleState = async () => {
+      setIsRoleStateLoading(true)
+      try {
+        const response = await fetch(
+          `${apiBase}/api/user/role-state?userId=${encodeURIComponent(userId)}`,
+          { signal: controller.signal }
+        )
+        if (!response.ok) {
+          throw new Error('Load role state failed')
+        }
+        const payload = (await response.json().catch(() => null)) as
+          | UserRoleStateResponse
+          | null
+        if (!cancelled) {
+          applyRoleState(payload)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setIsRoleSelectedOnce(false)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsRoleStateLoading(false)
+        }
+      }
+    }
+
+    void loadRoleState()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [apiBase, applyRoleState, userId])
+
+  useEffect(() => {
     preloadedViewsRef.current.add(view)
   }, [view])
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [view])
+
+  useEffect(() => {
+    if (isRoleStateLoading || !isRoleSelectedOnce || view !== 'start') return
+    const searchParams = new URLSearchParams(window.location.search)
+    const hasDeepLinkIntent = Boolean(
+      window.Telegram?.WebApp?.initDataUnsafe?.start_param ||
+        searchParams.get('startapp') ||
+        searchParams.get('start') ||
+        searchParams.get('masterId') ||
+        searchParams.get('master') ||
+        searchParams.get('chatId') ||
+        searchParams.get('chat')
+    )
+    if (hasDeepLinkIntent && !deepLinkHandledRef.current) return
+    navigate(role === 'pro' ? 'pro-cabinet' : 'client', {
+      reset: true,
+      replace: true,
+    })
+  }, [isRoleSelectedOnce, isRoleStateLoading, navigate, role, view])
 
   useEffect(() => {
     if (warmupDoneRef.current || view === 'start') return
@@ -630,6 +759,7 @@ function App() {
   }, [preloadView, role, view])
 
   useEffect(() => {
+    if (isRoleStateLoading) return
     if (deepLinkHandledRef.current) return
     const webAppStart = window.Telegram?.WebApp?.initDataUnsafe?.start_param
     const searchParams = new URLSearchParams(window.location.search)
@@ -658,7 +788,6 @@ function App() {
 
     if (parsedUnsubMasterId) {
       deepLinkHandledRef.current = true
-      setRole('client')
       const targetMasterId = parsedUnsubMasterId
       const runOptOut = async () => {
         if (!userId) {
@@ -702,14 +831,13 @@ function App() {
 
     if (!masterId) return
     deepLinkHandledRef.current = true
-    setRole('client')
     setSelectedMasterId(masterId)
     setBookingMasterId(masterId)
     setBookingPhotoUrls([])
     setBookingPreferredCategoryId(null)
     setBookingReturnView('client-master-profile')
     navigate('booking', { reset: true })
-  }, [apiBase, navigate, userId])
+  }, [apiBase, isRoleStateLoading, navigate, userId])
 
   const handleDistrictChange = (value: number | null) => {
     setDistrictId(value)
@@ -1136,7 +1264,8 @@ function App() {
     const backButton = window.Telegram?.WebApp?.BackButton
     if (!backButton) return
 
-    const shouldShow = view !== 'start' && (view !== 'client' || navStack.length > 0)
+    const roleHomeView: View = role === 'pro' ? 'pro-cabinet' : 'client'
+    const shouldShow = view !== 'start' && !(view === roleHomeView && navStack.length === 0)
 
     const handleBack = () => {
       if (screenBackHandlerRef.current?.()) {
@@ -1199,7 +1328,7 @@ function App() {
           goBack('pro-cabinet')
           break
         case 'pro-cabinet':
-          goBack('start')
+          goBack(roleHomeView)
           break
         default:
           break
@@ -1342,6 +1471,29 @@ function App() {
       navigate('pro-stories')
     },
     [navigate]
+  )
+
+  const handleRoleSwitch = useCallback(
+    async (nextRole: Role) => {
+      const result = await updateRole(nextRole, 'settings')
+      if (!result.ok) {
+        return false
+      }
+
+      if (nextRole === 'pro') {
+        setProProfileSection(null)
+        setProProfilePortfolioView(null)
+        setProProfileReturnView('pro-cabinet')
+        setAddressReturnView('pro-profile')
+        navigate('pro-cabinet', { reset: true })
+      } else {
+        setAddressReturnView('client')
+        navigate('client', { reset: true })
+      }
+
+      return true
+    },
+    [navigate, updateRole]
   )
 
   const openChatList = useCallback(() => {
@@ -1596,6 +1748,7 @@ function App() {
       <ClientSettingsScreen
         apiBase={apiBase}
         userId={userId}
+        role={role}
         displayNameFallback={clientName}
         favoritesCount={favorites.length}
         onBack={() => goBack('client-profile')}
@@ -1609,6 +1762,7 @@ function App() {
         onOpenSupport={() => void openSupportChat('client-settings')}
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}
+        onSwitchRole={handleRoleSwitch}
       />
     )
   }
@@ -1883,6 +2037,7 @@ function App() {
       <ProProfileScreen
         apiBase={apiBase}
         userId={userId}
+        role={role}
         displayNameFallback={clientName}
         telegramAvatarUrl={telegramAvatarUrl}
         returnView={proProfileReturnView}
@@ -1899,6 +2054,7 @@ function App() {
         focusSection={proProfileSection}
         initialPortfolioView={proProfilePortfolioView ?? undefined}
         onBackHandlerChange={registerProProfileBackHandler}
+        onSwitchRole={handleRoleSwitch}
       />
     )
   }
@@ -2066,11 +2222,29 @@ function App() {
     )
   }
 
+  if (isRoleStateLoading) {
+    return <ScreenLoader />
+  }
+
+  if (isRoleSelectedOnce) {
+    return renderScreen('start', <ScreenLoader />)
+  }
+
   return renderScreen(
     'start',
     <StartScreen
-      onRoleSelect={(nextRole) => {
-        setRole(nextRole)
+      isSubmittingRole={isRoleSelectionPending}
+      onRoleSelect={async (nextRole) => {
+        if (isRoleSelectionPending) return
+        setIsRoleSelectionPending(true)
+        const result = await updateRole(nextRole, 'onboarding')
+        setIsRoleSelectionPending(false)
+
+        if (!result.ok) {
+          window.alert(result.message)
+          return
+        }
+
         if (nextRole === 'pro') {
           setProProfileSection(null)
           setAddressReturnView('pro-profile')

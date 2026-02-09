@@ -284,6 +284,12 @@ const normalizeText = (value) => {
   return value.trim()
 }
 
+const normalizeUserRole = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  if (normalized === 'client' || normalized === 'pro') return normalized
+  return null
+}
+
 const normalizeStoryCaption = (value) => {
   const normalized = normalizeText(value)
   if (!normalized) return null
@@ -4186,6 +4192,45 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS app_role TEXT;
+  `)
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role_selected_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role_changed_at TIMESTAMPTZ;
+  `)
+
+  await pool.query(`
+    DO $$
+    DECLARE
+      constraint_name TEXT;
+    BEGIN
+      FOR constraint_name IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        WHERE t.relname = 'users'
+          AND c.contype = 'c'
+          AND pg_get_constraintdef(c.oid) ILIKE '%app_role%'
+      LOOP
+        EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', constraint_name);
+      END LOOP;
+    END$$;
+  `)
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD CONSTRAINT users_app_role_check
+    CHECK (app_role IN ('client', 'pro') OR app_role IS NULL);
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS cities (
       id SERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL
@@ -5316,6 +5361,130 @@ app.post('/api/user', async (req, res) => {
     res.json({ ok: true })
   } catch (error) {
     console.error('POST /api/user failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/user/role-state', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+    const result = await pool.query(
+      `
+        SELECT
+          app_role AS role,
+          role_selected_at AS "roleSelectedAt",
+          role_changed_at AS "roleChangedAt"
+        FROM users
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    const row = result.rows[0] ?? null
+    const role = normalizeUserRole(row?.role)
+    const selectedOnce = Boolean(role && row?.roleSelectedAt)
+
+    res.json({
+      role,
+      selectedOnce,
+      roleSelectedAt: row?.roleSelectedAt ?? null,
+      roleChangedAt: row?.roleChangedAt ?? null,
+    })
+  } catch (error) {
+    console.error('GET /api/user/role-state failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.patch('/api/user/role', async (req, res) => {
+  const { userId, role, source } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedRole = normalizeUserRole(role)
+  const normalizedSource = normalizeText(source).toLowerCase()
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  if (!normalizedRole) {
+    res.status(400).json({ error: 'role_invalid' })
+    return
+  }
+
+  if (normalizedSource !== 'onboarding' && normalizedSource !== 'settings') {
+    res.status(400).json({ error: 'source_invalid' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+    const currentResult = await pool.query(
+      `
+        SELECT
+          app_role AS role,
+          role_selected_at AS "roleSelectedAt"
+        FROM users
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+    const currentRow = currentResult.rows[0] ?? null
+    const currentRole = normalizeUserRole(currentRow?.role)
+    const hasSelectedOnce = Boolean(currentRole && currentRow?.roleSelectedAt)
+
+    if (normalizedSource === 'onboarding' && hasSelectedOnce) {
+      res.status(409).json({
+        error: 'role_already_selected',
+        role: currentRole,
+        selectedOnce: true,
+        roleSelectedAt: currentRow.roleSelectedAt ?? null,
+      })
+      return
+    }
+
+    await pool.query(
+      `
+        UPDATE users
+        SET app_role = $2,
+            role_selected_at = COALESCE(role_selected_at, NOW()),
+            role_changed_at = NOW(),
+            updated_at = NOW()
+        WHERE user_id = $1
+      `,
+      [normalizedUserId, normalizedRole]
+    )
+
+    const nextResult = await pool.query(
+      `
+        SELECT
+          app_role AS role,
+          role_selected_at AS "roleSelectedAt",
+          role_changed_at AS "roleChangedAt"
+        FROM users
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+    const nextRow = nextResult.rows[0] ?? null
+    const nextRole = normalizeUserRole(nextRow?.role)
+
+    res.json({
+      ok: true,
+      role: nextRole,
+      selectedOnce: Boolean(nextRole && nextRow?.roleSelectedAt),
+      roleSelectedAt: nextRow?.roleSelectedAt ?? null,
+      roleChangedAt: nextRow?.roleChangedAt ?? null,
+    })
+  } catch (error) {
+    console.error('PATCH /api/user/role failed:', error)
     res.status(500).json({ error: 'server_error' })
   }
 })

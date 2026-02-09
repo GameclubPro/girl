@@ -89,6 +89,55 @@ try {
       body: JSON.stringify({ ok: true }),
     })
   })
+  await context.route('**/api/user/role-state?userId=*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        role: null,
+        selectedOnce: false,
+        roleSelectedAt: null,
+        roleChangedAt: null,
+      }),
+    })
+  })
+  await context.route('**/api/user/role', async (route) => {
+    if (route.request().method().toUpperCase() !== 'PATCH') {
+      await route.continue()
+      return
+    }
+    let role = 'client'
+    try {
+      const payload = route.request().postDataJSON()
+      if (payload?.role === 'pro' || payload?.role === 'client') {
+        role = payload.role
+      }
+    } catch (error) {
+      // ignore malformed payload in screenshot harness
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        role,
+        selectedOnce: true,
+        roleSelectedAt: '2026-02-09T20:00:00.000Z',
+        roleChangedAt: '2026-02-09T20:00:00.000Z',
+      }),
+    })
+  })
+  await context.route('**/api/user', async (route) => {
+    if (route.request().method().toUpperCase() !== 'POST') {
+      await route.continue()
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true }),
+    })
+  })
 
   const page = await context.newPage()
 
