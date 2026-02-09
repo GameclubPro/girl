@@ -397,9 +397,6 @@ export const ClientSettingsScreen = ({
     <div className="screen screen--client screen--client-settings">
       <div className="client-shell cs26-shell">
         <header className="cs26-header">
-          <button className="cs26-back" type="button" onClick={onBack} aria-label="Назад в профиль">
-            ←
-          </button>
           <div className="cs26-header-copy">
             <p className="cs26-kicker">Параметры</p>
             <h1 className="cs26-title">Настройки клиента</h1>
@@ -438,10 +435,10 @@ export const ClientSettingsScreen = ({
               <strong>{bookingsCount}</strong>
               <span>записи</span>
             </button>
-            <button type="button" onClick={onBack}>
+            <div className="cs26-profile-stat">
               <strong>{favoritesCount}</strong>
               <span>избранное</span>
-            </button>
+            </div>
           </div>
         </section>
 

@@ -3564,12 +3564,11 @@ body {
 
 .cs26-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
 }
 
-.cs26-back,
 .cs26-refresh {
   min-width: 44px;
   width: 44px;
@@ -3582,11 +3581,6 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: 0 10px 20px rgba(var(--shadow-rgb), 0.08);
-}
-
-.cs26-back {
-  font-size: 19px;
-  font-weight: 700;
 }
 
 .cs26-refresh {
@@ -3714,7 +3708,8 @@ body {
   gap: 7px;
 }
 
-.cs26-profile-stats button {
+.cs26-profile-stats button,
+.cs26-profile-stat {
   min-height: 52px;
   border-radius: 12px;
   border: 1px solid rgba(var(--shadow-rgb), 0.14);
@@ -3951,7 +3946,6 @@ body {
   color: rgba(var(--ink-rgb), 0.62);
 }
 
-.cs26-back:focus-visible,
 .cs26-refresh:focus-visible,
 .cs26-card-head button:focus-visible,
 .cs26-toggle-item:focus-visible,
