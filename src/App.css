@@ -15368,14 +15368,14 @@
 }
 
 .pro-profile-editor-head {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 6px;
   position: sticky;
   top: 0;
   z-index: 4;
-  padding: 4px;
+  padding: 10px 12px;
   border-radius: 16px;
   background: rgba(var(--paper-rgb), 0.9);
   border: 1px solid rgba(var(--accent-rgb), 0.28);
@@ -16178,58 +16178,10 @@
 }
 
 .pro-profile-settings-toolbar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.pro-profile-toolbar-back,
-.pro-profile-toolbar-close {
-  min-height: 42px;
-  border-radius: 12px;
-  border: 1px solid rgba(var(--accent-rgb), 0.36);
-  background: rgba(var(--paper-rgb), 0.78);
-  color: var(--pro-ink);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.1);
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.pro-profile-toolbar-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.pro-profile-toolbar-back .chev {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.pro-profile-toolbar-close {
-  width: 42px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.pro-profile-toolbar-close svg,
-.pro-profile-toolbar-close img {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-}
-
-.pro-profile-toolbar-back:focus-visible,
-.pro-profile-toolbar-close:focus-visible {
-  outline: 3px solid rgba(var(--accent-rgb), 0.32);
-  outline-offset: 2px;
+  margin-bottom: 12px;
 }
 
 .pro-profile-settings-title {
@@ -31689,59 +31641,257 @@ h2 {
   box-shadow: inset 0 0 0 1px rgba(var(--danger-rgb), 0.25);
 }
 
-.pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-presets {
-  padding: 6px;
+.pro-profile-editor-screen[data-editor-section="availability"]
+  .pro-profile-editor-stack--availability {
+  gap: 14px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-summary {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    145deg,
+    rgba(var(--accent-rgb), 0.14),
+    rgba(var(--paper-rgb), 0.94) 44%,
+    rgba(var(--paper-rgb), 0.9)
+  );
+  border-color: rgba(var(--accent-rgb), 0.3);
+  box-shadow: 0 16px 24px rgba(var(--shadow-rgb), 0.12);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-summary::before {
+  content: '';
+  position: absolute;
+  inset: -45% -20% auto;
+  height: 150%;
+  background:
+    radial-gradient(56% 56% at 18% 18%, rgba(var(--accent-rgb), 0.2), transparent 60%),
+    radial-gradient(42% 42% at 76% 8%, rgba(var(--accent-rgb), 0.16), transparent 62%);
+  pointer-events: none;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-summary > * {
+  position: relative;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-summary-status {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-status-pill {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  background: rgba(var(--paper-rgb), 0.85);
+  color: var(--pro-muted);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-status-pill.is-active {
+  border-color: rgba(var(--success-rgb), 0.34);
+  background: rgba(var(--success-rgb), 0.14);
+  color: var(--success);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-status-pill.is-paused {
+  border-color: rgba(var(--warning-rgb), 0.35);
+  background: rgba(var(--warning-rgb), 0.14);
+  color: var(--warning);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-metric {
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.1);
+  background: rgba(var(--paper-rgb), 0.82);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-metric-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-metric-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pro-ink);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
   border-radius: 16px;
-  background: rgba(var(--accent-rgb), 0.22);
-  border: 1px solid rgba(var(--accent-rgb), 0.45);
-  gap: 6px;
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.72);
+  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.8);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-field-label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pro-muted);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(var(--accent-rgb), 0.07);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.72);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-presets.is-time {
+  margin-top: 0;
 }
 
 .pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-preset {
-  padding: 7px 10px;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  background: rgba(var(--accent-rgb), 0.2);
-  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  background: rgba(var(--paper-rgb), 0.92);
+  border: 1px solid rgba(var(--shadow-rgb), 0.14);
+  box-shadow: 0 6px 12px rgba(var(--shadow-rgb), 0.06);
   color: var(--pro-ink);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease,
+    background 0.18s ease;
 }
 
 .pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-preset.is-active {
   background: linear-gradient(
-    120deg,
-    rgba(var(--accent-rgb), 0.2),
-    rgba(var(--accent-rgb), 0.1)
+    130deg,
+    rgba(var(--accent-rgb), 0.22),
+    rgba(var(--accent-rgb), 0.14)
   );
-  color: var(--pro-ink);
-  border-color: rgba(var(--accent-rgb), 0.65);
+  border-color: rgba(var(--accent-rgb), 0.42);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.16);
 }
 
-.pro-profile-editor-screen[data-editor-section="availability"] .request-chips {
-  gap: 6px;
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-preset:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
 }
 
-.pro-profile-editor-screen[data-editor-section="availability"] .request-chip {
-  padding: 6px 10px;
-  font-size: 12px;
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-preset:active {
+  transform: translateY(1px);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-preset.is-ghost {
+  color: var(--pro-muted);
+  background: rgba(var(--paper-rgb), 0.74);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-days {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-days .request-chip {
+  min-height: 44px;
+  justify-content: center;
+  padding: 0 6px;
   border-radius: 12px;
-  background: rgba(var(--accent-rgb), 0.22);
-  border: 1px solid rgba(var(--accent-rgb), 0.45);
-  box-shadow: 0 8px 14px rgba(var(--shadow-rgb), 0.12);
-  backdrop-filter: var(--glass-frost-soft);
-  -webkit-backdrop-filter: var(--glass-frost-soft);
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(var(--paper-rgb), 0.92);
+  border: 1px solid rgba(var(--shadow-rgb), 0.16);
+  box-shadow: 0 6px 12px rgba(var(--shadow-rgb), 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease,
+    background 0.18s ease;
 }
 
-.pro-profile-editor-screen[data-editor-section="availability"] .request-chip.is-active {
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-days .request-chip.is-active {
   background: linear-gradient(
-    120deg,
-    rgba(var(--accent-rgb), 0.98),
-    rgba(var(--raspberry-rgb), 0.9)
+    125deg,
+    rgba(var(--accent-rgb), 0.95),
+    rgba(var(--accent-rgb), 0.78)
   );
   color: var(--paper);
   border-color: transparent;
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.24);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-days .request-chip:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.28);
+  outline-offset: 2px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-days .request-chip:active {
+  transform: translateY(1px);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-time-fields {
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--shadow-rgb), 0.12);
+  background: rgba(var(--paper-rgb), 0.75);
+  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.8);
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"]
+  .pro-availability-time-fields
+  .pro-input {
+  min-height: 44px;
+}
+
+.pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-hint {
+  margin: 0;
+}
+
+@media (max-width: 360px) {
+  .pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pro-profile-editor-screen[data-editor-section="availability"] .pro-profile-editor-presets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pro-profile-editor-screen[data-editor-section="availability"] .pro-availability-days {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .pro-profile-editor-screen[data-editor-section="services"] .pro-service-block {

@@ -11,7 +11,6 @@ import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
   IconClientVisit,
-  IconClose,
   IconExperience,
   IconFormat,
   IconHomeMaster,
@@ -1058,6 +1057,27 @@ export const ProProfileScreen = ({
     scheduleStartMinutes !== null &&
     scheduleEndMinutes !== null &&
     scheduleEndMinutes <= scheduleStartMinutes
+  const scheduleDaysCountLabel =
+    scheduleDayLabels.length > 0
+      ? formatCount(scheduleDayLabels.length, 'день', 'дня', 'дней')
+      : 'Дни не выбраны'
+  const availabilityStatusLabel = isActive ? 'Онлайн для заявок' : 'Пауза'
+  const availabilityStatusHint = isActive
+    ? 'Клиенты могут писать в выбранные дни и часы.'
+    : 'Новые заявки временно не принимаются.'
+  const availabilityDayError = isActive && scheduleDays.length === 0
+  const availabilityTimeError = hasPartialTimeRange || hasInvalidTimeRange
+  const availabilityDaysHint =
+    scheduleDays.length > 0
+      ? `Выбрано: ${scheduleDaysLabel || scheduleDaysCountLabel}.`
+      : 'Выберите рабочие дни, чтобы клиенты видели ваш ритм.'
+  const availabilityTimeHint = hasPartialTimeRange
+    ? 'Укажите и начало, и окончание рабочего времени.'
+    : hasInvalidTimeRange
+      ? 'Окончание должно быть позже начала.'
+      : scheduleTimeLabel
+        ? `Рабочее окно: ${scheduleTimeLabel}.`
+        : 'Оставьте пусто, если время подтверждается в чате.'
   const hasServicesWithoutPrice = serviceItems.some((service) => {
     if (!service.name.trim()) return false
     return typeof service.price !== 'number' || service.price <= 0
@@ -4983,30 +5003,12 @@ export const ProProfileScreen = ({
           <div className="pro-profile-editor-shell pro-profile-settings-shell">
             <section className="pro-profile-settings-hero animate">
               <div className="pro-profile-settings-toolbar">
-                <button
-                  className="pro-profile-toolbar-back"
-                  type="button"
-                  onClick={closeSettings}
-                >
-                  <span className="chev" aria-hidden="true">
-                    ‹
-                  </span>
-                  Назад
-                </button>
                 <h2
                   className="pro-profile-settings-title"
                   id="pro-profile-settings-title"
                 >
                   Настройки профиля
                 </h2>
-                <button
-                  className="pro-profile-toolbar-close"
-                  type="button"
-                  onClick={closeSettings}
-                  aria-label="Закрыть настройки профиля"
-                >
-                  <IconClose />
-                </button>
               </div>
               <div className="pro-profile-settings-identity">
                 <button
@@ -5183,28 +5185,10 @@ export const ProProfileScreen = ({
         >
           <div className="pro-profile-editor-shell">
             <div className="pro-profile-editor-head">
-              <button
-                className="pro-profile-toolbar-back"
-                type="button"
-                onClick={closeEditor}
-              >
-                <span className="chev" aria-hidden="true">
-                  ‹
-                </span>
-                Назад
-              </button>
               <div className="pro-profile-editor-title-block">
                 <p className="pro-profile-editor-kicker">Редактирование</p>
                 <h2 className="pro-profile-editor-title">{editorTitle}</h2>
               </div>
-              <button
-                className="pro-profile-toolbar-close"
-                type="button"
-                onClick={closeEditor}
-                aria-label="Закрыть редактор профиля"
-              >
-                <IconClose />
-              </button>
             </div>
             <section className="pro-profile-editor-card">
               {editingSection === 'media' && (
@@ -5636,8 +5620,44 @@ export const ProProfileScreen = ({
               )}
 
               {editingSection === 'availability' && (
-                <div className="pro-profile-editor-stack">
-                  <div className="pro-profile-editor-section">
+                <div className="pro-profile-editor-stack pro-profile-editor-stack--availability">
+                  <div className="pro-profile-editor-section pro-profile-editor-section--summary pro-availability-summary">
+                    <div className="pro-profile-editor-section-head">
+                      <p className="pro-profile-editor-section-kicker">Сводка</p>
+                      <h3 className="pro-profile-editor-section-title">
+                        Видимость графика
+                      </h3>
+                      <p className="pro-profile-editor-section-subtitle">
+                        {availabilityStatusHint}
+                      </p>
+                    </div>
+                    <div className="pro-availability-summary-status">
+                      <span
+                        className={`pro-availability-status-pill${
+                          isActive ? ' is-active' : ' is-paused'
+                        }`}
+                      >
+                        {availabilityStatusLabel}
+                      </span>
+                    </div>
+                    <div className="pro-availability-metrics">
+                      <div className="pro-availability-metric">
+                        <span className="pro-availability-metric-label">Дни</span>
+                        <span className="pro-availability-metric-value">
+                          {scheduleDaysCountLabel}
+                        </span>
+                      </div>
+                      <div className="pro-availability-metric">
+                        <span className="pro-availability-metric-label">
+                          Время
+                        </span>
+                        <span className="pro-availability-metric-value">
+                          {scheduleTimeLabel || 'По договоренности'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pro-profile-editor-section pro-availability-section">
                     <div className="pro-profile-editor-section-head">
                       <p className="pro-profile-editor-section-kicker">Статус</p>
                       <h3 className="pro-profile-editor-section-title">
@@ -5662,7 +5682,9 @@ export const ProProfileScreen = ({
                           Принимаю заявки
                         </span>
                         <span className="pro-profile-editor-toggle-subtitle">
-                          Клиенты могут писать сейчас
+                          {isActive
+                            ? 'Клиенты могут писать сейчас'
+                            : 'Новые заявки временно на паузе'}
                         </span>
                       </span>
                       <span
@@ -5673,118 +5695,147 @@ export const ProProfileScreen = ({
                       </span>
                     </label>
                   </div>
-                  <div className="pro-profile-editor-section">
+                  <div className="pro-profile-editor-section pro-availability-section">
                     <div className="pro-profile-editor-section-head">
                       <p className="pro-profile-editor-section-kicker">График</p>
                       <h3 className="pro-profile-editor-section-title">
                         Дни и время работы
                       </h3>
                       <p className="pro-profile-editor-section-subtitle">
-                        Можно выбрать пресет и уточнить вручную.
+                        Сначала выберите дни, затем задайте рабочее окно.
                       </p>
                     </div>
-                    <div className="pro-profile-editor-presets">
-                      {schedulePresetOptions.map((preset) => {
-                        const isPresetActive =
-                          preset.days.length === scheduleDays.length &&
-                          preset.days.every((day) => scheduleDaysSet.has(day))
-                        return (
-                          <button
-                            className={`pro-profile-editor-preset${
-                              isPresetActive ? ' is-active' : ''
-                            }`}
-                            key={preset.id}
-                            type="button"
-                            aria-pressed={isPresetActive}
-                            onClick={() => setScheduleDays([...preset.days])}
-                          >
-                            {preset.label}
-                          </button>
-                        )
-                      })}
-                      <button
-                        className="pro-profile-editor-preset is-ghost"
-                        type="button"
-                        onClick={() => setScheduleDays([])}
-                      >
-                        Сбросить
-                      </button>
-                    </div>
-                    <div className="request-chips">
-                      {scheduleDayOptions.map((day) => (
+                    <div className="pro-availability-control-group">
+                      <p className="pro-availability-field-label">Быстрый выбор</p>
+                      <div className="pro-profile-editor-presets">
+                        {schedulePresetOptions.map((preset) => {
+                          const isPresetActive =
+                            preset.days.length === scheduleDays.length &&
+                            preset.days.every((day) => scheduleDaysSet.has(day))
+                          return (
+                            <button
+                              className={`pro-profile-editor-preset${
+                                isPresetActive ? ' is-active' : ''
+                              }`}
+                              key={preset.id}
+                              type="button"
+                              aria-pressed={isPresetActive}
+                              onClick={() => setScheduleDays([...preset.days])}
+                            >
+                              {preset.label}
+                            </button>
+                          )
+                        })}
                         <button
-                          className={`request-chip${
-                            scheduleDays.includes(day.id) ? ' is-active' : ''
-                          }`}
-                          key={day.id}
+                          className="pro-profile-editor-preset is-ghost"
                           type="button"
-                          onClick={() => toggleScheduleDay(day.id)}
-                          aria-pressed={scheduleDays.includes(day.id)}
+                          onClick={() => setScheduleDays([])}
                         >
-                          {day.label}
+                          Сбросить
                         </button>
-                      ))}
+                      </div>
                     </div>
-                    <div className="pro-profile-editor-presets is-time">
-                      {scheduleTimePresets.map((preset) => {
-                        const isPresetActive =
-                          scheduleStartValue === preset.start &&
-                          scheduleEndValue === preset.end
-                        return (
+                    <div className="pro-availability-control-group">
+                      <p className="pro-availability-field-label">Рабочие дни</p>
+                      <div className="request-chips pro-availability-days">
+                        {scheduleDayOptions.map((day) => (
                           <button
-                            className={`pro-profile-editor-preset${
-                              isPresetActive ? ' is-active' : ''
+                            className={`request-chip${
+                              scheduleDays.includes(day.id) ? ' is-active' : ''
                             }`}
-                            key={preset.id}
+                            key={day.id}
                             type="button"
-                            aria-pressed={isPresetActive}
-                            onClick={() => {
-                              setScheduleStart(preset.start)
-                              setScheduleEnd(preset.end)
-                            }}
+                            onClick={() => toggleScheduleDay(day.id)}
+                            aria-pressed={scheduleDays.includes(day.id)}
                           >
-                            {preset.label}
+                            {day.label}
                           </button>
-                        )
-                      })}
-                      <button
-                        className="pro-profile-editor-preset is-ghost"
-                        type="button"
-                        onClick={() => {
-                          setScheduleStart('')
-                          setScheduleEnd('')
-                        }}
+                        ))}
+                      </div>
+                      <p
+                        className={`pro-profile-editor-help pro-availability-hint${
+                          availabilityDayError ? ' is-error' : ''
+                        }`}
                       >
-                        Без времени
-                      </button>
+                        {availabilityDayError
+                          ? 'Чтобы принимать заявки, выберите хотя бы один день.'
+                          : availabilityDaysHint}
+                      </p>
                     </div>
-                    <div className="pro-field pro-field--split">
-                      <div>
-                        <label className="pro-label" htmlFor="schedule-start">
-                          Начало
-                        </label>
-                        <input
-                          id="schedule-start"
-                          className="pro-input"
-                          type="time"
-                          value={scheduleStart}
-                          onChange={(event) =>
-                            setScheduleStart(event.target.value)
-                          }
-                        />
+                    <div className="pro-availability-control-group">
+                      <p className="pro-availability-field-label">Рабочее окно</p>
+                      <div className="pro-profile-editor-presets is-time">
+                        {scheduleTimePresets.map((preset) => {
+                          const isPresetActive =
+                            scheduleStartValue === preset.start &&
+                            scheduleEndValue === preset.end
+                          return (
+                            <button
+                              className={`pro-profile-editor-preset${
+                                isPresetActive ? ' is-active' : ''
+                              }`}
+                              key={preset.id}
+                              type="button"
+                              aria-pressed={isPresetActive}
+                              onClick={() => {
+                                setScheduleStart(preset.start)
+                                setScheduleEnd(preset.end)
+                              }}
+                            >
+                              {preset.label}
+                            </button>
+                          )
+                        })}
+                        <button
+                          className="pro-profile-editor-preset is-ghost"
+                          type="button"
+                          onClick={() => {
+                            setScheduleStart('')
+                            setScheduleEnd('')
+                          }}
+                        >
+                          Без времени
+                        </button>
                       </div>
-                      <div>
-                        <label className="pro-label" htmlFor="schedule-end">
-                          Окончание
-                        </label>
-                        <input
-                          id="schedule-end"
-                          className="pro-input"
-                          type="time"
-                          value={scheduleEnd}
-                          onChange={(event) => setScheduleEnd(event.target.value)}
-                        />
+                      <div className="pro-field pro-field--split pro-availability-time-fields">
+                        <div>
+                          <label className="pro-label" htmlFor="schedule-start">
+                            Начало
+                          </label>
+                          <input
+                            id="schedule-start"
+                            className="pro-input"
+                            type="time"
+                            value={scheduleStart}
+                            aria-invalid={availabilityTimeError}
+                            onChange={(event) =>
+                              setScheduleStart(event.target.value)
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="pro-label" htmlFor="schedule-end">
+                            Окончание
+                          </label>
+                          <input
+                            id="schedule-end"
+                            className="pro-input"
+                            type="time"
+                            value={scheduleEnd}
+                            aria-invalid={availabilityTimeError}
+                            onChange={(event) =>
+                              setScheduleEnd(event.target.value)
+                            }
+                          />
+                        </div>
                       </div>
+                      <p
+                        className={`pro-profile-editor-help pro-availability-hint${
+                          availabilityTimeError ? ' is-error' : ''
+                        }`}
+                      >
+                        {availabilityTimeHint}
+                      </p>
                     </div>
                   </div>
                 </div>
