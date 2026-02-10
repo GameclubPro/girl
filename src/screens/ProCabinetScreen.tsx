@@ -763,6 +763,16 @@ export const ProCabinetScreen = ({
     : activeJourneyStep.status === 'active'
       ? `Сейчас приоритет: «${activeJourneyStep.chipLabel}».`
       : 'Дорожка закрыта: переходите к масштабированию.'
+  const roadmapScoreKicker =
+    activeJourneyStep.status === 'active'
+      ? `Шаг ${completedJourneySteps + 1}`
+      : 'Готово'
+  const requestsCardStateClassName =
+    requestStats.open > 0
+      ? ' is-attention'
+      : requestStats.total > 0 || bookingStats.pending > 0
+        ? ' is-warm'
+        : ' is-calm'
   const shouldPromptScheduleSetup =
     !hasScheduleEvidence && !isProfileMetaUnavailable
   const shouldPromptMarketing =
@@ -777,6 +787,12 @@ export const ProCabinetScreen = ({
     !hasPendingActions &&
     activeJourneyStep.id === 'profile' &&
     activeJourneyStep.status === 'active'
+  const calendarCardStateClassName =
+    bookingStats.upcomingWeek > 0
+      ? ' is-busy'
+      : shouldPromptScheduleSetup || isProfileMetaUnavailable
+        ? ' is-setup'
+        : ' is-empty'
   const focusTitle = isOfflineFallback
     ? 'Начните рабочий день'
     : combinedError
@@ -957,7 +973,7 @@ export const ProCabinetScreen = ({
 
         <div className="pro-cabinet-nav-grid pro-cabinet-nav-grid--primary">
           <button
-            className="pro-cabinet-nav-card is-requests is-primary animate delay-2"
+            className={`pro-cabinet-nav-card is-requests is-primary animate delay-2${requestsCardStateClassName}`}
             type="button"
             onClick={onViewRequests}
           >
@@ -1004,7 +1020,7 @@ export const ProCabinetScreen = ({
             </div>
           </button>
           <button
-            className="pro-cabinet-nav-card is-calendar is-primary animate delay-3"
+            className={`pro-cabinet-nav-card is-calendar is-primary animate delay-3${calendarCardStateClassName}`}
             type="button"
             onClick={onOpenCalendar}
           >
@@ -1079,7 +1095,7 @@ export const ProCabinetScreen = ({
                 </button>
                 <span className="pro-cabinet-next-step-score">
                   <span className="pro-cabinet-next-step-score-label">
-                    Прогресс
+                    {roadmapScoreKicker}
                   </span>
                   {completedJourneySteps}/{journeySteps.length}
                 </span>
