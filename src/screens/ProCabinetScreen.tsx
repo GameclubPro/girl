@@ -652,9 +652,6 @@ export const ProCabinetScreen = ({
   const completedJourneySteps = journeySteps.filter(
     (step) => step.status === 'done'
   ).length
-  const journeyProgress = Math.round(
-    (completedJourneySteps / journeySteps.length) * 100
-  )
   const activeJourneyStep =
     journeySteps.find((step) => step.status === 'active') ??
     journeySteps[journeySteps.length - 1]
@@ -662,11 +659,6 @@ export const ProCabinetScreen = ({
     activeJourneyStep.status === 'active'
       ? completedJourneySteps + 1
       : journeySteps.length
-  const profileRoadmapMetaLabel = `Профиль ${profileRoadmapStepNumber}/${journeySteps.length}`
-  const profileRoadmapHint =
-    activeJourneyStep.status === 'active'
-      ? `Фокус: ${activeJourneyStep.chipLabel}`
-      : 'Дорожка завершена'
   const nextBookingLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
     : 'нет'
@@ -704,8 +696,7 @@ export const ProCabinetScreen = ({
   const focusActionsChipAction = hasActionBacklog
     ? onViewRequests
     : activeJourneyStep.onAction
-  const focusJourneyChipLabel =
-    profileRoadmapMetaLabel
+  const focusJourneyChipLabel = `Профиль ${profileRoadmapStepNumber}/${journeySteps.length}`
   const requestsCardStateClassName =
     requestStats.open > 0
       ? ' is-attention'
@@ -1004,40 +995,6 @@ export const ProCabinetScreen = ({
             </div>
           </button>
         </div>
-
-        <section className="pro-cabinet-tools-bridge animate delay-4">
-          <div className="pro-cabinet-tools-bridge-copy">
-            <p className="pro-cabinet-tools-bridge-kicker">Инструменты</p>
-            <h2 className="pro-cabinet-tools-bridge-title">
-              Операционный кабинет
-            </h2>
-            <p className="pro-cabinet-tools-bridge-subtitle">
-              Ежедневные действия здесь. Онбординг в «Профиле».
-            </p>
-          </div>
-          <button
-            className="pro-cabinet-tools-bridge-link"
-            type="button"
-            onClick={() => onEditProfile()}
-            aria-label={`${profileRoadmapMetaLabel}. ${profileRoadmapHint}. Открыть профиль мастера.`}
-          >
-            <span className="pro-cabinet-tools-bridge-link-title">
-              {profileRoadmapMetaLabel}
-            </span>
-            <span className="pro-cabinet-tools-bridge-link-meta">
-              {profileRoadmapHint}
-            </span>
-            <span className="pro-cabinet-tools-bridge-link-action">
-              Открыть профиль
-            </span>
-          </button>
-          <div className="pro-cabinet-roadmap-meter" aria-hidden="true">
-            <span
-              className="pro-cabinet-roadmap-meter-fill"
-              style={{ '--roadmap-progress': `${journeyProgress}%` } as CSSProperties}
-            />
-          </div>
-        </section>
 
         <div className="pro-cabinet-nav-grid pro-cabinet-nav-grid--secondary">
               <button
