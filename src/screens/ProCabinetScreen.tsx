@@ -1178,12 +1178,17 @@ export const ProCabinetScreen = ({
                   key={step.id}
                   type="button"
                   onClick={() => {
-                    setRoadmapSheetStepId(step.id)
+                    if (isLocked) {
+                      setRoadmapSheetStepId(step.id)
+                      return
+                    }
+                    setRoadmapSheetStepId(null)
+                    step.onAction()
                   }}
                   aria-disabled={isLocked}
                   aria-current={isCurrent ? 'step' : undefined}
-                  aria-haspopup="dialog"
-                  aria-expanded={roadmapSheetStep?.id === step.id}
+                  aria-haspopup={isLocked ? 'dialog' : undefined}
+                  aria-expanded={isLocked && roadmapSheetStep?.id === step.id}
                   aria-label={`${stepNumber}. ${step.chipLabel}. ${stepStateLabel}${
                     isLocked ? '. Сначала завершите профиль.' : ''
                   }`}
@@ -1210,16 +1215,16 @@ export const ProCabinetScreen = ({
             <button
               className="pro-cabinet-next-step-action is-primary"
               type="button"
-              onClick={() => setRoadmapSheetStepId(activeJourneyStep.id)}
+              onClick={activeJourneyStep.onAction}
             >
-              Выполнить шаг
+              {activeJourneyStep.actionLabel}
             </button>
             <button
               className="pro-cabinet-next-step-action is-ghost is-compact"
               type="button"
               onClick={() => setIsToolsExpanded((current) => !current)}
             >
-              {isToolsExpanded ? 'Свернуть блоки' : 'Инструменты роста'}
+              {isToolsExpanded ? 'Скрыть' : 'Инструменты'}
             </button>
           </div>
         </section>
