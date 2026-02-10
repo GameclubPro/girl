@@ -124,6 +124,16 @@ type MasterJourneyStep = Omit<MasterJourneyDraftStep, 'isDone'> & {
 
 type ProfileLoadState = 'loading' | 'ready' | 'missing' | 'error'
 
+const getRoadmapStepStateLabel = (
+  status: MasterJourneyStepStatus,
+  isLocked: boolean
+) => {
+  if (isLocked) return 'Закрыт'
+  if (status === 'done') return 'Готово'
+  if (status === 'active') return 'Сейчас'
+  return 'Далее'
+}
+
 const toMasterJourneySteps = (draft: MasterJourneyDraftStep[]) => {
   let locked = false
   return draft.map<MasterJourneyStep>((step) => {
@@ -457,18 +467,22 @@ export const ProCabinetScreen = ({
         profileTitle = 'Добавьте локацию'
         profileSubtitle = 'Укажите город и район, чтобы клиенты находили вас в выдаче.'
         profileActionLabel = 'Указать локацию'
+        profileAction = () => onEditProfile('location')
       } else if (missingBasics.has('displayName')) {
         profileTitle = 'Добавьте имя профиля'
         profileSubtitle = 'Понятное имя повышает доверие и кликабельность.'
         profileActionLabel = 'Заполнить имя'
+        profileAction = () => onEditProfile('basic')
       } else if (missingBasics.has('categories')) {
         profileTitle = 'Выберите категории'
         profileSubtitle = 'Категории влияют на попадание в подборки и поиск.'
         profileActionLabel = 'Выбрать категории'
+        profileAction = () => onEditProfile('services')
       } else if (missingBasics.has('workFormat')) {
         profileTitle = 'Выберите формат работы'
         profileSubtitle = 'Уточните, где принимаете: у себя, у клиента или оба формата.'
         profileActionLabel = 'Выбрать формат'
+        profileAction = () => onEditProfile('location')
       }
     } else if (!hasServicesConfigured) {
       profileTitle = 'Добавьте услуги'
@@ -658,6 +672,11 @@ export const ProCabinetScreen = ({
     journeySteps.find((step) => step.status === 'active') ??
     journeySteps[journeySteps.length - 1]
   const roadmapCoachmarkStorageKey = `pro-cabinet-roadmap-tip-seen:${userId}`
+  const revealRoadmapCoachmark = () => {
+    setIsRoadmapCoachmarkVisible(true)
+    if (typeof window === 'undefined' || !userId) return
+    window.localStorage.setItem(roadmapCoachmarkStorageKey, '1')
+  }
 
   useEffect(() => {
     if (!userId || activeJourneyStep.status !== 'active') return
@@ -1046,24 +1065,22 @@ export const ProCabinetScreen = ({
                 <button
                   className="pro-cabinet-next-step-info"
                   type="button"
-                  onClick={() =>
-                    setIsRoadmapCoachmarkVisible((current) => {
-                      const next = !current
-                      if (next && typeof window !== 'undefined') {
-                        window.localStorage.setItem(
-                          roadmapCoachmarkStorageKey,
-                          '1'
-                        )
-                      }
-                      return next
-                    })
-                  }
+                  onClick={() => {
+                    if (isRoadmapCoachmarkVisible) {
+                      setIsRoadmapCoachmarkVisible(false)
+                      return
+                    }
+                    revealRoadmapCoachmark()
+                  }}
                   aria-expanded={isRoadmapCoachmarkVisible}
                   aria-label="Показать подсказку"
                 >
                   i
                 </button>
                 <span className="pro-cabinet-next-step-score">
+                  <span className="pro-cabinet-next-step-score-label">
+                    Прогресс
+                  </span>
                   {completedJourneySteps}/{journeySteps.length}
                 </span>
               </div>
@@ -1089,20 +1106,41 @@ export const ProCabinetScreen = ({
             />
           </div>
           <div className="pro-cabinet-roadmap-steps">
-            {journeySteps.map((step) => {
+            {journeySteps.map((step, index) => {
               const isLocked = isRoadmapProfileLocked && step.id !== 'profile'
+              const stepStateLabel = getRoadmapStepStateLabel(step.status, isLocked)
+              const isCurrent = step.id === activeJourneyStep.id
               return (
                 <button
                   className={`pro-cabinet-roadmap-step is-${step.status}${
-                    step.id === activeJourneyStep.id ? ' is-current' : ''
+                    isCurrent ? ' is-current' : ''
                   }${isLocked ? ' is-locked' : ''}`}
                   key={step.id}
                   type="button"
-                  onClick={isLocked ? undefined : step.onAction}
-                  disabled={isLocked}
+                  onClick={() => {
+                    if (isLocked) {
+                      revealRoadmapCoachmark()
+                      return
+                    }
+                    step.onAction()
+                  }}
                   aria-disabled={isLocked}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  aria-label={`${index + 1}. ${step.chipLabel}. ${stepStateLabel}${
+                    isLocked ? '. Сначала завершите профиль.' : ''
+                  }`}
                 >
-                  <span className="pro-cabinet-roadmap-step-label">{step.chipLabel}</span>
+                  <span className="pro-cabinet-roadmap-step-index" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <span className="pro-cabinet-roadmap-step-text">
+                    <span className="pro-cabinet-roadmap-step-label">
+                      {step.chipLabel}
+                    </span>
+                    <span className="pro-cabinet-roadmap-step-state">
+                      {stepStateLabel}
+                    </span>
+                  </span>
                   <span className="pro-cabinet-roadmap-step-dot" aria-hidden="true" />
                 </button>
               )

@@ -2161,7 +2161,7 @@ function App() {
         userId={userId}
         telegramAvatarUrl={telegramAvatarUrl}
         onEditProfile={(section) => openProProfile({ section: section ?? null })}
-        onViewRequests={() => openProRequests()}
+        onViewRequests={() => openProRequests('requests')}
         onViewChats={openChatList}
         onOpenSupport={() => void openSupportChat('pro-cabinet')}
         onOpenAnalytics={() => navigate('pro-analytics')}
