@@ -134,6 +134,13 @@ const getRoadmapStepStateLabel = (
   return 'Далее'
 }
 
+const getRoadmapStepShortLabel = (stepId: MasterJourneyStepId) => {
+  if (stepId === 'profile') return 'Проф'
+  if (stepId === 'flow') return 'Поток'
+  if (stepId === 'growth') return 'Рост'
+  return 'Повт'
+}
+
 const toMasterJourneySteps = (draft: MasterJourneyDraftStep[]) => {
   let locked = false
   return draft.map<MasterJourneyStep>((step) => {
@@ -703,8 +710,16 @@ export const ProCabinetScreen = ({
 
   const toolsPreviewSubtitle =
     activeJourneyStep.status === 'active'
-      ? `Сфокусируйтесь на шаге «${activeJourneyStep.chipLabel}», затем открывайте блоки роста.`
-      : 'Блоки роста готовы: масштабируйте стабильный поток.'
+      ? `Сначала закройте шаг «${activeJourneyStep.chipLabel}», затем открывайте рост.`
+      : 'Поток стабилен: открывайте блоки роста.'
+  const toolsCollapsedTitle =
+    activeJourneyStep.status === 'active'
+      ? `Фокус: «${activeJourneyStep.chipLabel}»`
+      : 'Рост и масштаб'
+  const toolsCollapsedActionLabel =
+    activeJourneyStep.status === 'active'
+      ? 'Открыть инструменты'
+      : 'Открыть блоки'
   const nextBookingLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
     : 'нет'
@@ -732,7 +747,7 @@ export const ProCabinetScreen = ({
         ? 'Чаты'
         : activeJourneyStep.id === 'growth'
           ? 'Календарь'
-          : 'Продвижение'
+          : 'Клиенты'
   const focusSecondaryAction =
     activeJourneyStep.id === 'profile'
       ? onViewRequests
@@ -740,7 +755,7 @@ export const ProCabinetScreen = ({
         ? onViewChats
         : activeJourneyStep.id === 'growth'
           ? onOpenCalendar
-          : onOpenMarketing
+          : onOpenClients
   const requiredActionsCount = Math.max(
     pendingActions,
     activeJourneyStep.status === 'active' ? 1 : 0
@@ -759,13 +774,13 @@ export const ProCabinetScreen = ({
       ? `Шаг ${completedJourneySteps + 1}/${journeySteps.length}`
       : `${journeySteps.length}/${journeySteps.length}`
   const roadmapTipLabel = isRoadmapProfileLocked
-    ? 'Сначала завершите «Профиль», затем откроются остальные шаги.'
+    ? 'Сначала закройте шаг «Профиль».'
     : activeJourneyStep.status === 'active'
-      ? `Сейчас приоритет: «${activeJourneyStep.chipLabel}».`
-      : 'Дорожка закрыта: переходите к масштабированию.'
+      ? `Сейчас в фокусе: «${activeJourneyStep.chipLabel}».`
+      : 'Дорожка закрыта. Переходите к масштабированию.'
   const roadmapScoreKicker =
     activeJourneyStep.status === 'active'
-      ? `Шаг ${completedJourneySteps + 1}`
+      ? 'Прогресс'
       : 'Готово'
   const requestsCardStateClassName =
     requestStats.open > 0
@@ -1126,6 +1141,7 @@ export const ProCabinetScreen = ({
               const isLocked = isRoadmapProfileLocked && step.id !== 'profile'
               const stepStateLabel = getRoadmapStepStateLabel(step.status, isLocked)
               const isCurrent = step.id === activeJourneyStep.id
+              const stepShortLabel = getRoadmapStepShortLabel(step.id)
               return (
                 <button
                   className={`pro-cabinet-roadmap-step is-${step.status}${
@@ -1150,14 +1166,16 @@ export const ProCabinetScreen = ({
                     {index + 1}
                   </span>
                   <span className="pro-cabinet-roadmap-step-text">
-                    <span className="pro-cabinet-roadmap-step-label">
+                    <span className="pro-cabinet-roadmap-step-label pro-cabinet-roadmap-step-label--full">
                       {step.chipLabel}
+                    </span>
+                    <span className="pro-cabinet-roadmap-step-label pro-cabinet-roadmap-step-label--short">
+                      {stepShortLabel}
                     </span>
                     <span className="pro-cabinet-roadmap-step-state">
                       {stepStateLabel}
                     </span>
                   </span>
-                  <span className="pro-cabinet-roadmap-step-dot" aria-hidden="true" />
                 </button>
               )
             })}
@@ -1175,7 +1193,7 @@ export const ProCabinetScreen = ({
               type="button"
               onClick={() => setIsToolsExpanded((current) => !current)}
             >
-              {isToolsExpanded ? 'Свернуть блоки' : 'Инструменты'}
+              {isToolsExpanded ? 'Свернуть блоки' : 'Инструменты роста'}
             </button>
           </div>
         </section>
@@ -1445,13 +1463,13 @@ export const ProCabinetScreen = ({
               Инструменты роста
             </span>
             <span className="pro-cabinet-tools-collapsed-title">
-              Аналитика, клиенты, контент
+              {toolsCollapsedTitle}
             </span>
             <span className="pro-cabinet-tools-collapsed-subtitle">
               {toolsPreviewSubtitle}
             </span>
             <span className="pro-cabinet-tools-collapsed-action">
-              Открыть блоки
+              {toolsCollapsedActionLabel}
             </span>
           </button>
         )}
