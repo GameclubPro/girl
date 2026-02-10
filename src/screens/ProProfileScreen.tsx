@@ -305,6 +305,49 @@ const editorTitleMap: Record<InlineSection, string> = {
   media: 'Фото профиля',
 }
 
+type ProfileOnboardingStepId =
+  | 'foundation'
+  | 'offer'
+  | 'showcase'
+  | 'schedule'
+
+type ProfileOnboardingStepStatus = 'done' | 'active' | 'todo'
+
+type ProfileOnboardingDraftStep = {
+  id: ProfileOnboardingStepId
+  label: string
+  title: string
+  subtitle: string
+  actionLabel: string
+  onAction: () => void
+  isDone: boolean
+}
+
+type ProfileOnboardingStep = Omit<ProfileOnboardingDraftStep, 'isDone'> & {
+  status: ProfileOnboardingStepStatus
+}
+
+const toProfileOnboardingSteps = (draft: ProfileOnboardingDraftStep[]) => {
+  let locked = false
+  return draft.map<ProfileOnboardingStep>((step) => {
+    const { isDone, ...rest } = step
+    if (locked) {
+      return { ...rest, status: 'todo' }
+    }
+    if (isDone) {
+      return { ...rest, status: 'done' }
+    }
+    locked = true
+    return { ...rest, status: 'active' }
+  })
+}
+
+const getProfileOnboardingStateLabel = (status: ProfileOnboardingStepStatus) => {
+  if (status === 'done') return 'Готово'
+  if (status === 'active') return 'Сейчас'
+  return 'Далее'
+}
+
 type ProfilePayload = {
   userId: string
   displayName: string
@@ -3474,6 +3517,155 @@ export const ProProfileScreen = ({
     }
   }
 
+  const isFoundationDone =
+    displayName.trim().length >= 3 &&
+    categories.length > 0 &&
+    hasWorkFormat &&
+    hasLocationComplete
+  const isOfferDone = serviceItems.length > 0 && hasPrice
+  const isShowcaseDone = portfolioCount > 0 || showcaseCount > 0
+  const isScheduleDone =
+    scheduleDays.length > 0 &&
+    Boolean(scheduleStartValue) &&
+    Boolean(scheduleEndValue) &&
+    !availabilityTimeError
+  const profileOnboardingSteps = useMemo(() => {
+    let foundationTitle = 'Основа профиля готова'
+    let foundationSubtitle = 'Клиенты видят корректную карточку и локацию.'
+    let foundationActionLabel = 'Проверить основу'
+    let foundationAction = () => openEditor('basic')
+    if (!displayName.trim()) {
+      foundationTitle = 'Добавьте имя профиля'
+      foundationSubtitle = 'Имя мастера влияет на доверие и выдачу.'
+      foundationActionLabel = 'Заполнить имя'
+      foundationAction = () => openEditor('basic')
+    } else if (categories.length === 0) {
+      foundationTitle = 'Выберите категории'
+      foundationSubtitle = 'Категории нужны для поиска и релевантных заявок.'
+      foundationActionLabel = 'Выбрать категории'
+      foundationAction = () => openEditor('services')
+    } else if (!hasWorkFormat || !hasLocationComplete) {
+      foundationTitle = 'Укажите формат и локацию'
+      foundationSubtitle = 'Добавьте город, район и формат приема.'
+      foundationActionLabel = 'Открыть локацию'
+      foundationAction = () => openEditor('location')
+    }
+
+    let offerTitle = 'Услуги и цены готовы'
+    let offerSubtitle = 'Клиент сразу понимает, что вы делаете и за сколько.'
+    let offerActionLabel = 'Проверить услуги'
+    let offerAction = () => openEditor('services')
+    if (serviceItems.length === 0) {
+      offerTitle = 'Добавьте услуги'
+      offerSubtitle = 'Без списка услуг карточка теряет конверсию.'
+      offerActionLabel = 'Добавить услуги'
+      offerAction = () => openEditor('services')
+    } else if (!hasPrice) {
+      offerTitle = 'Укажите цену'
+      offerSubtitle = 'Цены ускоряют решение клиента о записи.'
+      offerActionLabel = 'Добавить цену'
+      offerAction = () => openEditor('services')
+    }
+
+    let showcaseTitle = 'Витрина оформлена'
+    let showcaseSubtitle = 'Работы показывают качество и стиль.'
+    let showcaseActionLabel = 'Открыть витрину'
+    let showcaseAction = () => openEditor('portfolio')
+    if (!isShowcaseDone) {
+      showcaseTitle = 'Добавьте работы'
+      showcaseSubtitle = 'Загрузите минимум одну работу в портфолио или витрину.'
+      showcaseActionLabel = 'Добавить работы'
+      showcaseAction = () => openEditor('portfolio')
+    }
+
+    let scheduleTitle = 'График подключен'
+    let scheduleSubtitle = hasCustomPolicies
+      ? 'Запись и политики настроены для стабильной работы.'
+      : 'Базовый график включен, при желании добавьте депозит.'
+    let scheduleActionLabel = hasCustomPolicies
+      ? 'Проверить график'
+      : 'Добавить политику'
+    let scheduleAction = hasCustomPolicies
+      ? () => openEditor('availability')
+      : () => openEditor('policies')
+    if (!isScheduleDone) {
+      scheduleTitle = 'Подключите график'
+      scheduleSubtitle = 'Клиенты не смогут выбрать время без расписания.'
+      scheduleActionLabel = 'Настроить график'
+      scheduleAction = () => openEditor('availability')
+    }
+
+    const draftSteps: ProfileOnboardingDraftStep[] = [
+      {
+        id: 'foundation',
+        label: 'Основа',
+        title: foundationTitle,
+        subtitle: foundationSubtitle,
+        actionLabel: foundationActionLabel,
+        onAction: foundationAction,
+        isDone: isFoundationDone,
+      },
+      {
+        id: 'offer',
+        label: 'Услуги',
+        title: offerTitle,
+        subtitle: offerSubtitle,
+        actionLabel: offerActionLabel,
+        onAction: offerAction,
+        isDone: isOfferDone,
+      },
+      {
+        id: 'showcase',
+        label: 'Витрина',
+        title: showcaseTitle,
+        subtitle: showcaseSubtitle,
+        actionLabel: showcaseActionLabel,
+        onAction: showcaseAction,
+        isDone: isShowcaseDone,
+      },
+      {
+        id: 'schedule',
+        label: 'График',
+        title: scheduleTitle,
+        subtitle: scheduleSubtitle,
+        actionLabel: scheduleActionLabel,
+        onAction: scheduleAction,
+        isDone: isScheduleDone,
+      },
+    ]
+
+    return toProfileOnboardingSteps(draftSteps)
+  }, [
+    categories.length,
+    displayName,
+    hasCustomPolicies,
+    hasLocationComplete,
+    hasPrice,
+    hasWorkFormat,
+    isScheduleDone,
+    isShowcaseDone,
+    isFoundationDone,
+    isOfferDone,
+    openEditor,
+    scheduleDays.length,
+    scheduleEndValue,
+    scheduleStartValue,
+    serviceItems.length,
+  ])
+  const profileOnboardingCompleted = profileOnboardingSteps.filter(
+    (step) => step.status === 'done'
+  ).length
+  const profileOnboardingProgress = Math.round(
+    (profileOnboardingCompleted / profileOnboardingSteps.length) * 100
+  )
+  const activeProfileOnboardingStep =
+    profileOnboardingSteps.find((step) => step.status === 'active') ??
+    profileOnboardingSteps[profileOnboardingSteps.length - 1]
+  const profileOnboardingProgressLabel = `${Math.min(
+    profileOnboardingCompleted + 1,
+    profileOnboardingSteps.length
+  )}/${profileOnboardingSteps.length}`
+
   return (
     <div className="screen screen--pro screen--pro-profile" style={screenStyle}>
       <div className="pro-shell pro-shell--ig">
@@ -3806,6 +3998,70 @@ export const ProProfileScreen = ({
                 </div>
               )}
             </div>
+          </div>
+        </section>
+
+        <section className="pro-profile-roadmap animate delay-2">
+          <div className="pro-profile-roadmap-head">
+            <div className="pro-profile-roadmap-title-block">
+              <p className="pro-profile-roadmap-kicker">Онбординг</p>
+              <h2 className="pro-profile-roadmap-title">Дорожка профиля</h2>
+            </div>
+            <span className="pro-profile-roadmap-progress">
+              {profileOnboardingCompleted}/{profileOnboardingSteps.length}
+            </span>
+          </div>
+          <p className="pro-profile-roadmap-subtitle">
+            {activeProfileOnboardingStep.title}
+          </p>
+          <p className="pro-profile-roadmap-caption">
+            {activeProfileOnboardingStep.subtitle}
+          </p>
+          <div className="pro-profile-roadmap-meter" aria-hidden="true">
+            <span
+              className="pro-profile-roadmap-meter-fill"
+              style={{ '--profile-roadmap-progress': `${profileOnboardingProgress}%` } as CSSProperties}
+            />
+          </div>
+          <div className="pro-profile-roadmap-steps">
+            {profileOnboardingSteps.map((step, index) => (
+              <button
+                className={`pro-profile-roadmap-step is-${step.status}`}
+                type="button"
+                key={step.id}
+                onClick={step.onAction}
+                aria-current={step.id === activeProfileOnboardingStep.id ? 'step' : undefined}
+                aria-label={`${index + 1}. ${step.label}. ${getProfileOnboardingStateLabel(
+                  step.status
+                )}`}
+              >
+                <span className="pro-profile-roadmap-step-index" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span className="pro-profile-roadmap-step-copy">
+                  <span className="pro-profile-roadmap-step-label">{step.label}</span>
+                  <span className="pro-profile-roadmap-step-state">
+                    {getProfileOnboardingStateLabel(step.status)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="pro-profile-roadmap-actions">
+            <button
+              className="pro-profile-roadmap-action is-primary"
+              type="button"
+              onClick={activeProfileOnboardingStep.onAction}
+            >
+              {activeProfileOnboardingStep.actionLabel}
+            </button>
+            <button
+              className="pro-profile-roadmap-action is-ghost"
+              type="button"
+              onClick={openSettings}
+            >
+              Разделы {profileOnboardingProgressLabel}
+            </button>
           </div>
         </section>
 

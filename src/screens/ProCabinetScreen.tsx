@@ -124,23 +124,6 @@ type MasterJourneyStep = Omit<MasterJourneyDraftStep, 'isDone'> & {
 
 type ProfileLoadState = 'loading' | 'ready' | 'missing' | 'error'
 
-const getRoadmapStepStateLabel = (
-  status: MasterJourneyStepStatus,
-  isLocked: boolean
-) => {
-  if (isLocked) return 'Закрыт'
-  if (status === 'done') return 'Готово'
-  if (status === 'active') return 'Сейчас'
-  return 'Далее'
-}
-
-const getRoadmapStepShortLabel = (stepId: MasterJourneyStepId) => {
-  if (stepId === 'profile') return 'Проф'
-  if (stepId === 'flow') return 'Поток'
-  if (stepId === 'growth') return 'Рост'
-  return 'Повт'
-}
-
 const toMasterJourneySteps = (draft: MasterJourneyDraftStep[]) => {
   let locked = false
   return draft.map<MasterJourneyStep>((step) => {
@@ -416,11 +399,6 @@ export const ProCabinetScreen = ({
     [profileDisplayName]
   )
   const avatarDisplayUrl = profileAvatarUrl || telegramAvatarUrl || null
-  const [isToolsExpanded, setIsToolsExpanded] = useState(false)
-  const [isRoadmapCoachmarkVisible, setIsRoadmapCoachmarkVisible] =
-    useState(false)
-  const [roadmapSheetStepId, setRoadmapSheetStepId] =
-    useState<MasterJourneyStepId | null>(null)
   const isProfileMetaUnavailable = profileLoadState === 'error'
   const isProfileMissing = profileLoadState === 'missing'
   const profileMissingFields = profileData?.missingFields ?? []
@@ -680,52 +658,15 @@ export const ProCabinetScreen = ({
   const activeJourneyStep =
     journeySteps.find((step) => step.status === 'active') ??
     journeySteps[journeySteps.length - 1]
-  const roadmapSteps = [
-    activeJourneyStep,
-    ...journeySteps.filter((step) => step.id !== activeJourneyStep.id),
-  ]
-  const roadmapCoachmarkStorageKey = `pro-cabinet-roadmap-tip-seen:${userId}`
-  const revealRoadmapCoachmark = () => {
-    setIsRoadmapCoachmarkVisible(true)
-    if (typeof window === 'undefined' || !userId) return
-    window.localStorage.setItem(roadmapCoachmarkStorageKey, '1')
-  }
-
-  useEffect(() => {
-    if (!userId || activeJourneyStep.status !== 'active') return
-    if (typeof window === 'undefined') return
-    const seen = window.localStorage.getItem(roadmapCoachmarkStorageKey)
-    if (seen) return
-
-    let hideTimer: number | null = null
-    const showTimer = window.setTimeout(() => {
-      setIsRoadmapCoachmarkVisible(true)
-      window.localStorage.setItem(roadmapCoachmarkStorageKey, '1')
-      hideTimer = window.setTimeout(() => {
-        setIsRoadmapCoachmarkVisible(false)
-      }, 4200)
-    }, 4200)
-
-    return () => {
-      window.clearTimeout(showTimer)
-      if (hideTimer !== null) {
-        window.clearTimeout(hideTimer)
-      }
-    }
-  }, [activeJourneyStep.status, roadmapCoachmarkStorageKey, userId])
-
-  const toolsPreviewSubtitle =
+  const profileRoadmapStepNumber =
     activeJourneyStep.status === 'active'
-      ? `Сначала закройте шаг «${activeJourneyStep.chipLabel}», затем открывайте рост.`
-      : 'Поток стабилен: открывайте блоки роста.'
-  const toolsCollapsedTitle =
+      ? completedJourneySteps + 1
+      : journeySteps.length
+  const profileRoadmapMetaLabel = `Профиль ${profileRoadmapStepNumber}/${journeySteps.length}`
+  const profileRoadmapHint =
     activeJourneyStep.status === 'active'
-      ? `Фокус: «${activeJourneyStep.chipLabel}»`
-      : 'Рост и масштаб'
-  const toolsCollapsedActionLabel =
-    activeJourneyStep.status === 'active'
-      ? 'Открыть инструменты'
-      : 'Открыть блоки'
+      ? `Фокус: ${activeJourneyStep.chipLabel}`
+      : 'Дорожка завершена'
   const nextBookingLabel = bookingStats.nextBookingTime
     ? formatShortDate(new Date(bookingStats.nextBookingTime))
     : 'нет'
@@ -751,23 +692,10 @@ export const ProCabinetScreen = ({
     activeJourneyStep.status === 'active' ? 1 : 0
   )
   const hasActionBacklog = requiredActionsCount > 0
-  const profileJourneyStep =
-    journeySteps.find((step) => step.id === 'profile') ?? null
-  const isRoadmapProfileLocked =
-    profileJourneyStep !== null && profileJourneyStep.status !== 'done'
   const journeyMetaLong =
     activeJourneyStep.status === 'active'
-      ? `Шаг: ${activeJourneyStep.chipLabel} ${completedJourneySteps + 1}/${journeySteps.length}`
-      : `Дорожка закрыта: ${journeySteps.length}/${journeySteps.length}`
-  const roadmapTipLabel = isRoadmapProfileLocked
-    ? 'Сначала закройте шаг «Профиль».'
-    : activeJourneyStep.status === 'active'
-      ? `Сейчас в фокусе: «${activeJourneyStep.chipLabel}».`
-      : 'Дорожка закрыта. Переходите к масштабированию.'
-  const roadmapScoreKicker =
-    activeJourneyStep.status === 'active'
-      ? 'Прогресс'
-      : 'Готово'
+      ? `Онбординг в профиле: шаг ${profileRoadmapStepNumber}/${journeySteps.length}`
+      : `Онбординг в профиле завершен: ${journeySteps.length}/${journeySteps.length}`
   const focusActionsChipClassName = hasActionBacklog ? ' is-alert' : ' is-ok'
   const focusWeekChipClassName =
     bookingStats.upcomingWeek > 0 ? ' is-ok' : ' is-neutral'
@@ -777,9 +705,7 @@ export const ProCabinetScreen = ({
     ? onViewRequests
     : activeJourneyStep.onAction
   const focusJourneyChipLabel =
-    activeJourneyStep.status === 'active'
-      ? `${activeJourneyStep.chipLabel} ${completedJourneySteps + 1}/${journeySteps.length}`
-      : 'Дорожка закрыта'
+    profileRoadmapMetaLabel
   const requestsCardStateClassName =
     requestStats.open > 0
       ? ' is-attention'
@@ -835,7 +761,7 @@ export const ProCabinetScreen = ({
           ? 'Проверьте окна в календаре и поддержите текущий темп.'
           : shouldPromptMarketing
             ? 'График есть, но спроса мало. Подключите продвижение и оффер.'
-            : 'Свободная неделя: выполните шаг из дорожки ниже.'
+            : 'Свободная неделя: проверьте следующий шаг в профиле.'
   const focusPrimaryActionLabel = isOfflineFallback
     ? 'Обновить данные'
     : combinedError
@@ -864,46 +790,6 @@ export const ProCabinetScreen = ({
         : shouldPromptMarketing
         ? onOpenMarketing
         : activeJourneyStep.onAction
-  const isRoadmapDuplicatingOverview =
-    focusTitle === activeJourneyStep.title &&
-    focusSubtitle === activeJourneyStep.subtitle
-  const roadmapTitle = isRoadmapDuplicatingOverview
-    ? `Шаг ${completedJourneySteps + 1}/${journeySteps.length}: ${activeJourneyStep.chipLabel}`
-    : activeJourneyStep.title
-  const roadmapSubtitle = isRoadmapDuplicatingOverview
-    ? 'Сделайте шаг и перейдите к следующему блоку дорожки.'
-    : activeJourneyStep.subtitle
-  const roadmapSheetStep = roadmapSheetStepId
-    ? journeySteps.find((step) => step.id === roadmapSheetStepId) ?? null
-    : null
-  const roadmapSheetStepIndex = roadmapSheetStep
-    ? journeySteps.findIndex((step) => step.id === roadmapSheetStep.id) + 1
-    : 0
-  const isRoadmapSheetLocked =
-    roadmapSheetStep !== null &&
-    isRoadmapProfileLocked &&
-    roadmapSheetStep.id !== 'profile'
-  const roadmapSheetStateLabel = roadmapSheetStep
-    ? getRoadmapStepStateLabel(roadmapSheetStep.status, isRoadmapSheetLocked)
-    : ''
-  const roadmapSheetActionLabel = roadmapSheetStep
-    ? isRoadmapSheetLocked
-      ? (profileJourneyStep?.actionLabel ?? 'Открыть профиль')
-      : roadmapSheetStep.actionLabel
-    : 'Открыть шаг'
-  const handleRoadmapSheetAction = () => {
-    if (!roadmapSheetStep) return
-    if (isRoadmapSheetLocked) {
-      if (profileJourneyStep) {
-        profileJourneyStep.onAction()
-      } else {
-        onEditProfile()
-      }
-    } else {
-      roadmapSheetStep.onAction()
-    }
-    setRoadmapSheetStepId(null)
-  }
   const storiesBadgeLabel = hasStoriesPublished ? 'LIVE' : 'START'
   const storiesHint = hasStoriesPublished
     ? `${activeStoriesCount} ${formatCountLabel(
@@ -992,14 +878,19 @@ export const ProCabinetScreen = ({
                 Запись: {nextBookingCompactLabel}
               </span>
             </span>
-            <span className="pro-cabinet-overview-meta-pill is-journey">
+            <button
+              className="pro-cabinet-overview-meta-pill is-journey is-action"
+              type="button"
+              onClick={() => onEditProfile()}
+              aria-label={`Открыть профиль мастера. ${journeyMetaLong}`}
+            >
               <span className="pro-cabinet-overview-meta-journey-long">
                 {journeyMetaLong}
               </span>
               <span className="pro-cabinet-overview-meta-journey-short">
                 {focusJourneyChipLabel}
               </span>
-            </span>
+            </button>
           </div>
           <div className="pro-cabinet-overview-actions is-single">
             <button
@@ -1114,123 +1005,41 @@ export const ProCabinetScreen = ({
           </button>
         </div>
 
-        <section className="pro-cabinet-next-step animate delay-4">
-          <div className="pro-cabinet-next-step-copy">
-            <div className="pro-cabinet-next-step-head">
-              <p className="pro-cabinet-next-step-kicker">Рабочая дорожка</p>
-              <div className="pro-cabinet-next-step-head-actions">
-                <button
-                  className="pro-cabinet-next-step-info"
-                  type="button"
-                  onClick={() => {
-                    if (isRoadmapCoachmarkVisible) {
-                      setIsRoadmapCoachmarkVisible(false)
-                      return
-                    }
-                    revealRoadmapCoachmark()
-                  }}
-                  aria-expanded={isRoadmapCoachmarkVisible}
-                  aria-label="Показать подсказку"
-                >
-                  i
-                </button>
-                <span className="pro-cabinet-next-step-score">
-                  <span className="pro-cabinet-next-step-score-label">
-                    {roadmapScoreKicker}
-                  </span>
-                  {completedJourneySteps}/{journeySteps.length}
-                </span>
-              </div>
-            </div>
-            <h2 className="pro-cabinet-next-step-title">{roadmapTitle}</h2>
-            <p className="pro-cabinet-next-step-subtitle">
-              {roadmapSubtitle}
+        <section className="pro-cabinet-tools-bridge animate delay-4">
+          <div className="pro-cabinet-tools-bridge-copy">
+            <p className="pro-cabinet-tools-bridge-kicker">Инструменты</p>
+            <h2 className="pro-cabinet-tools-bridge-title">
+              Операционный кабинет
+            </h2>
+            <p className="pro-cabinet-tools-bridge-subtitle">
+              Ежедневные действия здесь. Онбординг в «Профиле».
             </p>
           </div>
-          <div
-            className={`pro-cabinet-roadmap-tip${
-              isRoadmapCoachmarkVisible ? ' is-visible' : ''
-            }`}
-            role="status"
-            aria-live="polite"
+          <button
+            className="pro-cabinet-tools-bridge-link"
+            type="button"
+            onClick={() => onEditProfile()}
+            aria-label={`${profileRoadmapMetaLabel}. ${profileRoadmapHint}. Открыть профиль мастера.`}
           >
-            {roadmapTipLabel}
-          </div>
+            <span className="pro-cabinet-tools-bridge-link-title">
+              {profileRoadmapMetaLabel}
+            </span>
+            <span className="pro-cabinet-tools-bridge-link-meta">
+              {profileRoadmapHint}
+            </span>
+            <span className="pro-cabinet-tools-bridge-link-action">
+              Открыть профиль
+            </span>
+          </button>
           <div className="pro-cabinet-roadmap-meter" aria-hidden="true">
             <span
               className="pro-cabinet-roadmap-meter-fill"
               style={{ '--roadmap-progress': `${journeyProgress}%` } as CSSProperties}
             />
           </div>
-          <div className="pro-cabinet-roadmap-steps">
-            {roadmapSteps.map((step) => {
-              const stepNumber =
-                journeySteps.findIndex((item) => item.id === step.id) + 1
-              const isLocked = isRoadmapProfileLocked && step.id !== 'profile'
-              const stepStateLabel = getRoadmapStepStateLabel(step.status, isLocked)
-              const isCurrent = step.id === activeJourneyStep.id
-              const stepShortLabel = getRoadmapStepShortLabel(step.id)
-              return (
-                <button
-                  className={`pro-cabinet-roadmap-step is-${step.status}${
-                    isCurrent ? ' is-current' : ''
-                  }${isLocked ? ' is-locked' : ''}`}
-                  key={step.id}
-                  type="button"
-                  onClick={() => {
-                    if (isLocked) {
-                      setRoadmapSheetStepId(step.id)
-                      return
-                    }
-                    setRoadmapSheetStepId(null)
-                    step.onAction()
-                  }}
-                  aria-disabled={isLocked}
-                  aria-current={isCurrent ? 'step' : undefined}
-                  aria-haspopup={isLocked ? 'dialog' : undefined}
-                  aria-expanded={isLocked && roadmapSheetStep?.id === step.id}
-                  aria-label={`${stepNumber}. ${step.chipLabel}. ${stepStateLabel}${
-                    isLocked ? '. Сначала завершите профиль.' : ''
-                  }`}
-                >
-                  <span className="pro-cabinet-roadmap-step-index" aria-hidden="true">
-                    {stepNumber}
-                  </span>
-                  <span className="pro-cabinet-roadmap-step-text">
-                    <span className="pro-cabinet-roadmap-step-label pro-cabinet-roadmap-step-label--full">
-                      {step.chipLabel}
-                    </span>
-                    <span className="pro-cabinet-roadmap-step-label pro-cabinet-roadmap-step-label--short">
-                      {stepShortLabel}
-                    </span>
-                    <span className="pro-cabinet-roadmap-step-state">
-                      {stepStateLabel}
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          <div className="pro-cabinet-next-step-actions">
-            <button
-              className="pro-cabinet-next-step-action is-primary"
-              type="button"
-              onClick={activeJourneyStep.onAction}
-            >
-              {activeJourneyStep.actionLabel}
-            </button>
-            <button
-              className="pro-cabinet-next-step-action is-ghost is-compact"
-              type="button"
-              onClick={() => setIsToolsExpanded((current) => !current)}
-            >
-              {isToolsExpanded ? 'Скрыть' : 'Инструменты'}
-            </button>
-          </div>
         </section>
-        {isToolsExpanded ? (
-          <>
-            <div className="pro-cabinet-nav-grid pro-cabinet-nav-grid--secondary">
+
+        <div className="pro-cabinet-nav-grid pro-cabinet-nav-grid--secondary">
               <button
                 className="pro-cabinet-nav-card is-analytics animate delay-5"
                 type="button"
@@ -1483,84 +1292,7 @@ export const ProCabinetScreen = ({
               </span>
               <span className="pro-cabinet-support-action">Написать</span>
             </button>
-          </>
-        ) : (
-          <button
-            className="pro-cabinet-tools-collapsed animate delay-5"
-            type="button"
-            onClick={() => setIsToolsExpanded(true)}
-          >
-            <span className="pro-cabinet-tools-collapsed-kicker">
-              Инструменты роста
-            </span>
-            <span className="pro-cabinet-tools-collapsed-title">
-              {toolsCollapsedTitle}
-            </span>
-            <span className="pro-cabinet-tools-collapsed-subtitle">
-              {toolsPreviewSubtitle}
-            </span>
-            <span className="pro-cabinet-tools-collapsed-action">
-              {toolsCollapsedActionLabel}
-            </span>
-          </button>
-        )}
-      </div>
-      {roadmapSheetStep ? (
-        <div
-          className="pro-cabinet-step-sheet-overlay"
-          role="presentation"
-          onClick={() => setRoadmapSheetStepId(null)}
-        >
-          <div
-            className="pro-cabinet-step-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pro-cabinet-step-sheet-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <span className="pro-cabinet-step-sheet-handle" aria-hidden="true" />
-            <p className="pro-cabinet-step-sheet-kicker">
-              Шаг {roadmapSheetStepIndex}/{journeySteps.length}
-            </p>
-            <h3 className="pro-cabinet-step-sheet-title" id="pro-cabinet-step-sheet-title">
-              {roadmapSheetStep.title}
-            </h3>
-            <p className="pro-cabinet-step-sheet-subtitle">
-              {isRoadmapSheetLocked
-                ? 'Сначала закройте шаг «Профиль», затем этот шаг откроется.'
-                : roadmapSheetStep.subtitle}
-            </p>
-            <div className="pro-cabinet-step-sheet-meta">
-              <span className="pro-cabinet-step-sheet-chip">
-                {roadmapSheetStep.chipLabel}
-              </span>
-              <span
-                className={`pro-cabinet-step-sheet-state${
-                  isRoadmapSheetLocked ? ' is-locked' : ''
-                }`}
-              >
-                {roadmapSheetStateLabel}
-              </span>
-            </div>
-            <div className="pro-cabinet-step-sheet-actions">
-              <button
-                className="pro-cabinet-step-sheet-action is-primary"
-                type="button"
-                onClick={handleRoadmapSheetAction}
-              >
-                {roadmapSheetActionLabel}
-              </button>
-              <button
-                className="pro-cabinet-step-sheet-action is-ghost"
-                type="button"
-                onClick={() => setRoadmapSheetStepId(null)}
-              >
-                Позже
-              </button>
-            </div>
-          </div>
         </div>
-      ) : null}
 
       <ProBottomNav
         active="cabinet"
