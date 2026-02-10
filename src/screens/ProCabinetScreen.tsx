@@ -419,6 +419,8 @@ export const ProCabinetScreen = ({
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
   const [isRoadmapCoachmarkVisible, setIsRoadmapCoachmarkVisible] =
     useState(false)
+  const [roadmapSheetStepId, setRoadmapSheetStepId] =
+    useState<MasterJourneyStepId | null>(null)
   const isProfileMetaUnavailable = profileLoadState === 'error'
   const isProfileMissing = profileLoadState === 'missing'
   const profileMissingFields = profileData?.missingFields ?? []
@@ -678,6 +680,10 @@ export const ProCabinetScreen = ({
   const activeJourneyStep =
     journeySteps.find((step) => step.status === 'active') ??
     journeySteps[journeySteps.length - 1]
+  const roadmapSteps = [
+    activeJourneyStep,
+    ...journeySteps.filter((step) => step.id !== activeJourneyStep.id),
+  ]
   const roadmapCoachmarkStorageKey = `pro-cabinet-roadmap-tip-seen:${userId}`
   const revealRoadmapCoachmark = () => {
     setIsRoadmapCoachmarkVisible(true)
@@ -740,22 +746,6 @@ export const ProCabinetScreen = ({
       : isLoading
         ? ' is-loading'
         : ' is-ok'
-  const focusSecondaryActionLabel =
-    activeJourneyStep.id === 'profile'
-      ? 'Заявки'
-      : activeJourneyStep.id === 'flow'
-        ? 'Чаты'
-        : activeJourneyStep.id === 'growth'
-          ? 'Календарь'
-          : 'Клиенты'
-  const focusSecondaryAction =
-    activeJourneyStep.id === 'profile'
-      ? onViewRequests
-      : activeJourneyStep.id === 'flow'
-        ? onViewChats
-        : activeJourneyStep.id === 'growth'
-          ? onOpenCalendar
-          : onOpenClients
   const requiredActionsCount = Math.max(
     pendingActions,
     activeJourneyStep.status === 'active' ? 1 : 0
@@ -769,10 +759,6 @@ export const ProCabinetScreen = ({
     activeJourneyStep.status === 'active'
       ? `Шаг: ${activeJourneyStep.chipLabel} ${completedJourneySteps + 1}/${journeySteps.length}`
       : `Дорожка закрыта: ${journeySteps.length}/${journeySteps.length}`
-  const journeyMetaShort =
-    activeJourneyStep.status === 'active'
-      ? `Шаг ${completedJourneySteps + 1}/${journeySteps.length}`
-      : `${journeySteps.length}/${journeySteps.length}`
   const roadmapTipLabel = isRoadmapProfileLocked
     ? 'Сначала закройте шаг «Профиль».'
     : activeJourneyStep.status === 'active'
@@ -782,6 +768,18 @@ export const ProCabinetScreen = ({
     activeJourneyStep.status === 'active'
       ? 'Прогресс'
       : 'Готово'
+  const focusActionsChipClassName = hasActionBacklog ? ' is-alert' : ' is-ok'
+  const focusWeekChipClassName =
+    bookingStats.upcomingWeek > 0 ? ' is-ok' : ' is-neutral'
+  const focusClientsChipClassName =
+    bookingStats.uniqueClients > 0 ? ' is-neutral' : ' is-muted'
+  const focusActionsChipAction = hasActionBacklog
+    ? onViewRequests
+    : activeJourneyStep.onAction
+  const focusJourneyChipLabel =
+    activeJourneyStep.status === 'active'
+      ? `${activeJourneyStep.chipLabel} ${completedJourneySteps + 1}/${journeySteps.length}`
+      : 'Дорожка закрыта'
   const requestsCardStateClassName =
     requestStats.open > 0
       ? ' is-attention'
@@ -875,6 +873,37 @@ export const ProCabinetScreen = ({
   const roadmapSubtitle = isRoadmapDuplicatingOverview
     ? 'Сделайте шаг и перейдите к следующему блоку дорожки.'
     : activeJourneyStep.subtitle
+  const roadmapSheetStep = roadmapSheetStepId
+    ? journeySteps.find((step) => step.id === roadmapSheetStepId) ?? null
+    : null
+  const roadmapSheetStepIndex = roadmapSheetStep
+    ? journeySteps.findIndex((step) => step.id === roadmapSheetStep.id) + 1
+    : 0
+  const isRoadmapSheetLocked =
+    roadmapSheetStep !== null &&
+    isRoadmapProfileLocked &&
+    roadmapSheetStep.id !== 'profile'
+  const roadmapSheetStateLabel = roadmapSheetStep
+    ? getRoadmapStepStateLabel(roadmapSheetStep.status, isRoadmapSheetLocked)
+    : ''
+  const roadmapSheetActionLabel = roadmapSheetStep
+    ? isRoadmapSheetLocked
+      ? (profileJourneyStep?.actionLabel ?? 'Открыть профиль')
+      : roadmapSheetStep.actionLabel
+    : 'Открыть шаг'
+  const handleRoadmapSheetAction = () => {
+    if (!roadmapSheetStep) return
+    if (isRoadmapSheetLocked) {
+      if (profileJourneyStep) {
+        profileJourneyStep.onAction()
+      } else {
+        onEditProfile()
+      }
+    } else {
+      roadmapSheetStep.onAction()
+    }
+    setRoadmapSheetStepId(null)
+  }
   const storiesBadgeLabel = hasStoriesPublished ? 'LIVE' : 'START'
   const storiesHint = hasStoriesPublished
     ? `${activeStoriesCount} ${formatCountLabel(
@@ -922,33 +951,37 @@ export const ProCabinetScreen = ({
             <h1 className="pro-cabinet-overview-title">{focusTitle}</h1>
             <p className="pro-cabinet-overview-subtitle">{focusSubtitle}</p>
           </div>
-          <div className="pro-cabinet-overview-stats">
-            <div
-              className={`pro-cabinet-overview-stat${
-                hasActionBacklog ? ' is-actionable' : ' is-calm'
-              }`}
+          <div className="pro-cabinet-overview-rail">
+            <button
+              className={`pro-cabinet-overview-chip is-actions${focusActionsChipClassName}`}
+              type="button"
+              onClick={focusActionsChipAction}
             >
-              <span className="pro-cabinet-overview-stat-value">
+              <span className="pro-cabinet-overview-chip-label">Действия</span>
+              <span className="pro-cabinet-overview-chip-value">
                 {requiredActionsCount}
               </span>
-              <span className="pro-cabinet-overview-stat-label">
-                Нужны действия
-              </span>
-            </div>
-            <div className="pro-cabinet-overview-stat">
-              <span className="pro-cabinet-overview-stat-value">
+            </button>
+            <button
+              className={`pro-cabinet-overview-chip${focusWeekChipClassName}`}
+              type="button"
+              onClick={onOpenCalendar}
+            >
+              <span className="pro-cabinet-overview-chip-label">Неделя</span>
+              <span className="pro-cabinet-overview-chip-value">
                 {bookingStats.upcomingWeek}
               </span>
-              <span className="pro-cabinet-overview-stat-label">
-                Записи 7д
-              </span>
-            </div>
-            <div className="pro-cabinet-overview-stat">
-              <span className="pro-cabinet-overview-stat-value">
+            </button>
+            <button
+              className={`pro-cabinet-overview-chip${focusClientsChipClassName}`}
+              type="button"
+              onClick={onOpenClients}
+            >
+              <span className="pro-cabinet-overview-chip-label">Клиенты</span>
+              <span className="pro-cabinet-overview-chip-value">
                 {bookingStats.uniqueClients}
               </span>
-              <span className="pro-cabinet-overview-stat-label">Клиентов</span>
-            </div>
+            </button>
           </div>
           <div className="pro-cabinet-overview-meta">
             <span className="pro-cabinet-overview-meta-pill">
@@ -964,24 +997,17 @@ export const ProCabinetScreen = ({
                 {journeyMetaLong}
               </span>
               <span className="pro-cabinet-overview-meta-journey-short">
-                {journeyMetaShort}
+                {focusJourneyChipLabel}
               </span>
             </span>
           </div>
-          <div className="pro-cabinet-overview-actions">
+          <div className="pro-cabinet-overview-actions is-single">
             <button
-              className="pro-cabinet-overview-action is-primary"
+              className="pro-cabinet-overview-action is-primary is-focus"
               type="button"
               onClick={focusPrimaryAction}
             >
               {focusPrimaryActionLabel}
-            </button>
-            <button
-              className="pro-cabinet-overview-action is-ghost"
-              type="button"
-              onClick={focusSecondaryAction}
-            >
-              {focusSecondaryActionLabel}
             </button>
           </div>
         </section>
@@ -1137,7 +1163,9 @@ export const ProCabinetScreen = ({
             />
           </div>
           <div className="pro-cabinet-roadmap-steps">
-            {journeySteps.map((step, index) => {
+            {roadmapSteps.map((step) => {
+              const stepNumber =
+                journeySteps.findIndex((item) => item.id === step.id) + 1
               const isLocked = isRoadmapProfileLocked && step.id !== 'profile'
               const stepStateLabel = getRoadmapStepStateLabel(step.status, isLocked)
               const isCurrent = step.id === activeJourneyStep.id
@@ -1150,20 +1178,18 @@ export const ProCabinetScreen = ({
                   key={step.id}
                   type="button"
                   onClick={() => {
-                    if (isLocked) {
-                      revealRoadmapCoachmark()
-                      return
-                    }
-                    step.onAction()
+                    setRoadmapSheetStepId(step.id)
                   }}
                   aria-disabled={isLocked}
                   aria-current={isCurrent ? 'step' : undefined}
-                  aria-label={`${index + 1}. ${step.chipLabel}. ${stepStateLabel}${
+                  aria-haspopup="dialog"
+                  aria-expanded={roadmapSheetStep?.id === step.id}
+                  aria-label={`${stepNumber}. ${step.chipLabel}. ${stepStateLabel}${
                     isLocked ? '. Сначала завершите профиль.' : ''
                   }`}
                 >
                   <span className="pro-cabinet-roadmap-step-index" aria-hidden="true">
-                    {index + 1}
+                    {stepNumber}
                   </span>
                   <span className="pro-cabinet-roadmap-step-text">
                     <span className="pro-cabinet-roadmap-step-label pro-cabinet-roadmap-step-label--full">
@@ -1184,9 +1210,9 @@ export const ProCabinetScreen = ({
             <button
               className="pro-cabinet-next-step-action is-primary"
               type="button"
-              onClick={activeJourneyStep.onAction}
+              onClick={() => setRoadmapSheetStepId(activeJourneyStep.id)}
             >
-              {activeJourneyStep.actionLabel}
+              Выполнить шаг
             </button>
             <button
               className="pro-cabinet-next-step-action is-ghost is-compact"
@@ -1474,6 +1500,62 @@ export const ProCabinetScreen = ({
           </button>
         )}
       </div>
+      {roadmapSheetStep ? (
+        <div
+          className="pro-cabinet-step-sheet-overlay"
+          role="presentation"
+          onClick={() => setRoadmapSheetStepId(null)}
+        >
+          <div
+            className="pro-cabinet-step-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pro-cabinet-step-sheet-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="pro-cabinet-step-sheet-handle" aria-hidden="true" />
+            <p className="pro-cabinet-step-sheet-kicker">
+              Шаг {roadmapSheetStepIndex}/{journeySteps.length}
+            </p>
+            <h3 className="pro-cabinet-step-sheet-title" id="pro-cabinet-step-sheet-title">
+              {roadmapSheetStep.title}
+            </h3>
+            <p className="pro-cabinet-step-sheet-subtitle">
+              {isRoadmapSheetLocked
+                ? 'Сначала закройте шаг «Профиль», затем этот шаг откроется.'
+                : roadmapSheetStep.subtitle}
+            </p>
+            <div className="pro-cabinet-step-sheet-meta">
+              <span className="pro-cabinet-step-sheet-chip">
+                {roadmapSheetStep.chipLabel}
+              </span>
+              <span
+                className={`pro-cabinet-step-sheet-state${
+                  isRoadmapSheetLocked ? ' is-locked' : ''
+                }`}
+              >
+                {roadmapSheetStateLabel}
+              </span>
+            </div>
+            <div className="pro-cabinet-step-sheet-actions">
+              <button
+                className="pro-cabinet-step-sheet-action is-primary"
+                type="button"
+                onClick={handleRoadmapSheetAction}
+              >
+                {roadmapSheetActionLabel}
+              </button>
+              <button
+                className="pro-cabinet-step-sheet-action is-ghost"
+                type="button"
+                onClick={() => setRoadmapSheetStepId(null)}
+              >
+                Позже
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ProBottomNav
         active="cabinet"
