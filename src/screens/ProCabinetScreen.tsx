@@ -672,21 +672,27 @@ export const ProCabinetScreen = ({
       : isLoading
         ? ' is-loading'
         : ' is-ok'
-  const requiredActionsCount = Math.max(
-    pendingActions,
-    activeJourneyStep.status === 'active' ? 1 : 0
-  )
-  const hasActionBacklog = requiredActionsCount > 0
+  const hasOperationalActions = pendingActions > 0
+  const hasJourneyAction = activeJourneyStep.status === 'active'
+  const requiredActionsCount = hasOperationalActions
+    ? pendingActions
+    : hasJourneyAction
+      ? 1
+      : 0
   const journeyMetaLong =
     activeJourneyStep.status === 'active'
       ? `Онбординг в профиле: шаг ${profileRoadmapStepNumber}/${journeySteps.length}`
       : `Онбординг в профиле завершен: ${journeySteps.length}/${journeySteps.length}`
-  const focusActionsChipClassName = hasActionBacklog ? ' is-alert' : ' is-ok'
+  const focusActionsChipClassName = hasOperationalActions
+    ? ' is-alert'
+    : hasJourneyAction
+      ? ' is-neutral'
+      : ' is-ok'
   const focusWeekChipClassName =
     bookingStats.upcomingWeek > 0 ? ' is-ok' : ' is-neutral'
   const focusClientsChipClassName =
     bookingStats.uniqueClients > 0 ? ' is-neutral' : ' is-muted'
-  const focusActionsChipAction = hasActionBacklog
+  const focusActionsChipAction = hasOperationalActions
     ? onViewRequests
     : activeJourneyStep.onAction
   const focusJourneyChipLabel = `Профиль ${profileRoadmapStepNumber}/${journeySteps.length}`
