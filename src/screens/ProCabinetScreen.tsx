@@ -432,44 +432,44 @@ export const ProCabinetScreen = ({
   const isOfflineFallback = Boolean(combinedError) && !hasMetricsData
   const journeySteps = useMemo(() => {
     let profileTitle = 'Профиль и график готовы'
-    let profileSubtitle = 'Основа собрана, можно стабильно принимать записи.'
+    let profileSubtitle = 'Основа собрана, можно принимать записи.'
     let profileActionLabel = 'Открыть профиль'
     let profileAction = () => onEditProfile()
     if (isProfileMetaUnavailable) {
       profileTitle = 'Проверьте профиль'
-      profileSubtitle = 'Синхронизация профиля недоступна, обновите экран.'
+      profileSubtitle = 'Синхронизация профиля недоступна. Обновите данные.'
       profileActionLabel = 'Обновить данные'
       profileAction = refresh
     } else if (hasProfileBasicsGap) {
       const missingBasics = new Set(profileMissingFields)
       profileTitle = 'Заполните основу профиля'
-      profileSubtitle = 'Имя, категории, формат и локация нужны для выдачи.'
+      profileSubtitle = 'Имя, категории и локация нужны для выдачи.'
       profileActionLabel = 'Заполнить основу'
       profileAction = () => onEditProfile('basic')
       if (missingBasics.has('cityId') || missingBasics.has('districtId')) {
         profileTitle = 'Добавьте локацию'
-        profileSubtitle = 'Укажите город и район, чтобы клиенты находили вас в выдаче.'
+        profileSubtitle = 'Укажите город и район для поиска.'
         profileActionLabel = 'Указать локацию'
         profileAction = () => onEditProfile('location')
       } else if (missingBasics.has('displayName')) {
         profileTitle = 'Добавьте имя профиля'
-        profileSubtitle = 'Понятное имя повышает доверие и кликабельность.'
+        profileSubtitle = 'Понятное имя повышает доверие.'
         profileActionLabel = 'Заполнить имя'
         profileAction = () => onEditProfile('basic')
       } else if (missingBasics.has('categories')) {
         profileTitle = 'Выберите категории'
-        profileSubtitle = 'Категории влияют на попадание в подборки и поиск.'
+        profileSubtitle = 'Категории влияют на выдачу в подборках.'
         profileActionLabel = 'Выбрать категории'
         profileAction = () => onEditProfile('services')
       } else if (missingBasics.has('workFormat')) {
         profileTitle = 'Выберите формат работы'
-        profileSubtitle = 'Уточните, где принимаете: у себя, у клиента или оба формата.'
+        profileSubtitle = 'Уточните, где принимаете клиентов.'
         profileActionLabel = 'Выбрать формат'
         profileAction = () => onEditProfile('location')
       }
     } else if (!hasServicesConfigured) {
       profileTitle = 'Добавьте услуги'
-      profileSubtitle = 'Клиенты должны видеть понятный список услуг.'
+      profileSubtitle = 'Клиенты должны видеть список услуг.'
       profileActionLabel = 'Добавить услуги'
       profileAction = () => onEditProfile('services')
     } else if (!hasPortfolioConfigured) {
@@ -479,13 +479,13 @@ export const ProCabinetScreen = ({
       profileAction = () => onEditProfile('portfolio')
     } else if (!hasScheduleEvidence) {
       profileTitle = 'Подключите график'
-      profileSubtitle = 'Без графика нельзя стабильно принимать записи.'
+      profileSubtitle = 'Без графика нельзя принимать записи.'
       profileActionLabel = 'Подключить график'
       profileAction = () => onEditProfile('availability')
     }
 
     let flowTitle = 'Поток на неделе стабилен'
-    let flowSubtitle = 'Входящие закрыты, неделя уже заполнена записями.'
+    let flowSubtitle = 'Входящие закрыты, неделя заполнена.'
     let flowActionLabel = 'Открыть календарь'
     let flowAction = onOpenCalendar
     if (requestStats.open > 0) {
@@ -495,31 +495,28 @@ export const ProCabinetScreen = ({
         'заявки',
         'заявок'
       )}`
-      flowSubtitle = 'Быстрый ответ повышает шанс получить запись.'
+      flowSubtitle = 'Быстрый ответ повышает конверсию.'
       flowActionLabel = 'Открыть заявки'
       flowAction = onViewRequests
     } else if (!hasScheduleEvidence && !isProfileMetaUnavailable) {
       flowTitle = 'Подключите график'
-      flowSubtitle = 'Без графика клиенты не могут записаться на удобное время.'
+      flowSubtitle = 'Без графика клиент не выберет время.'
       flowActionLabel = 'Подключить график'
       flowAction = () => onEditProfile('availability')
     } else if (bookingStats.upcomingWeek === 0) {
       flowTitle = 'На неделе пока нет записей'
       if (!hasActivePromotion && !hasGrowthChannels) {
-        flowSubtitle =
-          'График уже есть. Подключите продвижение, чтобы получить новые записи.'
+        flowSubtitle = 'График есть. Запустите оффер для новых записей.'
         flowActionLabel = 'Подключить продвижение'
         flowAction = onOpenMarketing
       } else {
-        flowSubtitle =
-          'Проверьте календарь и заявки: сейчас важнее конверсия, а не новые окна.'
+        flowSubtitle = 'Проверьте календарь и заявки по неделе.'
         flowActionLabel = requestStats.total > 0 ? 'Открыть заявки' : 'Открыть календарь'
         flowAction = requestStats.total > 0 ? onViewRequests : onOpenCalendar
       }
     } else if (bookingStats.upcomingWeek < 2) {
       flowTitle = 'На неделе мало записей'
-      flowSubtitle =
-        'Усилите поток через быстрые ответы и продвижение, чтобы добрать загрузку.'
+      flowSubtitle = 'Усилите поток через быстрые ответы и оффер.'
       flowActionLabel =
         requestStats.total > 0
           ? 'Открыть заявки'
@@ -535,43 +532,43 @@ export const ProCabinetScreen = ({
     }
 
     let growthTitle = 'Продвижение подключено'
-    let growthSubtitle = 'Контент и оффер уже работают на рост.'
+    let growthSubtitle = 'Контент и оффер уже работают.'
     let growthActionLabel = 'Управлять ростом'
     let growthAction = onOpenMarketing
     if (!hasStoriesPublished) {
       growthTitle = 'Добавьте первую историю'
-      growthSubtitle = 'Истории возвращают внимание клиентов в ленте.'
+      growthSubtitle = 'Истории возвращают внимание клиентов.'
       growthActionLabel = 'Добавить сторис'
       growthAction = onOpenStories
     } else if (!hasActivePromotion && !hasGrowthChannels) {
       growthTitle = 'Подключите продвижение'
-      growthSubtitle = 'Соберите каналы и запустите первый оффер.'
+      growthSubtitle = 'Соберите каналы и запустите оффер.'
       growthActionLabel = 'Подключить рост'
       growthAction = onOpenMarketing
     } else if (!hasActivePromotion) {
       growthTitle = 'Запустите акцию'
-      growthSubtitle = 'Аудитория подключена, пора дать повод записаться.'
+      growthSubtitle = 'Аудитория подключена, пора запускать оффер.'
       growthActionLabel = 'Запустить акцию'
       growthAction = onOpenMarketing
     }
 
     let retentionTitle = 'Повторы запущены'
-    let retentionSubtitle = 'База клиентов растет и возвращается снова.'
+    let retentionSubtitle = 'База клиентов растет и возвращается.'
     let retentionActionLabel = 'Открыть аналитику'
     let retentionAction = onOpenAnalytics
     if (totalClients === 0) {
       retentionTitle = 'Соберите первых клиентов'
-      retentionSubtitle = 'Начните с заявок, чтобы сформировать клиентскую базу.'
+      retentionSubtitle = 'Начните с заявок и соберите базу.'
       retentionActionLabel = 'Открыть заявки'
       retentionAction = onViewRequests
     } else if (repeatClients === 0) {
       retentionTitle = 'Запустите повторные записи'
-      retentionSubtitle = 'Добавьте сценарий возврата в базе клиентов.'
+      retentionSubtitle = 'Добавьте сценарий возврата в базе.'
       retentionActionLabel = 'Открыть базу'
       retentionAction = onOpenClients
     } else if (totalClients < 3) {
       retentionTitle = 'Расширьте клиентскую базу'
-      retentionSubtitle = 'Нужно минимум 3 клиента для стабильного повтора.'
+      retentionSubtitle = 'Нужно минимум 3 клиента для стабильных повторов.'
       retentionActionLabel = 'Открыть базу'
       retentionAction = onOpenClients
     }
@@ -735,20 +732,20 @@ export const ProCabinetScreen = ({
             ? 'Неделя без записей'
             : 'Свободная неделя для роста'
   const focusSubtitle = isOfflineFallback
-    ? 'Нет связи с сервером. Нажмите «Обновить данные».'
+    ? 'Нет связи. Нажмите «Обновить данные».'
     : combinedError
-      ? 'Обновите ленту, чтобы вернуть актуальные заявки.'
+      ? 'Синхронизация сбилась. Обновите данные.'
       : hasPendingActions
-        ? 'Сначала закройте входящие и ожидания по записям.'
+        ? 'Сначала закройте входящие заявки и ожидания.'
         : shouldFocusProfileStep
           ? activeJourneyStep.subtitle
         : shouldPromptScheduleSetup
-          ? 'Без графика клиентам не выбрать время. Подключите расписание.'
+          ? 'Без графика клиенты не выберут время.'
           : bookingStats.upcomingWeek > 0
-          ? 'Проверьте окна в календаре и поддержите текущий темп.'
+          ? 'Проверьте окна в календаре и подтверждения.'
           : shouldPromptMarketing
-            ? 'График есть, но спроса мало. Подключите продвижение и оффер.'
-            : 'Свободная неделя: проверьте следующий шаг в профиле.'
+            ? 'График есть. Запустите оффер для новых записей.'
+            : 'Неделя свободна: сфокусируйтесь на росте.'
   const focusPrimaryActionLabel = isOfflineFallback
     ? 'Обновить данные'
     : combinedError
@@ -777,7 +774,7 @@ export const ProCabinetScreen = ({
         : shouldPromptMarketing
         ? onOpenMarketing
         : activeJourneyStep.onAction
-  const storiesBadgeLabel = hasStoriesPublished ? 'LIVE' : 'START'
+  const storiesBadgeLabel = hasStoriesPublished ? 'ЭФИР' : 'СТАРТ'
   const storiesHintCompact = hasStoriesPublished
     ? `${activeStoriesCount} ${formatCountLabel(
         activeStoriesCount,
@@ -785,14 +782,14 @@ export const ProCabinetScreen = ({
         'истории',
         'историй'
       )} в эфире`
-    : 'Добавьте первую историю'
+    : 'Опубликуйте первую сторис'
   const marketingHintCompact = hasActivePromotion
-    ? 'Акция активна, входящие прогреты'
+    ? 'Оффер активен'
     : hasGrowthChannels
-      ? 'Каналы подключены, запустите оффер'
+      ? 'Каналы подключены'
       : marketingAudience
-        ? 'База есть, осталось включить оффер'
-        : 'Начните с заявок, затем подключите рост'
+        ? 'База готова к офферу'
+        : 'Соберите базу через заявки'
   const requestsHintCompact = requestStats.open
     ? `${requestStats.open} к ответу`
     : requestStats.total > 0
@@ -817,8 +814,20 @@ export const ProCabinetScreen = ({
     (profileData?.portfolioUrls?.length ?? 0)
   const showcaseHintCompact =
     showcaseItemsCount > 0
-      ? 'Обновить витрину'
-      : 'Добавить работу'
+      ? 'Освежите витрину'
+      : 'Добавьте первую работу'
+  const quickAnalyticsNeedsAttention =
+    bookingStats.confirmed === 0 && bookingStats.upcomingWeek === 0
+  const quickClientsNeedsAttention = totalClients === 0
+  const quickGrowthNeedsAttention = !hasActivePromotion
+  const quickStoriesNeedsAttention = !hasStoriesPublished
+  const analyticsFooterNote = bookingStats.upcomingWeek
+    ? `На неделе: ${bookingStats.upcomingWeek}`
+    : 'Неделя пустая'
+  const analyticsCtaLabel = bookingStats.confirmed > 0 ? 'Детали' : 'Открыть'
+  const marketingCtaLabel = hasActivePromotion ? 'Оффер' : 'Запуск'
+  const storiesCtaLabel = hasStoriesPublished ? 'Лента' : 'Создать'
+  const showcaseCtaLabel = showcaseItemsCount > 0 ? 'Витрина' : 'Добавить'
 
   return (
     <div className="screen screen--pro screen--pro-cabinet">
@@ -1010,17 +1019,21 @@ export const ProCabinetScreen = ({
           aria-label="Быстрые переходы по инструментам"
         >
           <button
-            className="pro-cabinet-tools-quick-item"
+            className={`pro-cabinet-tools-quick-item${
+              quickAnalyticsNeedsAttention ? ' is-hot' : ''
+            }`}
             type="button"
             onClick={onOpenAnalytics}
           >
             <span className="pro-cabinet-tools-quick-icon" aria-hidden="true">
               <IconDashboard />
             </span>
-            <span className="pro-cabinet-tools-quick-label">Тренды</span>
+            <span className="pro-cabinet-tools-quick-label">Отчеты</span>
           </button>
           <button
-            className="pro-cabinet-tools-quick-item"
+            className={`pro-cabinet-tools-quick-item${
+              quickClientsNeedsAttention ? ' is-hot' : ''
+            }`}
             type="button"
             onClick={onOpenClients}
           >
@@ -1030,17 +1043,21 @@ export const ProCabinetScreen = ({
             <span className="pro-cabinet-tools-quick-label">Клиенты</span>
           </button>
           <button
-            className="pro-cabinet-tools-quick-item"
+            className={`pro-cabinet-tools-quick-item${
+              quickGrowthNeedsAttention ? ' is-hot' : ''
+            }`}
             type="button"
             onClick={onOpenMarketing}
           >
             <span className="pro-cabinet-tools-quick-icon" aria-hidden="true">
               <IconChat />
             </span>
-            <span className="pro-cabinet-tools-quick-label">Рост</span>
+            <span className="pro-cabinet-tools-quick-label">Оффер</span>
           </button>
           <button
-            className="pro-cabinet-tools-quick-item"
+            className={`pro-cabinet-tools-quick-item${
+              quickStoriesNeedsAttention ? ' is-hot' : ''
+            }`}
             type="button"
             onClick={onOpenStories}
           >
@@ -1071,7 +1088,7 @@ export const ProCabinetScreen = ({
                 <span className="pro-cabinet-tool-metric-value">
                   {bookingStats.confirmed}
                 </span>
-                <span className="pro-cabinet-tool-metric-label">подтверждено</span>
+                <span className="pro-cabinet-tool-metric-label">записей</span>
               </div>
               <div className="pro-cabinet-tool-spark" aria-hidden="true">
                 {analyticsSpark.slice(0, 5).map((value, index) => (
@@ -1083,10 +1100,8 @@ export const ProCabinetScreen = ({
                 ))}
               </div>
               <div className="pro-cabinet-tool-footer">
-                <span className="pro-cabinet-tool-note">
-                  Неделя: {bookingStats.upcomingWeek}
-                </span>
-                <span className="pro-cabinet-tool-link">Открыть</span>
+                <span className="pro-cabinet-tool-note">{analyticsFooterNote}</span>
+                <span className="pro-cabinet-tool-link">{analyticsCtaLabel}</span>
               </div>
             </div>
           </button>
@@ -1107,7 +1122,7 @@ export const ProCabinetScreen = ({
             <div className="pro-cabinet-nav-preview is-tool-preview">
               <div className="pro-cabinet-tool-metric">
                 <span className="pro-cabinet-tool-metric-value">{totalClients}</span>
-                <span className="pro-cabinet-tool-metric-label">в базе</span>
+                <span className="pro-cabinet-tool-metric-label">клиентов</span>
               </div>
               <div className="pro-cabinet-tool-client-row">
                 <span className="pro-cabinet-nav-client-avatar" aria-hidden="true">
@@ -1143,7 +1158,7 @@ export const ProCabinetScreen = ({
             <div className="pro-cabinet-nav-preview is-tool-preview">
               <div className="pro-cabinet-tool-metric">
                 <span className="pro-cabinet-tool-metric-value">{marketingReach}</span>
-                <span className="pro-cabinet-tool-metric-label">охват</span>
+                <span className="pro-cabinet-tool-metric-label">контактов</span>
               </div>
               <p className="pro-cabinet-tool-note is-clamp">{marketingHintCompact}</p>
               <div className="pro-cabinet-nav-meter is-compact" aria-hidden="true">
@@ -1154,7 +1169,7 @@ export const ProCabinetScreen = ({
               </div>
               <div className="pro-cabinet-tool-footer">
                 <span className="pro-cabinet-tool-note">Аудитория {totalClients}</span>
-                <span className="pro-cabinet-tool-link">Открыть</span>
+                <span className="pro-cabinet-tool-link">{marketingCtaLabel}</span>
               </div>
             </div>
           </button>
@@ -1177,7 +1192,7 @@ export const ProCabinetScreen = ({
                 <span className="pro-cabinet-tool-metric-value">
                   {activeStoriesCount}
                 </span>
-                <span className="pro-cabinet-tool-metric-label">в эфире</span>
+                <span className="pro-cabinet-tool-metric-label">историй</span>
               </div>
               <div className="pro-cabinet-tool-story-row">
                 <span className="pro-cabinet-nav-story-avatar" aria-hidden="true">
@@ -1193,7 +1208,7 @@ export const ProCabinetScreen = ({
               </div>
               <div className="pro-cabinet-tool-footer">
                 <span className="pro-cabinet-tool-note">{storiesBadgeLabel}</span>
-                <span className="pro-cabinet-tool-link">Открыть</span>
+                <span className="pro-cabinet-tool-link">{storiesCtaLabel}</span>
               </div>
             </div>
           </button>
@@ -1216,7 +1231,7 @@ export const ProCabinetScreen = ({
                 <span className="pro-cabinet-tool-metric-value">
                   {showcaseItemsCount}
                 </span>
-                <span className="pro-cabinet-tool-metric-label">материалов</span>
+                <span className="pro-cabinet-tool-metric-label">работ</span>
               </div>
               <div className="pro-cabinet-nav-mosaic is-compact" aria-hidden="true">
                 {showcaseTiles.map((item, index) => {
@@ -1251,7 +1266,7 @@ export const ProCabinetScreen = ({
               </div>
               <div className="pro-cabinet-tool-footer">
                 <span className="pro-cabinet-tool-note">{showcaseHintCompact}</span>
-                <span className="pro-cabinet-tool-link">Открыть</span>
+                <span className="pro-cabinet-tool-link">{showcaseCtaLabel}</span>
               </div>
             </div>
           </button>

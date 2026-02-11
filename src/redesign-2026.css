@@ -2356,6 +2356,12 @@ body {
   color: var(--ink-deep);
 }
 
+.pro-cabinet-tools-quick-item.is-hot {
+  border-color: rgba(var(--accent-rgb), 0.34);
+  background: rgba(var(--accent-rgb), 0.14);
+  box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.16);
+}
+
 .pro-cabinet-tools-quick-icon {
   width: 20px;
   height: 20px;
@@ -2382,6 +2388,10 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+.pro-cabinet-tools-quick-item.is-hot .pro-cabinet-tools-quick-label {
+  color: var(--accent-strong);
 }
 
 .pro-cabinet-nav-grid--secondary {
