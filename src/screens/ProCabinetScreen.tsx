@@ -681,8 +681,8 @@ export const ProCabinetScreen = ({
       : 0
   const journeyMetaLong =
     activeJourneyStep.status === 'active'
-      ? `Онбординг в профиле: шаг ${profileRoadmapStepNumber}/${journeySteps.length}`
-      : `Онбординг в профиле завершен: ${journeySteps.length}/${journeySteps.length}`
+      ? `Путь мастера: шаг ${profileRoadmapStepNumber}/${journeySteps.length}`
+      : `Путь мастера завершен: ${journeySteps.length}/${journeySteps.length}`
   const focusActionsChipClassName = hasOperationalActions
     ? ' is-alert'
     : hasJourneyAction
@@ -695,7 +695,7 @@ export const ProCabinetScreen = ({
   const focusActionsChipAction = hasOperationalActions
     ? onViewRequests
     : activeJourneyStep.onAction
-  const focusJourneyChipLabel = `Профиль ${profileRoadmapStepNumber}/${journeySteps.length}`
+  const focusJourneyChipLabel = `Путь ${profileRoadmapStepNumber}/${journeySteps.length}`
   const requestsCardStateClassName =
     requestStats.open > 0
       ? ' is-attention'

@@ -4004,8 +4004,8 @@ export const ProProfileScreen = ({
         <section className="pro-profile-roadmap animate delay-2">
           <div className="pro-profile-roadmap-head">
             <div className="pro-profile-roadmap-title-block">
-              <p className="pro-profile-roadmap-kicker">Онбординг</p>
-              <h2 className="pro-profile-roadmap-title">Дорожка профиля</h2>
+              <p className="pro-profile-roadmap-kicker">Рост</p>
+              <h2 className="pro-profile-roadmap-title">Путь мастера</h2>
             </div>
             <span className="pro-profile-roadmap-progress">
               {profileOnboardingCompleted}/{profileOnboardingSteps.length}
