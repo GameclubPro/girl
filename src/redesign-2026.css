@@ -2352,14 +2352,26 @@ body {
   align-items: center;
   justify-content: center;
   gap: 5px;
+  position: relative;
   text-align: left;
   color: var(--ink-deep);
 }
 
-.pro-cabinet-tools-quick-item.is-hot {
+.pro-cabinet-tools-quick-item.is-focus {
   border-color: rgba(var(--accent-rgb), 0.34);
   background: rgba(var(--accent-rgb), 0.14);
   box-shadow: 0 10px 16px rgba(var(--accent-rgb), 0.16);
+}
+
+.pro-cabinet-tools-quick-item.is-focus::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.92);
 }
 
 .pro-cabinet-tools-quick-icon {
@@ -2390,7 +2402,7 @@ body {
   min-width: 0;
 }
 
-.pro-cabinet-tools-quick-item.is-hot .pro-cabinet-tools-quick-label {
+.pro-cabinet-tools-quick-item.is-focus .pro-cabinet-tools-quick-label {
   color: var(--accent-strong);
 }
 

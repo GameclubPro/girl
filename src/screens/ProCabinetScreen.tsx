@@ -816,16 +816,26 @@ export const ProCabinetScreen = ({
     showcaseItemsCount > 0
       ? 'Освежите витрину'
       : 'Добавьте первую работу'
-  const quickAnalyticsNeedsAttention =
-    bookingStats.confirmed === 0 && bookingStats.upcomingWeek === 0
-  const quickClientsNeedsAttention = totalClients === 0
-  const quickGrowthNeedsAttention = !hasActivePromotion
-  const quickStoriesNeedsAttention = !hasStoriesPublished
+  const quickFocusTool: 'analytics' | 'clients' | 'marketing' | 'stories' | null =
+    combinedError
+      ? 'analytics'
+      : totalClients === 0
+        ? 'clients'
+        : !hasActivePromotion
+          ? 'marketing'
+          : !hasStoriesPublished
+            ? 'stories'
+            : bookingStats.confirmed === 0
+              ? 'analytics'
+              : null
   const analyticsFooterNote = bookingStats.upcomingWeek
     ? `На неделе: ${bookingStats.upcomingWeek}`
     : 'Неделя пустая'
+  const clientsFooterNote =
+    totalClients > 0 ? `Повторы ${repeatClients}` : 'Соберите первую базу'
   const analyticsCtaLabel = bookingStats.confirmed > 0 ? 'Детали' : 'Открыть'
-  const marketingCtaLabel = hasActivePromotion ? 'Оффер' : 'Запуск'
+  const clientsCtaLabel = totalClients > 0 ? 'База' : 'Добавить'
+  const marketingCtaLabel = hasActivePromotion ? 'Управлять' : 'Запустить'
   const storiesCtaLabel = hasStoriesPublished ? 'Лента' : 'Создать'
   const showcaseCtaLabel = showcaseItemsCount > 0 ? 'Витрина' : 'Добавить'
 
@@ -1020,7 +1030,7 @@ export const ProCabinetScreen = ({
         >
           <button
             className={`pro-cabinet-tools-quick-item${
-              quickAnalyticsNeedsAttention ? ' is-hot' : ''
+              quickFocusTool === 'analytics' ? ' is-focus' : ''
             }`}
             type="button"
             onClick={onOpenAnalytics}
@@ -1032,7 +1042,7 @@ export const ProCabinetScreen = ({
           </button>
           <button
             className={`pro-cabinet-tools-quick-item${
-              quickClientsNeedsAttention ? ' is-hot' : ''
+              quickFocusTool === 'clients' ? ' is-focus' : ''
             }`}
             type="button"
             onClick={onOpenClients}
@@ -1040,11 +1050,11 @@ export const ProCabinetScreen = ({
             <span className="pro-cabinet-tools-quick-icon" aria-hidden="true">
               <IconUsers />
             </span>
-            <span className="pro-cabinet-tools-quick-label">Клиенты</span>
+            <span className="pro-cabinet-tools-quick-label">База</span>
           </button>
           <button
             className={`pro-cabinet-tools-quick-item${
-              quickGrowthNeedsAttention ? ' is-hot' : ''
+              quickFocusTool === 'marketing' ? ' is-focus' : ''
             }`}
             type="button"
             onClick={onOpenMarketing}
@@ -1052,11 +1062,11 @@ export const ProCabinetScreen = ({
             <span className="pro-cabinet-tools-quick-icon" aria-hidden="true">
               <IconChat />
             </span>
-            <span className="pro-cabinet-tools-quick-label">Оффер</span>
+            <span className="pro-cabinet-tools-quick-label">Промо</span>
           </button>
           <button
             className={`pro-cabinet-tools-quick-item${
-              quickStoriesNeedsAttention ? ' is-hot' : ''
+              quickFocusTool === 'stories' ? ' is-focus' : ''
             }`}
             type="button"
             onClick={onOpenStories}
@@ -1134,10 +1144,8 @@ export const ProCabinetScreen = ({
                 </div>
               </div>
               <div className="pro-cabinet-tool-footer">
-                <span className="pro-cabinet-tool-note">Повторы {repeatClients}</span>
-                <span className="pro-cabinet-tool-link">
-                  {totalClients > 0 ? 'База' : 'Старт'}
-                </span>
+                <span className="pro-cabinet-tool-note">{clientsFooterNote}</span>
+                <span className="pro-cabinet-tool-link">{clientsCtaLabel}</span>
               </div>
             </div>
           </button>
