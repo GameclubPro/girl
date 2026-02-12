@@ -24,6 +24,9 @@ import {
   User,
 } from 'iconoir-react'
 
+const PRO_ICON_STROKE = 1.45
+const PRO_ICON_STROKE_SOFT = 1.25
+
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -480,6 +483,395 @@ export const IconUnlock = () => (
       stroke="currentColor"
       strokeWidth="1.6"
       strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconProPhoto = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4.4"
+      y="5.4"
+      width="15.2"
+      height="13.2"
+      rx="2.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <circle
+      cx="9.3"
+      cy="10"
+      r="1.75"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="m6.8 16 3.6-3.5 2.4 2.2 3.6-3.2 1.8 1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M15.8 8h2.1M16.85 6.95v2.1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconProProfileAbout = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="8"
+      r="3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="M6.2 18.4c1.5-2.8 3.6-4.3 5.8-4.3s4.3 1.5 5.8 4.3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinecap="round"
+    />
+    <path
+      d="m16.8 6.1 1 1 2-2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconProLocation = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M12 20c-3.3-3.8-5-6.5-5-9.1a5 5 0 1 1 10 0c0 2.6-1.7 5.3-5 9.1Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinejoin="round"
+    />
+    <circle
+      cx="12"
+      cy="10.8"
+      r="1.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="M9 16.9h6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconProSchedule = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4.3"
+      y="6.3"
+      width="15.4"
+      height="12.8"
+      rx="2.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="M8 4.7v2.7M16 4.7v2.7M4.3 10.1h15.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinecap="round"
+    />
+    <circle
+      cx="12"
+      cy="14.8"
+      r="2.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+    />
+    <path
+      d="M12 13.6v1.4l1.2.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconProPrice = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <ellipse
+      cx="12"
+      cy="7.1"
+      rx="4.9"
+      ry="2.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="M7.1 7.1v4.2c0 1.2 2.2 2.2 4.9 2.2s4.9-1 4.9-2.2V7.1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7.1 11.3c0 1.2 2.2 2.2 4.9 2.2s4.9-1 4.9-2.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+    />
+    <path
+      d="M8.6 15.8c.8.5 2 .9 3.4 1M15.5 15.8c-.3.2-.6.3-.9.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconProExperience = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="8.9"
+      r="4.1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="m10 15.2-1.2 3.6 3.2-1.7 3.2 1.7-1.2-3.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="m10.4 8.9 1.2 1.2 2.3-2.3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconProServices = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect
+      x="4.6"
+      y="5"
+      width="14.8"
+      height="14"
+      rx="2.7"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="m7.2 9.1.9.9 1.4-1.4M10.8 9.3h5.1M7.2 12.7l.9.9 1.4-1.4M10.8 12.9h5.1M7.2 16.2l.9.9 1.4-1.4M10.8 16.4h3.3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconProCertificate = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="9.1"
+      r="4.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <path
+      d="m10 14.8-1 3.4 3-1.6 3 1.6-1-3.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="m10.4 9.2 1.2 1.2 2.2-2.2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconProSettings = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="12"
+      r="4.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+    />
+    <circle
+      cx="12"
+      cy="12"
+      r="2.1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+    />
+    <path
+      d="M12 4.5v2M12 17.5v2M4.5 12h2M17.5 12h2M6.8 6.8l1.4 1.4M15.8 15.8l1.4 1.4M6.8 17.2l1.4-1.4M15.8 8.2l1.4-1.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconProFormatMaster = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M4.8 11.2 12 5.4l7.2 5.8V19a1.5 1.5 0 0 1-1.5 1.5h-3.9v-5h-3.6v5H6.3A1.5 1.5 0 0 1 4.8 19v-7.8Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9 11.8h1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+export const IconProHomeMaster = () => (
+  <IconProFormatMaster />
+)
+
+export const IconProClientVisit = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M3.9 14.3h9.5a1.3 1.3 0 0 1 1.2.8l.7 1.5H3.2l.7-1.5a1.3 1.3 0 0 1 1.2-.8Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinejoin="round"
+    />
+    <path
+      d="m5 14.3 1.1-2h5.1l1.1 2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle
+      cx="5.8"
+      cy="17.5"
+      r="0.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+    />
+    <circle
+      cx="11.5"
+      cy="17.5"
+      r="0.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+    />
+    <path
+      d="m16.2 5.2 4.6-1.4-2 4.4-1-1-1.8 1.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+export const IconProFormatClientVisit = () => (
+  <IconProClientVisit />
+)
+
+export const IconProFormatBoth = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M12.7 11.2 16.7 8l4 3.2V18h-2.9v-2.6h-2.1V18h-3v-6.8Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinejoin="round"
+    />
+    <path
+      d="M2.3 16.1h8.2a1 1 0 0 1 1 1V18H1.3v-.9a1 1 0 0 1 1-1Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinejoin="round"
+    />
+    <path
+      d="m3.1 16.1 1-1.7h4.4l1 1.7"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle
+      cx="3.9"
+      cy="18.8"
+      r="0.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
+    />
+    <circle
+      cx="8.7"
+      cy="18.8"
+      r="0.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={PRO_ICON_STROKE_SOFT}
     />
   </svg>
 )
