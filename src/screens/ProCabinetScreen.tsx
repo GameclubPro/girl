@@ -3,9 +3,9 @@ import type { CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'
 import {
   IconCalendar,
-  IconChat,
   IconDashboard,
   IconList,
+  IconMegaphone,
   IconShowcase,
   IconStories,
   IconSupport,
@@ -1066,7 +1066,7 @@ export const ProCabinetScreen = ({
             onClick={onOpenMarketing}
           >
             <span className="pro-cabinet-tools-quick-icon" aria-hidden="true">
-              <IconChat />
+              <IconMegaphone />
             </span>
             <span className="pro-cabinet-tools-quick-label">Промо</span>
           </button>
@@ -1162,7 +1162,7 @@ export const ProCabinetScreen = ({
           >
             <div className="pro-cabinet-nav-head">
               <span className="pro-cabinet-nav-icon" aria-hidden="true">
-                <IconChat />
+                <IconMegaphone />
               </span>
               <div className="pro-cabinet-nav-info">
                 <span className="pro-cabinet-nav-kicker">Рост</span>

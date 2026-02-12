@@ -2377,10 +2377,11 @@ body {
 .pro-cabinet-tools-quick-icon {
   width: 20px;
   height: 20px;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--accent-rgb), 0.26);
-  background: rgba(var(--accent-rgb), 0.12);
+  border-radius: 7px;
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+  background: rgba(var(--paper-rgb), 0.78);
   color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(var(--paper-rgb), 0.84);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2388,8 +2389,8 @@ body {
 }
 
 .pro-cabinet-tools-quick-icon svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
 }
 
 .pro-cabinet-tools-quick-label {
@@ -2631,13 +2632,13 @@ body {
   }
 
   .pro-cabinet-tools-quick-icon {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
   }
 
   .pro-cabinet-tools-quick-icon svg {
-    width: 11px;
-    height: 11px;
+    width: 12px;
+    height: 12px;
   }
 
   .pro-cabinet-nav-card.is-tool {

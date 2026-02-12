@@ -11,6 +11,20 @@ import servicesIcon from '../assets/services-icon.webp'
 import certificatesIcon from '../assets/certificates-icon.webp'
 import trashIcon from '../assets/trash-icon.webp'
 import lockClosedIcon from '../assets/lock-closed.webp'
+import {
+  Calendar,
+  ChatLines,
+  Community,
+  DotsGrid3x3,
+  GraphUp,
+  HeadsetHelp,
+  MediaImage,
+  Megaphone,
+  MessageText,
+  MultiplePages,
+  TaskList,
+  User,
+} from 'iconoir-react'
 
 export const IconBell = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -44,90 +58,15 @@ export const IconHome = () => (
 )
 
 export const IconDashboard = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="4"
-      y="4"
-      width="7"
-      height="7"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <rect
-      x="13"
-      y="4"
-      width="7"
-      height="7"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <rect
-      x="4"
-      y="13"
-      width="7"
-      height="7"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <rect
-      x="13"
-      y="13"
-      width="7"
-      height="7"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-  </svg>
+  <GraphUp strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconUsers = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <circle
-      cx="12"
-      cy="9"
-      r="3.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M4 20c1.7-3.4 4.7-5.2 8-5.2s6.3 1.8 8 5.2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+  <Community strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconList = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="5"
-      y="4"
-      width="14"
-      height="16"
-      rx="2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M8 9h8M8 13h8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+  <TaskList strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconCertificate = () => (
@@ -154,22 +93,7 @@ export const IconInbox = () => (
 )
 
 export const IconChat = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M5.4 6.4h13.2a1.6 1.6 0 0 1 1.6 1.6v7.2a1.6 1.6 0 0 1-1.6 1.6H9.2l-3.8 2.8v-2.8H5.4a1.6 1.6 0 0 1-1.6-1.6V8a1.6 1.6 0 0 1 1.6-1.6Z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M8 10h8M8 13h5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+  <ChatLines strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconNavHome = () => (
@@ -185,144 +109,23 @@ export const IconNavHome = () => (
 )
 
 export const IconNavChat = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M6.2 6.6h11.6a2 2 0 0 1 2 2v5.8a2 2 0 0 1-2 2H9.5l-3.7 2.6v-2.6H6.2a2 2 0 0 1-2-2V8.6a2 2 0 0 1 2-2Z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinejoin="round"
-    />
-    <circle cx="9.6" cy="11.2" r="0.8" fill="currentColor" />
-    <circle cx="12" cy="11.2" r="0.8" fill="currentColor" />
-    <circle cx="14.4" cy="11.2" r="0.8" fill="currentColor" />
-  </svg>
+  <MessageText strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconNavRequests = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="5"
-      y="4.4"
-      width="14"
-      height="15.2"
-      rx="2.4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    />
-    <path
-      d="M8 9.2h8M8 13h6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-    />
-  </svg>
+  <TaskList strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconNavProfile = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <circle
-      cx="12"
-      cy="8.8"
-      r="3.1"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    />
-    <path
-      d="M6.2 19.4c1.6-3 3.9-4.5 5.8-4.5s4.2 1.5 5.8 4.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-    />
-  </svg>
+  <User strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconNavCabinet = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="4.6"
-      y="4.6"
-      width="6.6"
-      height="6.6"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    />
-    <rect
-      x="12.8"
-      y="4.6"
-      width="6.6"
-      height="6.6"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    />
-    <rect
-      x="4.6"
-      y="12.8"
-      width="6.6"
-      height="6.6"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    />
-    <rect
-      x="12.8"
-      y="12.8"
-      width="6.6"
-      height="6.6"
-      rx="1.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    />
-  </svg>
+  <DotsGrid3x3 strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconSupport = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M4 12a8 8 0 0 1 16 0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-    <rect
-      x="3"
-      y="11.6"
-      width="4"
-      height="7"
-      rx="1.8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <rect
-      x="17"
-      y="11.6"
-      width="4"
-      height="7"
-      rx="1.8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M12 18.6h3.6a2.4 2.4 0 0 0 2.4-2.4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+  <HeadsetHelp strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconEdit = () => (
@@ -425,25 +228,7 @@ export const IconClock = () => (
 )
 
 export const IconCalendar = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="4"
-      y="6"
-      width="16"
-      height="14"
-      rx="2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M8 4v4M16 4v4M4 10h16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+  <Calendar strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconRadius = () => (
@@ -512,53 +297,15 @@ export const IconPhoto = () => (
 )
 
 export const IconShowcase = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect
-      x="4"
-      y="6"
-      width="16"
-      height="12"
-      rx="2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="m7.2 15.4 3.2-3 2.2 2.2 3.4-3 2 1.8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-    <path
-      d="m16.2 4.6.6 1.2 1.4.2-1 1 .2 1.4-1.2-.6-1.2.6.2-1.4-1-1 1.4-.2.6-1.2Z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-  </svg>
+  <MediaImage strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconStories = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <circle
-      cx="12"
-      cy="12"
-      r="7.2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <circle
-      cx="12"
-      cy="12"
-      r="3.4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-  </svg>
+  <MultiplePages strokeWidth={1.9} aria-hidden="true" />
+)
+
+export const IconMegaphone = () => (
+  <Megaphone strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconCity = () => (
