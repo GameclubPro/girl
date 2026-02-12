@@ -211,42 +211,42 @@ export const IconFormatClientVisit = () => (
 export const IconFormatBoth = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
-      d="M12.6 10.3 16.9 6.9l4.3 3.4V18h-2.7v-3h-2.9v3h-2.7v-7.7Z"
+      d="M12.8 11.2 16.9 7.8l4.1 3.4V18H18v-2.7h-2.2V18h-3v-6.8Z"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.8"
       strokeLinejoin="round"
     />
     <path
-      d="M2.2 16.2h8.8a1 1 0 0 1 1 1V19H1.2v-1.8a1 1 0 0 1 1-1Z"
+      d="M2.1 16.2h8.2a1.1 1.1 0 0 1 1.1 1.1V18H1v-.7a1.1 1.1 0 0 1 1.1-1.1Z"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.8"
       strokeLinejoin="round"
     />
     <path
-      d="m3 16.2 1.1-1.8h5.1l1.1 1.8"
+      d="m3 16.2 1-1.8h4.5l1 1.8"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.8"
       strokeLinejoin="round"
       strokeLinecap="round"
     />
     <circle
-      cx="4.3"
-      cy="19.1"
-      r="1"
+      cx="3.8"
+      cy="18.9"
+      r="0.9"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.8"
     />
     <circle
-      cx="8.9"
-      cy="19.1"
-      r="1"
+      cx="8.8"
+      cy="18.9"
+      r="0.9"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.8"
     />
   </svg>
 )
