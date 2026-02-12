@@ -1,27 +1,25 @@
-import locationPin from '../assets/location-pin.webp'
-import priceTag from '../assets/price-tag.webp'
-import experienceIcon from '../assets/experience-icon.webp'
-import workFormatIcon from '../assets/work-format.webp'
-import homeMasterIcon from '../assets/home-master.webp'
-import clientVisitIcon from '../assets/client-visit.webp'
-import settingsGear from '../assets/settings-gear.webp'
-import profileAboutIcon from '../assets/profile-about.webp'
-import scheduleIcon from '../assets/schedule-icon.webp'
-import servicesIcon from '../assets/services-icon.webp'
-import certificatesIcon from '../assets/certificates-icon.webp'
 import trashIcon from '../assets/trash-icon.webp'
 import lockClosedIcon from '../assets/lock-closed.webp'
 import {
+  BadgeCheck,
   Calendar,
   ChatLines,
+  Coins,
   Community,
   DotsGrid3x3,
   GraphUp,
   HeadsetHelp,
+  Home,
+  HomeSimple,
+  HomeUser,
   MediaImage,
   Megaphone,
+  Medal,
   MessageText,
   MultiplePages,
+  Pin,
+  ProfileCircle,
+  Settings,
   TaskList,
   User,
 } from 'iconoir-react'
@@ -70,7 +68,7 @@ export const IconList = () => (
 )
 
 export const IconCertificate = () => (
-  <img src={certificatesIcon} alt="" aria-hidden="true" />
+  <BadgeCheck strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconInbox = () => (
@@ -183,27 +181,27 @@ export const IconUser = () => (
 )
 
 export const IconPin = () => (
-  <img src={locationPin} alt="" aria-hidden="true" />
+  <Pin strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconPrice = () => (
-  <img src={priceTag} alt="" aria-hidden="true" />
+  <Coins strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconExperience = () => (
-  <img src={experienceIcon} alt="" aria-hidden="true" />
+  <Medal strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconFormat = () => (
-  <img src={workFormatIcon} alt="" aria-hidden="true" />
+  <Home strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconHomeMaster = () => (
-  <img src={homeMasterIcon} alt="" aria-hidden="true" />
+  <HomeSimple strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconClientVisit = () => (
-  <img src={clientVisitIcon} alt="" aria-hidden="true" />
+  <HomeUser strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconClock = () => (
@@ -309,27 +307,27 @@ export const IconMegaphone = () => (
 )
 
 export const IconCity = () => (
-  <img src={locationPin} alt="" aria-hidden="true" />
+  <Pin strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconDistrict = () => (
-  <img src={locationPin} alt="" aria-hidden="true" />
+  <Pin strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconSettings = () => (
-  <img src={settingsGear} alt="" aria-hidden="true" />
+  <Settings strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconProfileAbout = () => (
-  <img src={profileAboutIcon} alt="" aria-hidden="true" />
+  <ProfileCircle strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconSchedule = () => (
-  <img src={scheduleIcon} alt="" aria-hidden="true" />
+  <Calendar strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconServices = () => (
-  <img src={servicesIcon} alt="" aria-hidden="true" />
+  <TaskList strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconAddress = () => (
