@@ -3,13 +3,13 @@ import lockClosedIcon from '../assets/lock-closed.webp'
 import {
   BadgeCheck,
   Calendar,
+  Car,
   ChatLines,
   Coins,
   Community,
   DotsGrid3x3,
   GraphUp,
   HeadsetHelp,
-  Home,
   HomeSimple,
   HomeUser,
   MediaImage,
@@ -192,16 +192,67 @@ export const IconExperience = () => (
   <Medal strokeWidth={1.9} aria-hidden="true" />
 )
 
-export const IconFormat = () => (
-  <Home strokeWidth={1.9} aria-hidden="true" />
-)
-
 export const IconHomeMaster = () => (
   <HomeSimple strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconClientVisit = () => (
   <HomeUser strokeWidth={1.9} aria-hidden="true" />
+)
+
+export const IconFormatMaster = () => (
+  <HomeSimple strokeWidth={1.9} aria-hidden="true" />
+)
+
+export const IconFormatClientVisit = () => (
+  <Car strokeWidth={1.9} aria-hidden="true" />
+)
+
+export const IconFormatBoth = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M12.6 10.3 16.9 6.9l4.3 3.4V18h-2.7v-3h-2.9v3h-2.7v-7.7Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M2.2 16.2h8.8a1 1 0 0 1 1 1V19H1.2v-1.8a1 1 0 0 1 1-1Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+    <path
+      d="m3 16.2 1.1-1.8h5.1l1.1 1.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+    <circle
+      cx="4.3"
+      cy="19.1"
+      r="1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+    <circle
+      cx="8.9"
+      cy="19.1"
+      r="1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+    />
+  </svg>
+)
+
+export const IconFormat = () => (
+  <IconFormatBoth />
 )
 
 export const IconClock = () => (

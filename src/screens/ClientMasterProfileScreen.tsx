@@ -8,10 +8,10 @@ import {
   type RefObject,
 } from 'react'
 import {
-  IconClientVisit,
+  IconFormatBoth,
+  IconFormatClientVisit,
+  IconFormatMaster,
   IconExperience,
-  IconFormat,
-  IconHomeMaster,
   IconBell,
   IconPin,
   IconPrice,
@@ -866,11 +866,11 @@ export const ClientMasterProfileScreen = ({
     Number.isFinite(profile.experienceYears)
   const formatIcon =
     profile?.worksAtMaster && !profile?.worksAtClient ? (
-      <IconHomeMaster />
+      <IconFormatMaster />
     ) : profile?.worksAtClient && !profile?.worksAtMaster ? (
-      <IconClientVisit />
+      <IconFormatClientVisit />
     ) : (
-      <IconFormat />
+      <IconFormatBoth />
     )
   const profileFacts = [
     {

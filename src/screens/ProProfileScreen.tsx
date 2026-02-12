@@ -12,7 +12,9 @@ import {
   IconCertificate,
   IconClientVisit,
   IconExperience,
-  IconFormat,
+  IconFormatBoth,
+  IconFormatClientVisit,
+  IconFormatMaster,
   IconHomeMaster,
   IconPin,
   IconPhoto,
@@ -886,10 +888,10 @@ export const ProProfileScreen = ({
   const hasExperience = experienceValue !== null
   const formatIcon =
     worksAtMaster && !worksAtClient
-      ? <IconHomeMaster />
+      ? <IconFormatMaster />
       : worksAtClient && !worksAtMaster
-        ? <IconClientVisit />
-        : <IconFormat />
+        ? <IconFormatClientVisit />
+        : <IconFormatBoth />
   type ProfileFact = {
     id: string
     label: string
