@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import sharp from 'sharp'
 
@@ -29,6 +29,14 @@ const parseArgs = (tokens) => {
 
 const toInt = (value, fallback, min, max) => {
   const parsed = Number.parseInt(value ?? '', 10)
+  if (!Number.isFinite(parsed)) return fallback
+  if (parsed < min) return min
+  if (parsed > max) return max
+  return parsed
+}
+
+const toFloat = (value, fallback, min, max) => {
+  const parsed = Number.parseFloat(value ?? '')
   if (!Number.isFinite(parsed)) return fallback
   if (parsed < min) return min
   if (parsed > max) return max
@@ -105,6 +113,10 @@ const browserExecutable = args.get('browserExecutable')
 const cleanCapture = toBoolean(args.get('clean'), true)
 const cleanReport = toBoolean(args.get('cleanReport'), true)
 const pixelThreshold = toInt(args.get('pixelThreshold'), 14, 0, 255)
+const parallel = toInt(args.get('parallel'), 2, 1, 8)
+const failOnDelta = toBoolean(args.get('failOnDelta'), false)
+const maxMeanDelta = toFloat(args.get('maxMeanDelta'), 0.8, 0, 100)
+const maxScreenDelta = toFloat(args.get('maxScreenDelta'), 2.5, 0, 100)
 const matrix = parseMatrix(args.get('matrix') ?? '360x780,390x844,430x932')
 
 if (!['capture', 'compare', 'workflow'].includes(mode)) {
@@ -138,17 +150,49 @@ const buildAuditUrl = ({ width, height }) => {
   return url.toString()
 }
 
-const runCapture = (targetDir, stageName) => {
+const runNodeScript = (cliArgs) =>
+  new Promise((resolveRun, rejectRun) => {
+    const child = spawn('node', cliArgs, { stdio: 'inherit' })
+    child.on('error', (error) => rejectRun(error))
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolveRun()
+        return
+      }
+      const error = new Error(`Capture child failed with exit code ${code ?? 'unknown'}`)
+      error.exitCode = code ?? 1
+      rejectRun(error)
+    })
+  })
+
+const runWithConcurrency = async (items, limit, worker) => {
+  if (items.length === 0) return []
+  const results = new Array(items.length)
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = cursor
+      cursor += 1
+      if (index >= items.length) {
+        return
+      }
+      results[index] = await worker(items[index], index)
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
+const runCapture = async (targetDir, stageName) => {
   if (cleanCapture && existsSync(targetDir)) {
     rmSync(targetDir, { recursive: true, force: true })
   }
   mkdirSync(targetDir, { recursive: true })
 
   const startedAt = new Date().toISOString()
-  const shots = []
-
-  matrix.forEach((size, index) => {
+  const shots = await runWithConcurrency(matrix, parallel, async (size, index) => {
     const outDir = join(targetDir, size.key)
+    mkdirSync(outDir, { recursive: true })
     const url = buildAuditUrl(size)
     const cliArgs = [
       'scripts/design-redesign-audit.mjs',
@@ -169,21 +213,18 @@ const runCapture = (targetDir, stageName) => {
     }
 
     console.log(
-      `[visual-capture ${stageName}] ${index + 1}/${matrix.length} ${size.key}`
+      `[visual-capture ${stageName}] ${index + 1}/${matrix.length} ${size.key} (parallel=${parallel})`
     )
-    const result = spawnSync('node', cliArgs, { stdio: 'inherit' })
-    if (result.status !== 0) {
-      process.exit(result.status ?? 1)
-    }
+    await runNodeScript(cliArgs)
 
-    shots.push({
+    return {
       size: size.key,
       width: size.width,
       height: size.height,
       url,
       outDir,
       screenshots: listPngFiles(outDir),
-    })
+    }
   })
 
   const manifest = {
@@ -282,7 +323,17 @@ const buildCompareMarkdown = (summary) => {
   lines.push(
     `- Mean visual delta: **${summary.meanDeltaPercent.toFixed(3)}%** (pixel threshold ${summary.pixelThreshold})`
   )
+  lines.push(`- Max single-screen delta: **${summary.maxScreenDeltaObserved.toFixed(3)}%**`)
+  lines.push(
+    `- Visual gate: **${summary.gate.failed ? 'failed' : 'passed'}** (enabled=${summary.gate.failOnDelta ? 'yes' : 'no'})`
+  )
+  lines.push(
+    `- Gate thresholds: mean <= ${summary.gate.maxMeanDelta.toFixed(3)}%, screen <= ${summary.gate.maxScreenDelta.toFixed(3)}%`
+  )
   lines.push(`- Stability score: **${summary.stabilityScore}/100**`)
+  if (summary.gate.reasons.length > 0) {
+    lines.push(`- Gate reasons: ${summary.gate.reasons.join('; ')}`)
+  }
   lines.push('')
 
   summary.bySize.forEach((sizeBlock) => {
@@ -321,6 +372,7 @@ const runCompare = async () => {
   const bySize = []
   let compared = 0
   let deltaSum = 0
+  let maxScreenDeltaObserved = 0
 
   for (const size of matrix) {
     const baselineSizeDir = join(baselineDir, size.key)
@@ -366,6 +418,9 @@ const runCompare = async () => {
 
       compared += 1
       deltaSum += metrics.deltaPercent
+      if (metrics.deltaPercent > maxScreenDeltaObserved) {
+        maxScreenDeltaObserved = metrics.deltaPercent
+      }
       rows.push({
         screen: file,
         comparePath,
@@ -383,6 +438,21 @@ const runCompare = async () => {
 
   const meanDeltaPercent = compared > 0 ? deltaSum / compared : 0
   const stabilityScore = Math.max(0, Math.round(100 - meanDeltaPercent * 8))
+  const gateReasons = []
+  if (compared === 0) {
+    gateReasons.push('Нет ни одной общей пары baseline/after для сравнения')
+  }
+  if (meanDeltaPercent > maxMeanDelta) {
+    gateReasons.push(
+      `Mean delta ${meanDeltaPercent.toFixed(3)}% > threshold ${maxMeanDelta.toFixed(3)}%`
+    )
+  }
+  if (maxScreenDeltaObserved > maxScreenDelta) {
+    gateReasons.push(
+      `Max screen delta ${maxScreenDeltaObserved.toFixed(3)}% > threshold ${maxScreenDelta.toFixed(3)}%`
+    )
+  }
+
   const summary = {
     mode: 'compare',
     session,
@@ -392,8 +462,16 @@ const runCompare = async () => {
     pixelThreshold,
     totalCompared: compared,
     meanDeltaPercent,
+    maxScreenDeltaObserved,
     stabilityScore,
     generatedAt: new Date().toISOString(),
+    gate: {
+      failOnDelta,
+      maxMeanDelta,
+      maxScreenDelta,
+      failed: gateReasons.length > 0,
+      reasons: gateReasons,
+    },
     bySize,
   }
 
@@ -408,14 +486,23 @@ const runCompare = async () => {
   console.log(
     `Compared: ${compared} | Mean delta: ${meanDeltaPercent.toFixed(3)}% | Stability: ${stabilityScore}/100`
   )
+  if (failOnDelta && gateReasons.length > 0) {
+    console.error(`Visual gate failed: ${gateReasons.join(' | ')}`)
+    process.exit(1)
+  }
 }
 
-if (mode === 'capture') {
-  runCapture(stage === 'after' ? afterDir : baselineDir, stage)
-} else if (mode === 'compare') {
-  await runCompare()
-} else {
-  runCapture(baselineDir, 'baseline')
-  runCapture(afterDir, 'after')
-  await runCompare()
+try {
+  if (mode === 'capture') {
+    await runCapture(stage === 'after' ? afterDir : baselineDir, stage)
+  } else if (mode === 'compare') {
+    await runCompare()
+  } else {
+    await runCapture(baselineDir, 'baseline')
+    await runCapture(afterDir, 'after')
+    await runCompare()
+  }
+} catch (error) {
+  console.error(error?.message ?? String(error))
+  process.exit(error?.exitCode ?? 1)
 }

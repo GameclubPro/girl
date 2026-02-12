@@ -22,8 +22,15 @@
     "visual:capture:after": "node scripts/miniapp-visual-audit.mjs --mode capture --stage after",
     "visual:compare": "node scripts/miniapp-visual-audit.mjs --mode compare",
     "visual:workflow": "node scripts/miniapp-visual-audit.mjs --mode workflow",
+    "visual:workflow:smoke": "npm run visual:workflow -- --session smoke-pro-cabinet --userId 5510721194 --parallel 2",
+    "visual:gate": "node scripts/visual-gate.mjs --session smoke-pro-cabinet --userId 5510721194",
     "visual:cleanup": "node scripts/cleanup-visual-logs.mjs",
-    "visual:doctor": "node scripts/visual-doctor.mjs"
+    "visual:doctor": "node scripts/visual-doctor.mjs",
+    "deps:baseline": "node scripts/deps-baseline.mjs",
+    "deps:check": "node scripts/deps-check.mjs",
+    "deps:update:safe": "node scripts/deps-safe-update.mjs",
+    "agent:health": "npm run deps:check && npm run visual:doctor -- --strict 1",
+    "agent:autopilot": "npm run deps:update:safe && npm run deps:check && npm run build && npm run visual:gate && npm run visual:cleanup -- --maxAgeDays 7 --keepLatest 30"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",

@@ -17,6 +17,34 @@ npm run lint
 npm run build
 ```
 
+## Dependency контроль и автономность агента
+Baseline зависимостей (root + bot):
+```bash
+npm run deps:baseline
+```
+
+Жесткая проверка зависимостей:
+```bash
+npm run deps:check
+```
+- `FAIL`, если есть доступные patch/minor (`wanted > current`) или high/critical уязвимости.
+- `WARN`, если есть только major-долг (`latest > wanted` при `current == wanted`).
+
+Safe-обновление зависимостей (root + bot + playwright chromium):
+```bash
+npm run deps:update:safe
+```
+
+Preflight перед итерацией:
+```bash
+npm run agent:health
+```
+
+Полный autopilot-проход после UI/infra изменений:
+```bash
+npm run agent:autopilot
+```
+
 ## Fullscreen эмуляция Telegram Mini App
 Все скриншот-скрипты уже используют параметры fullscreen и safe-area:
 - `tgFullscreen=1`
@@ -48,6 +76,22 @@ One-shot:
 ```bash
 npm run visual:workflow -- --session smoke-pro --userId 5510721194
 ```
+
+Smoke workflow для быстрых проверок:
+```bash
+npm run visual:workflow:smoke
+```
+
+Жесткий visual gate (пороговый контроль):
+```bash
+npm run visual:gate
+```
+- default thresholds: `mean <= 0.8%`, `max-screen <= 2.5%`.
+- при превышении порога команда возвращает `exit 1`.
+
+Дополнительно:
+- `visual:workflow`, `visual:capture:*`, `visual:compare` поддерживают `--parallel` (default `2`) для ускоренного capture.
+- `visual:compare` поддерживает `--failOnDelta 1 --maxMeanDelta <n> --maxScreenDelta <n>`.
 
 Очистка логов:
 ```bash
