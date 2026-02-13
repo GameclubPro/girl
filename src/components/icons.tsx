@@ -3,15 +3,12 @@ import lockClosedIcon from '../assets/lock-closed.webp'
 import {
   BadgeCheck,
   Calendar,
-  Car,
   ChatLines,
   Coins,
   Community,
   DotsGrid3x3,
   GraphUp,
   HeadsetHelp,
-  HomeSimple,
-  HomeUser,
   MediaImage,
   Megaphone,
   Medal,
@@ -192,61 +189,163 @@ export const IconExperience = () => (
   <Medal strokeWidth={1.9} aria-hidden="true" />
 )
 
+const DetailedHomeIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M3.8 10.8 12 4.9l8.2 5.9V19a1.7 1.7 0 0 1-1.7 1.7H5.5A1.7 1.7 0 0 1 3.8 19v-8.2Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M15.8 5.4V3.8h2.4v3.3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M10.2 20.7v-4.3a1.8 1.8 0 0 1 3.6 0v4.3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinejoin="round"
+    />
+    <rect
+      x="7.1"
+      y="12"
+      width="2.3"
+      height="2.5"
+      rx="0.45"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.45"
+    />
+    <rect
+      x="14.6"
+      y="12"
+      width="2.3"
+      height="2.5"
+      rx="0.45"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.45"
+    />
+  </svg>
+)
+
+const DetailedCarIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M5.2 15 6.7 10.9a1.8 1.8 0 0 1 1.7-1.2h7.2a1.8 1.8 0 0 1 1.7 1.2l1.5 4.1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M2.4 15h19.2a1.2 1.2 0 0 1 1.2 1.2v1.6a1.2 1.2 0 0 1-1.2 1.2h-2.3M2.4 15a1.2 1.2 0 0 0-1.2 1.2v1.6A1.2 1.2 0 0 0 2.4 19h2.3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7.1 12h3.1v2.2H6.3M13.8 12h3.1l.8 2.2h-3.9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.45"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle
+      cx="6.9"
+      cy="18.6"
+      r="1.35"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+    />
+    <circle
+      cx="17.1"
+      cy="18.6"
+      r="1.35"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+    />
+  </svg>
+)
+
 export const IconHomeMaster = () => (
-  <HomeSimple strokeWidth={1.9} aria-hidden="true" />
+  <DetailedHomeIcon />
 )
 
 export const IconClientVisit = () => (
-  <HomeUser strokeWidth={1.9} aria-hidden="true" />
+  <DetailedCarIcon />
 )
 
 export const IconFormatMaster = () => (
-  <HomeSimple strokeWidth={1.9} aria-hidden="true" />
+  <DetailedHomeIcon />
 )
 
 export const IconFormatClientVisit = () => (
-  <Car strokeWidth={1.9} aria-hidden="true" />
+  <DetailedCarIcon />
 )
 
 export const IconFormatBoth = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path
-      d="M12.8 11.2 16.9 7.8l4.1 3.4V18H18v-2.7h-2.2V18h-3v-6.8Z"
+      d="M12.7 11.1 17 7.9l4.2 3.2V18h-3v-2.8h-2.1V18h-3.4v-6.9Z"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.7"
+      strokeLinejoin="round"
+    />
+    <rect
+      x="16.9"
+      y="12"
+      width="1.2"
+      height="1.5"
+      rx="0.25"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    />
+    <path
+      d="M2 16.1h8.4a1.1 1.1 0 0 1 1.1 1.1V18H.9v-.8A1.1 1.1 0 0 1 2 16.1Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
       strokeLinejoin="round"
     />
     <path
-      d="M2.1 16.2h8.2a1.1 1.1 0 0 1 1.1 1.1V18H1v-.7a1.1 1.1 0 0 1 1.1-1.1Z"
+      d="m3 16.1 1.1-1.9h4.4l1.1 1.9"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinejoin="round"
-    />
-    <path
-      d="m3 16.2 1-1.8h4.5l1 1.8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.6"
       strokeLinejoin="round"
       strokeLinecap="round"
     />
     <circle
-      cx="3.8"
-      cy="18.9"
-      r="0.9"
+      cx="4"
+      cy="18.8"
+      r="0.85"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.6"
     />
     <circle
-      cx="8.8"
-      cy="18.9"
-      r="0.9"
+      cx="8.4"
+      cy="18.8"
+      r="0.85"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.6"
     />
   </svg>
 )
