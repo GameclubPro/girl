@@ -10,6 +10,7 @@ import { ProBottomNav } from '../components/ProBottomNav'
 import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
+  IconChevron,
   IconClientVisit,
   IconExperience,
   IconFormatBoth,
@@ -5270,19 +5271,32 @@ export const ProProfileScreen = ({
         >
           <div className="pro-profile-editor-shell pro-profile-settings-shell">
             <div className="pro-profile-settings-head animate">
-              <h2
-                className="pro-profile-settings-title"
-                id="pro-profile-settings-title"
+              <button
+                className="pro-profile-settings-back"
+                type="button"
+                aria-label="Назад"
+                onClick={closeSettings}
               >
-                Настройки профиля
-              </h2>
-              <div className="pro-profile-settings-head-meta">
-                <span className={`pro-profile-settings-status ${profileStatusTone}`}>
-                  {profileStatusSummary.isResponseReady ? 'Готов к заявкам' : 'Черновик'}
+                <span className="pro-profile-settings-back-icon" aria-hidden="true">
+                  <IconChevron />
                 </span>
-                <span className="pro-profile-settings-progress-label">
-                  {settingsReadyCount}/{profileSettingsItems.length}
-                </span>
+                <span className="pro-profile-settings-back-label">Назад</span>
+              </button>
+              <div className="pro-profile-settings-head-main">
+                <h2
+                  className="pro-profile-settings-title"
+                  id="pro-profile-settings-title"
+                >
+                  Настройки профиля
+                </h2>
+                <div className="pro-profile-settings-head-meta">
+                  <span className={`pro-profile-settings-status ${profileStatusTone}`}>
+                    {profileStatusSummary.isResponseReady ? 'Готов к заявкам' : 'Черновик'}
+                  </span>
+                  <span className="pro-profile-settings-progress-label">
+                    {settingsReadyCount}/{profileSettingsItems.length}
+                  </span>
+                </div>
               </div>
             </div>
             <section className="pro-profile-settings-group animate delay-2">
