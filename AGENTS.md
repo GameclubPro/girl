@@ -1,13 +1,13 @@
-# AGENTS.md — KIVEN GIRL (Telegram Mini App, 2026 Standard)
+# AGENTS.md — KIVEN GIRL (Telegram + VK Mini App, 2026 Standard)
 
 ## 1) Главная мысль
-- Агент работает как продуктовый mobile-эксперт уровня 2026 для Telegram Mini App: делает современный UI, проверяет качество до/после, находит недочеты по ходу работы и предлагает конкретные исправления.
+- Агент работает как продуктовый mobile-эксперт уровня 2026 для Telegram/VK Mini App: делает современный UI, проверяет качество до/после, находит недочеты по ходу работы и предлагает конкретные исправления.
 - Любое изменение верстки/дизайна считается завершенным только после визуальной проверки на нескольких мобильных размерах и сравнительной оценки.
 - UI для смартфонов не перегружается текстом: вместо длинных подсказок используются прогрессивные и современные паттерны.
 - Агент обязан критиковать собственные решения так же строго, как и чужие: если найден недочет, не ограничиваться описанием, а сразу применять улучшение (если нет блокера).
 
 ## 2) Product Snapshot
-- Формат: Telegram Mini App, только мобильные устройства.
+- Формат: Telegram Mini App + VK Mini App, только мобильные устройства.
 - Целевая ширина: 360–430px.
 - Роли: client и master (pro).
 - Ключевые флоу: discovery, requests, bookings, deposits, chat, reschedule, reviews, stories, trust.
@@ -56,7 +56,7 @@
 - Backend: Express + Postgres, основной файл: `server/index.js`
 - Контракты и типы: `src/types/app.ts` (обязательно синхронизировать с API)
 - API base: `VITE_API_URL` (fallback: `http://localhost:4000`)
-- Идентификация пользователя: Telegram WebApp init data
+- Идентификация пользователя: Telegram WebApp init data или VK launch params (`vk_*`)
 
 ## 4) Базовая стратегия реализации
 1. Сначала изучить связанные экраны, типы и API-обработчики.
@@ -91,7 +91,7 @@ npm run screenshot:design-redesign -- --width 430 --height 932 --outDir .logs/de
 Аналогично для `after` с отдельными директориями.
 
 ### 5.1) Fullscreen visual-audit пайплайн (обязательно для сложных UI-итераций)
-- Для ускорения отладки агент должен использовать автоматизированный fullscreen-пайплайн Telegram Mini App (matrix + compare + cleanup).
+- Для ускорения отладки агент должен использовать автоматизированный fullscreen-пайплайн Mini App (Telegram/VK) (matrix + compare + cleanup).
 - Базовый цикл:
 ```bash
 npm run visual:setup
@@ -129,7 +129,7 @@ npm run visual:cleanup -- --dryRun 1 --maxAgeDays 7 --keepLatest 30
 - 20 баллов: консистентность состояний (loading/empty/error/success);
 - 15 баллов: типографика, ритм отступов, аккуратность деталей;
 - 10 баллов: визуальная целостность между ролями client/pro;
-- 10 баллов: отсутствие наложений и конфликтов с Telegram UI/safe-area.
+- 10 баллов: отсутствие наложений и конфликтов с UI/safe-area хоста (Telegram/VK).
 
 Интерпретация оценки:
 - 95–100: top-tier уровень, близко к эталону;
@@ -165,9 +165,10 @@ npm run visual:cleanup -- --dryRun 1 --maxAgeDays 7 --keepLatest 30
   - progressive disclosure вместо постоянного текста.
 - Статические подсказки: короткие, по делу, в 1–2 строки.
 
-## 9) Telegram Mini App ограничения
-- Учитывать `safe-area` и Telegram fullscreen поведение.
-- Учитывать, что sticky Telegram-кнопки (Main Button и системные слои) не контролируются приложением.
+## 9) Ограничения хостов Mini App (Telegram + VK)
+- Учитывать `safe-area` и fullscreen/WebView-поведение хоста (Telegram/VK).
+- Для Telegram учитывать, что sticky Main Button и системные слои не контролируются приложением.
+- Для VK учитывать launch params (`vk_*`) и поведение встроенного WebView при внешних переходах/share.
 - Не размещать критичные элементы в зонах конфликтов по нижнему краю.
 - Минимальные тач-таргеты: 44x44.
 - Дизайн только mobile-first, без desktop-компоновки.

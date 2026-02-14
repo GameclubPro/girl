@@ -1,5 +1,14 @@
 # KIVEN GIRL — Telegram Mini App (Fullscreen)
 
+## Multi-platform запуск (Telegram + VK)
+- Приложение автоматически определяет хост по launch params:
+  - Telegram WebApp -> работает в режиме Telegram Mini App;
+  - VK launch params (`vk_*`) -> работает в режиме VK Mini App.
+- Для share/deeplink в env:
+  - `VITE_TG_APP_URL` — ссылка на Telegram-бота/mini app;
+  - `VITE_VK_APP_URL` — ссылка вида `https://vk.com/app<APP_ID>`.
+- При запуске в VK `userId` формируется как `vk_<vk_user_id>`, чтобы не конфликтовать с Telegram ID в одной базе.
+
 ## Быстрый старт
 ```bash
 npm install

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  buildTelegramShareUrl,
   copyToClipboard,
-  openTelegramLink,
+  openShareLink,
+  resolveShareEnvHint,
 } from '../utils/telegramShare'
 
 type UseShareActionsParams = {
@@ -40,7 +40,7 @@ export const useShareActions = ({
     setMessage(
       shareConfigured
         ? 'Ссылка пока недоступна.'
-        : 'Добавьте VITE_TG_APP_URL, чтобы открыть Telegram.'
+        : resolveShareEnvHint()
     )
     return false
   }, [setMessage, shareConfigured, shareLink])
@@ -48,9 +48,8 @@ export const useShareActions = ({
   const openShare = useCallback(
     (text: string) => {
       if (!guardLink()) return
-      const shareUrl = buildTelegramShareUrl(shareLink, text)
-      openTelegramLink(shareUrl)
-      setMessage('Открываем личку...')
+      void openShareLink(shareLink, text)
+      setMessage('Открываем шаринг...')
     },
     [guardLink, setMessage, shareLink]
   )

@@ -1,22 +1,72 @@
+import bridge from '@vkontakte/vk-bridge'
+import { getMiniAppHost } from '../platform/miniAppHost'
+
+const appendOrReplaceQueryParam = (
+  base: string,
+  key: string,
+  encodedValue: string
+) => {
+  const pattern = new RegExp(`([?&])${key}=[^&#]*`, 'i')
+  if (pattern.test(base)) {
+    return base.replace(pattern, `$1${key}=${encodedValue}`)
+  }
+  const joiner = base.includes('?') ? '&' : '?'
+  return `${base}${joiner}${key}=${encodedValue}`
+}
+
 export const buildShareLink = (base: string, startParam: string) => {
   const trimmedBase = base.trim()
   const trimmedParam = startParam.trim()
   if (!trimmedBase || !trimmedParam) return ''
   const encodedParam = encodeURIComponent(trimmedParam)
-  if (/startapp=/i.test(trimmedBase)) {
-    return trimmedBase.replace(/startapp=[^&]*/i, `startapp=${encodedParam}`)
+  const host = getMiniAppHost()
+  if (host === 'telegram') {
+    return appendOrReplaceQueryParam(trimmedBase, 'startapp', encodedParam)
   }
-  const joiner = trimmedBase.includes('?') ? '&' : '?'
-  return `${trimmedBase}${joiner}startapp=${encodedParam}`
+  return appendOrReplaceQueryParam(trimmedBase, 'start', encodedParam)
 }
 
 export const buildTelegramShareUrl = (link: string, text: string) => {
+  const host = getMiniAppHost()
   const params = new URLSearchParams()
   params.set('url', link)
   if (text.trim()) {
-    params.set('text', text)
+    if (host === 'vk') {
+      params.set('title', text.trim())
+    } else {
+      params.set('text', text)
+    }
+  }
+  if (host === 'vk') {
+    return `https://vk.com/share.php?${params.toString()}`
   }
   return `https://t.me/share/url?${params.toString()}`
+}
+
+export const resolveShareBaseUrl = () => {
+  const host = getMiniAppHost()
+  if (host === 'vk') {
+    return (import.meta.env.VITE_VK_APP_URL ?? '').trim()
+  }
+  if (host === 'telegram') {
+    return (import.meta.env.VITE_TG_APP_URL ?? '').trim()
+  }
+  return (
+    (import.meta.env.VITE_TG_APP_URL ??
+      import.meta.env.VITE_VK_APP_URL ??
+      '') as string
+  ).trim()
+}
+
+export const resolveShareEnvHint = () => {
+  const host = getMiniAppHost()
+  if (host === 'vk') {
+    return 'Добавьте VITE_VK_APP_URL, чтобы включить ссылку во ВКонтакте.'
+  }
+  if (host === 'telegram') {
+    return 'Добавьте VITE_TG_APP_URL, чтобы открыть Telegram.'
+  }
+  return 'Добавьте VITE_TG_APP_URL или VITE_VK_APP_URL, чтобы включить ссылку.'
 }
 
 export const copyToClipboard = async (value: string) => {
@@ -42,6 +92,14 @@ export const copyToClipboard = async (value: string) => {
 
 export const openTelegramLink = (url: string) => {
   const webApp = window.Telegram?.WebApp
+  if (getMiniAppHost() === 'vk') {
+    if (webApp?.openLink) {
+      webApp.openLink(url)
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+    return
+  }
   if (webApp?.openTelegramLink) {
     webApp.openTelegramLink(url)
   } else if (webApp?.openLink) {
@@ -52,4 +110,24 @@ export const openTelegramLink = (url: string) => {
   if (webApp?.close) {
     window.setTimeout(() => webApp.close?.(), 250)
   }
+}
+
+export const openShareLink = async (shareLink: string, text: string) => {
+  const normalizedLink = shareLink.trim()
+  if (!normalizedLink) return false
+
+  if (getMiniAppHost() === 'vk') {
+    try {
+      await bridge.send('VKWebAppShare', { link: normalizedLink })
+      return true
+    } catch (_error) {
+      const fallbackUrl = buildTelegramShareUrl(normalizedLink, text)
+      openTelegramLink(fallbackUrl)
+      return false
+    }
+  }
+
+  const shareUrl = buildTelegramShareUrl(normalizedLink, text)
+  openTelegramLink(shareUrl)
+  return true
 }

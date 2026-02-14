@@ -29,6 +29,12 @@ import { getChatStream } from '../utils/chatStream'
 import { fetchJsonCached, readCache } from '../utils/dataCache'
 import { hapticSelection } from '../utils/haptics'
 import {
+  buildShareLink,
+  openShareLink,
+  resolveShareBaseUrl,
+  resolveShareEnvHint,
+} from '../utils/telegramShare'
+import {
   normalizeScheduleDays,
   parseScheduleRange,
   parseScheduleTimeToMinutes,
@@ -368,27 +374,6 @@ const getMinutesFromDateTime = (value?: string | null) => {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
   return parsed.getHours() * 60 + parsed.getMinutes()
-}
-
-const buildShareLink = (base: string, startParam: string) => {
-  const trimmedBase = base.trim()
-  const trimmedParam = startParam.trim()
-  if (!trimmedBase || !trimmedParam) return ''
-  const encodedParam = encodeURIComponent(trimmedParam)
-  if (/startapp=/i.test(trimmedBase)) {
-    return trimmedBase.replace(/startapp=[^&]*/i, `startapp=${encodedParam}`)
-  }
-  const joiner = trimmedBase.includes('?') ? '&' : '?'
-  return `${trimmedBase}${joiner}startapp=${encodedParam}`
-}
-
-const buildTelegramShareUrl = (link: string, text: string) => {
-  const params = new URLSearchParams()
-  params.set('url', link)
-  if (text.trim()) {
-    params.set('text', text)
-  }
-  return `https://t.me/share/url?${params.toString()}`
 }
 
 const getInitials = (value: string) => {
@@ -763,8 +748,9 @@ export const ProRequestsScreen = ({
   const slotNoticeTimerRef = useRef<number | null>(null)
   const slotsSectionRef = useRef<HTMLDivElement | null>(null)
   const bookingCalendarRef = useRef<HTMLElement | null>(null)
-  const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
+  const shareBase = resolveShareBaseUrl()
   const shareConfigured = Boolean(shareBase)
+  const shareConfigHint = resolveShareEnvHint()
   const [profileScheduleDays, setProfileScheduleDays] = useState<string[]>([])
   const [profileScheduleStart, setProfileScheduleStart] = useState<number | null>(
     null
@@ -932,7 +918,6 @@ export const ProRequestsScreen = ({
   }, [userId])
   const shareText =
     'Запись к мастеру\nОткройте ссылку, чтобы выбрать услугу и время.'
-  const shareUrl = shareLink ? buildTelegramShareUrl(shareLink, shareText) : ''
   const applyRequestsPayload = useCallback(
     (
       data:
@@ -2349,21 +2334,11 @@ export const ProRequestsScreen = ({
       return
     }
     if (!shareConfigured) {
-      setShareMessage('Добавьте VITE_TG_APP_URL, чтобы открыть Telegram.')
+      setShareMessage(shareConfigHint)
       return
     }
-    const webApp = window.Telegram?.WebApp
-    if (webApp?.openTelegramLink) {
-      webApp.openTelegramLink(shareUrl)
-    } else if (webApp?.openLink) {
-      webApp.openLink(shareUrl)
-    } else {
-      window.open(shareUrl, '_blank', 'noopener,noreferrer')
-    }
-    if (webApp?.close) {
-      window.setTimeout(() => webApp.close?.(), 250)
-    }
-    setShareMessage('Открываем личку...')
+    void openShareLink(shareLink, shareText)
+    setShareMessage('Открываем шаринг...')
   }
 
   const handleOpenAddSlots = (options?: { rescheduleBookingId?: number | null }) => {
@@ -2853,7 +2828,7 @@ export const ProRequestsScreen = ({
         )}
         {!shareConfigured && (
           <p className="pro-cabinet-share-warning">
-            Добавьте VITE_TG_APP_URL в env, чтобы ссылка открывалась в Telegram.
+            {shareConfigHint}
           </p>
         )}
       </div>

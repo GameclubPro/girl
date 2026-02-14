@@ -4,11 +4,17 @@ import './index.css'
 import './telegram-emulator.css'
 import App from './App.tsx'
 import { setupTelegramEmulator } from './dev/telegramEmulator'
+import { setupMiniAppBridge } from './platform/miniAppBridge'
 
-setupTelegramEmulator()
+const bootstrap = async () => {
+  await setupMiniAppBridge()
+  setupTelegramEmulator()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+void bootstrap()

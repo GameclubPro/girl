@@ -14,6 +14,7 @@ import { ScreenLoader } from './components/ScreenLoader'
 import { NavPreloadContext } from './contexts/NavPreloadContext'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
+import { getMiniAppHost } from './platform/miniAppHost'
 import type {
   City,
   District,
@@ -166,6 +167,11 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
+const resolveUserId = (user: ReturnType<typeof getTelegramUser>) => {
+  const rawId = user?.id ? String(user.id) : ''
+  if (!rawId) return 'local-dev'
+  return getMiniAppHost() === 'vk' ? `vk_${rawId}` : rawId
+}
 type View =
   | 'start'
   | 'address'
@@ -460,7 +466,7 @@ function App() {
   >('pro-cabinet')
   const [address, setAddress] = useState('')
   const [telegramUser] = useState(() => getTelegramUser())
-  const [userId] = useState(() => telegramUser?.id?.toString() ?? 'local-dev')
+  const [userId] = useState(() => resolveUserId(telegramUser))
   const [cities, setCities] = useState<City[]>([])
   const [districts, setDistricts] = useState<District[]>([])
   const [cityId, setCityId] = useState<number | null>(null)

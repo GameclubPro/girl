@@ -3,7 +3,11 @@ import { ProBottomNav } from '../components/ProBottomNav'
 import { useProCabinetData } from '../hooks/useProCabinetData'
 import type { MarketingSummary, Promotion, RepeatSettings } from '../types/app'
 import { buildBookingStartParam } from '../utils/deeplink'
-import { buildShareLink } from '../utils/telegramShare'
+import {
+  buildShareLink,
+  resolveShareBaseUrl,
+  resolveShareEnvHint,
+} from '../utils/telegramShare'
 
 const MARKETING_TEXT_LIMIT = 800
 const PROMOTION_TITLE_LIMIT = 60
@@ -112,8 +116,9 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
     onEditProfile,
   } = props
   const { bookings, isLoading, combinedError } = useProCabinetData(apiBase, userId)
-  const shareBase = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
+  const shareBase = resolveShareBaseUrl()
   const shareConfigured = Boolean(shareBase)
+  const shareConfigHint = resolveShareEnvHint()
   const bookingStartParam = useMemo(() => buildBookingStartParam(userId), [userId])
   const shareLink = useMemo(
     () => (shareBase ? buildShareLink(shareBase, bookingStartParam) : ''),
@@ -1278,7 +1283,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
             {!shareConfigured && (
               <p className="pro-detail-warning" role="status">
-                Добавьте VITE_TG_APP_URL, чтобы включить ссылку на запись.
+                {shareConfigHint}
               </p>
             )}
 
@@ -1427,7 +1432,7 @@ export const ProMarketingScreen = (props: ProMarketingScreenProps) => {
 
               {!shareConfigured && repeatChannel === 'bot' && (
                 <p className="pro-detail-warning" role="status">
-                  Добавьте VITE_TG_APP_URL, чтобы включить ссылку на запись.
+                  {shareConfigHint}
                 </p>
               )}
             </div>
