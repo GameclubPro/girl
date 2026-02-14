@@ -166,13 +166,57 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   /\/$/,
   ''
 )
-const ROLE_STATE_REQUEST_TIMEOUT_MS = 6500
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
 const resolveUserId = (user: ReturnType<typeof getTelegramUser>) => {
   const rawId = user?.id ? String(user.id) : ''
   if (!rawId) return 'local-dev'
   return getMiniAppHost() === 'vk' ? `vk_${rawId}` : rawId
 }
+
+type LaunchIntent =
+  | { type: 'none' }
+  | { type: 'booking'; masterId: string }
+  | { type: 'chat'; chatId: number }
+  | { type: 'unsubscribe'; masterId: string }
+
+const decodeLaunchValue = (value: string | null) => {
+  if (!value) return null
+  try {
+    return decodeURIComponent(value)
+  } catch (_error) {
+    return value
+  }
+}
+
+const resolveLaunchIntent = (): LaunchIntent => {
+  const searchParams = new URLSearchParams(window.location.search)
+  const webAppStart = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? null
+  const queryStart = searchParams.get('startapp') ?? searchParams.get('start') ?? null
+  const decodedStart = decodeLaunchValue(webAppStart ?? queryStart)
+
+  const unsubMasterId = parseUnsubscribeStartParam(decodedStart)
+  if (unsubMasterId) {
+    return { type: 'unsubscribe', masterId: unsubMasterId }
+  }
+
+  const parsedChatId = parseChatStartParam(decodedStart)
+  const queryChatId = searchParams.get('chatId') ?? searchParams.get('chat')
+  const rawChatId = parsedChatId ?? queryChatId?.trim() ?? null
+  const chatId = rawChatId ? Number(rawChatId) : null
+  if (chatId !== null && Number.isInteger(chatId) && chatId > 0) {
+    return { type: 'chat', chatId }
+  }
+
+  const parsedMasterId = parseBookingStartParam(decodedStart)
+  const queryMasterId = searchParams.get('masterId') ?? searchParams.get('master')
+  const masterId = parsedMasterId ?? queryMasterId?.trim() ?? null
+  if (masterId) {
+    return { type: 'booking', masterId }
+  }
+
+  return { type: 'none' }
+}
+
 type View =
   | 'start'
   | 'address'
@@ -668,9 +712,6 @@ function App() {
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => {
-      controller.abort()
-    }, ROLE_STATE_REQUEST_TIMEOUT_MS)
 
     const loadRoleState = async () => {
       setIsRoleStateLoading(true)
@@ -693,7 +734,6 @@ function App() {
           setIsRoleSelectedOnce(false)
         }
       } finally {
-        window.clearTimeout(timeoutId)
         if (!cancelled) {
           setIsRoleStateLoading(false)
         }
@@ -704,7 +744,6 @@ function App() {
 
     return () => {
       cancelled = true
-      window.clearTimeout(timeoutId)
       controller.abort()
     }
   }, [apiBase, applyRoleState, userId])
@@ -719,17 +758,8 @@ function App() {
 
   useEffect(() => {
     if (isRoleStateLoading || !isRoleSelectedOnce || view !== 'start') return
-    const searchParams = new URLSearchParams(window.location.search)
-    const hasDeepLinkIntent = Boolean(
-      window.Telegram?.WebApp?.initDataUnsafe?.start_param ||
-        searchParams.get('startapp') ||
-        searchParams.get('start') ||
-        searchParams.get('masterId') ||
-        searchParams.get('master') ||
-        searchParams.get('chatId') ||
-        searchParams.get('chat')
-    )
-    if (hasDeepLinkIntent && !deepLinkHandledRef.current) return
+    const launchIntent = resolveLaunchIntent()
+    if (launchIntent.type !== 'none' && !deepLinkHandledRef.current) return
     navigate(role === 'pro' ? 'pro-cabinet' : 'client', {
       reset: true,
       replace: true,
@@ -773,34 +803,11 @@ function App() {
   useEffect(() => {
     if (isRoleStateLoading) return
     if (deepLinkHandledRef.current) return
-    const webAppStart = window.Telegram?.WebApp?.initDataUnsafe?.start_param
-    const searchParams = new URLSearchParams(window.location.search)
-    const queryStart =
-      searchParams.get('startapp') ?? searchParams.get('start') ?? null
-    const queryMaster =
-      searchParams.get('masterId') ?? searchParams.get('master') ?? null
-    const queryChat =
-      searchParams.get('chatId') ?? searchParams.get('chat') ?? null
-    const rawParam = webAppStart ?? queryStart
-    const decodedParam = rawParam
-      ? (() => {
-          try {
-            return decodeURIComponent(rawParam)
-          } catch (error) {
-            return rawParam
-          }
-        })()
-      : null
-    const parsedChatId = parseChatStartParam(decodedParam)
-    const parsedMasterId = parseBookingStartParam(decodedParam)
-    const parsedUnsubMasterId = parseUnsubscribeStartParam(decodedParam)
-    const rawChatId = parsedChatId ?? queryChat?.trim() ?? null
-    const parsedChatNumber = rawChatId ? Number(rawChatId) : null
-    const masterId = parsedMasterId ?? queryMaster?.trim() ?? null
+    const launchIntent = resolveLaunchIntent()
 
-    if (parsedUnsubMasterId) {
+    if (launchIntent.type === 'unsubscribe') {
       deepLinkHandledRef.current = true
-      const targetMasterId = parsedUnsubMasterId
+      const targetMasterId = launchIntent.masterId
       const runOptOut = async () => {
         if (!userId) {
           window.alert('Не удалось подтвердить пользователя.')
@@ -833,18 +840,18 @@ function App() {
       return
     }
 
-    if (parsedChatNumber && Number.isInteger(parsedChatNumber)) {
+    if (launchIntent.type === 'chat') {
       deepLinkHandledRef.current = true
-      setSelectedChatId(parsedChatNumber)
+      setSelectedChatId(launchIntent.chatId)
       setChatReturnView('chats')
       navigate('chat-thread', { reset: true })
       return
     }
 
-    if (!masterId) return
+    if (launchIntent.type !== 'booking') return
     deepLinkHandledRef.current = true
-    setSelectedMasterId(masterId)
-    setBookingMasterId(masterId)
+    setSelectedMasterId(launchIntent.masterId)
+    setBookingMasterId(launchIntent.masterId)
     setBookingPhotoUrls([])
     setBookingPreferredCategoryId(null)
     setBookingReturnView('client-master-profile')

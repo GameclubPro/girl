@@ -11,47 +11,12 @@ type LaunchParams = {
 }
 
 const VK_APP_USER_ID_REGEX = /^\d+$/
-const BRIDGE_INIT_TIMEOUT_MS = 2200
-const BRIDGE_REQUEST_TIMEOUT_MS = 1800
 
 type VkLaunchParamsPayload = {
   vk_user_id?: number | string | null
   vk_ref?: string | null
   vk_language?: string | null
   vk_platform?: string | null
-}
-
-const withTimeout = <T>(promise: Promise<T>, timeoutMs: number) =>
-  new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => {
-      reject(new Error('bridge_timeout'))
-    }, timeoutMs)
-
-    promise.then(
-      (value) => {
-        window.clearTimeout(timer)
-        resolve(value)
-      },
-      (error) => {
-        window.clearTimeout(timer)
-        reject(error)
-      }
-    )
-  })
-
-const bridgeSendSafe = async <T>(
-  method: string,
-  payload?: Record<string, unknown>,
-  timeoutMs = BRIDGE_REQUEST_TIMEOUT_MS
-) => {
-  try {
-    const request = payload
-      ? bridge.send(method as never, payload as never)
-      : bridge.send(method as never)
-    return await withTimeout(request as Promise<T>, timeoutMs)
-  } catch (_error) {
-    return null
-  }
 }
 
 const toInsets = (value?: Partial<Insets> | null): TelegramInsets => ({
@@ -100,42 +65,44 @@ const parseVkUserIdUnsafe = (value: unknown) => {
 }
 
 const resolveLaunchParams = async (): Promise<LaunchParams> => {
-  const params = await bridgeSendSafe<VkLaunchParamsPayload>(
-    'VKWebAppGetLaunchParams',
-    undefined,
-    BRIDGE_REQUEST_TIMEOUT_MS
-  )
-  if (params) {
+  try {
+    const params = await bridge.send('VKWebAppGetLaunchParams')
+    const payload = params as VkLaunchParamsPayload
     return {
-      vkUserId: parseVkUserIdUnsafe(params.vk_user_id),
-      vkRef: typeof params.vk_ref === 'string' ? params.vk_ref : '',
-      vkLanguage: typeof params.vk_language === 'string' ? params.vk_language : '',
-      vkPlatform: typeof params.vk_platform === 'string' ? params.vk_platform : '',
+      vkUserId: parseVkUserIdUnsafe(payload.vk_user_id),
+      vkRef: typeof payload.vk_ref === 'string' ? payload.vk_ref : '',
+      vkLanguage: typeof payload.vk_language === 'string' ? payload.vk_language : '',
+      vkPlatform: typeof payload.vk_platform === 'string' ? payload.vk_platform : '',
     }
-  }
-  return {
-    vkUserId: parseVkUserId(readParam('vk_user_id')),
-    vkRef: readParam('vk_ref'),
-    vkLanguage: readParam('vk_language'),
-    vkPlatform: readParam('vk_platform'),
+  } catch (_error) {
+    return {
+      vkUserId: parseVkUserId(readParam('vk_user_id')),
+      vkRef: readParam('vk_ref'),
+      vkLanguage: readParam('vk_language'),
+      vkPlatform: readParam('vk_platform'),
+    }
   }
 }
 
 const resolveUserInfo = async () => {
-  const data = await bridgeSendSafe<UserInfo>('VKWebAppGetUserInfo')
-  return data
+  try {
+    return await bridge.send('VKWebAppGetUserInfo')
+  } catch (_error) {
+    return null
+  }
 }
 
 const resolveInsets = async () => {
-  const config = await bridgeSendSafe<ParentConfigData>(
-    'VKWebAppGetConfig',
-    undefined,
-    BRIDGE_REQUEST_TIMEOUT_MS
-  )
-  if (config && 'insets' in config && config.insets) {
-    return toInsets(config.insets)
+  try {
+    const config = await bridge.send('VKWebAppGetConfig')
+    const payload = config as ParentConfigData
+    if ('insets' in payload && payload.insets) {
+      return toInsets(payload.insets)
+    }
+    return toInsets()
+  } catch (_error) {
+    return toInsets()
   }
-  return toInsets()
 }
 
 const buildTelegramLikeUser = (
@@ -165,7 +132,11 @@ const impactStyleMap: Record<'light' | 'medium' | 'heavy' | 'rigid' | 'soft', 'l
 const setupVkShim = async () => {
   window.__vkBridgeCleanup?.()
 
-  await bridgeSendSafe('VKWebAppInit', undefined, BRIDGE_INIT_TIMEOUT_MS)
+  try {
+    await bridge.send('VKWebAppInit')
+  } catch (_error) {
+    // ignore bridge init errors, fallback behavior is still usable
+  }
 
   const [launchParams, userInfo, initialInsets] = await Promise.all([
     resolveLaunchParams(),
@@ -176,7 +147,6 @@ const setupVkShim = async () => {
   const startParam =
     readParam('startapp').trim() ||
     readParam('start').trim() ||
-    launchParams.vkRef.trim() ||
     undefined
   let safeAreaInset = initialInsets
   applySafeAreaVars(safeAreaInset)
