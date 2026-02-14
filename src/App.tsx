@@ -166,6 +166,7 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   /\/$/,
   ''
 )
+const ROLE_STATE_REQUEST_TIMEOUT_MS = 6500
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
 const resolveUserId = (user: ReturnType<typeof getTelegramUser>) => {
   const rawId = user?.id ? String(user.id) : ''
@@ -667,6 +668,9 @@ function App() {
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => {
+      controller.abort()
+    }, ROLE_STATE_REQUEST_TIMEOUT_MS)
 
     const loadRoleState = async () => {
       setIsRoleStateLoading(true)
@@ -689,6 +693,7 @@ function App() {
           setIsRoleSelectedOnce(false)
         }
       } finally {
+        window.clearTimeout(timeoutId)
         if (!cancelled) {
           setIsRoleStateLoading(false)
         }
@@ -699,6 +704,7 @@ function App() {
 
     return () => {
       cancelled = true
+      window.clearTimeout(timeoutId)
       controller.abort()
     }
   }, [apiBase, applyRoleState, userId])
