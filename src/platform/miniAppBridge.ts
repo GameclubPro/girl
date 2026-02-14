@@ -11,6 +11,48 @@ type LaunchParams = {
 }
 
 const VK_APP_USER_ID_REGEX = /^\d+$/
+const BRIDGE_INIT_TIMEOUT_MS = 2200
+const BRIDGE_REQUEST_TIMEOUT_MS = 1800
+
+type VkLaunchParamsPayload = {
+  vk_user_id?: number | string | null
+  vk_ref?: string | null
+  vk_language?: string | null
+  vk_platform?: string | null
+}
+
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number) =>
+  new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error('bridge_timeout'))
+    }, timeoutMs)
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+
+const bridgeSendSafe = async <T>(
+  method: string,
+  payload?: Record<string, unknown>,
+  timeoutMs = BRIDGE_REQUEST_TIMEOUT_MS
+) => {
+  try {
+    const request = payload
+      ? bridge.send(method as never, payload as never)
+      : bridge.send(method as never)
+    return await withTimeout(request as Promise<T>, timeoutMs)
+  } catch (_error) {
+    return null
+  }
+}
 
 const toInsets = (value?: Partial<Insets> | null): TelegramInsets => ({
   top: Number.isFinite(Number(value?.top)) ? Number(value?.top) : 0,
@@ -47,46 +89,53 @@ const parseVkUserId = (value: string) => {
   return parsed
 }
 
+const parseVkUserIdUnsafe = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value)
+  }
+  if (typeof value === 'string') {
+    return parseVkUserId(value)
+  }
+  return null
+}
+
 const resolveLaunchParams = async (): Promise<LaunchParams> => {
-  try {
-    const params = await bridge.send('VKWebAppGetLaunchParams')
+  const params = await bridgeSendSafe<VkLaunchParamsPayload>(
+    'VKWebAppGetLaunchParams',
+    undefined,
+    BRIDGE_REQUEST_TIMEOUT_MS
+  )
+  if (params) {
     return {
-      vkUserId:
-        typeof params.vk_user_id === 'number' && params.vk_user_id > 0
-          ? params.vk_user_id
-          : null,
+      vkUserId: parseVkUserIdUnsafe(params.vk_user_id),
       vkRef: typeof params.vk_ref === 'string' ? params.vk_ref : '',
       vkLanguage: typeof params.vk_language === 'string' ? params.vk_language : '',
       vkPlatform: typeof params.vk_platform === 'string' ? params.vk_platform : '',
     }
-  } catch (_error) {
-    return {
-      vkUserId: parseVkUserId(readParam('vk_user_id')),
-      vkRef: readParam('vk_ref'),
-      vkLanguage: readParam('vk_language'),
-      vkPlatform: readParam('vk_platform'),
-    }
+  }
+  return {
+    vkUserId: parseVkUserId(readParam('vk_user_id')),
+    vkRef: readParam('vk_ref'),
+    vkLanguage: readParam('vk_language'),
+    vkPlatform: readParam('vk_platform'),
   }
 }
 
 const resolveUserInfo = async () => {
-  try {
-    return await bridge.send('VKWebAppGetUserInfo')
-  } catch (_error) {
-    return null
-  }
+  const data = await bridgeSendSafe<UserInfo>('VKWebAppGetUserInfo')
+  return data
 }
 
 const resolveInsets = async () => {
-  try {
-    const config = await bridge.send('VKWebAppGetConfig')
-    if ('insets' in config && config.insets) {
-      return toInsets(config.insets)
-    }
-    return toInsets()
-  } catch (_error) {
-    return toInsets()
+  const config = await bridgeSendSafe<ParentConfigData>(
+    'VKWebAppGetConfig',
+    undefined,
+    BRIDGE_REQUEST_TIMEOUT_MS
+  )
+  if (config && 'insets' in config && config.insets) {
+    return toInsets(config.insets)
   }
+  return toInsets()
 }
 
 const buildTelegramLikeUser = (
@@ -116,11 +165,7 @@ const impactStyleMap: Record<'light' | 'medium' | 'heavy' | 'rigid' | 'soft', 'l
 const setupVkShim = async () => {
   window.__vkBridgeCleanup?.()
 
-  try {
-    await bridge.send('VKWebAppInit')
-  } catch (_error) {
-    // ignore bridge init errors, fallback behavior is still usable
-  }
+  await bridgeSendSafe('VKWebAppInit', undefined, BRIDGE_INIT_TIMEOUT_MS)
 
   const [launchParams, userInfo, initialInsets] = await Promise.all([
     resolveLaunchParams(),
