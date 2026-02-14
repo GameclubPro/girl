@@ -5411,7 +5411,18 @@ export const ProProfileScreen = ({
         >
           <div className="pro-profile-editor-shell">
             <div className="pro-profile-editor-head">
-              <div className="pro-profile-editor-title-block">
+              <button
+                className="pro-profile-editor-back"
+                type="button"
+                aria-label="Назад"
+                onClick={closeEditor}
+              >
+                <span className="pro-profile-editor-back-icon" aria-hidden="true">
+                  <IconChevron />
+                </span>
+                <span className="pro-profile-editor-back-label">Назад</span>
+              </button>
+              <div className="pro-profile-editor-head-main">
                 <h2 className="pro-profile-editor-title">{editorTitle}</h2>
               </div>
             </div>
