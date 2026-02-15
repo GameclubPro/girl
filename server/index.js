@@ -1628,7 +1628,11 @@ const normalizeSessionProfilePayload = (payload = {}) => ({
   photoUrl: normalizeExternalUrl(payload.photoUrl),
 })
 
-const upsertUserProfile = async (db, { userId, firstName, lastName, username, languageCode, photoUrl }) => {
+const upsertUserProfile = async (
+  db,
+  { userId, platform = null, firstName, lastName, username, languageCode, photoUrl }
+) => {
+  const normalizedPlatform = normalizeIdentityPlatform(platform)
   await db.query(
     `
       INSERT INTO users (
@@ -1645,10 +1649,14 @@ const upsertUserProfile = async (db, { userId, firstName, lastName, username, la
           last_name = COALESCE(EXCLUDED.last_name, users.last_name),
           username = COALESCE(EXCLUDED.username, users.username),
           language_code = COALESCE(EXCLUDED.language_code, users.language_code),
-          avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+          avatar_url = CASE
+            WHEN users.avatar_url IS NULL THEN EXCLUDED.avatar_url
+            WHEN $7 = 'vk' AND EXCLUDED.avatar_url IS NOT NULL THEN EXCLUDED.avatar_url
+            ELSE users.avatar_url
+          END,
           updated_at = NOW()
     `,
-    [userId, firstName, lastName, username, languageCode, photoUrl]
+    [userId, firstName, lastName, username, languageCode, photoUrl, normalizedPlatform]
   )
 }
 
@@ -1809,6 +1817,7 @@ const bootstrapSession = async ({
     await ensureUser(fallbackUserId)
     await upsertUserProfile(pool, {
       userId: fallbackUserId,
+      platform,
       ...profile,
     })
     const roleResult = await pool.query(
@@ -1860,6 +1869,7 @@ const bootstrapSession = async ({
     })
     await upsertUserProfile(client, {
       userId: internalUserId,
+      platform,
       ...profile,
     })
     const roleResult = await client.query(
@@ -2762,7 +2772,7 @@ const mergeUserAccounts = async ({
           last_name = COALESCE(primary_user.last_name, secondary_user.last_name),
           username = COALESCE(primary_user.username, secondary_user.username),
           language_code = COALESCE(primary_user.language_code, secondary_user.language_code),
-          avatar_url = COALESCE(primary_user.avatar_url, secondary_user.avatar_url),
+          avatar_url = COALESCE(secondary_user.avatar_url, primary_user.avatar_url),
           app_role = COALESCE(primary_user.app_role, secondary_user.app_role),
           role_selected_at = COALESCE(primary_user.role_selected_at, secondary_user.role_selected_at),
           role_changed_at = COALESCE(primary_user.role_changed_at, secondary_user.role_changed_at),
@@ -6910,6 +6920,7 @@ app.post('/api/account/link/complete', async (req, res) => {
     })
     await upsertUserProfile(client, {
       userId: normalizedUserId,
+      platform: targetPlatform,
       ...sessionProfile,
     })
 
@@ -7016,7 +7027,7 @@ app.post('/api/user', async (req, res) => {
             last_name = EXCLUDED.last_name,
             username = EXCLUDED.username,
             language_code = EXCLUDED.language_code,
-            avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+            avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url),
             updated_at = NOW()
       `,
       [
