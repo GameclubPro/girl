@@ -12,6 +12,7 @@ import {
   GraphUp,
   HeadsetHelp,
   Home as HomeIconoir,
+  LogOut,
   MediaImage,
   Megaphone,
   Medal,
@@ -178,6 +179,10 @@ export const IconUser = () => (
       strokeLinecap="round"
     />
   </svg>
+)
+
+export const IconLogout = () => (
+  <LogOut strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconPin = () => (

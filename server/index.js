@@ -5489,6 +5489,42 @@ app.patch('/api/user/role', async (req, res) => {
   }
 })
 
+app.post('/api/user/logout', async (req, res) => {
+  const { userId } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+    await pool.query(
+      `
+        UPDATE users
+        SET app_role = NULL,
+            role_selected_at = NULL,
+            role_changed_at = NOW(),
+            updated_at = NOW()
+        WHERE user_id = $1
+      `,
+      [normalizedUserId]
+    )
+
+    res.json({
+      ok: true,
+      role: null,
+      selectedOnce: false,
+      roleSelectedAt: null,
+      roleChangedAt: null,
+    })
+  } catch (error) {
+    console.error('POST /api/user/logout failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
 app.get('/api/cities', async (_req, res) => {
   try {
     const result = await pool.query(

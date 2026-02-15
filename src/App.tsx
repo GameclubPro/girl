@@ -581,6 +581,7 @@ function App() {
   )
   const [supportChatId, setSupportChatId] = useState<number | null>(null)
   const supportChatPromiseRef = useRef<Promise<number | null> | null>(null)
+  const logoutPendingRef = useRef(false)
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const screenBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
@@ -1492,38 +1493,38 @@ function App() {
     [navigate]
   )
 
-  const handleRoleSwitch = useCallback(
-    async (nextRole: Role) => {
-      const result = await updateRole(nextRole, 'settings')
-      if (!result.ok) {
-        return false
+  const handleAccountLogout = useCallback(async () => {
+    if (!userId) {
+      window.alert('Не удалось определить пользователя. Перезапустите приложение.')
+      return
+    }
+    if (logoutPendingRef.current) return
+    logoutPendingRef.current = true
+
+    try {
+      const response = await fetch(`${apiBase}/api/user/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      if (!response.ok) {
+        throw new Error('Logout failed')
       }
 
-      if (nextRole === 'pro') {
-        setProProfileSection(null)
-        setProProfilePortfolioView(null)
-        setProProfileReturnView('pro-cabinet')
-        setAddressReturnView('pro-profile')
-        navigate('pro-cabinet', { reset: true })
-      } else {
-        setAddressReturnView('client')
-        navigate('client', { reset: true })
-      }
-
-      return true
-    },
-    [navigate, updateRole]
-  )
-
-  const handleProfileLogout = useCallback(() => {
-    setIsRoleSelectedOnce(false)
-    setIsRoleSelectionPending(false)
-    setProProfileSection(null)
-    setProProfilePortfolioView(null)
-    setProProfileReturnView('pro-cabinet')
-    setAddressReturnView('start')
-    navigate('start', { reset: true, replace: true })
-  }, [navigate])
+      setRole('client')
+      setIsRoleSelectedOnce(false)
+      setIsRoleSelectionPending(false)
+      setProProfileSection(null)
+      setProProfilePortfolioView(null)
+      setProProfileReturnView('pro-cabinet')
+      setAddressReturnView('start')
+      navigate('start', { reset: true, replace: true })
+    } catch (error) {
+      window.alert('Не удалось выйти из аккаунта. Проверьте соединение и повторите.')
+    } finally {
+      logoutPendingRef.current = false
+    }
+  }, [apiBase, navigate, userId])
 
   const openChatList = useCallback(() => {
     setSelectedChatId(null)
@@ -1777,7 +1778,6 @@ function App() {
       <ClientSettingsScreen
         apiBase={apiBase}
         userId={userId}
-        role={role}
         displayNameFallback={clientName}
         favoritesCount={favorites.length}
         onBack={() => goBack('client-profile')}
@@ -1791,7 +1791,7 @@ function App() {
         onOpenSupport={() => void openSupportChat('client-settings')}
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}
-        onSwitchRole={handleRoleSwitch}
+        onLogout={handleAccountLogout}
       />
     )
   }
@@ -2082,7 +2082,7 @@ function App() {
         focusSection={proProfileSection}
         initialPortfolioView={proProfilePortfolioView ?? undefined}
         onBackHandlerChange={registerProProfileBackHandler}
-        onLogout={handleProfileLogout}
+        onLogout={handleAccountLogout}
       />
     )
   }

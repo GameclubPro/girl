@@ -15,6 +15,7 @@ import {
   IconFormatBoth,
   IconFormatClientVisit,
   IconFormatMaster,
+  IconLogout,
   IconPin,
   IconPhoto,
   IconProfileAbout,
@@ -5353,7 +5354,7 @@ export const ProProfileScreen = ({
                   onClick={handleLogout}
                 >
                   <span className="pro-profile-settings-icon" aria-hidden="true">
-                    <IconTrash />
+                    <IconLogout />
                   </span>
                   <span className="pro-profile-settings-content">
                     <span className="pro-profile-settings-label">
