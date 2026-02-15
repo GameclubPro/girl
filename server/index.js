@@ -341,6 +341,8 @@ const normalizeStoryCaption = (value) => {
   return normalized
 }
 
+const isLocalDevUserId = (value) => normalizeText(value).toLowerCase() === 'local-dev'
+
 const normalizeStringArray = (value) => {
   if (!Array.isArray(value)) return []
   return value
@@ -6703,6 +6705,10 @@ app.post('/api/account/link/start', async (req, res) => {
     res.status(400).json({ error: 'userId_required' })
     return
   }
+  if (isLocalDevUserId(normalizedUserId)) {
+    res.status(400).json({ error: 'session_user_invalid' })
+    return
+  }
   if (!normalizedTargetPlatform) {
     res.status(400).json({ error: 'target_platform_invalid' })
     return
@@ -6826,6 +6832,10 @@ app.post('/api/account/link/complete', async (req, res) => {
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (isLocalDevUserId(normalizedUserId)) {
+    res.status(400).json({ error: 'session_user_invalid' })
     return
   }
   if (!normalizedToken) {

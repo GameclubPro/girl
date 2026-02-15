@@ -173,11 +173,6 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
-const resolveUserId = (user: ReturnType<typeof getTelegramUser>) => {
-  const rawId = user?.id ? String(user.id) : ''
-  if (!rawId) return 'local-dev'
-  return getMiniAppHost() === 'vk' ? `vk_${rawId}` : rawId
-}
 
 type LaunchIntent =
   | { type: 'none' }
@@ -193,6 +188,22 @@ const decodeLaunchValue = (value: string | null) => {
   } catch (_error) {
     return value
   }
+}
+
+const VK_USER_ID_REGEX = /^\d+$/
+
+const getHashParams = () => {
+  const rawHash = window.location.hash.replace(/^#\/?/, '')
+  const hashQuery = rawHash.startsWith('?') ? rawHash.slice(1) : rawHash
+  return new URLSearchParams(hashQuery)
+}
+
+const resolveVkLaunchUserId = () => {
+  const searchParams = new URLSearchParams(window.location.search)
+  const hashParams = getHashParams()
+  const rawValue = (searchParams.get('vk_user_id') ?? hashParams.get('vk_user_id') ?? '').trim()
+  if (!VK_USER_ID_REGEX.test(rawValue)) return ''
+  return rawValue
 }
 
 const resolveLaunchIntent = (): LaunchIntent => {
@@ -610,6 +621,17 @@ function App() {
   const deepLinkHandledRef = useRef(false)
   const warmupDoneRef = useRef(false)
   const [telegramUser] = useState(() => getTelegramUser())
+  const resolveCurrentPlatformUserId = () => {
+    const currentUser = getTelegramUser() ?? telegramUser
+    if (currentUser?.id) return String(currentUser.id)
+    if (miniAppHost === 'vk') return resolveVkLaunchUserId()
+    return ''
+  }
+  const resolveFallbackSessionUserId = () => {
+    const platformUserId = resolveCurrentPlatformUserId()
+    if (!platformUserId) return 'local-dev'
+    return miniAppHost === 'vk' ? `vk_${platformUserId}` : platformUserId
+  }
   const [userId, setUserId] = useState('')
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
@@ -829,18 +851,20 @@ function App() {
       setIsRoleStateLoading(true)
       try {
         const launchIntent = resolveLaunchIntent()
+        const currentTelegramUser = getTelegramUser() ?? telegramUser
+        const platformUserId = resolveCurrentPlatformUserId()
         const response = await fetch(`${apiBase}/api/session/bootstrap`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
             host: miniAppHost,
-            platformUserId: telegramUser?.id ? String(telegramUser.id) : '',
-            firstName: telegramUser?.first_name ?? null,
-            lastName: telegramUser?.last_name ?? null,
-            username: telegramUser?.username ?? null,
-            languageCode: telegramUser?.language_code ?? null,
-            photoUrl: telegramUser?.photo_url ?? null,
+            platformUserId,
+            firstName: currentTelegramUser?.first_name ?? null,
+            lastName: currentTelegramUser?.last_name ?? null,
+            username: currentTelegramUser?.username ?? null,
+            languageCode: currentTelegramUser?.language_code ?? null,
+            photoUrl: currentTelegramUser?.photo_url ?? null,
             startParam: launchIntent.type === 'none' ? null : JSON.stringify(launchIntent),
           }),
         })
@@ -855,7 +879,7 @@ function App() {
         const nextUserId =
           typeof payload?.userId === 'string' && payload.userId.trim()
             ? payload.userId.trim()
-            : resolveUserId(telegramUser)
+            : resolveFallbackSessionUserId()
 
         if (cancelled) return
         setUserId(nextUserId)
@@ -864,7 +888,7 @@ function App() {
         setIsSupportAgent(Boolean(payload?.isSupportAgent))
       } catch (error) {
         if (cancelled) return
-        const fallbackUserId = resolveUserId(telegramUser)
+        const fallbackUserId = resolveFallbackSessionUserId()
         setUserId(fallbackUserId)
         setIsRoleSelectedOnce(false)
         applyAccountIdentities(null)
@@ -962,6 +986,17 @@ function App() {
           navigate('start', { reset: true })
           return
         }
+        const currentTelegramUser = getTelegramUser() ?? telegramUser
+        const platformUserId = resolveCurrentPlatformUserId()
+        if (!platformUserId) {
+          window.alert(
+            miniAppHost === 'vk'
+              ? 'Не удалось получить VK ID. Откройте Mini App внутри ВКонтакте и повторите.'
+              : 'Не удалось получить Telegram ID. Откройте Mini App внутри Telegram и повторите.'
+          )
+          navigate('start', { reset: true })
+          return
+        }
         try {
           const response = await fetch(`${apiBase}/api/account/link/complete`, {
             method: 'POST',
@@ -970,14 +1005,64 @@ function App() {
               userId,
               token: launchIntent.token,
               host: miniAppHost,
-              platformUserId: telegramUser?.id ? String(telegramUser.id) : '',
-              firstName: telegramUser?.first_name ?? null,
-              lastName: telegramUser?.last_name ?? null,
-              username: telegramUser?.username ?? null,
-              languageCode: telegramUser?.language_code ?? null,
-              photoUrl: telegramUser?.photo_url ?? null,
+              platformUserId,
+              firstName: currentTelegramUser?.first_name ?? null,
+              lastName: currentTelegramUser?.last_name ?? null,
+              username: currentTelegramUser?.username ?? null,
+              languageCode: currentTelegramUser?.language_code ?? null,
+              photoUrl: currentTelegramUser?.photo_url ?? null,
             }),
           })
+          if (!response.ok) {
+            const apiError = await parseApiError(response, 'link_complete_failed')
+            const payload = apiError.payload as { error?: string } | null
+            const errorCode =
+              payload && typeof payload === 'object' && 'error' in payload
+                ? payload.error
+                : apiError.code
+            if (errorCode === 'token_invalid_or_used') {
+              window.alert(
+                'Код привязки истек или уже использован. Запустите привязку заново из исходной платформы.'
+              )
+              navigate('start', { reset: true })
+              return
+            }
+            if (errorCode === 'target_platform_mismatch') {
+              window.alert('Ссылка привязки открыта не в той платформе. Повторите переход заново.')
+              navigate('start', { reset: true })
+              return
+            }
+            if (errorCode === 'platform_user_id_required') {
+              window.alert(
+                miniAppHost === 'vk'
+                  ? 'Не удалось получить VK ID. Откройте Mini App внутри ВКонтакте и повторите.'
+                  : 'Не удалось получить Telegram ID. Откройте Mini App внутри Telegram и повторите.'
+              )
+              navigate('start', { reset: true })
+              return
+            }
+            if (errorCode === 'session_user_invalid') {
+              window.alert(
+                'Сессия аккаунта не определена. Перезапустите Mini App внутри платформы и повторите.'
+              )
+              navigate('start', { reset: true })
+              return
+            }
+            if (apiError.status >= 500 || apiError.code.startsWith('http_')) {
+              const statusLabel = apiError.status > 0 ? `HTTP ${apiError.status}` : 'network'
+              window.alert(
+                `Проблема API (${statusLabel}, code: ${apiError.code}). ${apiError.message}`
+              )
+              navigate('start', { reset: true })
+              return
+            }
+            window.alert(
+              `Не удалось завершить привязку (${errorCode ?? apiError.code}). ${apiError.message}`
+            )
+            navigate('start', { reset: true })
+            return
+          }
+
           const payload = (await response.json().catch(() => null)) as
             | AccountLinkCompleteResponse
             | { error?: string }
@@ -986,12 +1071,14 @@ function App() {
             payload && typeof payload === 'object' && 'ok' in payload && payload.ok === true
               ? (payload as AccountLinkCompleteResponse)
               : null
-          if (!response.ok || !successPayload) {
-            throw new Error(
-              payload && typeof payload === 'object' && 'error' in payload && payload.error
+          if (!successPayload) {
+            const errorCode =
+              payload && typeof payload === 'object' && 'error' in payload
                 ? payload.error
-                : 'link_complete_failed'
-            )
+                : 'link_complete_invalid_payload'
+            window.alert(`Не удалось завершить привязку (${errorCode}).`)
+            navigate('start', { reset: true })
+            return
           }
           const nextUserId =
             typeof successPayload.userId === 'string' && successPayload.userId.trim()
@@ -1010,7 +1097,7 @@ function App() {
             reset: true,
           })
         } catch (error) {
-          window.alert('Не удалось завершить привязку аккаунта. Попробуйте еще раз.')
+          window.alert('Не удалось завершить привязку аккаунта. Проверьте соединение и повторите.')
           navigate('start', { reset: true })
         }
       }
@@ -1764,6 +1851,12 @@ function App() {
             : apiError.code
         if (errorCode === 'source_platform_not_linked') {
           window.alert('Сначала войдите в текущий аккаунт на этой платформе, затем повторите.')
+          return
+        }
+        if (errorCode === 'session_user_invalid') {
+          window.alert(
+            'Сессия аккаунта не определена. Перезапустите Mini App внутри платформы и повторите.'
+          )
           return
         }
         if (errorCode === 'tg_url_missing') {
