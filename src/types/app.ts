@@ -48,6 +48,52 @@ export type NextAction = {
 
 export type Role = 'client' | 'pro'
 
+export type AccountIdentitiesResponse = {
+  userId?: string
+  telegramLinked: boolean
+  vkLinked: boolean
+  telegramUserId?: string | null
+  vkUserId?: string | null
+}
+
+export type SessionBootstrapResponse = {
+  userId: string
+  roleState: {
+    role?: Role | null
+    selectedOnce?: boolean
+    roleSelectedAt?: string | null
+    roleChangedAt?: string | null
+  }
+  identities: AccountIdentitiesResponse
+  isSupportAgent?: boolean
+}
+
+export type AccountLinkStartResponse = {
+  ok: boolean
+  alreadyLinked?: boolean
+  token?: string
+  targetPlatform?: 'telegram' | 'vk'
+  targetUrl?: string
+  expiresAt?: string
+  identities?: AccountIdentitiesResponse
+  error?: string
+}
+
+export type AccountLinkCompleteResponse = {
+  ok: boolean
+  merged?: boolean
+  userId: string
+  roleState: {
+    role?: Role | null
+    selectedOnce?: boolean
+    roleSelectedAt?: string | null
+    roleChangedAt?: string | null
+  }
+  identities: AccountIdentitiesResponse
+  isSupportAgent?: boolean
+  error?: string
+}
+
 export type ProfileStatus = 'draft' | 'ready' | 'complete'
 
 export type ProProfileSection =

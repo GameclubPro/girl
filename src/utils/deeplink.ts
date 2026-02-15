@@ -1,6 +1,7 @@
 const BOOKING_START_PREFIX = 'book'
 const CHAT_START_PREFIX = 'chat'
 const UNSUB_START_PREFIX = 'unsub'
+const ACCOUNT_LINK_START_PREFIX = 'link'
 
 const buildStartToken = (prefix: string, value: string | number) => {
   const normalized = String(value ?? '').trim()
@@ -16,6 +17,9 @@ export const buildChatStartParam = (chatId: number | string) =>
 
 export const buildUnsubscribeStartParam = (masterId: string) =>
   buildStartToken(UNSUB_START_PREFIX, masterId)
+
+export const buildAccountLinkStartParam = (token: string) =>
+  buildStartToken(ACCOUNT_LINK_START_PREFIX, token)
 
 const parseStartParam = (value: string | null | undefined, prefix: string) => {
   if (!value) return null
@@ -35,3 +39,6 @@ export const parseChatStartParam = (value?: string | null) =>
 
 export const parseUnsubscribeStartParam = (value?: string | null) =>
   parseStartParam(value, UNSUB_START_PREFIX)
+
+export const parseAccountLinkStartParam = (value?: string | null) =>
+  parseStartParam(value, ACCOUNT_LINK_START_PREFIX)

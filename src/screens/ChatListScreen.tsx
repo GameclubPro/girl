@@ -14,6 +14,7 @@ type ChatListScreenProps = {
   apiBase: string
   userId: string
   role: 'client' | 'pro'
+  isSupportAgent?: boolean
   onOpenChat: (chatId: number) => void
   onOpenSupport?: () => void
   onViewHome?: () => void
@@ -22,7 +23,6 @@ type ChatListScreenProps = {
   onViewCabinet?: () => void
 }
 
-const SUPPORT_AGENT_IDS = new Set(['5510721194', '7226796630'])
 const SEARCH_NO_RESULTS_SENTINEL = '___none___'
 
 const formatChatTimestamp = (value?: string | null) => {
@@ -235,6 +235,7 @@ export const ChatListScreen = ({
   apiBase,
   userId,
   role,
+  isSupportAgent = false,
   onOpenChat,
   onOpenSupport,
   onViewHome,
@@ -255,7 +256,6 @@ export const ChatListScreen = ({
   const loadRequestIdRef = useRef(0)
   const listUpdateTokenRef = useRef(0)
   const includeContextsRef = useRef(false)
-  const isSupportAgent = SUPPORT_AGENT_IDS.has(userId)
 
   const supportChat = useMemo(
     () => items.find((item) => item.contextType === 'support') ?? null,

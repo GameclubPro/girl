@@ -16,14 +16,19 @@ import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
 import { getMiniAppHost } from './platform/miniAppHost'
 import type {
+  AccountIdentitiesResponse,
+  AccountLinkCompleteResponse,
+  AccountLinkStartResponse,
   City,
   District,
   ProProfileSection,
   Role,
+  SessionBootstrapResponse,
   UserLocation,
 } from './types/app'
 import { isGeoFailure, requestPreciseLocation } from './utils/geo'
 import {
+  parseAccountLinkStartParam,
   parseBookingStartParam,
   parseChatStartParam,
   parseUnsubscribeStartParam,
@@ -175,6 +180,7 @@ const resolveUserId = (user: ReturnType<typeof getTelegramUser>) => {
 
 type LaunchIntent =
   | { type: 'none' }
+  | { type: 'link'; token: string }
   | { type: 'booking'; masterId: string }
   | { type: 'chat'; chatId: number }
   | { type: 'unsubscribe'; masterId: string }
@@ -193,6 +199,11 @@ const resolveLaunchIntent = (): LaunchIntent => {
   const webAppStart = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? null
   const queryStart = searchParams.get('startapp') ?? searchParams.get('start') ?? null
   const decodedStart = decodeLaunchValue(webAppStart ?? queryStart)
+
+  const parsedLinkToken = parseAccountLinkStartParam(decodedStart)
+  if (parsedLinkToken) {
+    return { type: 'link', token: parsedLinkToken }
+  }
 
   const unsubMasterId = parseUnsubscribeStartParam(decodedStart)
   if (unsubMasterId) {
@@ -432,6 +443,13 @@ const formatGeoError = (error: unknown) => {
 const parseRole = (value: unknown): Role | null =>
   value === 'client' || value === 'pro' ? value : null
 
+const emptyIdentities: AccountIdentitiesResponse = {
+  telegramLinked: false,
+  vkLinked: false,
+  telegramUserId: null,
+  vkUserId: null,
+}
+
 function App() {
   const [nav, dispatchNav] = useReducer(navReducer, {
     view: 'start',
@@ -494,10 +512,16 @@ function App() {
     navIntentRef.current += 1
     dispatchNav({ type: 'BACK', fallback })
   }, [])
+  const miniAppHost = getMiniAppHost()
   const [role, setRole] = useState<Role>('client')
   const [isRoleStateLoading, setIsRoleStateLoading] = useState(true)
+  const [isSessionBootstrapping, setIsSessionBootstrapping] = useState(true)
   const [isRoleSelectedOnce, setIsRoleSelectedOnce] = useState(false)
   const [isRoleSelectionPending, setIsRoleSelectionPending] = useState(false)
+  const [isAccountLinkPending, setIsAccountLinkPending] = useState(false)
+  const [accountIdentities, setAccountIdentities] =
+    useState<AccountIdentitiesResponse>(emptyIdentities)
+  const [isSupportAgent, setIsSupportAgent] = useState(false)
   const [proProfileSection, setProProfileSection] =
     useState<ProProfileSection | null>(null)
   const [proProfilePortfolioView, setProProfilePortfolioView] = useState<
@@ -510,8 +534,6 @@ function App() {
     'pro-cabinet' | 'pro-profile'
   >('pro-cabinet')
   const [address, setAddress] = useState('')
-  const [telegramUser] = useState(() => getTelegramUser())
-  const [userId] = useState(() => resolveUserId(telegramUser))
   const [cities, setCities] = useState<City[]>([])
   const [districts, setDistricts] = useState<District[]>([])
   const [cityId, setCityId] = useState<number | null>(null)
@@ -586,12 +608,44 @@ function App() {
   const screenBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
   const warmupDoneRef = useRef(false)
+  const [telegramUser] = useState(() => getTelegramUser())
+  const [userId, setUserId] = useState('')
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
       .filter(Boolean)
       .join(' ')
       .trim() || telegramUser?.username?.trim() || ''
   const telegramAvatarUrl = telegramUser?.photo_url ?? null
+  const tgAppUrl = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
+  const vkAppUrl = (import.meta.env.VITE_VK_APP_URL ?? '').trim()
+  const accountLinkTargetPlatform: 'telegram' | 'vk' =
+    miniAppHost === 'vk' ? 'telegram' : 'vk'
+  const accountLinkLabel =
+    accountLinkTargetPlatform === 'telegram'
+      ? 'Привязать Telegram'
+      : 'Привязать ВКонтакте'
+  const accountLinkMissingHint =
+    accountLinkTargetPlatform === 'telegram'
+      ? 'Добавьте VITE_TG_APP_URL'
+      : 'Добавьте VITE_VK_APP_URL'
+  const accountLinkEnvMissing =
+    accountLinkTargetPlatform === 'telegram' ? !tgAppUrl : !vkAppUrl
+  const isAccountAlreadyLinked =
+    accountLinkTargetPlatform === 'telegram'
+      ? accountIdentities.telegramLinked
+      : accountIdentities.vkLinked
+  const accountLinkStatusLabel = isAccountAlreadyLinked ? 'Подключено' : 'Не подключено'
+  const accountLinkHint = accountLinkEnvMissing
+    ? accountLinkMissingHint
+    : isAccountAlreadyLinked
+      ? 'Платформа уже привязана.'
+      : ''
+  const isAccountLinkActionDisabled =
+    !userId ||
+    isAccountLinkPending ||
+    isRoleSelectionPending ||
+    isAccountAlreadyLinked ||
+    accountLinkEnvMissing
 
   const applyRoleState = useCallback((payload: UserRoleStateResponse | null) => {
     const nextRole = parseRole(payload?.role)
@@ -600,6 +654,23 @@ function App() {
       setRole(nextRole)
     }
     setIsRoleSelectedOnce(nextSelectedOnce)
+  }, [])
+
+  const applyAccountIdentities = useCallback((payload: AccountIdentitiesResponse | null) => {
+    if (!payload || typeof payload !== 'object') {
+      setAccountIdentities(emptyIdentities)
+      return
+    }
+    setAccountIdentities({
+      telegramLinked: Boolean(payload.telegramLinked),
+      vkLinked: Boolean(payload.vkLinked),
+      telegramUserId:
+        typeof payload.telegramUserId === 'string'
+          ? payload.telegramUserId.trim() || null
+          : null,
+      vkUserId:
+        typeof payload.vkUserId === 'string' ? payload.vkUserId.trim() || null : null,
+    })
   }, [])
 
   const updateRole = useCallback(
@@ -714,40 +785,77 @@ function App() {
     let cancelled = false
     const controller = new AbortController()
 
-    const loadRoleState = async () => {
+    const bootstrap = async () => {
+      setIsSessionBootstrapping(true)
       setIsRoleStateLoading(true)
       try {
-        const response = await fetch(
-          `${apiBase}/api/user/role-state?userId=${encodeURIComponent(userId)}`,
-          { signal: controller.signal }
-        )
+        const launchIntent = resolveLaunchIntent()
+        const response = await fetch(`${apiBase}/api/session/bootstrap`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            host: miniAppHost,
+            platformUserId: telegramUser?.id ? String(telegramUser.id) : '',
+            firstName: telegramUser?.first_name ?? null,
+            lastName: telegramUser?.last_name ?? null,
+            username: telegramUser?.username ?? null,
+            languageCode: telegramUser?.language_code ?? null,
+            photoUrl: telegramUser?.photo_url ?? null,
+            startParam: launchIntent.type === 'none' ? null : JSON.stringify(launchIntent),
+          }),
+        })
+
         if (!response.ok) {
-          throw new Error('Load role state failed')
+          throw new Error('Session bootstrap failed')
         }
+
         const payload = (await response.json().catch(() => null)) as
-          | UserRoleStateResponse
+          | SessionBootstrapResponse
           | null
-        if (!cancelled) {
-          applyRoleState(payload)
-        }
+        const nextUserId =
+          typeof payload?.userId === 'string' && payload.userId.trim()
+            ? payload.userId.trim()
+            : resolveUserId(telegramUser)
+
+        if (cancelled) return
+        setUserId(nextUserId)
+        applyRoleState(payload?.roleState ?? null)
+        applyAccountIdentities(payload?.identities ?? null)
+        setIsSupportAgent(Boolean(payload?.isSupportAgent))
       } catch (error) {
-        if (!cancelled) {
-          setIsRoleSelectedOnce(false)
-        }
+        if (cancelled) return
+        const fallbackUserId = resolveUserId(telegramUser)
+        setUserId(fallbackUserId)
+        setIsRoleSelectedOnce(false)
+        applyAccountIdentities(null)
+        setIsSupportAgent(false)
       } finally {
         if (!cancelled) {
           setIsRoleStateLoading(false)
+          setIsSessionBootstrapping(false)
         }
       }
     }
 
-    void loadRoleState()
+    void bootstrap()
 
     return () => {
       cancelled = true
       controller.abort()
     }
-  }, [apiBase, applyRoleState, userId])
+  }, [
+    apiBase,
+    applyAccountIdentities,
+    applyRoleState,
+    miniAppHost,
+    telegramUser?.id,
+    telegramUser?.first_name,
+    telegramUser?.last_name,
+    telegramUser?.username,
+    telegramUser?.language_code,
+    telegramUser?.photo_url,
+  ])
 
   useEffect(() => {
     preloadedViewsRef.current.add(view)
@@ -758,14 +866,15 @@ function App() {
   }, [view])
 
   useEffect(() => {
-    if (isRoleStateLoading || !isRoleSelectedOnce || view !== 'start') return
+    if (isSessionBootstrapping || isRoleStateLoading || !isRoleSelectedOnce || view !== 'start')
+      return
     const launchIntent = resolveLaunchIntent()
     if (launchIntent.type !== 'none' && !deepLinkHandledRef.current) return
     navigate(role === 'pro' ? 'pro-cabinet' : 'client', {
       reset: true,
       replace: true,
     })
-  }, [isRoleSelectedOnce, isRoleStateLoading, navigate, role, view])
+  }, [isRoleSelectedOnce, isRoleStateLoading, isSessionBootstrapping, navigate, role, view])
 
   useEffect(() => {
     if (warmupDoneRef.current || view === 'start') return
@@ -802,9 +911,73 @@ function App() {
   }, [preloadView, role, view])
 
   useEffect(() => {
-    if (isRoleStateLoading) return
+    if (isSessionBootstrapping || isRoleStateLoading) return
     if (deepLinkHandledRef.current) return
     const launchIntent = resolveLaunchIntent()
+
+    if (launchIntent.type === 'link') {
+      deepLinkHandledRef.current = true
+      const runLinkComplete = async () => {
+        if (!userId) {
+          window.alert('Не удалось определить пользователя для привязки.')
+          navigate('start', { reset: true })
+          return
+        }
+        try {
+          const response = await fetch(`${apiBase}/api/account/link/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              token: launchIntent.token,
+              host: miniAppHost,
+              platformUserId: telegramUser?.id ? String(telegramUser.id) : '',
+              firstName: telegramUser?.first_name ?? null,
+              lastName: telegramUser?.last_name ?? null,
+              username: telegramUser?.username ?? null,
+              languageCode: telegramUser?.language_code ?? null,
+              photoUrl: telegramUser?.photo_url ?? null,
+            }),
+          })
+          const payload = (await response.json().catch(() => null)) as
+            | AccountLinkCompleteResponse
+            | { error?: string }
+            | null
+          const successPayload =
+            payload && typeof payload === 'object' && 'ok' in payload && payload.ok === true
+              ? (payload as AccountLinkCompleteResponse)
+              : null
+          if (!response.ok || !successPayload) {
+            throw new Error(
+              payload && typeof payload === 'object' && 'error' in payload && payload.error
+                ? payload.error
+                : 'link_complete_failed'
+            )
+          }
+          const nextUserId =
+            typeof successPayload.userId === 'string' && successPayload.userId.trim()
+              ? successPayload.userId.trim()
+              : userId
+          const nextRole = parseRole(successPayload.roleState?.role) ?? role
+          const selectedOnce = Boolean(successPayload.roleState?.selectedOnce && nextRole)
+          setUserId(nextUserId)
+          applyRoleState(successPayload.roleState ?? null)
+          applyAccountIdentities(successPayload.identities ?? null)
+          setIsSupportAgent(Boolean(successPayload.isSupportAgent))
+          setSupportChatId(null)
+          supportChatPromiseRef.current = null
+          window.alert(successPayload.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+          navigate(selectedOnce ? (nextRole === 'pro' ? 'pro-cabinet' : 'client') : 'start', {
+            reset: true,
+          })
+        } catch (error) {
+          window.alert('Не удалось завершить привязку аккаунта. Попробуйте еще раз.')
+          navigate('start', { reset: true })
+        }
+      }
+      void runLinkComplete()
+      return
+    }
 
     if (launchIntent.type === 'unsubscribe') {
       deepLinkHandledRef.current = true
@@ -857,7 +1030,23 @@ function App() {
     setBookingPreferredCategoryId(null)
     setBookingReturnView('client-master-profile')
     navigate('booking', { reset: true })
-  }, [apiBase, isRoleStateLoading, navigate, userId])
+  }, [
+    apiBase,
+    applyAccountIdentities,
+    applyRoleState,
+    isRoleStateLoading,
+    isSessionBootstrapping,
+    miniAppHost,
+    navigate,
+    role,
+    telegramUser?.id,
+    telegramUser?.first_name,
+    telegramUser?.last_name,
+    telegramUser?.username,
+    telegramUser?.language_code,
+    telegramUser?.photo_url,
+    userId,
+  ])
 
   const handleDistrictChange = (value: number | null) => {
     setDistrictId(value)
@@ -1028,38 +1217,6 @@ function App() {
       setIsSaving(false)
     }
   }, [address, addressReturnView, cityId, districtId, navigate, role, userId])
-
-  useEffect(() => {
-    if (!telegramUser?.id) return
-
-    const payload = {
-      userId,
-      firstName: telegramUser.first_name ?? null,
-      lastName: telegramUser.last_name ?? null,
-      username: telegramUser.username ?? null,
-      languageCode: telegramUser.language_code ?? null,
-      photoUrl: telegramUser.photo_url ?? null,
-    }
-
-    const controller = new AbortController()
-
-    fetch(`${apiBase}/api/user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    }).catch(() => {})
-
-    return () => controller.abort()
-  }, [
-    telegramUser?.id,
-    telegramUser?.first_name,
-    telegramUser?.last_name,
-    telegramUser?.username,
-    telegramUser?.language_code,
-    telegramUser?.photo_url,
-    userId,
-  ])
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp
@@ -1526,6 +1683,84 @@ function App() {
     }
   }, [apiBase, navigate, userId])
 
+  const handleStartAccountLink = useCallback(async () => {
+    if (!userId) {
+      window.alert('Не удалось определить пользователя. Перезапустите приложение.')
+      return
+    }
+    if (isAccountAlreadyLinked) {
+      window.alert('Аккаунт уже привязан.')
+      return
+    }
+    if (isAccountLinkPending || isRoleSelectionPending || accountLinkEnvMissing) {
+      return
+    }
+    setIsAccountLinkPending(true)
+    try {
+      const response = await fetch(`${apiBase}/api/account/link/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          sourcePlatform: miniAppHost === 'vk' ? 'vk' : 'telegram',
+          targetPlatform: accountLinkTargetPlatform,
+        }),
+      })
+      const payload = (await response.json().catch(() => null)) as
+        | AccountLinkStartResponse
+        | { error?: string; identities?: AccountIdentitiesResponse }
+        | null
+
+      if (!response.ok) {
+        throw new Error(
+          payload && typeof payload === 'object' && 'error' in payload && payload.error
+            ? payload.error
+            : 'link_start_failed'
+        )
+      }
+
+      if (payload && typeof payload === 'object' && 'identities' in payload) {
+        applyAccountIdentities(payload.identities ?? null)
+      }
+
+      const alreadyLinked =
+        Boolean(payload && typeof payload === 'object' && 'alreadyLinked' in payload && payload.alreadyLinked)
+      if (alreadyLinked) {
+        window.alert('Аккаунт уже привязан.')
+        return
+      }
+
+      const targetUrl =
+        payload && typeof payload === 'object' && 'targetUrl' in payload
+          ? payload.targetUrl?.trim() ?? ''
+          : ''
+      if (!targetUrl) {
+        throw new Error('link_target_missing')
+      }
+
+      const webApp = window.Telegram?.WebApp
+      if (webApp?.openLink) {
+        webApp.openLink(targetUrl)
+      } else {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch (error) {
+      window.alert('Не удалось начать привязку аккаунта. Попробуйте еще раз.')
+    } finally {
+      setIsAccountLinkPending(false)
+    }
+  }, [
+    accountLinkEnvMissing,
+    accountLinkTargetPlatform,
+    apiBase,
+    applyAccountIdentities,
+    isAccountAlreadyLinked,
+    isAccountLinkPending,
+    isRoleSelectionPending,
+    miniAppHost,
+    userId,
+  ])
+
   const openChatList = useCallback(() => {
     setSelectedChatId(null)
     setChatReturnView(null)
@@ -1792,6 +2027,12 @@ function App() {
         onRequestLocation={handleRequestLocation}
         onClearLocation={handleClearLocation}
         onLogout={handleAccountLogout}
+        accountLinkLabel={accountLinkLabel}
+        accountLinkStatusLabel={accountLinkStatusLabel}
+        accountLinkHint={accountLinkHint}
+        isAccountLinkDisabled={isAccountLinkActionDisabled}
+        isAccountLinkPending={isAccountLinkPending}
+        onStartAccountLink={handleStartAccountLink}
       />
     )
   }
@@ -1942,6 +2183,7 @@ function App() {
         apiBase={apiBase}
         userId={userId}
         role={role}
+        isSupportAgent={isSupportAgent}
         onOpenChat={(chatId) => openChatThread(chatId, 'chats')}
         onOpenSupport={() => void openSupportChat('chats')}
         onViewHome={() => navigate('client', { reset: true })}
@@ -2083,6 +2325,12 @@ function App() {
         initialPortfolioView={proProfilePortfolioView ?? undefined}
         onBackHandlerChange={registerProProfileBackHandler}
         onLogout={handleAccountLogout}
+        accountLinkLabel={accountLinkLabel}
+        accountLinkStatusLabel={accountLinkStatusLabel}
+        accountLinkHint={accountLinkHint}
+        isAccountLinkDisabled={isAccountLinkActionDisabled}
+        isAccountLinkPending={isAccountLinkPending}
+        onStartAccountLink={handleStartAccountLink}
       />
     )
   }
@@ -2250,7 +2498,7 @@ function App() {
     )
   }
 
-  if (isRoleStateLoading) {
+  if (isSessionBootstrapping || isRoleStateLoading || !userId) {
     return <ScreenLoader />
   }
 

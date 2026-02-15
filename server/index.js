@@ -123,6 +123,13 @@ const SUPPORT_AGENT_IDS = Array.from(
       .filter(Boolean)
   )
 )
+const SUPPORT_AGENT_ID_SET = new Set(SUPPORT_AGENT_IDS)
+const LINK_TOKEN_TTL_MS = 10 * 60 * 1000
+const VK_APP_URL = normalizeText(
+  process.env.VITE_VK_APP_URL ?? process.env.VK_APP_URL ?? 'https://vk.com/app54453024'
+)
+const identityPlatforms = new Set(['telegram', 'vk'])
+const linkableHosts = new Set(['telegram', 'vk', 'web'])
 const SUPPORT_CONTEXT_ID = 1
 const SUPPORT_WELCOME_MESSAGE =
   'Здравствуйте! Это поддержка KIVEN. Опишите ситуацию, добавьте номер заявки/записи (если есть) и приложите фото или скриншот.'
@@ -289,6 +296,41 @@ const normalizeUserRole = (value) => {
   if (normalized === 'client' || normalized === 'pro') return normalized
   return null
 }
+
+const normalizeIdentityPlatform = (value) => {
+  const normalized = normalizeText(value).toLowerCase()
+  return identityPlatforms.has(normalized) ? normalized : null
+}
+
+const resolveIdentityPlatformByHost = (host) => {
+  const normalized = normalizeText(host).toLowerCase()
+  if (!linkableHosts.has(normalized)) return 'telegram'
+  if (normalized === 'vk') return 'vk'
+  return 'telegram'
+}
+
+const normalizeExternalUserId = (value) => normalizeText(String(value ?? ''))
+
+const buildLegacyUserId = (platform, externalUserId) =>
+  platform === 'vk' ? `vk_${externalUserId}` : externalUserId
+
+const parseLegacyIdentity = (userId) => {
+  const normalized = normalizeText(userId)
+  if (!normalized) return null
+  if (normalized.startsWith('vk_')) {
+    const externalUserId = normalizeText(normalized.slice(3))
+    if (!externalUserId) return null
+    return { platform: 'vk', externalUserId }
+  }
+  if (normalized.startsWith('u_')) {
+    return null
+  }
+  return { platform: 'telegram', externalUserId: normalized }
+}
+
+const buildInternalUserId = () => `u_${randomUUID()}`
+
+const buildLinkToken = () => randomUUID().replace(/-/g, '')
 
 const normalizeStoryCaption = (value) => {
   const normalized = normalizeText(value)
@@ -1321,7 +1363,9 @@ const safeJson = (value) => {
 }
 
 const telegramBotToken = normalizeText(process.env.BOT_TOKEN)
-const telegramWebAppUrl = normalizeText(process.env.WEB_APP_URL)
+const telegramWebAppUrl = normalizeText(
+  process.env.WEB_APP_URL ?? process.env.VITE_TG_APP_URL
+)
 const telegramApiBase = 'https://api.telegram.org'
 
 const buildStartAppUrl = (baseUrl, startParam) => {
@@ -1374,9 +1418,30 @@ const buildTelegramButtons = (buttons) => {
     .filter(Boolean)
 }
 
+const resolveTelegramRecipientId = async (recipientId) => {
+  const normalizedRecipientId = normalizeText(recipientId)
+  if (!normalizedRecipientId) return ''
+  if (/^\d+$/.test(normalizedRecipientId)) {
+    return normalizedRecipientId
+  }
+  const identityResult = await pool.query(
+    `
+      SELECT external_user_id AS "externalUserId"
+      FROM user_identities
+      WHERE internal_user_id = $1
+        AND platform = 'telegram'
+      LIMIT 1
+    `,
+    [normalizedRecipientId]
+  )
+  return normalizeText(identityResult.rows[0]?.externalUserId)
+}
+
 const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl, buttons }) => {
   if (!telegramBotToken) return false
   if (typeof fetch !== 'function') return false
+  const resolvedRecipientId = await resolveTelegramRecipientId(recipientId)
+  if (!resolvedRecipientId) return false
   const normalizedButtons = buildTelegramButtons(buttons)
   const fallbackButton = webAppUrl
     ? { text: 'Открыть чат', web_app: { url: webAppUrl } }
@@ -1389,7 +1454,7 @@ const sendTelegramMessage = async ({ recipientId, text, url, webAppUrl, buttons 
       ? [fallbackButton]
       : []
   const payload = {
-    chat_id: recipientId,
+    chat_id: resolvedRecipientId,
     text,
     disable_web_page_preview: true,
     ...(resolvedButtons.length
@@ -1534,8 +1599,8 @@ const getProfileStatusSummary = (profile) => {
   }
 }
 
-const ensureUser = async (userId) => {
-  await pool.query(
+const ensureUser = async (userId, db = pool) => {
+  await db.query(
     `
       INSERT INTO users (user_id)
       VALUES ($1)
@@ -1543,6 +1608,1171 @@ const ensureUser = async (userId) => {
     `,
     [userId]
   )
+}
+
+const normalizeOptionalProfileValue = (value) => {
+  const normalized = normalizeText(value)
+  return normalized || null
+}
+
+const normalizeSessionProfilePayload = (payload = {}) => ({
+  firstName: normalizeOptionalProfileValue(payload.firstName),
+  lastName: normalizeOptionalProfileValue(payload.lastName),
+  username: normalizeOptionalProfileValue(payload.username),
+  languageCode: normalizeOptionalProfileValue(payload.languageCode),
+  photoUrl: normalizeExternalUrl(payload.photoUrl),
+})
+
+const upsertUserProfile = async (db, { userId, firstName, lastName, username, languageCode, photoUrl }) => {
+  await db.query(
+    `
+      INSERT INTO users (
+        user_id,
+        first_name,
+        last_name,
+        username,
+        language_code,
+        avatar_url
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (user_id) DO UPDATE
+      SET first_name = COALESCE(EXCLUDED.first_name, users.first_name),
+          last_name = COALESCE(EXCLUDED.last_name, users.last_name),
+          username = COALESCE(EXCLUDED.username, users.username),
+          language_code = COALESCE(EXCLUDED.language_code, users.language_code),
+          avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+          updated_at = NOW()
+    `,
+    [userId, firstName, lastName, username, languageCode, photoUrl]
+  )
+}
+
+const loadAccountIdentities = async (db, userId) => {
+  const result = await db.query(
+    `
+      SELECT
+        platform,
+        external_user_id AS "externalUserId"
+      FROM user_identities
+      WHERE internal_user_id = $1
+    `,
+    [userId]
+  )
+  const identities = {
+    telegramLinked: false,
+    vkLinked: false,
+    telegramUserId: null,
+    vkUserId: null,
+  }
+  result.rows.forEach((row) => {
+    if (row.platform === 'telegram') {
+      identities.telegramLinked = true
+      identities.telegramUserId = normalizeText(row.externalUserId) || null
+    }
+    if (row.platform === 'vk') {
+      identities.vkLinked = true
+      identities.vkUserId = normalizeText(row.externalUserId) || null
+    }
+  })
+  return identities
+}
+
+const isSupportAgentUser = async (db, userId) => {
+  const normalizedUserId = normalizeText(userId)
+  if (!normalizedUserId) return false
+  if (SUPPORT_AGENT_ID_SET.has(normalizedUserId)) return true
+  const result = await db.query(
+    `
+      SELECT 1
+      FROM user_identities
+      WHERE internal_user_id = $1
+        AND external_user_id = ANY($2::text[])
+      LIMIT 1
+    `,
+    [normalizedUserId, SUPPORT_AGENT_IDS]
+  )
+  return result.rowCount > 0
+}
+
+const ensureIdentityBinding = async (db, { internalUserId, platform, externalUserId, isPrimary = false }) => {
+  await db.query(
+    `
+      INSERT INTO user_identities (
+        internal_user_id,
+        platform,
+        external_user_id,
+        is_primary,
+        linked_at,
+        last_seen_at,
+        created_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, NOW(), NOW(), NOW(), NOW())
+      ON CONFLICT (platform, external_user_id) DO UPDATE
+      SET internal_user_id = EXCLUDED.internal_user_id,
+          is_primary = user_identities.is_primary OR EXCLUDED.is_primary,
+          last_seen_at = NOW(),
+          updated_at = NOW()
+    `,
+    [internalUserId, platform, externalUserId, Boolean(isPrimary)]
+  )
+}
+
+const resolveOrCreateCanonicalUserId = async (db, { platform, externalUserId }) => {
+  const normalizedPlatform = normalizeIdentityPlatform(platform)
+  const normalizedExternalUserId = normalizeExternalUserId(externalUserId)
+  if (!normalizedPlatform || !normalizedExternalUserId) {
+    return null
+  }
+
+  const identityResult = await db.query(
+    `
+      SELECT internal_user_id AS "internalUserId"
+      FROM user_identities
+      WHERE platform = $1
+        AND external_user_id = $2
+      LIMIT 1
+    `,
+    [normalizedPlatform, normalizedExternalUserId]
+  )
+  const identityRow = identityResult.rows[0]
+  if (identityRow?.internalUserId) {
+    await ensureUser(identityRow.internalUserId, db)
+    return identityRow.internalUserId
+  }
+
+  const legacyUserId = buildLegacyUserId(normalizedPlatform, normalizedExternalUserId)
+  const legacyResult = await db.query(
+    `
+      SELECT user_id AS "userId"
+      FROM users
+      WHERE user_id = $1
+      LIMIT 1
+    `,
+    [legacyUserId]
+  )
+  const existingLegacyUserId = normalizeText(legacyResult.rows[0]?.userId)
+  if (existingLegacyUserId) {
+    await ensureIdentityBinding(db, {
+      internalUserId: existingLegacyUserId,
+      platform: normalizedPlatform,
+      externalUserId: normalizedExternalUserId,
+      isPrimary: true,
+    })
+    return existingLegacyUserId
+  }
+
+  const internalUserId = buildInternalUserId()
+  await db.query(
+    `
+      INSERT INTO users (user_id)
+      VALUES ($1)
+      ON CONFLICT (user_id) DO NOTHING
+    `,
+    [internalUserId]
+  )
+  await ensureIdentityBinding(db, {
+    internalUserId,
+    platform: normalizedPlatform,
+    externalUserId: normalizedExternalUserId,
+    isPrimary: true,
+  })
+  return internalUserId
+}
+
+const bootstrapSession = async ({
+  host,
+  platformUserId,
+  firstName,
+  lastName,
+  username,
+  languageCode,
+  photoUrl,
+}) => {
+  const platform = resolveIdentityPlatformByHost(host)
+  const normalizedExternalUserId = normalizeExternalUserId(platformUserId)
+  const fallbackUserId = 'local-dev'
+  const profile = normalizeSessionProfilePayload({
+    firstName,
+    lastName,
+    username,
+    languageCode,
+    photoUrl,
+  })
+
+  if (!normalizedExternalUserId) {
+    await ensureUser(fallbackUserId)
+    await upsertUserProfile(pool, {
+      userId: fallbackUserId,
+      ...profile,
+    })
+    const roleResult = await pool.query(
+      `
+        SELECT
+          app_role AS role,
+          role_selected_at AS "roleSelectedAt",
+          role_changed_at AS "roleChangedAt"
+        FROM users
+        WHERE user_id = $1
+      `,
+      [fallbackUserId]
+    )
+    const roleRow = roleResult.rows[0] ?? null
+    const role = normalizeUserRole(roleRow?.role)
+    return {
+      userId: fallbackUserId,
+      roleState: {
+        role,
+        selectedOnce: Boolean(role && roleRow?.roleSelectedAt),
+        roleSelectedAt: roleRow?.roleSelectedAt ?? null,
+        roleChangedAt: roleRow?.roleChangedAt ?? null,
+      },
+      identities: {
+        telegramLinked: false,
+        vkLinked: false,
+        telegramUserId: null,
+        vkUserId: null,
+      },
+      isSupportAgent: false,
+    }
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const internalUserId = await resolveOrCreateCanonicalUserId(client, {
+      platform,
+      externalUserId: normalizedExternalUserId,
+    })
+    if (!internalUserId) {
+      throw new Error('session_user_resolve_failed')
+    }
+    await ensureIdentityBinding(client, {
+      internalUserId,
+      platform,
+      externalUserId: normalizedExternalUserId,
+      isPrimary: true,
+    })
+    await upsertUserProfile(client, {
+      userId: internalUserId,
+      ...profile,
+    })
+    const roleResult = await client.query(
+      `
+        SELECT
+          app_role AS role,
+          role_selected_at AS "roleSelectedAt",
+          role_changed_at AS "roleChangedAt"
+        FROM users
+        WHERE user_id = $1
+      `,
+      [internalUserId]
+    )
+    const roleRow = roleResult.rows[0] ?? null
+    const role = normalizeUserRole(roleRow?.role)
+    const identities = await loadAccountIdentities(client, internalUserId)
+    const isSupportAgent = await isSupportAgentUser(client, internalUserId)
+    await client.query('COMMIT')
+    return {
+      userId: internalUserId,
+      roleState: {
+        role,
+        selectedOnce: Boolean(role && roleRow?.roleSelectedAt),
+        roleSelectedAt: roleRow?.roleSelectedAt ?? null,
+        roleChangedAt: roleRow?.roleChangedAt ?? null,
+      },
+      identities,
+      isSupportAgent,
+    }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+const toEpochMs = (value) => {
+  if (!value) return 0
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const mergeTextArray = (...values) => {
+  const merged = []
+  values.forEach((value) => {
+    if (!Array.isArray(value)) return
+    value.forEach((item) => {
+      const normalized = normalizeText(item)
+      if (!normalized) return
+      if (!merged.includes(normalized)) {
+        merged.push(normalized)
+      }
+    })
+  })
+  return merged
+}
+
+const choosePreferredRow = (primaryRow, secondaryRow) => {
+  const primaryTime = toEpochMs(primaryRow?.updated_at)
+  const secondaryTime = toEpochMs(secondaryRow?.updated_at)
+  if (secondaryTime > primaryTime) {
+    return { preferred: secondaryRow, fallback: primaryRow }
+  }
+  return { preferred: primaryRow, fallback: secondaryRow }
+}
+
+const mergeUserAddressRow = async (db, primaryUserId, secondaryUserId) => {
+  const result = await db.query(
+    `
+      SELECT *
+      FROM user_addresses
+      WHERE user_id = ANY($1::text[])
+    `,
+    [[primaryUserId, secondaryUserId]]
+  )
+  const primaryRow = result.rows.find((row) => row.user_id === primaryUserId) ?? null
+  const secondaryRow = result.rows.find((row) => row.user_id === secondaryUserId) ?? null
+  if (!secondaryRow) return
+  if (!primaryRow) {
+    await db.query(
+      `
+        UPDATE user_addresses
+        SET user_id = $1,
+            updated_at = NOW()
+        WHERE user_id = $2
+      `,
+      [primaryUserId, secondaryUserId]
+    )
+    return
+  }
+  const { preferred, fallback } = choosePreferredRow(primaryRow, secondaryRow)
+  await db.query(
+    `
+      UPDATE user_addresses
+      SET city_id = COALESCE($2, $3),
+          district_id = COALESCE($4, $5),
+          address = COALESCE(NULLIF($6, ''), NULLIF($7, ''), address),
+          updated_at = NOW()
+      WHERE user_id = $1
+    `,
+    [
+      primaryUserId,
+      preferred?.city_id ?? null,
+      fallback?.city_id ?? null,
+      preferred?.district_id ?? null,
+      fallback?.district_id ?? null,
+      normalizeText(preferred?.address),
+      normalizeText(fallback?.address),
+    ]
+  )
+  await db.query(`DELETE FROM user_addresses WHERE user_id = $1`, [secondaryUserId])
+}
+
+const mergeUserLocationRow = async (db, primaryUserId, secondaryUserId) => {
+  const result = await db.query(
+    `
+      SELECT *
+      FROM user_locations
+      WHERE user_id = ANY($1::text[])
+    `,
+    [[primaryUserId, secondaryUserId]]
+  )
+  const primaryRow = result.rows.find((row) => row.user_id === primaryUserId) ?? null
+  const secondaryRow = result.rows.find((row) => row.user_id === secondaryUserId) ?? null
+  if (!secondaryRow) return
+  if (!primaryRow) {
+    await db.query(
+      `
+        UPDATE user_locations
+        SET user_id = $1,
+            updated_at = NOW()
+        WHERE user_id = $2
+      `,
+      [primaryUserId, secondaryUserId]
+    )
+    return
+  }
+  const { preferred, fallback } = choosePreferredRow(primaryRow, secondaryRow)
+  await db.query(
+    `
+      UPDATE user_locations
+      SET lat = COALESCE($2, $3),
+          lng = COALESCE($4, $5),
+          accuracy = COALESCE($6, $7),
+          share_to_clients = COALESCE($8, share_to_clients),
+          share_to_masters = COALESCE($9, share_to_masters),
+          updated_at = NOW()
+      WHERE user_id = $1
+    `,
+    [
+      primaryUserId,
+      preferred?.lat ?? null,
+      fallback?.lat ?? null,
+      preferred?.lng ?? null,
+      fallback?.lng ?? null,
+      preferred?.accuracy ?? null,
+      fallback?.accuracy ?? null,
+      preferred?.share_to_clients ?? fallback?.share_to_clients ?? true,
+      preferred?.share_to_masters ?? fallback?.share_to_masters ?? true,
+    ]
+  )
+  await db.query(`DELETE FROM user_locations WHERE user_id = $1`, [secondaryUserId])
+}
+
+const mergeMasterProfileRow = async (db, primaryUserId, secondaryUserId) => {
+  const result = await db.query(
+    `
+      SELECT *
+      FROM master_profiles
+      WHERE user_id = ANY($1::text[])
+    `,
+    [[primaryUserId, secondaryUserId]]
+  )
+  const primaryRow = result.rows.find((row) => row.user_id === primaryUserId) ?? null
+  const secondaryRow = result.rows.find((row) => row.user_id === secondaryUserId) ?? null
+  if (!secondaryRow) return
+  if (!primaryRow) {
+    await db.query(
+      `
+        UPDATE master_profiles
+        SET user_id = $1,
+            updated_at = NOW()
+        WHERE user_id = $2
+      `,
+      [primaryUserId, secondaryUserId]
+    )
+    return
+  }
+  const { preferred, fallback } = choosePreferredRow(primaryRow, secondaryRow)
+  await db.query(
+    `
+      UPDATE master_profiles
+      SET display_name = COALESCE(NULLIF($2, ''), NULLIF($3, ''), display_name),
+          about = COALESCE(NULLIF($4, ''), NULLIF($5, ''), about),
+          city_id = COALESCE($6, $7, city_id),
+          district_id = COALESCE($8, $9, district_id),
+          experience_years = COALESCE($10, $11, experience_years),
+          price_from = COALESCE($12, $13, price_from),
+          price_to = COALESCE($14, $15, price_to),
+          avatar_path = COALESCE(NULLIF($16, ''), NULLIF($17, ''), avatar_path),
+          cover_path = COALESCE(NULLIF($18, ''), NULLIF($19, ''), cover_path),
+          works_at_client = COALESCE($20, works_at_client),
+          works_at_master = COALESCE($21, works_at_master),
+          categories = $22,
+          services = $23,
+          portfolio_urls = $24,
+          is_active = COALESCE($25, is_active),
+          schedule_days = $26,
+          schedule_start = COALESCE(NULLIF($27, ''), NULLIF($28, ''), schedule_start),
+          schedule_end = COALESCE(NULLIF($29, ''), NULLIF($30, ''), schedule_end),
+          cancel_window_hours = COALESCE($31, $32, cancel_window_hours),
+          deposit_percent = COALESCE($33, $34, deposit_percent),
+          deposit_type = COALESCE(NULLIF($35, ''), NULLIF($36, ''), deposit_type),
+          deposit_fixed = COALESCE($37, $38, deposit_fixed),
+          deposit_details = COALESCE(NULLIF($39, ''), NULLIF($40, ''), deposit_details),
+          deposit_qr_path = COALESCE(NULLIF($41, ''), NULLIF($42, ''), deposit_qr_path),
+          certificates = COALESCE($43, $44, certificates),
+          updated_at = NOW()
+      WHERE user_id = $1
+    `,
+    [
+      primaryUserId,
+      normalizeText(preferred?.display_name),
+      normalizeText(fallback?.display_name),
+      normalizeText(preferred?.about),
+      normalizeText(fallback?.about),
+      preferred?.city_id ?? null,
+      fallback?.city_id ?? null,
+      preferred?.district_id ?? null,
+      fallback?.district_id ?? null,
+      preferred?.experience_years ?? null,
+      fallback?.experience_years ?? null,
+      preferred?.price_from ?? null,
+      fallback?.price_from ?? null,
+      preferred?.price_to ?? null,
+      fallback?.price_to ?? null,
+      normalizeText(preferred?.avatar_path),
+      normalizeText(fallback?.avatar_path),
+      normalizeText(preferred?.cover_path),
+      normalizeText(fallback?.cover_path),
+      preferred?.works_at_client ?? fallback?.works_at_client ?? false,
+      preferred?.works_at_master ?? fallback?.works_at_master ?? false,
+      mergeTextArray(preferred?.categories, fallback?.categories),
+      mergeTextArray(preferred?.services, fallback?.services),
+      mergeTextArray(preferred?.portfolio_urls, fallback?.portfolio_urls),
+      preferred?.is_active ?? fallback?.is_active ?? true,
+      mergeTextArray(preferred?.schedule_days, fallback?.schedule_days),
+      normalizeText(preferred?.schedule_start),
+      normalizeText(fallback?.schedule_start),
+      normalizeText(preferred?.schedule_end),
+      normalizeText(fallback?.schedule_end),
+      preferred?.cancel_window_hours ?? null,
+      fallback?.cancel_window_hours ?? null,
+      preferred?.deposit_percent ?? null,
+      fallback?.deposit_percent ?? null,
+      normalizeText(preferred?.deposit_type),
+      normalizeText(fallback?.deposit_type),
+      preferred?.deposit_fixed ?? null,
+      fallback?.deposit_fixed ?? null,
+      normalizeText(preferred?.deposit_details),
+      normalizeText(fallback?.deposit_details),
+      normalizeText(preferred?.deposit_qr_path),
+      normalizeText(fallback?.deposit_qr_path),
+      preferred?.certificates ?? null,
+      fallback?.certificates ?? null,
+    ]
+  )
+  await db.query(`DELETE FROM master_profiles WHERE user_id = $1`, [secondaryUserId])
+}
+
+const mergeMasterShowcaseRow = async (db, primaryUserId, secondaryUserId) => {
+  const result = await db.query(
+    `
+      SELECT *
+      FROM master_showcases
+      WHERE user_id = ANY($1::text[])
+    `,
+    [[primaryUserId, secondaryUserId]]
+  )
+  const primaryRow = result.rows.find((row) => row.user_id === primaryUserId) ?? null
+  const secondaryRow = result.rows.find((row) => row.user_id === secondaryUserId) ?? null
+  if (!secondaryRow) return
+  if (!primaryRow) {
+    await db.query(
+      `
+        UPDATE master_showcases
+        SET user_id = $1,
+            updated_at = NOW()
+        WHERE user_id = $2
+      `,
+      [primaryUserId, secondaryUserId]
+    )
+    return
+  }
+  const mergedUrls = mergeTextArray(primaryRow.showcase_urls, secondaryRow.showcase_urls)
+  await db.query(
+    `
+      UPDATE master_showcases
+      SET showcase_urls = $2,
+          updated_at = NOW()
+      WHERE user_id = $1
+    `,
+    [primaryUserId, mergedUrls]
+  )
+  await db.query(`DELETE FROM master_showcases WHERE user_id = $1`, [secondaryUserId])
+}
+
+const mergeClientTrustScoreRow = async (db, primaryUserId, secondaryUserId) => {
+  const result = await db.query(
+    `
+      SELECT *
+      FROM client_trust_scores
+      WHERE user_id = ANY($1::text[])
+    `,
+    [[primaryUserId, secondaryUserId]]
+  )
+  const primaryRow = result.rows.find((row) => row.user_id === primaryUserId) ?? null
+  const secondaryRow = result.rows.find((row) => row.user_id === secondaryUserId) ?? null
+  if (!secondaryRow) return
+  if (!primaryRow) {
+    await db.query(
+      `
+        UPDATE client_trust_scores
+        SET user_id = $1,
+            updated_at = NOW()
+        WHERE user_id = $2
+      `,
+      [primaryUserId, secondaryUserId]
+    )
+    return
+  }
+  const { preferred, fallback } = choosePreferredRow(primaryRow, secondaryRow)
+  await db.query(
+    `
+      UPDATE client_trust_scores
+      SET score = COALESCE($2, $3, score),
+          confidence = COALESCE($4, $5, confidence),
+          reasons = COALESCE($6, $7, reasons),
+          updated_at = NOW()
+      WHERE user_id = $1
+    `,
+    [
+      primaryUserId,
+      preferred?.score ?? null,
+      fallback?.score ?? null,
+      preferred?.confidence ?? null,
+      fallback?.confidence ?? null,
+      preferred?.reasons ?? null,
+      fallback?.reasons ?? null,
+    ]
+  )
+  await db.query(`DELETE FROM client_trust_scores WHERE user_id = $1`, [secondaryUserId])
+}
+
+const mergeRepeatSettingsRow = async (db, primaryUserId, secondaryUserId) => {
+  const result = await db.query(
+    `
+      SELECT *
+      FROM marketing_repeat_settings
+      WHERE master_id = ANY($1::text[])
+    `,
+    [[primaryUserId, secondaryUserId]]
+  )
+  const primaryRow = result.rows.find((row) => row.master_id === primaryUserId) ?? null
+  const secondaryRow = result.rows.find((row) => row.master_id === secondaryUserId) ?? null
+  if (!secondaryRow) return
+  if (!primaryRow) {
+    await db.query(
+      `
+        UPDATE marketing_repeat_settings
+        SET master_id = $1,
+            updated_at = NOW()
+        WHERE master_id = $2
+      `,
+      [primaryUserId, secondaryUserId]
+    )
+    return
+  }
+  const { preferred, fallback } = choosePreferredRow(primaryRow, secondaryRow)
+  await db.query(
+    `
+      UPDATE marketing_repeat_settings
+      SET enabled = COALESCE($2, enabled),
+          channel = COALESCE(NULLIF($3, ''), NULLIF($4, ''), channel),
+          include_link = COALESCE($5, include_link),
+          include_unsubscribe = COALESCE($6, include_unsubscribe),
+          intervals = COALESCE($7, $8, intervals),
+          template = COALESCE(NULLIF($9, ''), NULLIF($10, ''), template),
+          updated_at = NOW()
+      WHERE master_id = $1
+    `,
+    [
+      primaryUserId,
+      preferred?.enabled ?? fallback?.enabled ?? false,
+      normalizeText(preferred?.channel),
+      normalizeText(fallback?.channel),
+      preferred?.include_link ?? fallback?.include_link ?? true,
+      preferred?.include_unsubscribe ?? fallback?.include_unsubscribe ?? true,
+      preferred?.intervals ?? null,
+      fallback?.intervals ?? null,
+      normalizeText(preferred?.template),
+      normalizeText(fallback?.template),
+    ]
+  )
+  await db.query(`DELETE FROM marketing_repeat_settings WHERE master_id = $1`, [secondaryUserId])
+}
+
+const moveRowsWithConflictHandling = async ({
+  db,
+  table,
+  columns,
+  userColumns,
+  conflictColumns,
+  primaryUserId,
+  secondaryUserId,
+}) => {
+  if (!Array.isArray(columns) || columns.length === 0) return
+  const whereClause = userColumns.map((column) => `${column} = $2`).join(' OR ')
+  const transformedSelect = columns
+    .map((column) =>
+      userColumns.includes(column)
+        ? `CASE WHEN ${column} = $2 THEN $1 ELSE ${column} END AS ${column}`
+        : column
+    )
+    .join(', ')
+  await db.query(
+    `
+      INSERT INTO ${table} (${columns.join(', ')})
+      SELECT ${transformedSelect}
+      FROM ${table}
+      WHERE ${whereClause}
+      ON CONFLICT (${conflictColumns.join(', ')}) DO NOTHING
+    `,
+    [primaryUserId, secondaryUserId]
+  )
+  await db.query(
+    `
+      DELETE FROM ${table}
+      WHERE ${whereClause}
+    `,
+    [primaryUserId, secondaryUserId]
+  )
+}
+
+const mergeRequestResponses = async (db, primaryUserId, secondaryUserId) => {
+  const duplicates = await db.query(
+    `
+      SELECT
+        s.id AS "secondaryId",
+        p.id AS "primaryId"
+      FROM request_responses s
+      JOIN request_responses p
+        ON p.request_id = s.request_id
+       AND p.master_id = $1
+      WHERE s.master_id = $2
+    `,
+    [primaryUserId, secondaryUserId]
+  )
+
+  for (const row of duplicates.rows) {
+    const secondaryId = Number(row.secondaryId)
+    const primaryId = Number(row.primaryId)
+    if (!secondaryId || !primaryId) continue
+    await db.query(
+      `
+        UPDATE service_bookings
+        SET response_id = $1,
+            updated_at = NOW()
+        WHERE response_id = $2
+      `,
+      [primaryId, secondaryId]
+    )
+    await db.query(
+      `
+        UPDATE chats
+        SET response_id = $1,
+            updated_at = NOW()
+        WHERE response_id = $2
+      `,
+      [primaryId, secondaryId]
+    )
+    await db.query(
+      `
+        UPDATE chat_contexts
+        SET response_id = $1,
+            updated_at = NOW()
+        WHERE response_id = $2
+      `,
+      [primaryId, secondaryId]
+    )
+    await db.query(`DELETE FROM request_responses WHERE id = $1`, [secondaryId])
+  }
+
+  await db.query(
+    `
+      UPDATE request_responses
+      SET master_id = $1,
+          updated_at = NOW()
+      WHERE master_id = $2
+    `,
+    [primaryUserId, secondaryUserId]
+  )
+}
+
+const mergeChatMembersInto = async (db, { sourceChatId, targetChatId, primaryUserId, secondaryUserId }) => {
+  await db.query(
+    `
+      INSERT INTO chat_members (
+        chat_id,
+        user_id,
+        role,
+        last_read_message_id,
+        unread_count,
+        muted_until,
+        created_at,
+        updated_at
+      )
+      SELECT
+        $1,
+        CASE WHEN user_id = $3 THEN $2 ELSE user_id END,
+        role,
+        last_read_message_id,
+        unread_count,
+        muted_until,
+        created_at,
+        NOW()
+      FROM chat_members
+      WHERE chat_id = $4
+      ON CONFLICT (chat_id, user_id) DO UPDATE
+      SET role = CASE
+            WHEN chat_members.role = 'master' OR EXCLUDED.role = 'master'
+              THEN 'master'
+            ELSE chat_members.role
+          END,
+          unread_count = GREATEST(chat_members.unread_count, EXCLUDED.unread_count),
+          last_read_message_id = NULLIF(
+            GREATEST(
+              COALESCE(chat_members.last_read_message_id, 0),
+              COALESCE(EXCLUDED.last_read_message_id, 0)
+            ),
+            0
+          ),
+          muted_until = GREATEST(
+            COALESCE(chat_members.muted_until, 'epoch'::timestamptz),
+            COALESCE(EXCLUDED.muted_until, 'epoch'::timestamptz)
+          ),
+          updated_at = NOW()
+    `,
+    [targetChatId, primaryUserId, secondaryUserId, sourceChatId]
+  )
+}
+
+const refreshChatLastMessage = async (db, chatId) => {
+  await db.query(
+    `
+      UPDATE chats
+      SET last_message_id = lm.id,
+          last_message_at = lm.created_at,
+          updated_at = NOW()
+      FROM LATERAL (
+        SELECT id, created_at
+        FROM chat_messages
+        WHERE chat_id = $1
+        ORDER BY id DESC
+        LIMIT 1
+      ) lm
+      WHERE chats.id = $1
+    `,
+    [chatId]
+  )
+}
+
+const mergeChats = async (db, primaryUserId, secondaryUserId) => {
+  const chatsResult = await db.query(
+    `
+      SELECT
+        id,
+        context_type AS "contextType",
+        context_id AS "contextId",
+        client_id AS "clientId",
+        master_id AS "masterId"
+      FROM chats
+      WHERE client_id = $1
+         OR master_id = $1
+      ORDER BY id ASC
+    `,
+    [secondaryUserId]
+  )
+
+  for (const chat of chatsResult.rows) {
+    const sourceChatId = Number(chat.id)
+    if (!sourceChatId) continue
+    const nextClientId =
+      normalizeText(chat.clientId) === secondaryUserId ? primaryUserId : normalizeText(chat.clientId)
+    const nextMasterId =
+      normalizeText(chat.masterId) === secondaryUserId ? primaryUserId : normalizeText(chat.masterId)
+
+    const targetResult = await db.query(
+      `
+        SELECT id
+        FROM chats
+        WHERE context_type = $1
+          AND context_id = $2
+          AND client_id = $3
+          AND master_id = $4
+        LIMIT 1
+      `,
+      [chat.contextType, chat.contextId, nextClientId, nextMasterId]
+    )
+    const existingChatId = Number(targetResult.rows[0]?.id ?? 0) || null
+
+    if (existingChatId && existingChatId !== sourceChatId) {
+      await mergeChatMembersInto(db, {
+        sourceChatId,
+        targetChatId: existingChatId,
+        primaryUserId,
+        secondaryUserId,
+      })
+      await db.query(
+        `
+          UPDATE chat_messages
+          SET chat_id = $1,
+              sender_id = CASE WHEN sender_id = $3 THEN $2 ELSE sender_id END
+          WHERE chat_id = $4
+        `,
+        [existingChatId, primaryUserId, secondaryUserId, sourceChatId]
+      )
+      await db.query(
+        `
+          INSERT INTO chat_contexts (
+            chat_id,
+            context_type,
+            context_id,
+            request_id,
+            response_id,
+            booking_id,
+            created_at,
+            updated_at
+          )
+          SELECT
+            $1,
+            context_type,
+            context_id,
+            request_id,
+            response_id,
+            booking_id,
+            created_at,
+            NOW()
+          FROM chat_contexts
+          WHERE chat_id = $2
+          ON CONFLICT (chat_id, context_type, context_id) DO UPDATE
+          SET request_id = COALESCE(chat_contexts.request_id, EXCLUDED.request_id),
+              response_id = COALESCE(chat_contexts.response_id, EXCLUDED.response_id),
+              booking_id = COALESCE(chat_contexts.booking_id, EXCLUDED.booking_id),
+              updated_at = NOW()
+        `,
+        [existingChatId, sourceChatId]
+      )
+      await db.query(`DELETE FROM chats WHERE id = $1`, [sourceChatId])
+      await refreshChatLastMessage(db, existingChatId)
+      continue
+    }
+
+    await mergeChatMembersInto(db, {
+      sourceChatId,
+      targetChatId: sourceChatId,
+      primaryUserId,
+      secondaryUserId,
+    })
+    await db.query(
+      `
+        DELETE FROM chat_members
+        WHERE chat_id = $1
+          AND user_id = $2
+      `,
+      [sourceChatId, secondaryUserId]
+    )
+    await db.query(
+      `
+        UPDATE chat_messages
+        SET sender_id = $1
+        WHERE chat_id = $2
+          AND sender_id = $3
+      `,
+      [primaryUserId, sourceChatId, secondaryUserId]
+    )
+    await db.query(
+      `
+        UPDATE chats
+        SET client_id = $2,
+            master_id = $3,
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [sourceChatId, nextClientId, nextMasterId]
+    )
+    await refreshChatLastMessage(db, sourceChatId)
+  }
+}
+
+const mergeUserAccounts = async ({
+  db,
+  primaryUserId,
+  secondaryUserId,
+  sourcePlatform = null,
+  targetPlatform = null,
+}) => {
+  const primary = normalizeText(primaryUserId)
+  const secondary = normalizeText(secondaryUserId)
+  if (!primary || !secondary || primary === secondary) {
+    return { merged: false }
+  }
+
+  const existsResult = await db.query(
+    `
+      SELECT user_id AS "userId"
+      FROM users
+      WHERE user_id = ANY($1::text[])
+    `,
+    [[primary, secondary]]
+  )
+  const userIds = new Set(existsResult.rows.map((row) => normalizeText(row.userId)).filter(Boolean))
+  if (!userIds.has(primary) || !userIds.has(secondary)) {
+    return { merged: false }
+  }
+
+  await mergeUserAddressRow(db, primary, secondary)
+  await mergeUserLocationRow(db, primary, secondary)
+  await mergeMasterProfileRow(db, primary, secondary)
+  await mergeMasterShowcaseRow(db, primary, secondary)
+  await mergeClientTrustScoreRow(db, primary, secondary)
+  await mergeRepeatSettingsRow(db, primary, secondary)
+
+  await db.query(`UPDATE master_reviews SET master_id = $1 WHERE master_id = $2`, [primary, secondary])
+  await db.query(`UPDATE master_reviews SET reviewer_id = $1 WHERE reviewer_id = $2`, [primary, secondary])
+  await db.query(`UPDATE marketing_repeat_log SET master_id = $1 WHERE master_id = $2`, [primary, secondary])
+  await db.query(`UPDATE marketing_repeat_log SET client_id = $1 WHERE client_id = $2`, [primary, secondary])
+  await db.query(`UPDATE master_promotions SET master_id = $1 WHERE master_id = $2`, [primary, secondary])
+  await db.query(`UPDATE marketing_campaigns SET master_id = $1 WHERE master_id = $2`, [primary, secondary])
+  await db.query(`UPDATE master_stories SET master_id = $1 WHERE master_id = $2`, [primary, secondary])
+  await db.query(`UPDATE service_requests SET user_id = $1 WHERE user_id = $2`, [primary, secondary])
+  await db.query(`UPDATE service_bookings SET client_id = $1 WHERE client_id = $2`, [primary, secondary])
+  await db.query(`UPDATE service_bookings SET master_id = $1 WHERE master_id = $2`, [primary, secondary])
+  await db.query(`UPDATE client_trust_events SET user_id = $1 WHERE user_id = $2`, [primary, secondary])
+  await db.query(`UPDATE chat_messages SET sender_id = $1 WHERE sender_id = $2`, [primary, secondary])
+
+  await moveRowsWithConflictHandling({
+    db,
+    table: 'master_followers',
+    columns: [
+      'master_id',
+      'follower_id',
+      'created_at',
+      'marketing_opt_in',
+      'marketing_opt_in_at',
+      'marketing_opt_out_at',
+    ],
+    userColumns: ['master_id', 'follower_id'],
+    conflictColumns: ['master_id', 'follower_id'],
+    primaryUserId: primary,
+    secondaryUserId: secondary,
+  })
+  await moveRowsWithConflictHandling({
+    db,
+    table: 'master_marketing_subscriptions',
+    columns: [
+      'master_id',
+      'subscriber_id',
+      'opt_in',
+      'opt_in_at',
+      'opt_out_at',
+      'created_at',
+    ],
+    userColumns: ['master_id', 'subscriber_id'],
+    conflictColumns: ['master_id', 'subscriber_id'],
+    primaryUserId: primary,
+    secondaryUserId: secondary,
+  })
+  await moveRowsWithConflictHandling({
+    db,
+    table: 'marketing_campaign_recipients',
+    columns: ['campaign_id', 'client_id', 'channel', 'sent_at'],
+    userColumns: ['client_id'],
+    conflictColumns: ['campaign_id', 'client_id'],
+    primaryUserId: primary,
+    secondaryUserId: secondary,
+  })
+  await moveRowsWithConflictHandling({
+    db,
+    table: 'master_profile_views',
+    columns: ['master_id', 'viewer_id', 'view_date', 'created_at'],
+    userColumns: ['master_id', 'viewer_id'],
+    conflictColumns: ['master_id', 'viewer_id', 'view_date'],
+    primaryUserId: primary,
+    secondaryUserId: secondary,
+  })
+  await moveRowsWithConflictHandling({
+    db,
+    table: 'master_story_views',
+    columns: ['story_id', 'viewer_id', 'created_at'],
+    userColumns: ['viewer_id'],
+    conflictColumns: ['story_id', 'viewer_id'],
+    primaryUserId: primary,
+    secondaryUserId: secondary,
+  })
+  await moveRowsWithConflictHandling({
+    db,
+    table: 'request_dispatches',
+    columns: [
+      'request_id',
+      'master_id',
+      'batch',
+      'status',
+      'sent_at',
+      'expires_at',
+      'responded_at',
+      'created_at',
+      'updated_at',
+    ],
+    userColumns: ['master_id'],
+    conflictColumns: ['request_id', 'master_id'],
+    primaryUserId: primary,
+    secondaryUserId: secondary,
+  })
+
+  await mergeRequestResponses(db, primary, secondary)
+  await mergeChats(db, primary, secondary)
+
+  await db.query(
+    `
+      INSERT INTO chat_members (
+        chat_id,
+        user_id,
+        role,
+        last_read_message_id,
+        unread_count,
+        muted_until,
+        created_at,
+        updated_at
+      )
+      SELECT
+        chat_id,
+        $1,
+        role,
+        last_read_message_id,
+        unread_count,
+        muted_until,
+        created_at,
+        NOW()
+      FROM chat_members
+      WHERE user_id = $2
+      ON CONFLICT (chat_id, user_id) DO NOTHING
+    `,
+    [primary, secondary]
+  )
+  await db.query(`DELETE FROM chat_members WHERE user_id = $1`, [secondary])
+
+  await db.query(
+    `
+      DELETE FROM user_identities source
+      USING user_identities primary_identity
+      WHERE source.internal_user_id = $2
+        AND primary_identity.internal_user_id = $1
+        AND source.platform = primary_identity.platform
+    `,
+    [primary, secondary]
+  )
+  await db.query(
+    `
+      UPDATE user_identities
+      SET internal_user_id = $1,
+          linked_at = COALESCE(linked_at, NOW()),
+          updated_at = NOW()
+      WHERE internal_user_id = $2
+    `,
+    [primary, secondary]
+  )
+
+  await db.query(
+    `
+      UPDATE users primary_user
+      SET first_name = COALESCE(primary_user.first_name, secondary_user.first_name),
+          last_name = COALESCE(primary_user.last_name, secondary_user.last_name),
+          username = COALESCE(primary_user.username, secondary_user.username),
+          language_code = COALESCE(primary_user.language_code, secondary_user.language_code),
+          avatar_url = COALESCE(primary_user.avatar_url, secondary_user.avatar_url),
+          app_role = COALESCE(primary_user.app_role, secondary_user.app_role),
+          role_selected_at = COALESCE(primary_user.role_selected_at, secondary_user.role_selected_at),
+          role_changed_at = COALESCE(primary_user.role_changed_at, secondary_user.role_changed_at),
+          is_blocked = primary_user.is_blocked OR secondary_user.is_blocked,
+          blocked_reason = COALESCE(primary_user.blocked_reason, secondary_user.blocked_reason),
+          blocked_at = COALESCE(primary_user.blocked_at, secondary_user.blocked_at),
+          updated_at = NOW()
+      FROM users secondary_user
+      WHERE primary_user.user_id = $1
+        AND secondary_user.user_id = $2
+    `,
+    [primary, secondary]
+  )
+
+  await db.query(`DELETE FROM users WHERE user_id = $1`, [secondary])
+
+  await db.query(
+    `
+      INSERT INTO account_merge_audit (
+        primary_user_id,
+        secondary_user_id,
+        source_platform,
+        target_platform,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, NOW())
+    `,
+    [primary, secondary, sourcePlatform, targetPlatform]
+  )
+
+  return { merged: true }
 }
 
 const loadClientTrustScore = async (userId) => {
@@ -2583,11 +3813,27 @@ const insertChatTextMessage = async (
 }
 
 const createSupportChat = async ({ userId }) => {
-  if (SUPPORT_AGENT_IDS.length === 0) {
+  const supportIdentityResult = await pool.query(
+    `
+      SELECT DISTINCT internal_user_id AS "userId"
+      FROM user_identities
+      WHERE external_user_id = ANY($1::text[])
+    `,
+    [SUPPORT_AGENT_IDS]
+  )
+  const resolvedSupportIds = Array.from(
+    new Set([
+      ...SUPPORT_AGENT_IDS,
+      ...supportIdentityResult.rows
+        .map((row) => normalizeText(row.userId))
+        .filter(Boolean),
+    ])
+  )
+  if (resolvedSupportIds.length === 0) {
     throw new Error('support_agents_missing')
   }
-  const supportMembers = SUPPORT_AGENT_IDS.filter((id) => id !== userId)
-  const primarySupportId = supportMembers[0] ?? SUPPORT_AGENT_IDS[0]
+  const supportMembers = resolvedSupportIds.filter((id) => id !== userId)
+  const primarySupportId = supportMembers[0] ?? resolvedSupportIds[0]
   const uniqueSupportMembers = Array.from(new Set(supportMembers))
   const uniqueUserIds = Array.from(
     new Set([userId, primarySupportId, ...uniqueSupportMembers].filter(Boolean))
@@ -4231,6 +5477,95 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_identities (
+      id BIGSERIAL PRIMARY KEY,
+      internal_user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      platform TEXT NOT NULL CHECK (platform IN ('telegram', 'vk')),
+      external_user_id TEXT NOT NULL,
+      is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+      linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS user_identities_platform_external_idx
+    ON user_identities (platform, external_user_id);
+  `)
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS user_identities_internal_platform_idx
+    ON user_identities (internal_user_id, platform);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS user_identities_internal_idx
+    ON user_identities (internal_user_id);
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS account_link_challenges (
+      token TEXT PRIMARY KEY,
+      source_internal_user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      source_platform TEXT NOT NULL CHECK (source_platform IN ('telegram', 'vk')),
+      target_platform TEXT NOT NULL CHECK (target_platform IN ('telegram', 'vk')),
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS account_link_challenges_source_idx
+    ON account_link_challenges (source_internal_user_id, created_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS account_link_challenges_exp_idx
+    ON account_link_challenges (expires_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS account_merge_audit (
+      id BIGSERIAL PRIMARY KEY,
+      primary_user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      secondary_user_id TEXT NOT NULL,
+      source_platform TEXT,
+      target_platform TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  await pool.query(`
+    INSERT INTO user_identities (
+      internal_user_id,
+      platform,
+      external_user_id,
+      is_primary,
+      linked_at,
+      last_seen_at,
+      created_at,
+      updated_at
+    )
+    SELECT
+      u.user_id,
+      CASE WHEN u.user_id LIKE 'vk_%' THEN 'vk' ELSE 'telegram' END,
+      CASE WHEN u.user_id LIKE 'vk_%' THEN SUBSTRING(u.user_id FROM 4) ELSE u.user_id END,
+      TRUE,
+      COALESCE(u.created_at, NOW()),
+      COALESCE(u.updated_at, NOW()),
+      COALESCE(u.created_at, NOW()),
+      COALESCE(u.updated_at, NOW())
+    FROM users u
+    WHERE u.user_id IS NOT NULL
+      AND u.user_id <> ''
+      AND u.user_id NOT LIKE 'u_%'
+    ON CONFLICT (platform, external_user_id) DO NOTHING
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS cities (
       id SERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL
@@ -5309,6 +6644,313 @@ const seedLocations = async () => {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
+})
+
+app.post('/api/session/bootstrap', async (req, res) => {
+  const {
+    host,
+    platformUserId,
+    firstName,
+    lastName,
+    username,
+    languageCode,
+    photoUrl,
+  } = req.body ?? {}
+
+  try {
+    const payload = await bootstrapSession({
+      host,
+      platformUserId,
+      firstName,
+      lastName,
+      username,
+      languageCode,
+      photoUrl,
+    })
+    res.json(payload)
+  } catch (error) {
+    console.error('POST /api/session/bootstrap failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.get('/api/account/identities', async (req, res) => {
+  const normalizedUserId = normalizeText(req.query.userId)
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  try {
+    await ensureUser(normalizedUserId)
+    const identities = await loadAccountIdentities(pool, normalizedUserId)
+    res.json({ userId: normalizedUserId, ...identities })
+  } catch (error) {
+    console.error('GET /api/account/identities failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/account/link/start', async (req, res) => {
+  const { userId, sourcePlatform, targetPlatform } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedSourcePlatform = normalizeIdentityPlatform(sourcePlatform)
+  const normalizedTargetPlatform = normalizeIdentityPlatform(targetPlatform)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (!normalizedTargetPlatform) {
+    res.status(400).json({ error: 'target_platform_invalid' })
+    return
+  }
+  if (
+    normalizedSourcePlatform &&
+    normalizedSourcePlatform === normalizedTargetPlatform
+  ) {
+    res.status(400).json({ error: 'platform_same' })
+    return
+  }
+
+  try {
+    await ensureUser(normalizedUserId)
+    const identities = await loadAccountIdentities(pool, normalizedUserId)
+    const alreadyLinked =
+      normalizedTargetPlatform === 'telegram'
+        ? identities.telegramLinked
+        : identities.vkLinked
+    if (alreadyLinked) {
+      res.json({
+        ok: true,
+        alreadyLinked: true,
+        userId: normalizedUserId,
+        targetPlatform: normalizedTargetPlatform,
+        targetUrl: '',
+        identities,
+      })
+      return
+    }
+
+    const source =
+      normalizedSourcePlatform ??
+      (normalizedTargetPlatform === 'vk'
+        ? identities.telegramLinked
+          ? 'telegram'
+          : 'vk'
+        : identities.vkLinked
+          ? 'vk'
+          : 'telegram')
+    const sourceLinked =
+      source === 'telegram' ? identities.telegramLinked : identities.vkLinked
+    if (!sourceLinked || source === normalizedTargetPlatform) {
+      res.status(409).json({
+        error: 'source_platform_not_linked',
+        userId: normalizedUserId,
+        targetPlatform: normalizedTargetPlatform,
+        identities,
+      })
+      return
+    }
+
+    const startParam = `link_${buildLinkToken()}`
+    const targetUrl =
+      normalizedTargetPlatform === 'telegram'
+        ? buildStartAppUrl(telegramWebAppUrl, startParam)
+        : (() => {
+            if (!VK_APP_URL) return ''
+            const encoded = encodeURIComponent(startParam)
+            if (/start=/i.test(VK_APP_URL)) {
+              return VK_APP_URL.replace(/start=[^&]*/i, `start=${encoded}`)
+            }
+            const joiner = VK_APP_URL.includes('?') ? '&' : '?'
+            return `${VK_APP_URL}${joiner}start=${encoded}`
+          })()
+
+    if (!targetUrl) {
+      res.status(400).json({
+        error: normalizedTargetPlatform === 'telegram' ? 'tg_url_missing' : 'vk_url_missing',
+      })
+      return
+    }
+
+    const token = startParam.replace(/^link_/, '')
+    const expiresAt = new Date(Date.now() + LINK_TOKEN_TTL_MS)
+    await pool.query(
+      `
+        INSERT INTO account_link_challenges (
+          token,
+          source_internal_user_id,
+          source_platform,
+          target_platform,
+          expires_at
+        )
+        VALUES ($1, $2, $3, $4, $5)
+      `,
+      [token, normalizedUserId, source, normalizedTargetPlatform, expiresAt.toISOString()]
+    )
+
+    res.json({
+      ok: true,
+      alreadyLinked: false,
+      token,
+      targetPlatform: normalizedTargetPlatform,
+      targetUrl,
+      expiresAt: expiresAt.toISOString(),
+      identities,
+    })
+  } catch (error) {
+    console.error('POST /api/account/link/start failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+app.post('/api/account/link/complete', async (req, res) => {
+  const {
+    userId,
+    token,
+    host,
+    platformUserId,
+    firstName,
+    lastName,
+    username,
+    languageCode,
+    photoUrl,
+  } = req.body ?? {}
+  const normalizedUserId = normalizeText(userId)
+  const normalizedToken = normalizeText(token)
+  const targetPlatform = resolveIdentityPlatformByHost(host)
+  const externalUserId = normalizeExternalUserId(platformUserId)
+
+  if (!normalizedUserId) {
+    res.status(400).json({ error: 'userId_required' })
+    return
+  }
+  if (!normalizedToken) {
+    res.status(400).json({ error: 'token_required' })
+    return
+  }
+  if (!externalUserId) {
+    res.status(400).json({ error: 'platform_user_id_required' })
+    return
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const challengeResult = await client.query(
+      `
+        SELECT
+          token,
+          source_internal_user_id AS "sourceUserId",
+          source_platform AS "sourcePlatform",
+          target_platform AS "targetPlatform",
+          expires_at AS "expiresAt",
+          used_at AS "usedAt"
+        FROM account_link_challenges
+        WHERE token = $1
+        LIMIT 1
+      `,
+      [normalizedToken]
+    )
+    const challenge = challengeResult.rows[0] ?? null
+    if (!challenge || challenge.usedAt || toEpochMs(challenge.expiresAt) <= Date.now()) {
+      await client.query('ROLLBACK')
+      res.status(409).json({ error: 'token_invalid_or_used' })
+      return
+    }
+    if (challenge.targetPlatform !== targetPlatform) {
+      await client.query('ROLLBACK')
+      res.status(409).json({ error: 'target_platform_mismatch' })
+      return
+    }
+
+    await ensureUser(normalizedUserId, client)
+    const sourceUserId = normalizeText(challenge.sourceUserId)
+    if (!sourceUserId) {
+      await client.query('ROLLBACK')
+      res.status(500).json({ error: 'link_source_missing' })
+      return
+    }
+
+    const sessionProfile = normalizeSessionProfilePayload({
+      firstName,
+      lastName,
+      username,
+      languageCode,
+      photoUrl,
+    })
+    await upsertUserProfile(client, {
+      userId: normalizedUserId,
+      ...sessionProfile,
+    })
+
+    let activeUserId = sourceUserId
+    let merged = false
+    if (normalizedUserId !== sourceUserId) {
+      const mergeResult = await mergeUserAccounts({
+        db: client,
+        primaryUserId: sourceUserId,
+        secondaryUserId: normalizedUserId,
+        sourcePlatform: challenge.sourcePlatform,
+        targetPlatform: challenge.targetPlatform,
+      })
+      merged = Boolean(mergeResult?.merged)
+      activeUserId = sourceUserId
+    }
+
+    await ensureIdentityBinding(client, {
+      internalUserId: activeUserId,
+      platform: targetPlatform,
+      externalUserId,
+      isPrimary: true,
+    })
+
+    await client.query(
+      `
+        UPDATE account_link_challenges
+        SET used_at = NOW()
+        WHERE token = $1
+      `,
+      [normalizedToken]
+    )
+
+    const roleResult = await client.query(
+      `
+        SELECT
+          app_role AS role,
+          role_selected_at AS "roleSelectedAt",
+          role_changed_at AS "roleChangedAt"
+        FROM users
+        WHERE user_id = $1
+      `,
+      [activeUserId]
+    )
+    const roleRow = roleResult.rows[0] ?? null
+    const role = normalizeUserRole(roleRow?.role)
+    const identities = await loadAccountIdentities(client, activeUserId)
+    const isSupportAgent = await isSupportAgentUser(client, activeUserId)
+
+    await client.query('COMMIT')
+    res.json({
+      ok: true,
+      merged,
+      userId: activeUserId,
+      roleState: {
+        role,
+        selectedOnce: Boolean(role && roleRow?.roleSelectedAt),
+        roleSelectedAt: roleRow?.roleSelectedAt ?? null,
+        roleChangedAt: roleRow?.roleChangedAt ?? null,
+      },
+      identities,
+      isSupportAgent,
+    })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    console.error('POST /api/account/link/complete failed:', error)
+    res.status(500).json({ error: 'server_error' })
+  } finally {
+    client.release()
+  }
 })
 
 app.post('/api/user', async (req, res) => {

@@ -17,6 +17,12 @@ type ClientSettingsScreenProps = {
   onRequestLocation: () => Promise<void>
   onClearLocation: () => Promise<void>
   onLogout: () => void
+  accountLinkLabel: string
+  accountLinkStatusLabel: string
+  accountLinkHint?: string
+  isAccountLinkDisabled?: boolean
+  isAccountLinkPending?: boolean
+  onStartAccountLink: () => void
 }
 
 type SettingsPrefs = {
@@ -145,6 +151,12 @@ export const ClientSettingsScreen = ({
   onRequestLocation,
   onClearLocation,
   onLogout,
+  accountLinkLabel,
+  accountLinkStatusLabel,
+  accountLinkHint = '',
+  isAccountLinkDisabled = false,
+  isAccountLinkPending = false,
+  onStartAccountLink,
 }: ClientSettingsScreenProps) => {
   const [prefs, setPrefs] = useState<SettingsPrefs>(() => loadPrefs())
   const [requestsCount, setRequestsCount] = useState(0)
@@ -559,6 +571,14 @@ export const ClientSettingsScreen = ({
           </p>
           <div className="cs26-role-actions">
             <button
+              className="cs26-action"
+              type="button"
+              onClick={onStartAccountLink}
+              disabled={isAccountLinkDisabled || isAccountLinkPending}
+            >
+              {isAccountLinkPending ? 'Открываем...' : accountLinkLabel}
+            </button>
+            <button
               className="cs26-action is-primary"
               type="button"
               onClick={handleLogout}
@@ -566,6 +586,10 @@ export const ClientSettingsScreen = ({
               Выйти из аккаунта
             </button>
           </div>
+          <p className="cs26-role-note">
+            {accountLinkStatusLabel}
+            {accountLinkHint ? ` · ${accountLinkHint}` : ''}
+          </p>
         </section>
 
         <section className="cs26-note animate delay-4">

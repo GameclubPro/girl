@@ -63,6 +63,12 @@ type ProProfileScreenProps = {
   onViewChats: () => void
   onViewStories: () => void
   onLogout: () => void
+  accountLinkLabel: string
+  accountLinkStatusLabel: string
+  accountLinkHint?: string
+  isAccountLinkDisabled?: boolean
+  isAccountLinkPending?: boolean
+  onStartAccountLink: () => void
   focusSection?: ProProfileSection | null
   initialPortfolioView?: 'portfolio' | 'showcase'
   onBackHandlerChange?: ((handler: (() => boolean) | null) => void) | undefined
@@ -421,6 +427,12 @@ export const ProProfileScreen = ({
   onViewChats,
   onViewStories,
   onLogout,
+  accountLinkLabel,
+  accountLinkStatusLabel,
+  accountLinkHint = '',
+  isAccountLinkDisabled = false,
+  isAccountLinkPending = false,
+  onStartAccountLink,
   focusSection,
   initialPortfolioView,
   onBackHandlerChange,
@@ -5348,6 +5360,30 @@ export const ProProfileScreen = ({
                 </span>
               </div>
               <div className="pro-profile-settings-list">
+                <button
+                  className="pro-profile-settings-item pro-profile-settings-item--role-switch"
+                  type="button"
+                  onClick={onStartAccountLink}
+                  disabled={isAccountLinkDisabled || isAccountLinkPending}
+                >
+                  <span className="pro-profile-settings-icon" aria-hidden="true">
+                    <IconSettings />
+                  </span>
+                  <span className="pro-profile-settings-content">
+                    <span className="pro-profile-settings-label">{accountLinkLabel}</span>
+                    <span className="pro-profile-settings-hint">
+                      {accountLinkHint || 'Свяжите аккаунты Telegram и ВКонтакте.'}
+                    </span>
+                  </span>
+                  <span className="pro-profile-settings-tail">
+                    <span className="pro-profile-settings-status-pill is-ready">
+                      {isAccountLinkPending ? 'Открываем...' : accountLinkStatusLabel}
+                    </span>
+                    <span className="pro-profile-settings-arrow" aria-hidden="true">
+                      ›
+                    </span>
+                  </span>
+                </button>
                 <button
                   className="pro-profile-settings-item pro-profile-settings-item--role-switch"
                   type="button"
