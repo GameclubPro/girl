@@ -286,7 +286,7 @@ const createPool = () => {
 const pool = createPool()
 const chatClientsByUserId = new Map()
 
-const normalizeText = (value) => {
+function normalizeText(value) {
   if (typeof value !== 'string') return ''
   return value.trim()
 }
