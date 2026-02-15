@@ -11,7 +11,6 @@ import { MediaCropper } from '../components/MediaCropper'
 import {
   IconCertificate,
   IconChevron,
-  IconClientVisit,
   IconExperience,
   IconFormatBoth,
   IconFormatClientVisit,
@@ -35,7 +34,6 @@ import type {
   MasterReview,
   MasterReviewSummary,
   ProProfileSection,
-  Role,
   UserLocation,
 } from '../types/app'
 import {
@@ -55,7 +53,6 @@ import { buildImageSrcSet, buildImageUrl } from '../utils/media'
 type ProProfileScreenProps = {
   apiBase: string
   userId: string
-  role: Role
   displayNameFallback: string
   telegramAvatarUrl?: string | null
   returnView?: 'pro-cabinet' | 'pro-requests'
@@ -64,7 +61,7 @@ type ProProfileScreenProps = {
   onViewRequests: () => void
   onViewChats: () => void
   onViewStories: () => void
-  onSwitchRole?: (nextRole: Role) => Promise<boolean>
+  onLogout: () => void
   focusSection?: ProProfileSection | null
   initialPortfolioView?: 'portfolio' | 'showcase'
   onBackHandlerChange?: ((handler: (() => boolean) | null) => void) | undefined
@@ -414,7 +411,6 @@ const showcaseSlotClasses = [
 export const ProProfileScreen = ({
   apiBase,
   userId,
-  role,
   displayNameFallback,
   telegramAvatarUrl,
   returnView = 'pro-cabinet',
@@ -423,7 +419,7 @@ export const ProProfileScreen = ({
   onViewRequests,
   onViewChats,
   onViewStories,
-  onSwitchRole,
+  onLogout,
   focusSection,
   initialPortfolioView,
   onBackHandlerChange,
@@ -562,8 +558,6 @@ export const ProProfileScreen = ({
   const portfolioLongPressStartRef = useRef<{ x: number; y: number } | null>(null)
   const followersRequestIdRef = useRef(0)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isRoleSwitching, setIsRoleSwitching] = useState(false)
-  const [roleSwitchError, setRoleSwitchError] = useState('')
   const settingsOpenRef = useRef(false)
   const settingsReturnRef = useRef(false)
   const [editingSection, setEditingSection] = useState<InlineSection | null>(() =>
@@ -1495,25 +1489,17 @@ export const ProProfileScreen = ({
     }
     settingsReturnRef.current = false
     setSaveError('')
-    setRoleSwitchError('')
     setIsAvatarActionsOpen(false)
     setIsSettingsOpen(true)
   }
   const closeSettings = () => {
     settingsReturnRef.current = false
-    setRoleSwitchError('')
     setIsSettingsOpen(false)
   }
-  const handleSwitchToClientRole = useCallback(async () => {
-    if (!onSwitchRole || isRoleSwitching) return
-    setRoleSwitchError('')
-    setIsRoleSwitching(true)
-    const switched = await onSwitchRole('client')
-    if (!switched) {
-      setRoleSwitchError('Не удалось переключить режим. Попробуйте еще раз.')
-    }
-    setIsRoleSwitching(false)
-  }, [isRoleSwitching, onSwitchRole])
+  const handleLogout = useCallback(() => {
+    setIsSettingsOpen(false)
+    onLogout()
+  }, [onLogout])
   const openMediaEditor = () => {
     if (isAvatarUploading || isCoverUploading) return
     setIsSettingsOpen(false)
@@ -5355,43 +5341,37 @@ export const ProProfileScreen = ({
             </section>
             <section className="pro-profile-settings-group animate delay-3">
               <div className="pro-profile-settings-group-head">
-                <p className="pro-profile-settings-group-title">Режим аккаунта</p>
+                <p className="pro-profile-settings-group-title">Аккаунт</p>
                 <span className="pro-profile-settings-progress-label">
-                  {role === 'pro' ? 'Мастер' : 'Клиент'}
+                  Сессия
                 </span>
               </div>
               <div className="pro-profile-settings-list">
                 <button
                   className="pro-profile-settings-item pro-profile-settings-item--role-switch"
                   type="button"
-                  onClick={handleSwitchToClientRole}
-                  disabled={!onSwitchRole || isRoleSwitching || role !== 'pro'}
+                  onClick={handleLogout}
                 >
                   <span className="pro-profile-settings-icon" aria-hidden="true">
-                    <IconClientVisit />
+                    <IconTrash />
                   </span>
                   <span className="pro-profile-settings-content">
                     <span className="pro-profile-settings-label">
-                      {role === 'pro'
-                        ? 'Перейти в режим клиента'
-                        : 'Перейти в режим мастера'}
+                      Выйти из аккаунта
                     </span>
                     <span className="pro-profile-settings-hint">
-                      После первого входа режим меняется только здесь.
+                      Откроется стартовый экран выбора роли.
                     </span>
                   </span>
                   <span className="pro-profile-settings-tail">
                     <span className="pro-profile-settings-status-pill is-ready">
-                      {isRoleSwitching ? 'Сохраняем' : 'Сменить'}
+                      Выйти
                     </span>
                     <span className="pro-profile-settings-arrow" aria-hidden="true">
                       ›
                     </span>
                   </span>
                 </button>
-                {roleSwitchError && (
-                  <p className="pro-profile-settings-role-error">{roleSwitchError}</p>
-                )}
               </div>
             </section>
           </div>

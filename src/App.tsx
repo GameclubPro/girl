@@ -1515,6 +1515,16 @@ function App() {
     [navigate, updateRole]
   )
 
+  const handleProfileLogout = useCallback(() => {
+    setIsRoleSelectedOnce(false)
+    setIsRoleSelectionPending(false)
+    setProProfileSection(null)
+    setProProfilePortfolioView(null)
+    setProProfileReturnView('pro-cabinet')
+    setAddressReturnView('start')
+    navigate('start', { reset: true, replace: true })
+  }, [navigate])
+
   const openChatList = useCallback(() => {
     setSelectedChatId(null)
     setChatReturnView(null)
@@ -2056,7 +2066,6 @@ function App() {
       <ProProfileScreen
         apiBase={apiBase}
         userId={userId}
-        role={role}
         displayNameFallback={clientName}
         telegramAvatarUrl={telegramAvatarUrl}
         returnView={proProfileReturnView}
@@ -2073,7 +2082,7 @@ function App() {
         focusSection={proProfileSection}
         initialPortfolioView={proProfilePortfolioView ?? undefined}
         onBackHandlerChange={registerProProfileBackHandler}
-        onSwitchRole={handleRoleSwitch}
+        onLogout={handleProfileLogout}
       />
     )
   }
