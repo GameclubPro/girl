@@ -620,6 +620,10 @@ function App() {
   const vkAppUrl = (import.meta.env.VITE_VK_APP_URL ?? '').trim()
   const accountLinkTargetPlatform: 'telegram' | 'vk' =
     miniAppHost === 'vk' ? 'telegram' : 'vk'
+  const startAccountCtaLabel =
+    accountLinkTargetPlatform === 'telegram'
+      ? 'У меня уже есть аккаунт в Telegram'
+      : 'У меня уже есть аккаунт ВКонтакте'
   const accountLinkLabel =
     accountLinkTargetPlatform === 'telegram'
       ? 'Привязать Telegram'
@@ -640,12 +644,15 @@ function App() {
     : isAccountAlreadyLinked
       ? 'Платформа уже привязана.'
       : ''
+  const startAccountCtaHint = accountLinkEnvMissing ? accountLinkMissingHint : ''
   const isAccountLinkActionDisabled =
     !userId ||
     isAccountLinkPending ||
     isRoleSelectionPending ||
     isAccountAlreadyLinked ||
     accountLinkEnvMissing
+  const isStartAccountCtaDisabled =
+    !userId || isAccountLinkPending || isRoleSelectionPending || accountLinkEnvMissing
 
   const applyRoleState = useCallback((payload: UserRoleStateResponse | null) => {
     const nextRole = parseRole(payload?.role)
@@ -698,14 +705,38 @@ function App() {
               : undefined
           if (errorCode === 'role_already_selected') {
             applyRoleState(payload)
+            const lockedRole =
+              payload && typeof payload === 'object' && 'role' in payload
+                ? parseRole(payload.role)
+                : null
             return {
               ok: false as const,
+              reason: 'role_already_selected' as const,
+              role: lockedRole,
               message: 'Роль уже выбрана. Сменить можно только в настройках.',
+            }
+          }
+          if (errorCode === 'userId_required') {
+            return {
+              ok: false as const,
+              message: 'Не удалось определить аккаунт. Перезапустите Mini App.',
+            }
+          }
+          if (errorCode === 'source_invalid' || errorCode === 'role_invalid') {
+            return {
+              ok: false as const,
+              message: 'Некорректные данные роли. Обновите экран и повторите.',
+            }
+          }
+          if (errorCode === 'server_error') {
+            return {
+              ok: false as const,
+              message: 'Сервер временно недоступен. Повторите через пару секунд.',
             }
           }
           return {
             ok: false as const,
-            message: 'Не удалось сохранить роль. Попробуйте еще раз.',
+            message: `Не удалось сохранить роль (${errorCode ?? 'unknown_error'}).`,
           }
         }
 
@@ -715,6 +746,7 @@ function App() {
       } catch (error) {
         return {
           ok: false as const,
+          reason: 'network' as const,
           message: 'Не удалось сохранить роль. Проверьте соединение и повторите.',
         }
       }
@@ -1683,12 +1715,16 @@ function App() {
     }
   }, [apiBase, navigate, userId])
 
-  const handleStartAccountLink = useCallback(async () => {
+  const handleStartAccountLink = useCallback(async (source: 'start' | 'settings' = 'settings') => {
     if (!userId) {
       window.alert('Не удалось определить пользователя. Перезапустите приложение.')
       return
     }
     if (isAccountAlreadyLinked) {
+      if (source === 'start' && isRoleSelectedOnce) {
+        navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
+        return
+      }
       window.alert('Аккаунт уже привязан.')
       return
     }
@@ -1712,10 +1748,27 @@ function App() {
         | null
 
       if (!response.ok) {
-        throw new Error(
-          payload && typeof payload === 'object' && 'error' in payload && payload.error
+        if (payload && typeof payload === 'object' && 'identities' in payload) {
+          applyAccountIdentities(payload.identities ?? null)
+        }
+        const errorCode =
+          payload && typeof payload === 'object' && 'error' in payload
             ? payload.error
             : 'link_start_failed'
+        if (errorCode === 'source_platform_not_linked') {
+          window.alert('Сначала войдите в текущий аккаунт на этой платформе, затем повторите.')
+          return
+        }
+        if (errorCode === 'tg_url_missing') {
+          window.alert('Не задан VITE_TG_APP_URL.')
+          return
+        }
+        if (errorCode === 'vk_url_missing') {
+          window.alert('Не задан VITE_VK_APP_URL.')
+          return
+        }
+        throw new Error(
+          errorCode
         )
       }
 
@@ -1726,6 +1779,10 @@ function App() {
       const alreadyLinked =
         Boolean(payload && typeof payload === 'object' && 'alreadyLinked' in payload && payload.alreadyLinked)
       if (alreadyLinked) {
+        if (source === 'start' && isRoleSelectedOnce) {
+          navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
+          return
+        }
         window.alert('Аккаунт уже привязан.')
         return
       }
@@ -1756,8 +1813,11 @@ function App() {
     applyAccountIdentities,
     isAccountAlreadyLinked,
     isAccountLinkPending,
+    isRoleSelectedOnce,
     isRoleSelectionPending,
     miniAppHost,
+    navigate,
+    role,
     userId,
   ])
 
@@ -2510,6 +2570,11 @@ function App() {
     'start',
     <StartScreen
       isSubmittingRole={isRoleSelectionPending}
+      accountCtaLabel={startAccountCtaLabel}
+      accountCtaHint={startAccountCtaHint}
+      isAccountCtaDisabled={isStartAccountCtaDisabled}
+      isAccountCtaPending={isAccountLinkPending}
+      onAccountCtaClick={() => void handleStartAccountLink('start')}
       onRoleSelect={async (nextRole) => {
         if (isRoleSelectionPending) return
         setIsRoleSelectionPending(true)
@@ -2517,6 +2582,10 @@ function App() {
         setIsRoleSelectionPending(false)
 
         if (!result.ok) {
+          if ('reason' in result && result.reason === 'role_already_selected' && result.role) {
+            navigate(result.role === 'pro' ? 'pro-cabinet' : 'client', { reset: true })
+            return
+          }
           window.alert(result.message)
           return
         }

@@ -3,7 +3,6 @@ import girlOneImage from '../assets/kiven-girl-1.webp'
 import girlTwoImage from '../assets/kiven-girl-2.webp'
 import footerLeftImage from '../assets/start-footer-left.webp'
 import footerRightImage from '../assets/start-footer-right.webp'
-import { getMiniAppHost } from '../platform/miniAppHost'
 import type { Role } from '../types/app'
 import { useNavPreload } from '../contexts/NavPreloadContext'
 import { hapticSelection } from '../utils/haptics'
@@ -11,38 +10,26 @@ import { hapticSelection } from '../utils/haptics'
 export const StartScreen = ({
   onRoleSelect,
   isSubmittingRole = false,
+  accountCtaLabel,
+  accountCtaHint = '',
+  isAccountCtaDisabled = false,
+  isAccountCtaPending = false,
+  onAccountCtaClick,
 }: {
   onRoleSelect: (role: Role) => Promise<void> | void
   isSubmittingRole?: boolean
+  accountCtaLabel: string
+  accountCtaHint?: string
+  isAccountCtaDisabled?: boolean
+  isAccountCtaPending?: boolean
+  onAccountCtaClick: () => void
 }) => {
   const preload = useNavPreload()
-  const host = getMiniAppHost()
-  const tgUrl = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
-  const vkUrl = (import.meta.env.VITE_VK_APP_URL ?? '').trim()
-  const ctaConfig =
-    host === 'vk'
-      ? {
-          label: 'У меня уже есть аккаунт в Telegram',
-          target: tgUrl,
-          hintMissing: 'Добавьте VITE_TG_APP_URL',
-        }
-      : {
-          label: 'У меня уже есть аккаунт ВКонтакте',
-          target: vkUrl,
-          hintMissing: 'Добавьте VITE_VK_APP_URL',
-        }
-  const isAccountCtaDisabled = isSubmittingRole || !ctaConfig.target
 
   const handleAccountCtaClick = () => {
-    if (isAccountCtaDisabled) return
+    if (isSubmittingRole || isAccountCtaDisabled || isAccountCtaPending) return
     hapticSelection()
-    const target = ctaConfig.target
-    const webApp = window.Telegram?.WebApp
-    if (webApp?.openLink) {
-      webApp.openLink(target)
-      return
-    }
-    window.open(target, '_blank', 'noopener,noreferrer')
+    onAccountCtaClick()
   }
 
   return (
@@ -125,14 +112,12 @@ export const StartScreen = ({
           <button
             className="start-account-cta__button"
             type="button"
-            disabled={isAccountCtaDisabled}
+            disabled={isSubmittingRole || isAccountCtaDisabled || isAccountCtaPending}
             onClick={handleAccountCtaClick}
           >
-            {ctaConfig.label}
+            {isAccountCtaPending ? 'Авторизуем...' : accountCtaLabel}
           </button>
-          {!ctaConfig.target && (
-            <p className="start-account-cta__hint">{ctaConfig.hintMissing}</p>
-          )}
+          {accountCtaHint ? <p className="start-account-cta__hint">{accountCtaHint}</p> : null}
         </div>
 
         <div className="footer-decor" aria-hidden="true">
