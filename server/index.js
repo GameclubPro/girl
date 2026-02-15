@@ -2373,6 +2373,18 @@ const mergeRequestResponses = async (db, primaryUserId, secondaryUserId) => {
 const mergeChatMembersInto = async (db, { sourceChatId, targetChatId, primaryUserId, secondaryUserId }) => {
   await db.query(
     `
+      WITH source_members AS (
+        SELECT
+          CASE WHEN user_id = $3 THEN $2 ELSE user_id END AS merged_user_id,
+          BOOL_OR(role = 'master') AS has_master_role,
+          MAX(COALESCE(last_read_message_id, 0)) AS max_last_read_message_id,
+          MAX(COALESCE(unread_count, 0)) AS max_unread_count,
+          MAX(COALESCE(muted_until, 'epoch'::timestamptz)) AS max_muted_until,
+          MIN(created_at) AS min_created_at
+        FROM chat_members
+        WHERE chat_id = $4
+        GROUP BY 1
+      )
       INSERT INTO chat_members (
         chat_id,
         user_id,
@@ -2385,15 +2397,14 @@ const mergeChatMembersInto = async (db, { sourceChatId, targetChatId, primaryUse
       )
       SELECT
         $1,
-        CASE WHEN user_id = $3 THEN $2 ELSE user_id END,
-        role,
-        last_read_message_id,
-        unread_count,
-        muted_until,
-        created_at,
+        merged_user_id,
+        CASE WHEN has_master_role THEN 'master' ELSE 'client' END,
+        NULLIF(max_last_read_message_id, 0),
+        max_unread_count,
+        NULLIF(max_muted_until, 'epoch'::timestamptz),
+        min_created_at,
         NOW()
-      FROM chat_members
-      WHERE chat_id = $4
+      FROM source_members
       ON CONFLICT (chat_id, user_id) DO UPDATE
       SET role = CASE
             WHEN chat_members.role = 'master' OR EXCLUDED.role = 'master'
