@@ -70,9 +70,7 @@ export const StartScreen = ({
             }}
           >
             <span className="role-card__inner">
-              <span className="role-card__chip">Клиентский режим</span>
               <span className="role-card__title">Я клиент</span>
-              <span className="role-card__hint">Найти мастера и записаться</span>
             </span>
           </button>
           <button
@@ -88,9 +86,7 @@ export const StartScreen = ({
             }}
           >
             <span className="role-card__inner">
-              <span className="role-card__chip">Профи-режим</span>
               <span className="role-card__title">Я мастер</span>
-              <span className="role-card__hint">Принимать заявки и записи</span>
             </span>
           </button>
         </div>
