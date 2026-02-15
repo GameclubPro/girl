@@ -1366,6 +1366,9 @@ const telegramBotToken = normalizeText(process.env.BOT_TOKEN)
 const telegramWebAppUrl = normalizeText(
   process.env.WEB_APP_URL ?? process.env.VITE_TG_APP_URL
 )
+const telegramMiniAppUrl = normalizeText(
+  process.env.VITE_TG_APP_URL ?? process.env.TG_APP_URL ?? process.env.WEB_APP_URL
+)
 const telegramApiBase = 'https://api.telegram.org'
 
 const buildStartAppUrl = (baseUrl, startParam) => {
@@ -6755,7 +6758,7 @@ app.post('/api/account/link/start', async (req, res) => {
     const startParam = `link_${buildLinkToken()}`
     const targetUrl =
       normalizedTargetPlatform === 'telegram'
-        ? buildStartAppUrl(telegramWebAppUrl, startParam)
+        ? buildStartAppUrl(telegramMiniAppUrl, startParam)
         : (() => {
             if (!VK_APP_URL) return ''
             const encoded = encodeURIComponent(startParam)
