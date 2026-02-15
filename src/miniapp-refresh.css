@@ -508,9 +508,9 @@ textarea:focus-visible {
 
 .role-card {
   position: relative;
-  border-radius: 999px;
+  border-radius: 26px;
   padding: 0;
-  min-height: 66px;
+  min-height: 58px;
   border: 1px solid rgb(var(--role-edge));
   background: linear-gradient(
     180deg,
@@ -542,47 +542,47 @@ textarea:focus-visible {
   border-radius: inherit;
   background: linear-gradient(
     180deg,
-    rgba(var(--role-top), 0.18) 0%,
-    rgba(var(--role-top), 0.08) 36%,
+    rgba(var(--role-top), 0.08) 0%,
+    rgba(var(--role-top), 0.03) 36%,
     rgba(var(--role-mid), 0) 100%
   );
 }
 
 .role-card::after {
   inset: auto 8px 6px;
-  height: 8px;
-  border-radius: 999px;
+  height: 7px;
+  border-radius: 14px;
   background: linear-gradient(
     180deg,
-    rgba(var(--role-deep), 0.02),
-    rgba(var(--role-deep), 0.22)
+    rgba(var(--role-deep), 0),
+    rgba(var(--role-deep), 0.24)
   );
 }
 
 .role-card--client {
-  --role-top: 111, 177, 255;
-  --role-mid: 63, 133, 231;
-  --role-bottom: 44, 104, 196;
-  --role-edge: 30, 86, 174;
-  --role-deep: 18, 67, 145;
-  --role-shadow: 15, 52, 110;
+  --role-top: 76, 165, 255;
+  --role-mid: 25, 116, 234;
+  --role-bottom: 8, 78, 186;
+  --role-edge: 7, 66, 166;
+  --role-deep: 5, 48, 132;
+  --role-shadow: 7, 53, 134;
 }
 
 .role-card--pro {
-  --role-top: 255, 123, 193;
-  --role-mid: 232, 74, 156;
-  --role-bottom: 200, 41, 126;
-  --role-edge: 170, 27, 105;
-  --role-deep: 133, 18, 80;
-  --role-shadow: 95, 24, 65;
+  --role-top: 255, 97, 186;
+  --role-mid: 232, 34, 140;
+  --role-bottom: 186, 8, 106;
+  --role-edge: 153, 4, 86;
+  --role-deep: 118, 2, 64;
+  --role-shadow: 100, 12, 64;
 }
 
 .role-card__inner {
   position: relative;
   z-index: 1;
   height: 100%;
-  min-height: 66px;
-  padding: 0 10px 8px;
+  min-height: 58px;
+  padding: 0 10px 7px;
   display: grid;
   place-items: center;
   align-items: center;
@@ -591,7 +591,7 @@ textarea:focus-visible {
 
 .role-card__title {
   font-family: var(--font-title);
-  font-size: clamp(20px, 5.1vw, 24px);
+  font-size: clamp(19px, 4.8vw, 22px);
   font-weight: 800;
   line-height: 1;
   color: #f6f8ff;
@@ -603,8 +603,8 @@ textarea:focus-visible {
   transform: translateY(-1px);
   border-color: rgb(var(--role-edge));
   box-shadow:
-    0 6px 0 rgba(var(--role-deep), 0.8),
-    0 13px 20px rgba(var(--role-shadow), 0.3);
+    0 6px 0 rgba(var(--role-deep), 0.86),
+    0 12px 18px rgba(var(--role-shadow), 0.36);
 }
 
 .role-card:active {
