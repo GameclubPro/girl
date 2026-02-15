@@ -1,14 +1,17 @@
 import trashIcon from '../assets/trash-icon.webp'
 import lockClosedIcon from '../assets/lock-closed.webp'
 import {
+  ArrowsUpFromLine,
   BadgeCheck,
   Calendar,
   ChatLines,
   Coins,
   Community,
+  DeliveryTruck,
   DotsGrid3x3,
   GraphUp,
   HeadsetHelp,
+  Home as HomeIconoir,
   MediaImage,
   Megaphone,
   Medal,
@@ -290,64 +293,15 @@ export const IconClientVisit = () => (
 )
 
 export const IconFormatMaster = () => (
-  <DetailedHomeIcon />
+  <HomeIconoir strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconFormatClientVisit = () => (
-  <DetailedCarIcon />
+  <DeliveryTruck strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconFormatBoth = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M12.7 11.1 17 7.9l4.2 3.2V18h-3v-2.8h-2.1V18h-3.4v-6.9Z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinejoin="round"
-    />
-    <rect
-      x="16.9"
-      y="12"
-      width="1.2"
-      height="1.5"
-      rx="0.25"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-    />
-    <path
-      d="M2 16.1h8.4a1.1 1.1 0 0 1 1.1 1.1V18H.9v-.8A1.1 1.1 0 0 1 2 16.1Z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinejoin="round"
-    />
-    <path
-      d="m3 16.1 1.1-1.9h4.4l1.1 1.9"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-      strokeLinecap="round"
-    />
-    <circle
-      cx="4"
-      cy="18.8"
-      r="0.85"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <circle
-      cx="8.4"
-      cy="18.8"
-      r="0.85"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-  </svg>
+  <ArrowsUpFromLine strokeWidth={1.9} aria-hidden="true" />
 )
 
 export const IconFormat = () => (

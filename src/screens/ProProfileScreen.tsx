@@ -16,7 +16,6 @@ import {
   IconFormatBoth,
   IconFormatClientVisit,
   IconFormatMaster,
-  IconHomeMaster,
   IconPin,
   IconPhoto,
   IconProfileAbout,
@@ -5802,7 +5801,7 @@ export const ProProfileScreen = ({
                             }
                           />
                           <span className="pro-profile-editor-toggle-icon">
-                            <IconHomeMaster />
+                            <IconFormatMaster />
                           </span>
                           <span className="pro-profile-editor-toggle-body">
                             <span className="pro-profile-editor-toggle-title">
@@ -5832,7 +5831,7 @@ export const ProProfileScreen = ({
                             }
                           />
                           <span className="pro-profile-editor-toggle-icon">
-                            <IconClientVisit />
+                            <IconFormatClientVisit />
                           </span>
                           <span className="pro-profile-editor-toggle-body">
                             <span className="pro-profile-editor-toggle-title">
