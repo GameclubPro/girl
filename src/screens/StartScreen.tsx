@@ -1,8 +1,6 @@
 import brandHeroImage from '../assets/start-logo.webp'
 import girlOneImage from '../assets/kiven-girl-1.webp'
 import girlTwoImage from '../assets/kiven-girl-2.webp'
-import clientRoleImage from '../assets/start-role-client-new.webp'
-import proRoleImage from '../assets/start-role-pro-new.webp'
 import footerLeftImage from '../assets/start-footer-left.webp'
 import footerRightImage from '../assets/start-footer-right.webp'
 import type { Role } from '../types/app'
@@ -62,7 +60,7 @@ export const StartScreen = ({
           <button
             className="role-card role-card--client"
             type="button"
-            aria-label="Мне нужна услуга"
+            aria-label="Я клиент"
             disabled={isSubmittingRole}
             onPointerDown={() => preload?.('address')}
             onClick={() => {
@@ -71,12 +69,11 @@ export const StartScreen = ({
               onRoleSelect('client')
             }}
           >
-            <img
-              className="role-card__image"
-              src={clientRoleImage}
-              alt=""
-              aria-hidden="true"
-            />
+            <span className="role-card__inner">
+              <span className="role-card__chip">Клиентский режим</span>
+              <span className="role-card__title">Я клиент</span>
+              <span className="role-card__hint">Найти мастера и записаться</span>
+            </span>
           </button>
           <button
             className="role-card role-card--pro"
@@ -90,12 +87,11 @@ export const StartScreen = ({
               onRoleSelect('pro')
             }}
           >
-            <img
-              className="role-card__image"
-              src={proRoleImage}
-              alt=""
-              aria-hidden="true"
-            />
+            <span className="role-card__inner">
+              <span className="role-card__chip">Профи-режим</span>
+              <span className="role-card__title">Я мастер</span>
+              <span className="role-card__hint">Принимать заявки и записи</span>
+            </span>
           </button>
         </div>
 
