@@ -27,6 +27,7 @@ import type {
   UserLocation,
 } from './types/app'
 import { isGeoFailure, requestPreciseLocation } from './utils/geo'
+import { parseApiError } from './utils/apiError'
 import {
   parseAccountLinkStartParam,
   parseBookingStartParam,
@@ -693,16 +694,17 @@ function App() {
           }),
         })
 
-        const payload = (await response.json().catch(() => null)) as
-          | UserRoleStateResponse
-          | { error?: string; role?: Role | null; selectedOnce?: boolean }
-          | null
-
         if (!response.ok) {
+          const apiError = await parseApiError(response, 'role_update_failed')
+          const payload = apiError.payload as
+            | {
+                error?: string
+                role?: Role | null
+                selectedOnce?: boolean
+              }
+            | null
           const errorCode =
-            payload && typeof payload === 'object' && 'error' in payload
-              ? payload.error
-              : undefined
+            payload && typeof payload === 'object' ? payload.error : apiError.code
           if (errorCode === 'role_already_selected') {
             applyRoleState(payload)
             const lockedRole =
@@ -731,14 +733,19 @@ function App() {
           if (errorCode === 'server_error') {
             return {
               ok: false as const,
-              message: 'Сервер временно недоступен. Повторите через пару секунд.',
+              message: `Не удалось сохранить роль. ${apiError.message}`,
             }
           }
           return {
             ok: false as const,
-            message: `Не удалось сохранить роль (${errorCode ?? 'unknown_error'}).`,
+            message: `Не удалось сохранить роль (${errorCode ?? apiError.code}). ${apiError.message}`,
           }
         }
+
+        const payload = (await response.json().catch(() => null)) as
+          | UserRoleStateResponse
+          | { error?: string; role?: Role | null; selectedOnce?: boolean }
+          | null
 
         applyRoleState(payload)
         const savedRole = parseRole(payload?.role) ?? nextRole
@@ -1742,19 +1749,19 @@ function App() {
           targetPlatform: accountLinkTargetPlatform,
         }),
       })
-      const payload = (await response.json().catch(() => null)) as
-        | AccountLinkStartResponse
-        | { error?: string; identities?: AccountIdentitiesResponse }
-        | null
 
       if (!response.ok) {
+        const apiError = await parseApiError(response, 'link_start_failed')
+        const payload = apiError.payload as
+          | { error?: string; identities?: AccountIdentitiesResponse }
+          | null
         if (payload && typeof payload === 'object' && 'identities' in payload) {
           applyAccountIdentities(payload.identities ?? null)
         }
         const errorCode =
           payload && typeof payload === 'object' && 'error' in payload
             ? payload.error
-            : 'link_start_failed'
+            : apiError.code
         if (errorCode === 'source_platform_not_linked') {
           window.alert('Сначала войдите в текущий аккаунт на этой платформе, затем повторите.')
           return
@@ -1767,10 +1774,19 @@ function App() {
           window.alert('Не задан VITE_VK_APP_URL.')
           return
         }
-        throw new Error(
-          errorCode
-        )
+        const statusLabel = apiError.status > 0 ? `HTTP ${apiError.status}` : 'network'
+        if (apiError.status >= 500 || apiError.code.startsWith('http_')) {
+          window.alert(`Проблема API (${statusLabel}, code: ${apiError.code}). ${apiError.message}`)
+          return
+        }
+        window.alert(`Не удалось начать привязку аккаунта (${errorCode ?? apiError.code}). ${apiError.message}`)
+        return
       }
+
+      const payload = (await response.json().catch(() => null)) as
+        | AccountLinkStartResponse
+        | { error?: string; identities?: AccountIdentitiesResponse }
+        | null
 
       if (payload && typeof payload === 'object' && 'identities' in payload) {
         applyAccountIdentities(payload.identities ?? null)
