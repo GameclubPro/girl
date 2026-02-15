@@ -2278,11 +2278,16 @@ const moveRowsWithConflictHandling = async ({
   secondaryUserId,
 }) => {
   if (!Array.isArray(columns) || columns.length === 0) return
-  const whereClause = userColumns.map((column) => `${column} = $2`).join(' OR ')
+  const insertWhereClause = userColumns
+    .map((column) => `${column} = $2::text`)
+    .join(' OR ')
+  const deleteWhereClause = userColumns
+    .map((column) => `${column} = $1::text`)
+    .join(' OR ')
   const transformedSelect = columns
     .map((column) =>
       userColumns.includes(column)
-        ? `CASE WHEN ${column} = $2 THEN $1 ELSE ${column} END AS ${column}`
+        ? `CASE WHEN ${column} = $2::text THEN $1::text ELSE ${column} END AS ${column}`
         : column
     )
     .join(', ')
@@ -2291,7 +2296,7 @@ const moveRowsWithConflictHandling = async ({
       INSERT INTO ${table} (${columns.join(', ')})
       SELECT ${transformedSelect}
       FROM ${table}
-      WHERE ${whereClause}
+      WHERE ${insertWhereClause}
       ON CONFLICT (${conflictColumns.join(', ')}) DO NOTHING
     `,
     [primaryUserId, secondaryUserId]
@@ -2299,9 +2304,9 @@ const moveRowsWithConflictHandling = async ({
   await db.query(
     `
       DELETE FROM ${table}
-      WHERE ${whereClause}
+      WHERE ${deleteWhereClause}
     `,
-    [primaryUserId, secondaryUserId]
+    [secondaryUserId]
   )
 }
 
