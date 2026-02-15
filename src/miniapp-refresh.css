@@ -511,25 +511,25 @@ textarea:focus-visible {
   border-radius: 999px;
   padding: 0;
   min-height: 74px;
-  border: 1px solid rgba(var(--role-edge), 0.8);
+  border: 1px solid rgba(var(--role-edge), 0.62);
   background: linear-gradient(
     180deg,
-    rgba(var(--role-top), 0.96) 0%,
-    rgba(var(--role-mid), 0.92) 48%,
-    rgba(var(--role-bottom), 0.94) 100%
+    rgba(var(--role-top), 0.9) 0%,
+    rgba(var(--role-mid), 0.9) 52%,
+    rgba(var(--role-bottom), 0.9) 100%
   );
   box-shadow:
-    0 10px 0 rgba(var(--role-deep), 0.88),
-    0 17px 30px rgba(var(--role-shadow), 0.42),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.48),
-    inset 0 -2px 0 rgba(var(--role-deep), 0.38);
-  backdrop-filter: blur(7px) saturate(1.18);
-  -webkit-backdrop-filter: blur(7px) saturate(1.18);
+    0 7px 0 rgba(var(--role-deep), 0.62),
+    0 14px 24px rgba(var(--role-shadow), 0.3),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.22),
+    inset 0 -1px 0 rgba(var(--role-deep), 0.24);
+  backdrop-filter: blur(5px) saturate(1.08);
+  -webkit-backdrop-filter: blur(5px) saturate(1.08);
   transform: translateY(0);
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    filter 0.18s ease;
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
   overflow: hidden;
 }
 
@@ -542,20 +542,14 @@ textarea:focus-visible {
 }
 
 .role-card::before {
-  inset: 5px 9px auto;
-  height: 44%;
-  border-radius: 999px;
-  background:
-    radial-gradient(
-      34% 78% at 9% 22%,
-      rgba(var(--paper-rgb), 0.78) 0%,
-      rgba(var(--paper-rgb), 0) 72%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(var(--paper-rgb), 0.44) 0%,
-      rgba(var(--paper-rgb), 0.08) 100%
-    );
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--paper-rgb), 0.16) 0%,
+    rgba(var(--paper-rgb), 0.08) 42%,
+    rgba(var(--paper-rgb), 0.02) 100%
+  );
 }
 
 .role-card::after {
@@ -564,27 +558,27 @@ textarea:focus-visible {
   border-radius: 999px;
   background: linear-gradient(
     180deg,
-    rgba(var(--paper-rgb), 0.26),
-    rgba(var(--role-deep), 0.2)
+    rgba(var(--paper-rgb), 0.08),
+    rgba(var(--role-deep), 0.18)
   );
 }
 
 .role-card--client {
-  --role-top: 93, 166, 255;
-  --role-mid: 52, 129, 240;
-  --role-bottom: 28, 92, 211;
-  --role-edge: 23, 78, 188;
-  --role-deep: 7, 54, 150;
-  --role-shadow: 9, 44, 122;
+  --role-top: 111, 177, 255;
+  --role-mid: 63, 133, 231;
+  --role-bottom: 44, 104, 196;
+  --role-edge: 30, 86, 174;
+  --role-deep: 18, 67, 145;
+  --role-shadow: 15, 52, 110;
 }
 
 .role-card--pro {
-  --role-top: 255, 106, 185;
-  --role-mid: 240, 55, 149;
-  --role-bottom: 214, 24, 123;
-  --role-edge: 176, 17, 98;
-  --role-deep: 138, 8, 70;
-  --role-shadow: 110, 12, 67;
+  --role-top: 255, 123, 193;
+  --role-mid: 232, 74, 156;
+  --role-bottom: 200, 41, 126;
+  --role-edge: 170, 27, 105;
+  --role-deep: 133, 18, 80;
+  --role-shadow: 95, 24, 65;
 }
 
 .role-card__inner {
@@ -604,25 +598,23 @@ textarea:focus-visible {
   font-size: clamp(20px, 5.1vw, 24px);
   font-weight: 800;
   line-height: 1;
-  color: #f8fbff;
+  color: #f6f8ff;
   letter-spacing: 0.01em;
-  text-shadow:
-    0 1px 0 rgba(11, 22, 46, 0.28),
-    0 4px 10px rgba(11, 22, 46, 0.24);
+  text-shadow: 0 1px 1px rgba(11, 22, 46, 0.28);
 }
 
 .role-card:hover {
   transform: translateY(-1px);
+  border-color: rgba(var(--role-edge), 0.72);
   box-shadow:
-    0 11px 0 rgba(var(--role-deep), 0.88),
-    0 20px 34px rgba(var(--role-shadow), 0.44),
-    inset 0 1px 0 rgba(var(--paper-rgb), 0.54),
-    inset 0 -2px 0 rgba(var(--role-deep), 0.44);
-  filter: saturate(1.05);
+    0 8px 0 rgba(var(--role-deep), 0.66),
+    0 16px 26px rgba(var(--role-shadow), 0.32),
+    inset 0 1px 0 rgba(var(--paper-rgb), 0.24),
+    inset 0 -1px 0 rgba(var(--role-deep), 0.26);
 }
 
 .role-card:active {
-  transform: translateY(1px) scale(0.99);
+  transform: translateY(1px) scale(0.995);
 }
 
 .role-card:focus-visible {

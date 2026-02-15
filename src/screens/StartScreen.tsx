@@ -60,7 +60,7 @@ export const StartScreen = ({
           <button
             className="role-card role-card--client"
             type="button"
-            aria-label="Я клиент"
+            aria-label="Я Клиент"
             disabled={isSubmittingRole}
             onPointerDown={() => preload?.('address')}
             onClick={() => {
@@ -70,13 +70,13 @@ export const StartScreen = ({
             }}
           >
             <span className="role-card__inner">
-              <span className="role-card__title">Я клиент</span>
+              <span className="role-card__title">Я Клиент</span>
             </span>
           </button>
           <button
             className="role-card role-card--pro"
             type="button"
-            aria-label="Я мастер"
+            aria-label="Я Мастер"
             disabled={isSubmittingRole}
             onPointerDown={() => preload?.('pro-profile')}
             onClick={() => {
@@ -86,7 +86,7 @@ export const StartScreen = ({
             }}
           >
             <span className="role-card__inner">
-              <span className="role-card__title">Я мастер</span>
+              <span className="role-card__title">Я Мастер</span>
             </span>
           </button>
         </div>
