@@ -332,6 +332,27 @@ const buildInternalUserId = () => `u_${randomUUID()}`
 
 const buildLinkToken = () => randomUUID().replace(/-/g, '')
 
+const normalizeBooleanFlag = (value) => {
+  const normalized = normalizeText(String(value ?? '')).toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
+const accountLinkDebugEnabled =
+  process.env.NODE_ENV !== 'production' || normalizeBooleanFlag(process.env.ACCOUNT_LINK_DEBUG)
+
+const getTokenDebugMeta = (token) => {
+  const normalized = normalizeText(token)
+  return {
+    tokenPrefix: normalized ? normalized.slice(0, 6) : '',
+    tokenLength: normalized.length,
+  }
+}
+
+const logAccountLinkDebug = (event, payload = {}) => {
+  if (!accountLinkDebugEnabled) return
+  console.info(`[account-link] ${event}`, payload)
+}
+
 const normalizeStoryCaption = (value) => {
   const normalized = normalizeText(value)
   if (!normalized) return null
@@ -1381,6 +1402,36 @@ const buildStartAppUrl = (baseUrl, startParam) => {
   }
   const joiner = baseUrl.includes('?') ? '&' : '?'
   return `${baseUrl}${joiner}startapp=${encodedParam}`
+}
+
+const buildLinkTargetUrl = (baseUrl, paramKey, paramValue) => {
+  const normalizedBaseUrl = normalizeText(baseUrl)
+  const normalizedParamKey = normalizeText(paramKey)
+  const normalizedParamValue = normalizeText(paramValue)
+  if (!normalizedBaseUrl || !normalizedParamKey || !normalizedParamValue) return ''
+
+  try {
+    const url = new URL(normalizedBaseUrl)
+    url.searchParams.set(normalizedParamKey, normalizedParamValue)
+    const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash
+    const hashParams = new URLSearchParams(hash)
+    hashParams.set(normalizedParamKey, normalizedParamValue)
+    const nextHash = hashParams.toString()
+    url.hash = nextHash ? `#${nextHash}` : ''
+    return url.toString()
+  } catch (_error) {
+    const encodedValue = encodeURIComponent(normalizedParamValue)
+    const escapedKey = normalizedParamKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const keyPattern = new RegExp(`${escapedKey}=[^&#]*`, 'i')
+    const withQuery = keyPattern.test(normalizedBaseUrl)
+      ? normalizedBaseUrl.replace(keyPattern, `${normalizedParamKey}=${encodedValue}`)
+      : `${normalizedBaseUrl}${normalizedBaseUrl.includes('?') ? '&' : '?'}${normalizedParamKey}=${encodedValue}`
+    const [withoutHash, rawHash = ''] = withQuery.split('#', 2)
+    const hashParams = new URLSearchParams(rawHash)
+    hashParams.set(normalizedParamKey, normalizedParamValue)
+    const nextHash = hashParams.toString()
+    return nextHash ? `${withoutHash}#${nextHash}` : withoutHash
+  }
 }
 
 const resolveUserDisplayName = async (userId) => {
@@ -6950,18 +7001,14 @@ app.post('/api/account/link/start', async (req, res) => {
     const startParam = `link_${buildLinkToken()}`
     const targetUrl =
       normalizedTargetPlatform === 'telegram'
-        ? buildStartAppUrl(telegramMiniAppUrl, startParam)
-        : (() => {
-            if (!VK_APP_URL) return ''
-            const encoded = encodeURIComponent(startParam)
-            if (/start=/i.test(VK_APP_URL)) {
-              return VK_APP_URL.replace(/start=[^&]*/i, `start=${encoded}`)
-            }
-            const joiner = VK_APP_URL.includes('?') ? '&' : '?'
-            return `${VK_APP_URL}${joiner}start=${encoded}`
-          })()
+        ? buildLinkTargetUrl(telegramMiniAppUrl, 'startapp', startParam)
+        : buildLinkTargetUrl(VK_APP_URL, 'start', startParam)
 
     if (!targetUrl) {
+      logAccountLinkDebug('link-start-target-missing', {
+        sourcePlatform: source,
+        targetPlatform: normalizedTargetPlatform,
+      })
       res.status(400).json({
         error: normalizedTargetPlatform === 'telegram' ? 'tg_url_missing' : 'vk_url_missing',
       })
@@ -6993,8 +7040,17 @@ app.post('/api/account/link/start', async (req, res) => {
       expiresAt: expiresAt.toISOString(),
       identities,
     })
+    logAccountLinkDebug('link-start-issued', {
+      sourcePlatform: source,
+      targetPlatform: normalizedTargetPlatform,
+      ...getTokenDebugMeta(token),
+    })
   } catch (error) {
     console.error('POST /api/account/link/start failed:', error)
+    logAccountLinkDebug('link-start-error', {
+      targetPlatform: normalizedTargetPlatform,
+      message: error instanceof Error ? error.message : 'unknown_error',
+    })
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -7015,20 +7071,31 @@ app.post('/api/account/link/complete', async (req, res) => {
   const normalizedToken = normalizeText(token)
   const targetPlatform = resolveIdentityPlatformByHost(host)
   const externalUserId = normalizeExternalUserId(platformUserId)
+  logAccountLinkDebug('link-complete-request', {
+    host: normalizeText(host).toLowerCase() || 'unknown',
+    targetPlatform,
+    hasUserId: Boolean(normalizedUserId),
+    hasPlatformUserId: Boolean(externalUserId),
+    ...getTokenDebugMeta(normalizedToken),
+  })
 
   if (!normalizedUserId) {
+    logAccountLinkDebug('link-complete-failed', { errorCode: 'userId_required' })
     res.status(400).json({ error: 'userId_required' })
     return
   }
   if (isLocalDevUserId(normalizedUserId)) {
+    logAccountLinkDebug('link-complete-failed', { errorCode: 'session_user_invalid' })
     res.status(400).json({ error: 'session_user_invalid' })
     return
   }
   if (!normalizedToken) {
+    logAccountLinkDebug('link-complete-failed', { errorCode: 'token_required' })
     res.status(400).json({ error: 'token_required' })
     return
   }
   if (!externalUserId) {
+    logAccountLinkDebug('link-complete-failed', { errorCode: 'platform_user_id_required' })
     res.status(400).json({ error: 'platform_user_id_required' })
     return
   }
@@ -7054,11 +7121,17 @@ app.post('/api/account/link/complete', async (req, res) => {
     const challenge = challengeResult.rows[0] ?? null
     if (!challenge || challenge.usedAt || toEpochMs(challenge.expiresAt) <= Date.now()) {
       await client.query('ROLLBACK')
+      logAccountLinkDebug('link-complete-failed', { errorCode: 'token_invalid_or_used' })
       res.status(409).json({ error: 'token_invalid_or_used' })
       return
     }
     if (challenge.targetPlatform !== targetPlatform) {
       await client.query('ROLLBACK')
+      logAccountLinkDebug('link-complete-failed', {
+        errorCode: 'target_platform_mismatch',
+        challengeTargetPlatform: challenge.targetPlatform,
+        requestTargetPlatform: targetPlatform,
+      })
       res.status(409).json({ error: 'target_platform_mismatch' })
       return
     }
@@ -7067,6 +7140,7 @@ app.post('/api/account/link/complete', async (req, res) => {
     const sourceUserId = normalizeText(challenge.sourceUserId)
     if (!sourceUserId) {
       await client.query('ROLLBACK')
+      logAccountLinkDebug('link-complete-failed', { errorCode: 'link_source_missing' })
       res.status(500).json({ error: 'link_source_missing' })
       return
     }
@@ -7137,6 +7211,11 @@ app.post('/api/account/link/complete', async (req, res) => {
     const isSupportAgent = await isSupportAgentUser(client, activeUserId)
 
     await client.query('COMMIT')
+    logAccountLinkDebug('link-complete-success', {
+      merged,
+      sourcePlatform: challenge.sourcePlatform,
+      targetPlatform: challenge.targetPlatform,
+    })
     res.json({
       ok: true,
       merged,
@@ -7153,6 +7232,9 @@ app.post('/api/account/link/complete', async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('POST /api/account/link/complete failed:', error)
+    logAccountLinkDebug('link-complete-error', {
+      message: error instanceof Error ? error.message : 'unknown_error',
+    })
     res.status(500).json({ error: 'server_error' })
   } finally {
     client.release()

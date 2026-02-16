@@ -173,10 +173,32 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
   ''
 )
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
+const ACCOUNT_LINK_TOKEN_STORAGE_KEY = 'kiven-account-link-token-v1'
+const ACCOUNT_LINK_TOKEN_TTL_MS = 10 * 60 * 1000
+const accountLinkDebugEnabled =
+  import.meta.env.DEV ||
+  ['1', 'true', 'yes', 'on'].includes(
+    String(import.meta.env.VITE_ACCOUNT_LINK_DEBUG ?? '').trim().toLowerCase()
+  )
+
+type LinkTokenSource = 'initData' | 'search' | 'hash' | 'session'
+
+const getTokenDebugMeta = (token: string) => ({
+  tokenPrefix: token ? token.slice(0, 6) : '',
+  tokenLength: token.length,
+})
+
+const logAccountLinkDebug = (
+  event: string,
+  payload: Record<string, unknown> = {}
+) => {
+  if (!accountLinkDebugEnabled) return
+  console.info(`[account-link] ${event}`, payload)
+}
 
 type LaunchIntent =
   | { type: 'none' }
-  | { type: 'link'; token: string }
+  | { type: 'link'; token: string; source: LinkTokenSource }
   | { type: 'booking'; masterId: string }
   | { type: 'chat'; chatId: number }
   | { type: 'unsubscribe'; masterId: string }
@@ -206,15 +228,95 @@ const resolveVkLaunchUserId = () => {
   return rawValue
 }
 
+const saveStoredLinkToken = (token: string) => {
+  if (typeof window === 'undefined') return
+  const normalized = token.trim()
+  if (!normalized) return
+  try {
+    window.sessionStorage.setItem(
+      ACCOUNT_LINK_TOKEN_STORAGE_KEY,
+      JSON.stringify({
+        token: normalized,
+        savedAt: Date.now(),
+      })
+    )
+  } catch (_error) {
+    // ignore storage errors in WebView/private mode
+  }
+}
+
+const clearStoredLinkToken = () => {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.removeItem(ACCOUNT_LINK_TOKEN_STORAGE_KEY)
+  } catch (_error) {
+    // ignore storage errors in WebView/private mode
+  }
+}
+
+const readStoredLinkToken = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(ACCOUNT_LINK_TOKEN_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { token?: string; savedAt?: number } | null
+    const token = typeof parsed?.token === 'string' ? parsed.token.trim() : ''
+    const savedAt = Number(parsed?.savedAt)
+    if (!token || !Number.isFinite(savedAt) || savedAt <= 0) {
+      clearStoredLinkToken()
+      return null
+    }
+    if (Date.now() - savedAt > ACCOUNT_LINK_TOKEN_TTL_MS) {
+      clearStoredLinkToken()
+      return null
+    }
+    return token
+  } catch (_error) {
+    clearStoredLinkToken()
+    return null
+  }
+}
+
+const resolveDecodedStartCandidate = () => {
+  const searchParams = new URLSearchParams(window.location.search)
+  const hashParams = getHashParams()
+  const candidates: Array<{ value: string | null; source: Exclude<LinkTokenSource, 'session'> }> = [
+    {
+      value: window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? null,
+      source: 'initData',
+    },
+    {
+      value: searchParams.get('startapp') ?? searchParams.get('start') ?? null,
+      source: 'search',
+    },
+    {
+      value: hashParams.get('startapp') ?? hashParams.get('start') ?? null,
+      source: 'hash',
+    },
+  ]
+
+  for (const candidate of candidates) {
+    const decoded = decodeLaunchValue(candidate.value)
+    const normalized = decoded?.trim() ?? ''
+    if (!normalized) continue
+    return {
+      decodedStart: normalized,
+      source: candidate.source,
+    }
+  }
+
+  return null
+}
+
 const resolveLaunchIntent = (): LaunchIntent => {
   const searchParams = new URLSearchParams(window.location.search)
-  const webAppStart = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? null
-  const queryStart = searchParams.get('startapp') ?? searchParams.get('start') ?? null
-  const decodedStart = decodeLaunchValue(webAppStart ?? queryStart)
+  const startCandidate = resolveDecodedStartCandidate()
+  const decodedStart = startCandidate?.decodedStart ?? null
 
   const parsedLinkToken = parseAccountLinkStartParam(decodedStart)
   if (parsedLinkToken) {
-    return { type: 'link', token: parsedLinkToken }
+    saveStoredLinkToken(parsedLinkToken)
+    return { type: 'link', token: parsedLinkToken, source: startCandidate?.source ?? 'search' }
   }
 
   const unsubMasterId = parseUnsubscribeStartParam(decodedStart)
@@ -235,6 +337,13 @@ const resolveLaunchIntent = (): LaunchIntent => {
   const masterId = parsedMasterId ?? queryMasterId?.trim() ?? null
   if (masterId) {
     return { type: 'booking', masterId }
+  }
+
+  if (!decodedStart) {
+    const storedToken = readStoredLinkToken()
+    if (storedToken) {
+      return { type: 'link', token: storedToken, source: 'session' }
+    }
   }
 
   return { type: 'none' }
@@ -979,24 +1088,31 @@ function App() {
     const launchIntent = resolveLaunchIntent()
 
     if (launchIntent.type === 'link') {
-      deepLinkHandledRef.current = true
       const runLinkComplete = async () => {
         if (!userId) {
-          window.alert('Не удалось определить пользователя для привязки.')
-          navigate('start', { reset: true })
+          logAccountLinkDebug('link-complete-wait-user', {
+            host: miniAppHost,
+            source: launchIntent.source,
+            ...getTokenDebugMeta(launchIntent.token),
+          })
           return
         }
         const currentTelegramUser = getTelegramUser() ?? telegramUser
         const platformUserId = resolveCurrentPlatformUserId()
         if (!platformUserId) {
-          window.alert(
-            miniAppHost === 'vk'
-              ? 'Не удалось получить VK ID. Откройте Mini App внутри ВКонтакте и повторите.'
-              : 'Не удалось получить Telegram ID. Откройте Mini App внутри Telegram и повторите.'
-          )
-          navigate('start', { reset: true })
+          logAccountLinkDebug('link-complete-wait-platform-user-id', {
+            host: miniAppHost,
+            source: launchIntent.source,
+            ...getTokenDebugMeta(launchIntent.token),
+          })
           return
         }
+        deepLinkHandledRef.current = true
+        logAccountLinkDebug('link-complete-start', {
+          host: miniAppHost,
+          source: launchIntent.source,
+          ...getTokenDebugMeta(launchIntent.token),
+        })
         try {
           const response = await fetch(`${apiBase}/api/account/link/complete`, {
             method: 'POST',
@@ -1021,6 +1137,13 @@ function App() {
                 ? payload.error
                 : apiError.code
             if (errorCode === 'token_invalid_or_used') {
+              clearStoredLinkToken()
+              logAccountLinkDebug('link-complete-failed', {
+                host: miniAppHost,
+                source: launchIntent.source,
+                errorCode,
+                ...getTokenDebugMeta(launchIntent.token),
+              })
               window.alert(
                 'Код привязки истек или уже использован. Запустите привязку заново из исходной платформы.'
               )
@@ -1028,6 +1151,13 @@ function App() {
               return
             }
             if (errorCode === 'target_platform_mismatch') {
+              clearStoredLinkToken()
+              logAccountLinkDebug('link-complete-failed', {
+                host: miniAppHost,
+                source: launchIntent.source,
+                errorCode,
+                ...getTokenDebugMeta(launchIntent.token),
+              })
               window.alert('Ссылка привязки открыта не в той платформе. Повторите переход заново.')
               navigate('start', { reset: true })
               return
@@ -1076,10 +1206,23 @@ function App() {
               payload && typeof payload === 'object' && 'error' in payload
                 ? payload.error
                 : 'link_complete_invalid_payload'
+            logAccountLinkDebug('link-complete-invalid-payload', {
+              host: miniAppHost,
+              source: launchIntent.source,
+              errorCode,
+              ...getTokenDebugMeta(launchIntent.token),
+            })
             window.alert(`Не удалось завершить привязку (${errorCode}).`)
             navigate('start', { reset: true })
             return
           }
+          clearStoredLinkToken()
+          logAccountLinkDebug('link-complete-success', {
+            host: miniAppHost,
+            source: launchIntent.source,
+            merged: Boolean(successPayload.merged),
+            ...getTokenDebugMeta(launchIntent.token),
+          })
           const nextUserId =
             typeof successPayload.userId === 'string' && successPayload.userId.trim()
               ? successPayload.userId.trim()
@@ -1097,6 +1240,11 @@ function App() {
             reset: true,
           })
         } catch (error) {
+          logAccountLinkDebug('link-complete-network-error', {
+            host: miniAppHost,
+            source: launchIntent.source,
+            ...getTokenDebugMeta(launchIntent.token),
+          })
           window.alert('Не удалось завершить привязку аккаунта. Проверьте соединение и повторите.')
           navigate('start', { reset: true })
         }
