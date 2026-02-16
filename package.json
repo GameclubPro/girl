@@ -11,6 +11,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint src server scripts",
     "test:integration": "node --test tests/integration",
+    "test:integration:ci": "CI=1 node --test tests/integration",
+    "test:db:up": "node scripts/test-db-up.mjs",
+    "test:db:down": "node scripts/test-db-down.mjs --volumes",
+    "test:integration:local": "npm run test:db:up && npm run test:integration && npm run test:db:down",
     "preview": "vite preview",
     "screenshot:miniapp": "node scripts/miniapp-screenshot.mjs",
     "screenshot:miniapp:matrix": "node scripts/miniapp-screenshot-suite.mjs",
@@ -31,7 +35,8 @@
     "deps:check": "node scripts/deps-check.mjs",
     "deps:update:safe": "node scripts/deps-safe-update.mjs",
     "agent:health": "npm run deps:check && npm run visual:doctor -- --strict 1",
-    "agent:autopilot": "npm run deps:update:safe && npm run deps:check && npm run test:integration && npm run build && npm run visual:gate && npm run visual:cleanup -- --maxAgeDays 7 --keepLatest 30"
+    "agent:autopilot": "npm run deps:check && npm run test:integration && npm run build && npm run visual:gate && npm run visual:cleanup -- --maxAgeDays 7 --keepLatest 30",
+    "agent:maintenance": "npm run deps:update:safe && npm run deps:check && npm run build"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",

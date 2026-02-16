@@ -86,3 +86,35 @@ LIMIT 50;
 12. link/start + link/complete (TG->VK и VK->TG),
 13. WS чат с валидной сессией.
 14. При аномалиях временно вернуть `AUTH_LOG_ONLY=1`, `AUTH_STRICT=0` и зафиксировать причину в инциденте.
+
+## Как поднять test DB
+
+1. Скопировать env-шаблон:
+2. `cp .env.test.example .env.test`
+3. Поднять Postgres:
+4. `npm run test:db:up`
+5. Проверить, что контейнер healthy:
+6. `docker compose -f docker-compose.test.yml ps`
+7. Остановить и очистить:
+8. `npm run test:db:down`
+
+## Как прогнать integration security suite
+
+1. Локальный полный цикл:
+2. `npm run test:integration:local`
+3. Только тесты (если БД уже поднята):
+4. `npm run test:integration`
+5. CI-режим (skip отключен, недоступная БД = fail):
+6. `npm run test:integration:ci`
+
+## Что делать при fail в strict-auth тестах
+
+1. Проверить доступность БД и переменные (`DATABASE_URL`, `BOT_TOKEN`, `VK_APP_SECRET`).
+2. Переподнять тестовую БД: `npm run test:db:down && npm run test:db:up`.
+3. Повторно прогнать только integration suite.
+4. Если падают сценарии `forbidden`/`auth_required`:
+5. проверить `AUTH_STRICT=1`, `AUTH_LOG_ONLY=0`, `ALLOW_LOCAL_DEV_SESSION=0`.
+6. Если падает link-race кейс:
+7. проверить, что `account_link_challenges` обновляется через транзакцию и `used_at` выставляется атомарно.
+8. После исправления обязательно прогнать gate:
+9. `npm run deps:check && npm run test:integration && npm run build && npm run visual:gate`.

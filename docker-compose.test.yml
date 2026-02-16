@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: girl-test-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: girl_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '55432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d girl_test']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 2s
+    volumes:
+      - girl_test_pg_data:/var/lib/postgresql/data
+
+volumes:
+  girl_test_pg_data:
