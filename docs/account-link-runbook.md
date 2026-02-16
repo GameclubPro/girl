@@ -69,3 +69,20 @@ LIMIT 50;
 4. `auth-user-mismatch`
 5. `bootstrap-platform-auth-invalid`
 6. После стабилизации: `AUTH_STRICT=1` на staging, затем production.
+
+## On-call checklist для strict-auth
+
+1. Проверить флаги окружения:
+2. `AUTH_STRICT=1`
+3. `AUTH_LOG_ONLY=0`
+4. `ALLOW_LOCAL_DEV_SESSION=0` (для production)
+5. Снять выборку 4xx/401/403 по endpoint за последние 30 минут.
+6. Проверить долю ошибок:
+7. `auth_required`
+8. `forbidden`
+9. `platform_auth_invalid`
+10. Прогнать smoke вручную:
+11. bootstrap (TG/VK),
+12. link/start + link/complete (TG->VK и VK->TG),
+13. WS чат с валидной сессией.
+14. При аномалиях временно вернуть `AUTH_LOG_ONLY=1`, `AUTH_STRICT=0` и зафиксировать причину в инциденте.

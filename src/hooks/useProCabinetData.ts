@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from '../utils/apiClient'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Booking, ClientTrust, ServiceRequest } from '../types/app'
 

@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from '../utils/apiClient'
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ProBottomNav } from '../components/ProBottomNav'

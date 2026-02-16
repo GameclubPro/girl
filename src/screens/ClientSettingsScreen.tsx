@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from '../utils/apiClient'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClientBottomNav } from '../components/ClientBottomNav'
 import { IconBell, IconLogout, IconPin } from '../components/icons'

@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from '../utils/apiClient'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AnalyticsRangeKey, ProAnalyticsResponse } from '../types/analytics'
 

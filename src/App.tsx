@@ -1,4 +1,8 @@
 import {
+  apiFetch as fetch,
+  configureApiClient,
+} from './utils/apiClient'
+import {
   Suspense,
   lazy,
   startTransition,
@@ -43,11 +47,11 @@ import {
   toggleFavorite,
   type FavoriteMaster,
 } from './utils/favorites'
-import { installApiFetchInterceptor } from './utils/apiClient'
 import { prefetchJson, resetDataCache } from './utils/dataCache'
 import { resetChatCache } from './utils/chatCache'
 import { resetProCabinetDataCache } from './hooks/useProCabinetData'
 import { resetProAnalyticsCache } from './hooks/useProAnalyticsData'
+import { notify, subscribeNotify, type NotifyEvent } from './utils/notify'
 import {
   clearSessionAuth,
   getSessionAuth,
@@ -640,6 +644,22 @@ const emptyIdentities: AccountIdentitiesResponse = {
   vkUserId: null,
 }
 
+const API_MESSAGE_BY_CODE: Record<string, string> = {
+  source_platform_not_linked:
+    'Платформа не подтвердила ваш ID в этой сессии. Откройте Mini App внутри Telegram/ВКонтакте и повторите.',
+  platform_auth_invalid:
+    'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.',
+  auth_required:
+    'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.',
+  host_invalid:
+    'Запуск вне Mini App-контекста. Откройте приложение внутри Telegram/ВКонтакте.',
+  session_user_invalid:
+    'Сессия аккаунта не определена. Перезапустите Mini App внутри платформы и повторите.',
+}
+
+const resolveApiMessage = (code: string, fallback: string) =>
+  API_MESSAGE_BY_CODE[code] ?? fallback
+
 function App() {
   const [nav, dispatchNav] = useReducer(navReducer, {
     view: 'start',
@@ -807,6 +827,8 @@ function App() {
   const [linkResultRefreshIssue, setLinkResultRefreshIssue] =
     useState<LinkResultRefreshIssueState | null>(null)
   const [isLinkResultRetryPending, setIsLinkResultRetryPending] = useState(false)
+  const [notifications, setNotifications] = useState<NotifyEvent[]>([])
+  const notificationTimeoutsRef = useRef<Map<string, number>>(new Map())
   const [telegramUser] = useState(() => getTelegramUser())
   const resolveCurrentPlatformUserId = () => {
     const currentUser = getTelegramUser() ?? telegramUser
@@ -819,6 +841,24 @@ function App() {
     if (!platformUserId) return 'local-dev'
     return miniAppHost === 'vk' ? `vk_${platformUserId}` : platformUserId
   }
+
+  useEffect(() => {
+    const unsubscribe = subscribeNotify((event) => {
+      setNotifications((prev) => [...prev.slice(-2), event])
+      const timeoutId = window.setTimeout(() => {
+        setNotifications((prev) => prev.filter((item) => item.id !== event.id))
+        notificationTimeoutsRef.current.delete(event.id)
+      }, event.durationMs)
+      notificationTimeoutsRef.current.set(event.id, timeoutId)
+    })
+    return () => {
+      unsubscribe()
+      notificationTimeoutsRef.current.forEach((timeoutId) => {
+        window.clearTimeout(timeoutId)
+      })
+      notificationTimeoutsRef.current.clear()
+    }
+  }, [])
   const [userId, setUserId] = useState('')
   const clientName =
     [telegramUser?.first_name, telegramUser?.last_name]
@@ -1007,7 +1047,7 @@ function App() {
           status: launchIntent.status,
           nonce: launchIntent.nonce,
         })
-        window.alert(launchIntent.status === 'merged' ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+        notify(launchIntent.status === 'merged' ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
         navigate(selectedOnce ? (nextRole === 'pro' ? 'pro-cabinet' : 'client') : 'start', {
           reset: true,
         })
@@ -1104,10 +1144,10 @@ function App() {
           manual: true,
         })
         if (openMethod === 'none') {
-          window.alert('Не удалось открыть исходную Mini App. Попробуйте снова.')
+          notify('Не удалось открыть исходную Mini App. Попробуйте снова.')
         }
       } catch (_error) {
-        window.alert('Не удалось открыть исходную Mini App. Попробуйте снова.')
+        notify('Не удалось открыть исходную Mini App. Попробуйте снова.')
       } finally {
         setIsManualSourceReturnPending(false)
       }
@@ -1120,7 +1160,7 @@ function App() {
     const nextView = linkReturnFallback.nextView
     const merged = linkReturnFallback.merged
     setLinkReturnFallback(null)
-    window.alert(merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+    notify(merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
     navigate(nextView, { reset: true })
   }, [linkReturnFallback, navigate])
 
@@ -1264,7 +1304,7 @@ function App() {
   }, [prefetchViewData])
 
   useEffect(() => {
-    installApiFetchInterceptor(apiBase)
+    configureApiClient({ apiBase })
   }, [apiBase])
 
   useEffect(() => {
@@ -1538,7 +1578,7 @@ function App() {
                 errorCode,
                 ...getTokenDebugMeta(launchIntent.token),
               })
-              window.alert(
+              notify(
                 'Код привязки истек или уже использован. Запустите привязку заново из исходной платформы.'
               )
               navigate('start', { reset: true })
@@ -1552,12 +1592,12 @@ function App() {
                 errorCode,
                 ...getTokenDebugMeta(launchIntent.token),
               })
-              window.alert('Ссылка привязки открыта не в той платформе. Повторите переход заново.')
+              notify('Ссылка привязки открыта не в той платформе. Повторите переход заново.')
               navigate('start', { reset: true })
               return
             }
             if (errorCode === 'platform_user_id_required') {
-              window.alert(
+              notify(
                 miniAppHost === 'vk'
                   ? 'Не удалось получить VK ID. Откройте Mini App внутри ВКонтакте и повторите.'
                   : 'Не удалось получить Telegram ID. Откройте Mini App внутри Telegram и повторите.'
@@ -1566,33 +1606,29 @@ function App() {
               return
             }
             if (errorCode === 'platform_auth_invalid' || errorCode === 'auth_required') {
-              window.alert(
-                'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.'
-              )
+              notify(resolveApiMessage(errorCode, 'Сессия платформы не подтверждена.'))
               navigate('start', { reset: true })
               return
             }
             if (errorCode === 'host_invalid') {
-              window.alert('Запуск вне Mini App-контекста. Откройте приложение внутри Telegram/ВКонтакте.')
+              notify(resolveApiMessage(errorCode, 'Запуск вне Mini App-контекста.'))
               navigate('start', { reset: true })
               return
             }
             if (errorCode === 'session_user_invalid') {
-              window.alert(
-                'Сессия аккаунта не определена. Перезапустите Mini App внутри платформы и повторите.'
-              )
+              notify(resolveApiMessage(errorCode, 'Сессия аккаунта не определена.'))
               navigate('start', { reset: true })
               return
             }
             if (apiError.status >= 500 || apiError.code.startsWith('http_')) {
               const statusLabel = apiError.status > 0 ? `HTTP ${apiError.status}` : 'network'
-              window.alert(
+              notify(
                 `Проблема API (${statusLabel}, code: ${apiError.code}). ${apiError.message}`
               )
               navigate('start', { reset: true })
               return
             }
-            window.alert(
+            notify(
               `Не удалось завершить привязку (${errorCode ?? apiError.code}). ${apiError.message}`
             )
             navigate('start', { reset: true })
@@ -1618,7 +1654,7 @@ function App() {
               errorCode,
               ...getTokenDebugMeta(launchIntent.token),
             })
-            window.alert(`Не удалось завершить привязку (${errorCode}).`)
+            notify(`Не удалось завершить привязку (${errorCode}).`)
             navigate('start', { reset: true })
             return
           }
@@ -1653,11 +1689,11 @@ function App() {
               merged: applied.merged,
               nextView: applied.nextView,
             })
-            window.alert(applied.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+            notify(applied.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
             return
           }
           const applied = applyLinkCompleteSuccessPayload(successPayload)
-          window.alert(applied.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+          notify(applied.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
           navigate(applied.nextView, { reset: true })
         } catch (error) {
           logAccountLinkDebug('link-complete-network-error', {
@@ -1665,7 +1701,7 @@ function App() {
             source: launchIntent.source,
             ...getTokenDebugMeta(launchIntent.token),
           })
-          window.alert('Не удалось завершить привязку аккаунта. Проверьте соединение и повторите.')
+          notify('Не удалось завершить привязку аккаунта. Проверьте соединение и повторите.')
           navigate('start', { reset: true })
         }
       }
@@ -1678,7 +1714,7 @@ function App() {
       const targetMasterId = launchIntent.masterId
       const runOptOut = async () => {
         if (!userId) {
-          window.alert('Не удалось подтвердить пользователя.')
+          notify('Не удалось подтвердить пользователя.')
           navigate('client', { reset: true })
           return
         }
@@ -1694,12 +1730,12 @@ function App() {
             }
           )
           if (response.ok) {
-            window.alert('Вы отписались от предложений мастера.')
+            notify('Вы отписались от предложений мастера.')
           } else {
-            window.alert('Не удалось отписаться. Попробуйте еще раз.')
+            notify('Не удалось отписаться. Попробуйте еще раз.')
           }
         } catch (error) {
-          window.alert('Не удалось отписаться. Попробуйте еще раз.')
+          notify('Не удалось отписаться. Попробуйте еще раз.')
         } finally {
           navigate('client', { reset: true })
         }
@@ -2347,7 +2383,7 @@ function App() {
 
   const handleAccountLogout = useCallback(async () => {
     if (!userId) {
-      window.alert('Не удалось определить пользователя. Перезапустите приложение.')
+      notify('Не удалось определить пользователя. Перезапустите приложение.')
       return
     }
     if (logoutPendingRef.current) return
@@ -2373,7 +2409,7 @@ function App() {
       setAddressReturnView('start')
       navigate('start', { reset: true, replace: true })
     } catch (error) {
-      window.alert('Не удалось выйти из аккаунта. Проверьте соединение и повторите.')
+      notify('Не удалось выйти из аккаунта. Проверьте соединение и повторите.')
     } finally {
       logoutPendingRef.current = false
     }
@@ -2381,12 +2417,12 @@ function App() {
 
   const handleStartAccountLink = useCallback(async (source: 'start' | 'settings' = 'settings') => {
     if (!userId) {
-      window.alert('Не удалось определить пользователя. Перезапустите приложение.')
+      notify('Не удалось определить пользователя. Перезапустите приложение.')
       return
     }
     const platformUserId = resolveCurrentPlatformUserId()
     if (miniAppHost === 'web' || !platformUserId) {
-      window.alert('Откройте Mini App внутри Telegram/ВКонтакте и повторите.')
+      notify('Откройте Mini App внутри Telegram/ВКонтакте и повторите.')
       return
     }
     if (isAccountAlreadyLinked) {
@@ -2394,7 +2430,7 @@ function App() {
         navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
         return
       }
-      window.alert('Аккаунт уже привязан.')
+      notify('Аккаунт уже привязан.')
       return
     }
     if (isAccountLinkPending || isRoleSelectionPending || accountLinkEnvMissing) {
@@ -2429,39 +2465,35 @@ function App() {
             ? payload.error
             : apiError.code
         if (errorCode === 'source_platform_not_linked') {
-          window.alert('Платформа не подтвердила ваш ID в этой сессии. Откройте Mini App внутри Telegram/ВКонтакте и повторите.')
+          notify(resolveApiMessage(errorCode, 'Платформа не подтвердила ваш ID в этой сессии.'))
           return
         }
         if (errorCode === 'platform_auth_invalid' || errorCode === 'auth_required') {
-          window.alert(
-            'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.'
-          )
+          notify(resolveApiMessage(errorCode, 'Сессия платформы не подтверждена.'))
           return
         }
         if (errorCode === 'host_invalid') {
-          window.alert('Запуск вне Mini App-контекста. Откройте приложение внутри Telegram/ВКонтакте.')
+          notify(resolveApiMessage(errorCode, 'Запуск вне Mini App-контекста.'))
           return
         }
         if (errorCode === 'session_user_invalid') {
-          window.alert(
-            'Сессия аккаунта не определена. Перезапустите Mini App внутри платформы и повторите.'
-          )
+          notify(resolveApiMessage(errorCode, 'Сессия аккаунта не определена.'))
           return
         }
         if (errorCode === 'tg_url_missing') {
-          window.alert('Не задан VITE_TG_APP_URL.')
+          notify('Не задан VITE_TG_APP_URL.')
           return
         }
         if (errorCode === 'vk_url_missing') {
-          window.alert('Не задан VITE_VK_APP_URL.')
+          notify('Не задан VITE_VK_APP_URL.')
           return
         }
         const statusLabel = apiError.status > 0 ? `HTTP ${apiError.status}` : 'network'
         if (apiError.status >= 500 || apiError.code.startsWith('http_')) {
-          window.alert(`Проблема API (${statusLabel}, code: ${apiError.code}). ${apiError.message}`)
+          notify(`Проблема API (${statusLabel}, code: ${apiError.code}). ${apiError.message}`)
           return
         }
-        window.alert(`Не удалось начать привязку аккаунта (${errorCode ?? apiError.code}). ${apiError.message}`)
+        notify(`Не удалось начать привязку аккаунта (${errorCode ?? apiError.code}). ${apiError.message}`)
         return
       }
 
@@ -2481,7 +2513,7 @@ function App() {
           navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
           return
         }
-        window.alert('Аккаунт уже привязан.')
+        notify('Аккаунт уже привязан.')
         return
       }
 
@@ -2500,7 +2532,7 @@ function App() {
         window.open(targetUrl, '_blank', 'noopener,noreferrer')
       }
     } catch (error) {
-      window.alert('Не удалось начать привязку аккаунта. Попробуйте еще раз.')
+      notify('Не удалось начать привязку аккаунта. Попробуйте еще раз.')
     } finally {
       setIsAccountLinkPending(false)
     }
@@ -2685,7 +2717,18 @@ function App() {
     <NavPreloadContext.Provider value={navPreloadHandler}>
       <Suspense fallback={<ScreenLoader />}>
         <ScreenPerfMarker screenView={screenView} pendingNavPerfRef={pendingNavPerfRef}>
-          {screen}
+          <>
+            {screen}
+            {notifications.length > 0 ? (
+              <div className="app-toast-stack" aria-live="polite" aria-atomic="true">
+                {notifications.map((item) => (
+                  <div key={item.id} className={`app-toast app-toast--${item.tone}`}>
+                    {item.message}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </>
         </ScreenPerfMarker>
       </Suspense>
     </NavPreloadContext.Provider>
@@ -3332,7 +3375,7 @@ function App() {
   }
 
   if (isSessionBootstrapping || isRoleStateLoading || !userId) {
-    return <ScreenLoader />
+    return renderScreen('start', <ScreenLoader />)
   }
 
   if (isRoleSelectedOnce) {
@@ -3359,7 +3402,7 @@ function App() {
             navigate(result.role === 'pro' ? 'pro-cabinet' : 'client', { reset: true })
             return
           }
-          window.alert(result.message)
+          notify(result.message)
           return
         }
 

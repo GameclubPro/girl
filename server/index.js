@@ -18081,7 +18081,16 @@ const runRepeatReminderCycle = async () => {
   }
 }
 
-const start = async () => {
+let runtimeServerContext = null
+
+export const createApp = () => app
+
+export const getDbPool = () => pool
+
+const start = async (options = {}) => {
+  if (runtimeServerContext) return runtimeServerContext
+  const listenPort = Number(options.port ?? port)
+  const runBackgroundJobs = options.runBackgroundJobs !== false
   const normalizedTrustBackfill = normalizeText(process.env.TRUST_BACKFILL)
   const shouldBackfillTrust =
     normalizedTrustBackfill === '1' || normalizedTrustBackfill.toLowerCase() === 'true'
@@ -18105,9 +18114,22 @@ const start = async () => {
     }
   }
 
-  const server = app.listen(port, () => {
-    console.log(`API listening on :${port}`)
+  const intervalHandles = []
+
+  const server = await new Promise((resolve, reject) => {
+    const nextServer = app.listen(listenPort, () => {
+      resolve(nextServer)
+    })
+    nextServer.on('error', (error) => {
+      reject(error)
+    })
   })
+  const boundAddress = server.address()
+  const boundPort =
+    boundAddress && typeof boundAddress === 'object' && 'port' in boundAddress
+      ? Number(boundAddress.port)
+      : listenPort
+  console.log(`API listening on :${boundPort}`)
   const wss = new WebSocketServer({ server, path: CHAT_STREAM_PATH })
   wss.on('connection', (ws, req) => {
     const init = async () => {
@@ -18155,33 +18177,91 @@ const start = async () => {
     }
     void init()
   })
-  void runRequestDispatchCycle()
-  setInterval(() => {
+  if (runBackgroundJobs) {
     void runRequestDispatchCycle()
-  }, REQUEST_DISPATCH_SCAN_INTERVAL_MS)
-  void runBookingOutcomePromptCycle()
-  setInterval(() => {
+    intervalHandles.push(
+      setInterval(() => {
+        void runRequestDispatchCycle()
+      }, REQUEST_DISPATCH_SCAN_INTERVAL_MS)
+    )
     void runBookingOutcomePromptCycle()
-  }, OUTCOME_PROMPT_SCAN_INTERVAL_MS)
-  void runDepositHoldCycle()
-  setInterval(() => {
+    intervalHandles.push(
+      setInterval(() => {
+        void runBookingOutcomePromptCycle()
+      }, OUTCOME_PROMPT_SCAN_INTERVAL_MS)
+    )
     void runDepositHoldCycle()
-  }, DEPOSIT_HOLD_SCAN_INTERVAL_MS)
-  void runRepeatReminderCycle()
-  setInterval(() => {
+    intervalHandles.push(
+      setInterval(() => {
+        void runDepositHoldCycle()
+      }, DEPOSIT_HOLD_SCAN_INTERVAL_MS)
+    )
     void runRepeatReminderCycle()
-  }, REPEAT_REMINDER_SCAN_INTERVAL_MS)
+    intervalHandles.push(
+      setInterval(() => {
+        void runRepeatReminderCycle()
+      }, REPEAT_REMINDER_SCAN_INTERVAL_MS)
+    )
+  }
+
+  const stop = async (options = {}) => {
+    if (!runtimeServerContext) return
+    runtimeServerContext = null
+    intervalHandles.forEach((handle) => {
+      clearInterval(handle)
+    })
+    await Promise.all([
+      new Promise((resolve) => {
+        wss.close(() => resolve(null))
+      }),
+      new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          resolve(null)
+        })
+      }),
+    ])
+    if (options.closeDb !== false) {
+      await pool.end()
+    }
+  }
+
+  runtimeServerContext = {
+    app,
+    server,
+    wss,
+    port: boundPort,
+    stop,
+  }
+  return runtimeServerContext
 }
 
-start().catch((error) => {
-  console.error('Failed to start API:', error)
-  process.exit(1)
-})
+export const startServer = start
 
-const shutdown = async () => {
-  await pool.end()
-  process.exit(0)
+const shouldAutoStart =
+  process.env.NODE_ENV !== 'test' && !parseEnvBoolean(process.env.SKIP_API_AUTOSTART, false)
+
+if (shouldAutoStart) {
+  start().catch((error) => {
+    console.error('Failed to start API:', error)
+    process.exit(1)
+  })
+
+  const shutdown = async () => {
+    try {
+      if (runtimeServerContext?.stop) {
+        await runtimeServerContext.stop({ closeDb: true })
+      } else {
+        await pool.end()
+      }
+    } finally {
+      process.exit(0)
+    }
+  }
+
+  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', shutdown)
 }
-
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
