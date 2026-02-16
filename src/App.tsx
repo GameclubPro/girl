@@ -179,6 +179,8 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
 const ACCOUNT_LINK_TOKEN_STORAGE_KEY = 'kiven-account-link-token-v1'
 const ACCOUNT_LINK_TOKEN_TTL_MS = 10 * 60 * 1000
+const LINK_RETURN_HANDOFF_TIMEOUT_MS = 2500
+const LINK_RESULT_BOOTSTRAP_TIMEOUT_MS = 12_000
 const accountLinkDebugEnabled =
   import.meta.env.DEV ||
   ['1', 'true', 'yes', 'on'].includes(
@@ -187,6 +189,16 @@ const accountLinkDebugEnabled =
 
 type LinkTokenSource = 'initData' | 'search' | 'hash' | 'session'
 type LinkResultStatus = 'linked' | 'merged'
+type LinkReturnSourcePlatform = 'telegram' | 'vk'
+type LinkReturnOpenMethod =
+  | 'openTelegramLink'
+  | 'openLink'
+  | 'location.assign'
+  | 'window.open'
+  | 'none'
+
+const isTelegramDeepLinkUrl = (url: string) =>
+  /^tg:\/\//i.test(url) || /^https?:\/\/(?:t|telegram)\.me\//i.test(url)
 
 const getTokenDebugMeta = (token: string) => ({
   tokenPrefix: token ? token.slice(0, 6) : '',
@@ -420,6 +432,20 @@ type RoleUpdateSource = 'onboarding' | 'settings'
 type UserRoleStateResponse = {
   role?: Role | null
   selectedOnce?: boolean
+}
+
+type LinkResultIntent = Extract<LaunchIntent, { type: 'link-result' }>
+
+type LinkReturnFallbackState = {
+  sourcePlatform: LinkReturnSourcePlatform
+  sourceReturnUrl: string
+  merged: boolean
+  nextView: View
+}
+
+type LinkResultRefreshIssueState = {
+  intent: LinkResultIntent
+  message: string
 }
 
 const ScreenPerfMarker = ({
@@ -746,6 +772,14 @@ function App() {
   const deepLinkHandledRef = useRef(false)
   const linkResultHandledNonceRef = useRef('')
   const warmupDoneRef = useRef(false)
+  const [launchIntentRevision, setLaunchIntentRevision] = useState(0)
+  const [linkReturnFallback, setLinkReturnFallback] = useState<LinkReturnFallbackState | null>(
+    null
+  )
+  const [isManualSourceReturnPending, setIsManualSourceReturnPending] = useState(false)
+  const [linkResultRefreshIssue, setLinkResultRefreshIssue] =
+    useState<LinkResultRefreshIssueState | null>(null)
+  const [isLinkResultRetryPending, setIsLinkResultRetryPending] = useState(false)
   const [telegramUser] = useState(() => getTelegramUser())
   const resolveCurrentPlatformUserId = () => {
     const currentUser = getTelegramUser() ?? telegramUser
@@ -837,6 +871,274 @@ function App() {
     setSupportChatId(null)
     supportChatPromiseRef.current = null
   }, [])
+
+  const openSourceReturnUrl = useCallback(
+    (url: string, sourcePlatform: LinkReturnSourcePlatform): LinkReturnOpenMethod => {
+      const normalizedUrl = url.trim()
+      if (!normalizedUrl) return 'none'
+      const webApp = window.Telegram?.WebApp
+      if (sourcePlatform === 'telegram' && isTelegramDeepLinkUrl(normalizedUrl)) {
+        if (webApp?.openTelegramLink) {
+          webApp.openTelegramLink(normalizedUrl)
+          return 'openTelegramLink'
+        }
+      }
+      if (webApp?.openLink) {
+        webApp.openLink(normalizedUrl)
+        return 'openLink'
+      }
+      if (typeof window.location.assign === 'function') {
+        window.location.assign(normalizedUrl)
+        return 'location.assign'
+      }
+      window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
+      return 'window.open'
+    },
+    []
+  )
+
+  const attemptSourceReturn = useCallback(
+    async (url: string, sourcePlatform: LinkReturnSourcePlatform) => {
+      const normalizedUrl = url.trim()
+      if (!normalizedUrl) {
+        return { handoffConfirmed: false, openMethod: 'none' as LinkReturnOpenMethod }
+      }
+      return await new Promise<{ handoffConfirmed: boolean; openMethod: LinkReturnOpenMethod }>(
+        (resolve) => {
+          let timeoutId = 0
+          let settled = false
+          let openMethod: LinkReturnOpenMethod = 'none'
+          const cleanup = () => {
+            window.clearTimeout(timeoutId)
+            window.removeEventListener('pagehide', handlePageHide)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+          }
+          const finish = (handoffConfirmed: boolean) => {
+            if (settled) return
+            settled = true
+            cleanup()
+            resolve({ handoffConfirmed, openMethod })
+          }
+          const handlePageHide = () => {
+            finish(true)
+          }
+          const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+              finish(true)
+            }
+          }
+
+          window.addEventListener('pagehide', handlePageHide, { once: true })
+          document.addEventListener('visibilitychange', handleVisibilityChange)
+          timeoutId = window.setTimeout(() => {
+            finish(false)
+          }, LINK_RETURN_HANDOFF_TIMEOUT_MS)
+
+          try {
+            openMethod = openSourceReturnUrl(normalizedUrl, sourcePlatform)
+            if (openMethod === 'none') {
+              finish(false)
+            }
+          } catch (_error) {
+            finish(false)
+          }
+        }
+      )
+    },
+    [openSourceReturnUrl]
+  )
+
+  const applyLinkCompleteSuccessPayload = useCallback(
+    (successPayload: AccountLinkCompleteResponse): { merged: boolean; nextView: View } => {
+      const nextUserId =
+        typeof successPayload.userId === 'string' && successPayload.userId.trim()
+          ? successPayload.userId.trim()
+          : userId
+      const nextRole = parseRole(successPayload.roleState?.role) ?? role
+      const selectedOnce = Boolean(successPayload.roleState?.selectedOnce && nextRole)
+      setUserId(nextUserId)
+      applyRoleState(successPayload.roleState ?? null)
+      applyAccountIdentities(successPayload.identities ?? null)
+      setIsSupportAgent(Boolean(successPayload.isSupportAgent))
+      setSupportChatId(null)
+      supportChatPromiseRef.current = null
+      const nextView: View = selectedOnce ? (nextRole === 'pro' ? 'pro-cabinet' : 'client') : 'start'
+      return {
+        merged: Boolean(successPayload.merged),
+        nextView,
+      }
+    },
+    [applyAccountIdentities, applyRoleState, role, userId]
+  )
+
+  const performLinkResultBootstrap = useCallback(
+    async (launchIntent: LinkResultIntent) => {
+      const currentTelegramUser = getTelegramUser() ?? telegramUser
+      const platformUserId = resolveCurrentPlatformUserId()
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => {
+        controller.abort()
+      }, LINK_RESULT_BOOTSTRAP_TIMEOUT_MS)
+
+      try {
+        const response = await fetch(`${apiBase}/api/session/bootstrap`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            host: miniAppHost,
+            platformUserId,
+            firstName: currentTelegramUser?.first_name ?? null,
+            lastName: currentTelegramUser?.last_name ?? null,
+            username: currentTelegramUser?.username ?? null,
+            languageCode: currentTelegramUser?.language_code ?? null,
+            photoUrl: currentTelegramUser?.photo_url ?? null,
+            startParam: JSON.stringify(launchIntent),
+          }),
+        })
+        if (!response.ok) {
+          throw new Error('Session bootstrap failed')
+        }
+        const payload = (await response.json().catch(() => null)) as SessionBootstrapResponse | null
+        const nextUserId =
+          typeof payload?.userId === 'string' && payload.userId.trim()
+            ? payload.userId.trim()
+            : resolveFallbackSessionUserId()
+        const nextRole = parseRole(payload?.roleState?.role) ?? role
+        const selectedOnce = Boolean(payload?.roleState?.selectedOnce && nextRole)
+        setUserId(nextUserId)
+        applyRoleState(payload?.roleState ?? null)
+        applyAccountIdentities(payload?.identities ?? null)
+        setIsSupportAgent(Boolean(payload?.isSupportAgent))
+        logAccountLinkDebug('link-result-bootstrap-success', {
+          host: miniAppHost,
+          status: launchIntent.status,
+          nonce: launchIntent.nonce,
+        })
+        window.alert(launchIntent.status === 'merged' ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+        navigate(selectedOnce ? (nextRole === 'pro' ? 'pro-cabinet' : 'client') : 'start', {
+          reset: true,
+        })
+        return { ok: true as const, timedOut: false as const }
+      } catch (error) {
+        const timedOut = error instanceof DOMException && error.name === 'AbortError'
+        if (timedOut) {
+          logAccountLinkDebug('link-result-bootstrap-timeout', {
+            host: miniAppHost,
+            status: launchIntent.status,
+            nonce: launchIntent.nonce,
+            timeoutMs: LINK_RESULT_BOOTSTRAP_TIMEOUT_MS,
+          })
+        }
+        logAccountLinkDebug('link-result-bootstrap-failed', {
+          host: miniAppHost,
+          status: launchIntent.status,
+          nonce: launchIntent.nonce,
+          timedOut,
+        })
+        return { ok: false as const, timedOut }
+      } finally {
+        window.clearTimeout(timeoutId)
+      }
+    },
+    [
+      apiBase,
+      applyAccountIdentities,
+      applyRoleState,
+      miniAppHost,
+      navigate,
+      role,
+      telegramUser?.first_name,
+      telegramUser?.language_code,
+      telegramUser?.last_name,
+      telegramUser?.photo_url,
+      telegramUser?.username,
+    ]
+  )
+
+  const handleRetryLinkResultBootstrap = useCallback(() => {
+    if (
+      !linkResultRefreshIssue ||
+      isSessionBootstrapping ||
+      isRoleStateLoading ||
+      isLinkResultRetryPending
+    ) {
+      return
+    }
+    const retryIntent = linkResultRefreshIssue.intent
+    setLinkResultRefreshIssue(null)
+    setIsLinkResultRetryPending(true)
+    setIsSessionBootstrapping(true)
+    setIsRoleStateLoading(true)
+    const runRetry = async () => {
+      resetPostLinkCaches()
+      const result = await performLinkResultBootstrap(retryIntent)
+      if (!result.ok) {
+        setLinkResultRefreshIssue({
+          intent: retryIntent,
+          message: result.timedOut
+            ? 'Не удалось обновить сессию. Нажмите "Обновить".'
+            : 'Не удалось обновить данные после привязки. Нажмите "Обновить".',
+        })
+      }
+      setIsLinkResultRetryPending(false)
+      setIsRoleStateLoading(false)
+      setIsSessionBootstrapping(false)
+    }
+    void runRetry()
+  }, [
+    isLinkResultRetryPending,
+    isRoleStateLoading,
+    isSessionBootstrapping,
+    linkResultRefreshIssue,
+    performLinkResultBootstrap,
+    resetPostLinkCaches,
+  ])
+
+  const handleOpenSourceFromFallback = useCallback(() => {
+    if (!linkReturnFallback || isManualSourceReturnPending) return
+    setIsManualSourceReturnPending(true)
+    const runManualOpen = async () => {
+      logAccountLinkDebug('link-return-attempt', {
+        host: miniAppHost,
+        sourcePlatform: linkReturnFallback.sourcePlatform,
+        sourceReturnUrlLength: linkReturnFallback.sourceReturnUrl.length,
+        manual: true,
+      })
+      const result = await attemptSourceReturn(
+        linkReturnFallback.sourceReturnUrl,
+        linkReturnFallback.sourcePlatform
+      )
+      if (result.handoffConfirmed) {
+        logAccountLinkDebug('link-return-handoff-confirmed', {
+          host: miniAppHost,
+          sourcePlatform: linkReturnFallback.sourcePlatform,
+          openMethod: result.openMethod,
+          manual: true,
+        })
+      } else {
+        logAccountLinkDebug('link-return-handoff-timeout', {
+          host: miniAppHost,
+          sourcePlatform: linkReturnFallback.sourcePlatform,
+          openMethod: result.openMethod,
+          manual: true,
+          timeoutMs: LINK_RETURN_HANDOFF_TIMEOUT_MS,
+        })
+        window.alert('Не удалось автоматически открыть исходную Mini App. Попробуйте снова.')
+      }
+      setIsManualSourceReturnPending(false)
+    }
+    void runManualOpen()
+  }, [attemptSourceReturn, isManualSourceReturnPending, linkReturnFallback, miniAppHost])
+
+  const handleStayInCurrentMiniApp = useCallback(() => {
+    if (!linkReturnFallback) return
+    const nextView = linkReturnFallback.nextView
+    const merged = linkReturnFallback.merged
+    setLinkReturnFallback(null)
+    window.alert(merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+    navigate(nextView, { reset: true })
+  }, [linkReturnFallback, navigate])
 
   const updateRole = useCallback(
     async (nextRole: Role, source: RoleUpdateSource) => {
@@ -1064,6 +1366,27 @@ function App() {
   }, [view])
 
   useEffect(() => {
+    const bumpRevision = () => {
+      setLaunchIntentRevision((current) => current + 1)
+    }
+    const handleVisibilityChange = () => {
+      bumpRevision()
+    }
+    window.addEventListener('focus', bumpRevision)
+    window.addEventListener('pageshow', bumpRevision)
+    window.addEventListener('hashchange', bumpRevision)
+    window.addEventListener('popstate', bumpRevision)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener('focus', bumpRevision)
+      window.removeEventListener('pageshow', bumpRevision)
+      window.removeEventListener('hashchange', bumpRevision)
+      window.removeEventListener('popstate', bumpRevision)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  useEffect(() => {
     if (isSessionBootstrapping || isRoleStateLoading || !isRoleSelectedOnce || view !== 'start')
       return
     const launchIntent = resolveLaunchIntent()
@@ -1072,7 +1395,15 @@ function App() {
       reset: true,
       replace: true,
     })
-  }, [isRoleSelectedOnce, isRoleStateLoading, isSessionBootstrapping, navigate, role, view])
+  }, [
+    isRoleSelectedOnce,
+    isRoleStateLoading,
+    isSessionBootstrapping,
+    launchIntentRevision,
+    navigate,
+    role,
+    view,
+  ])
 
   useEffect(() => {
     if (warmupDoneRef.current || view === 'start') return
@@ -1123,68 +1454,21 @@ function App() {
           status: launchIntent.status,
           nonce: launchIntent.nonce,
         })
+        setLinkResultRefreshIssue(null)
         resetPostLinkCaches()
         setIsSessionBootstrapping(true)
         setIsRoleStateLoading(true)
-        try {
-          const currentTelegramUser = getTelegramUser() ?? telegramUser
-          const platformUserId = resolveCurrentPlatformUserId()
-          const response = await fetch(`${apiBase}/api/session/bootstrap`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              host: miniAppHost,
-              platformUserId,
-              firstName: currentTelegramUser?.first_name ?? null,
-              lastName: currentTelegramUser?.last_name ?? null,
-              username: currentTelegramUser?.username ?? null,
-              languageCode: currentTelegramUser?.language_code ?? null,
-              photoUrl: currentTelegramUser?.photo_url ?? null,
-              startParam: JSON.stringify(launchIntent),
-            }),
+        const result = await performLinkResultBootstrap(launchIntent)
+        if (!result.ok) {
+          setLinkResultRefreshIssue({
+            intent: launchIntent,
+            message: result.timedOut
+              ? 'Не удалось обновить сессию. Нажмите "Обновить".'
+              : 'Не удалось обновить данные после привязки. Нажмите "Обновить".',
           })
-          if (!response.ok) {
-            throw new Error('Session bootstrap failed')
-          }
-          const payload = (await response.json().catch(() => null)) as
-            | SessionBootstrapResponse
-            | null
-          const nextUserId =
-            typeof payload?.userId === 'string' && payload.userId.trim()
-              ? payload.userId.trim()
-              : resolveFallbackSessionUserId()
-          const nextRole = parseRole(payload?.roleState?.role) ?? role
-          const selectedOnce = Boolean(payload?.roleState?.selectedOnce && nextRole)
-          setUserId(nextUserId)
-          applyRoleState(payload?.roleState ?? null)
-          applyAccountIdentities(payload?.identities ?? null)
-          setIsSupportAgent(Boolean(payload?.isSupportAgent))
-          logAccountLinkDebug('link-result-bootstrap-success', {
-            host: miniAppHost,
-            status: launchIntent.status,
-            nonce: launchIntent.nonce,
-          })
-          window.alert(launchIntent.status === 'merged' ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
-          navigate(selectedOnce ? (nextRole === 'pro' ? 'pro-cabinet' : 'client') : 'start', {
-            reset: true,
-          })
-        } catch (_error) {
-          const fallbackUserId = resolveFallbackSessionUserId()
-          setUserId(fallbackUserId)
-          setIsRoleSelectedOnce(false)
-          applyAccountIdentities(null)
-          setIsSupportAgent(false)
-          logAccountLinkDebug('link-result-bootstrap-failed', {
-            host: miniAppHost,
-            status: launchIntent.status,
-            nonce: launchIntent.nonce,
-          })
-          window.alert('Не удалось обновить данные после привязки. Перезапустите Mini App.')
-          navigate('start', { reset: true })
-        } finally {
-          setIsRoleStateLoading(false)
-          setIsSessionBootstrapping(false)
         }
+        setIsRoleStateLoading(false)
+        setIsSessionBootstrapping(false)
       }
       void runLinkResultRefresh()
       return
@@ -1329,51 +1613,67 @@ function App() {
             merged: Boolean(successPayload.merged),
             ...getTokenDebugMeta(launchIntent.token),
           })
+          setLinkReturnFallback(null)
           const sourceReturnUrl =
             typeof successPayload.sourceReturnUrl === 'string'
               ? successPayload.sourceReturnUrl.trim()
               : ''
           if (sourceReturnUrl) {
-            logAccountLinkDebug('link-return-open-source', {
+            const sourcePlatform: LinkReturnSourcePlatform =
+              miniAppHost === 'vk' ? 'telegram' : 'vk'
+            logAccountLinkDebug('link-return-attempt', {
               host: miniAppHost,
               source: launchIntent.source,
+              sourcePlatform,
               merged: Boolean(successPayload.merged),
               sourceReturnUrlLength: sourceReturnUrl.length,
               ...getTokenDebugMeta(launchIntent.token),
             })
-            try {
-              const webApp = window.Telegram?.WebApp
-              if (webApp?.openLink) {
-                webApp.openLink(sourceReturnUrl)
-              } else {
-                window.location.assign(sourceReturnUrl)
-              }
-              return
-            } catch (_error) {
-              logAccountLinkDebug('link-return-open-source-failed', {
+            const handoff = await attemptSourceReturn(sourceReturnUrl, sourcePlatform)
+            if (handoff.handoffConfirmed) {
+              logAccountLinkDebug('link-return-handoff-confirmed', {
                 host: miniAppHost,
                 source: launchIntent.source,
+                sourcePlatform,
+                merged: Boolean(successPayload.merged),
                 sourceReturnUrlLength: sourceReturnUrl.length,
+                openMethod: handoff.openMethod,
                 ...getTokenDebugMeta(launchIntent.token),
               })
+              return
             }
+            logAccountLinkDebug('link-return-handoff-timeout', {
+              host: miniAppHost,
+              source: launchIntent.source,
+              sourcePlatform,
+              merged: Boolean(successPayload.merged),
+              sourceReturnUrlLength: sourceReturnUrl.length,
+              openMethod: handoff.openMethod,
+              timeoutMs: LINK_RETURN_HANDOFF_TIMEOUT_MS,
+              ...getTokenDebugMeta(launchIntent.token),
+            })
+            resetPostLinkCaches()
+            const applied = applyLinkCompleteSuccessPayload(successPayload)
+            setLinkReturnFallback({
+              sourcePlatform,
+              sourceReturnUrl,
+              merged: applied.merged,
+              nextView: applied.nextView,
+            })
+            logAccountLinkDebug('link-return-fallback-shown', {
+              host: miniAppHost,
+              source: launchIntent.source,
+              sourcePlatform,
+              merged: applied.merged,
+              sourceReturnUrlLength: sourceReturnUrl.length,
+              timeoutMs: LINK_RETURN_HANDOFF_TIMEOUT_MS,
+              ...getTokenDebugMeta(launchIntent.token),
+            })
+            return
           }
-          const nextUserId =
-            typeof successPayload.userId === 'string' && successPayload.userId.trim()
-              ? successPayload.userId.trim()
-              : userId
-          const nextRole = parseRole(successPayload.roleState?.role) ?? role
-          const selectedOnce = Boolean(successPayload.roleState?.selectedOnce && nextRole)
-          setUserId(nextUserId)
-          applyRoleState(successPayload.roleState ?? null)
-          applyAccountIdentities(successPayload.identities ?? null)
-          setIsSupportAgent(Boolean(successPayload.isSupportAgent))
-          setSupportChatId(null)
-          supportChatPromiseRef.current = null
-          window.alert(successPayload.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
-          navigate(selectedOnce ? (nextRole === 'pro' ? 'pro-cabinet' : 'client') : 'start', {
-            reset: true,
-          })
+          const applied = applyLinkCompleteSuccessPayload(successPayload)
+          window.alert(applied.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+          navigate(applied.nextView, { reset: true })
         } catch (error) {
           logAccountLinkDebug('link-complete-network-error', {
             host: miniAppHost,
@@ -1441,14 +1741,15 @@ function App() {
     navigate('booking', { reset: true })
   }, [
     apiBase,
-    applyAccountIdentities,
-    applyRoleState,
+    applyLinkCompleteSuccessPayload,
+    attemptSourceReturn,
     isRoleStateLoading,
     isSessionBootstrapping,
+    launchIntentRevision,
     miniAppHost,
     navigate,
+    performLinkResultBootstrap,
     resetPostLinkCaches,
-    role,
     telegramUser?.id,
     telegramUser?.first_name,
     telegramUser?.last_name,
@@ -2390,6 +2691,82 @@ function App() {
       </Suspense>
     </NavPreloadContext.Provider>
   )
+
+  if (linkResultRefreshIssue) {
+    const isMergedResult = linkResultRefreshIssue.intent.status === 'merged'
+    return renderScreen(
+      'start',
+      <div className="screen screen--start">
+        <main className="content link-flow-fallback">
+          <section className="link-flow-fallback__card">
+            <p className="link-flow-fallback__eyebrow">Проверка сессии</p>
+            <h2 className="link-flow-fallback__title">
+              {isMergedResult ? 'Объединение завершено' : 'Привязка завершена'}
+            </h2>
+            <p className="link-flow-fallback__text">{linkResultRefreshIssue.message}</p>
+            <div className="link-flow-fallback__actions">
+              <button
+                type="button"
+                className="link-flow-fallback__button is-primary"
+                onClick={handleRetryLinkResultBootstrap}
+                disabled={isLinkResultRetryPending}
+              >
+                {isLinkResultRetryPending ? 'Обновляем...' : 'Обновить'}
+              </button>
+              <button
+                type="button"
+                className="link-flow-fallback__button is-secondary"
+                onClick={() => setLinkResultRefreshIssue(null)}
+                disabled={isLinkResultRetryPending}
+              >
+                Остаться здесь
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    )
+  }
+
+  if (linkReturnFallback) {
+    const sourceLabel =
+      linkReturnFallback.sourcePlatform === 'telegram' ? 'Telegram Mini App' : 'ВКонтакте Mini App'
+    return renderScreen(
+      'start',
+      <div className="screen screen--start">
+        <main className="content link-flow-fallback">
+          <section className="link-flow-fallback__card">
+            <p className="link-flow-fallback__eyebrow">Возврат в исходный аккаунт</p>
+            <h2 className="link-flow-fallback__title">
+              {linkReturnFallback.merged ? 'Аккаунты объединены' : 'Аккаунт привязан'}
+            </h2>
+            <p className="link-flow-fallback__text">
+              Авто-переход не подтвердился. Вернитесь в {sourceLabel}, чтобы подтянуть свежую
+              сессию.
+            </p>
+            <div className="link-flow-fallback__actions">
+              <button
+                type="button"
+                className="link-flow-fallback__button is-primary"
+                onClick={handleOpenSourceFromFallback}
+                disabled={isManualSourceReturnPending}
+              >
+                {isManualSourceReturnPending ? 'Открываем...' : `Вернуться в ${sourceLabel}`}
+              </button>
+              <button
+                type="button"
+                className="link-flow-fallback__button is-secondary"
+                onClick={handleStayInCurrentMiniApp}
+                disabled={isManualSourceReturnPending}
+              >
+                Остаться здесь
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    )
+  }
 
   if (view === 'client') {
     return renderScreen(

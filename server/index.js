@@ -1404,20 +1404,23 @@ const buildStartAppUrl = (baseUrl, startParam) => {
   return `${baseUrl}${joiner}startapp=${encodedParam}`
 }
 
-const buildLinkTargetUrl = (baseUrl, paramKey, paramValue) => {
+const buildLinkTargetUrl = (baseUrl, paramKey, paramValue, options = {}) => {
   const normalizedBaseUrl = normalizeText(baseUrl)
   const normalizedParamKey = normalizeText(paramKey)
   const normalizedParamValue = normalizeText(paramValue)
+  const mirrorHash = options?.mirrorHash !== false
   if (!normalizedBaseUrl || !normalizedParamKey || !normalizedParamValue) return ''
 
   try {
     const url = new URL(normalizedBaseUrl)
     url.searchParams.set(normalizedParamKey, normalizedParamValue)
-    const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash
-    const hashParams = new URLSearchParams(hash)
-    hashParams.set(normalizedParamKey, normalizedParamValue)
-    const nextHash = hashParams.toString()
-    url.hash = nextHash ? `#${nextHash}` : ''
+    if (mirrorHash) {
+      const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash
+      const hashParams = new URLSearchParams(hash)
+      hashParams.set(normalizedParamKey, normalizedParamValue)
+      const nextHash = hashParams.toString()
+      url.hash = nextHash ? `#${nextHash}` : ''
+    }
     return url.toString()
   } catch (_error) {
     const encodedValue = encodeURIComponent(normalizedParamValue)
@@ -1426,6 +1429,9 @@ const buildLinkTargetUrl = (baseUrl, paramKey, paramValue) => {
     const withQuery = keyPattern.test(normalizedBaseUrl)
       ? normalizedBaseUrl.replace(keyPattern, `${normalizedParamKey}=${encodedValue}`)
       : `${normalizedBaseUrl}${normalizedBaseUrl.includes('?') ? '&' : '?'}${normalizedParamKey}=${encodedValue}`
+    if (!mirrorHash) {
+      return withQuery
+    }
     const [withoutHash, rawHash = ''] = withQuery.split('#', 2)
     const hashParams = new URLSearchParams(rawHash)
     hashParams.set(normalizedParamKey, normalizedParamValue)
@@ -7250,14 +7256,19 @@ app.post('/api/account/link/complete', async (req, res) => {
     const linkResultStartParam = `linked_${linkResultStatus}_${Date.now()}`
     const sourceReturnUrl =
       challenge.sourcePlatform === 'telegram'
-        ? buildLinkTargetUrl(telegramMiniAppUrl, 'startapp', linkResultStartParam)
+        ? buildLinkTargetUrl(telegramMiniAppUrl, 'startapp', linkResultStartParam, {
+            mirrorHash: false,
+          })
         : challenge.sourcePlatform === 'vk'
-          ? buildLinkTargetUrl(VK_APP_URL, 'start', linkResultStartParam)
+          ? buildLinkTargetUrl(VK_APP_URL, 'start', linkResultStartParam, {
+              mirrorHash: false,
+            })
           : ''
     if (sourceReturnUrl) {
       logAccountLinkDebug('link-complete-source-return-url-built', {
         sourcePlatform: challenge.sourcePlatform,
         status: linkResultStatus,
+        mirrorHash: false,
         startParamPrefix: linkResultStartParam.slice(0, 20),
         startParamLength: linkResultStartParam.length,
       })
@@ -7265,6 +7276,7 @@ app.post('/api/account/link/complete', async (req, res) => {
       logAccountLinkDebug('link-complete-source-return-missing', {
         sourcePlatform: challenge.sourcePlatform,
         status: linkResultStatus,
+        mirrorHash: false,
       })
     }
 
