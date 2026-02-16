@@ -1630,9 +1630,8 @@ const normalizeSessionProfilePayload = (payload = {}) => ({
 
 const upsertUserProfile = async (
   db,
-  { userId, platform = null, firstName, lastName, username, languageCode, photoUrl }
+  { userId, firstName, lastName, username, languageCode, photoUrl }
 ) => {
-  const normalizedPlatform = normalizeIdentityPlatform(platform)
   await db.query(
     `
       INSERT INTO users (
@@ -1645,18 +1644,14 @@ const upsertUserProfile = async (
       )
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (user_id) DO UPDATE
-      SET first_name = COALESCE(EXCLUDED.first_name, users.first_name),
-          last_name = COALESCE(EXCLUDED.last_name, users.last_name),
-          username = COALESCE(EXCLUDED.username, users.username),
-          language_code = COALESCE(EXCLUDED.language_code, users.language_code),
-          avatar_url = CASE
-            WHEN users.avatar_url IS NULL THEN EXCLUDED.avatar_url
-            WHEN $7 = 'vk' AND EXCLUDED.avatar_url IS NOT NULL THEN EXCLUDED.avatar_url
-            ELSE users.avatar_url
-          END,
+      SET first_name = COALESCE(users.first_name, EXCLUDED.first_name),
+          last_name = COALESCE(users.last_name, EXCLUDED.last_name),
+          username = COALESCE(users.username, EXCLUDED.username),
+          language_code = COALESCE(users.language_code, EXCLUDED.language_code),
+          avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url),
           updated_at = NOW()
     `,
-    [userId, firstName, lastName, username, languageCode, photoUrl, normalizedPlatform]
+    [userId, firstName, lastName, username, languageCode, photoUrl]
   )
 }
 
@@ -1929,12 +1924,168 @@ const mergeTextArray = (...values) => {
 }
 
 const choosePreferredRow = (primaryRow, secondaryRow) => {
-  const primaryTime = toEpochMs(primaryRow?.updated_at)
-  const secondaryTime = toEpochMs(secondaryRow?.updated_at)
-  if (secondaryTime > primaryTime) {
-    return { preferred: secondaryRow, fallback: primaryRow }
-  }
   return { preferred: primaryRow, fallback: secondaryRow }
+}
+
+const loadUserMergeSnapshot = async (db, userId) => {
+  const normalizedUserId = normalizeText(userId)
+  if (!normalizedUserId) return null
+
+  const result = await db.query(
+    `
+      SELECT
+        u.user_id AS "userId",
+        u.created_at AS "createdAt",
+        u.app_role AS "role",
+        u.role_selected_at AS "roleSelectedAt",
+        (
+          EXISTS (
+            SELECT 1
+            FROM service_requests sr
+            WHERE sr.user_id = u.user_id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM service_bookings sb
+            WHERE sb.client_id = u.user_id
+               OR sb.master_id = u.user_id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM request_responses rr
+            WHERE rr.master_id = u.user_id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM chats c
+            WHERE c.client_id = u.user_id
+               OR c.master_id = u.user_id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM master_profiles mp
+            WHERE mp.user_id = u.user_id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM client_trust_events cte
+            WHERE cte.user_id = u.user_id
+          )
+        ) AS "hasDomainActivity"
+      FROM users u
+      WHERE u.user_id = $1
+      LIMIT 1
+    `,
+    [normalizedUserId]
+  )
+
+  const row = result.rows[0] ?? null
+  if (!row) return null
+  return {
+    userId: normalizeText(row.userId) || null,
+    createdAt: row.createdAt ?? null,
+    role: normalizeUserRole(row.role),
+    roleSelectedAt: row.roleSelectedAt ?? null,
+    hasDomainActivity: Boolean(row.hasDomainActivity),
+  }
+}
+
+const resolvePrimaryForAccountMerge = async ({ db, sourceUserId, targetUserId }) => {
+  const source = normalizeText(sourceUserId)
+  const target = normalizeText(targetUserId)
+  if (!source || !target || source === target) {
+    return {
+      primaryUserId: source || target,
+      secondaryUserId: source || target,
+      selectionReason: 'source_fallback',
+    }
+  }
+
+  const [sourceSnapshot, targetSnapshot] = await Promise.all([
+    loadUserMergeSnapshot(db, source),
+    loadUserMergeSnapshot(db, target),
+  ])
+
+  if (!sourceSnapshot || !targetSnapshot) {
+    return {
+      primaryUserId: source,
+      secondaryUserId: target,
+      selectionReason: 'source_fallback',
+    }
+  }
+
+  const sourceRoleSelectedAt = toEpochMs(sourceSnapshot.roleSelectedAt)
+  const targetRoleSelectedAt = toEpochMs(targetSnapshot.roleSelectedAt)
+  const sourceHasRoleSelectedAt = sourceRoleSelectedAt > 0
+  const targetHasRoleSelectedAt = targetRoleSelectedAt > 0
+
+  if (sourceHasRoleSelectedAt !== targetHasRoleSelectedAt) {
+    return sourceHasRoleSelectedAt
+      ? {
+          primaryUserId: source,
+          secondaryUserId: target,
+          selectionReason: 'role_selected_at',
+        }
+      : {
+          primaryUserId: target,
+          secondaryUserId: source,
+          selectionReason: 'role_selected_at',
+        }
+  }
+
+  if (
+    sourceHasRoleSelectedAt &&
+    targetHasRoleSelectedAt &&
+    sourceRoleSelectedAt !== targetRoleSelectedAt
+  ) {
+    return sourceRoleSelectedAt < targetRoleSelectedAt
+      ? {
+          primaryUserId: source,
+          secondaryUserId: target,
+          selectionReason: 'role_selected_at',
+        }
+      : {
+          primaryUserId: target,
+          secondaryUserId: source,
+          selectionReason: 'role_selected_at',
+        }
+  }
+
+  if (sourceSnapshot.hasDomainActivity !== targetSnapshot.hasDomainActivity) {
+    return sourceSnapshot.hasDomainActivity
+      ? {
+          primaryUserId: source,
+          secondaryUserId: target,
+          selectionReason: 'domain_activity',
+        }
+      : {
+          primaryUserId: target,
+          secondaryUserId: source,
+          selectionReason: 'domain_activity',
+        }
+  }
+
+  const sourceCreatedAt = toEpochMs(sourceSnapshot.createdAt)
+  const targetCreatedAt = toEpochMs(targetSnapshot.createdAt)
+  if (sourceCreatedAt !== targetCreatedAt) {
+    return sourceCreatedAt < targetCreatedAt
+      ? {
+          primaryUserId: source,
+          secondaryUserId: target,
+          selectionReason: 'created_at',
+        }
+      : {
+          primaryUserId: target,
+          secondaryUserId: source,
+          selectionReason: 'created_at',
+        }
+  }
+
+  return {
+    primaryUserId: source,
+    secondaryUserId: target,
+    selectionReason: 'source_fallback',
+  }
 }
 
 const mergeUserAddressRow = async (db, primaryUserId, secondaryUserId) => {
@@ -2593,9 +2744,11 @@ const mergeUserAccounts = async ({
   secondaryUserId,
   sourcePlatform = null,
   targetPlatform = null,
+  selectionReason = null,
 }) => {
   const primary = normalizeText(primaryUserId)
   const secondary = normalizeText(secondaryUserId)
+  const normalizedSelectionReason = normalizeText(selectionReason)
   if (!primary || !secondary || primary === secondary) {
     return { merged: false }
   }
@@ -2772,7 +2925,7 @@ const mergeUserAccounts = async ({
           last_name = COALESCE(primary_user.last_name, secondary_user.last_name),
           username = COALESCE(primary_user.username, secondary_user.username),
           language_code = COALESCE(primary_user.language_code, secondary_user.language_code),
-          avatar_url = COALESCE(secondary_user.avatar_url, primary_user.avatar_url),
+          avatar_url = COALESCE(primary_user.avatar_url, secondary_user.avatar_url),
           app_role = COALESCE(primary_user.app_role, secondary_user.app_role),
           role_selected_at = COALESCE(primary_user.role_selected_at, secondary_user.role_selected_at),
           role_changed_at = COALESCE(primary_user.role_changed_at, secondary_user.role_changed_at),
@@ -2796,11 +2949,12 @@ const mergeUserAccounts = async ({
         secondary_user_id,
         source_platform,
         target_platform,
+        selection_reason,
         created_at
       )
-      VALUES ($1, $2, $3, $4, NOW())
+      VALUES ($1, $2, $3, $4, $5, NOW())
     `,
-    [primary, secondary, sourcePlatform, targetPlatform]
+    [primary, secondary, sourcePlatform, targetPlatform, normalizedSelectionReason]
   )
 
   return { merged: true }
@@ -5565,8 +5719,14 @@ const ensureSchema = async () => {
       secondary_user_id TEXT NOT NULL,
       source_platform TEXT,
       target_platform TEXT,
+      selection_reason TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    ALTER TABLE account_merge_audit
+    ADD COLUMN IF NOT EXISTS selection_reason TEXT;
   `)
 
   await pool.query(`
@@ -6927,15 +7087,21 @@ app.post('/api/account/link/complete', async (req, res) => {
     let activeUserId = sourceUserId
     let merged = false
     if (normalizedUserId !== sourceUserId) {
+      const mergeDirection = await resolvePrimaryForAccountMerge({
+        db: client,
+        sourceUserId,
+        targetUserId: normalizedUserId,
+      })
       const mergeResult = await mergeUserAccounts({
         db: client,
-        primaryUserId: sourceUserId,
-        secondaryUserId: normalizedUserId,
+        primaryUserId: mergeDirection.primaryUserId,
+        secondaryUserId: mergeDirection.secondaryUserId,
         sourcePlatform: challenge.sourcePlatform,
         targetPlatform: challenge.targetPlatform,
+        selectionReason: mergeDirection.selectionReason,
       })
       merged = Boolean(mergeResult?.merged)
-      activeUserId = sourceUserId
+      activeUserId = mergeDirection.primaryUserId
     }
 
     await ensureIdentityBinding(client, {
