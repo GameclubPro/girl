@@ -1777,6 +1777,32 @@ const ensureIdentityBinding = async (db, { internalUserId, platform, externalUse
   )
 }
 
+const resolveIdentityExternalUserId = async (db, { internalUserId, platform }) => {
+  const normalizedUserId = normalizeText(internalUserId)
+  const normalizedPlatform = normalizeIdentityPlatform(platform)
+  if (!normalizedUserId || !normalizedPlatform) return ''
+
+  const result = await db.query(
+    `
+      SELECT external_user_id AS "externalUserId"
+      FROM user_identities
+      WHERE internal_user_id = $1
+        AND platform = $2
+      ORDER BY is_primary DESC, linked_at DESC, id DESC
+      LIMIT 1
+    `,
+    [normalizedUserId, normalizedPlatform]
+  )
+  const externalUserId = normalizeExternalUserId(result.rows[0]?.externalUserId)
+  if (externalUserId) return externalUserId
+
+  const legacyIdentity = parseLegacyIdentity(normalizedUserId)
+  if (legacyIdentity?.platform === normalizedPlatform) {
+    return normalizeExternalUserId(legacyIdentity.externalUserId)
+  }
+  return ''
+}
+
 const resolveOrCreateCanonicalUserId = async (db, { platform, externalUserId }) => {
   const normalizedPlatform = normalizeIdentityPlatform(platform)
   const normalizedExternalUserId = normalizeExternalUserId(externalUserId)
@@ -2955,6 +2981,7 @@ const mergeUserAccounts = async ({
       WHERE source.internal_user_id = $2
         AND primary_identity.internal_user_id = $1
         AND source.platform = primary_identity.platform
+        AND source.external_user_id = primary_identity.external_user_id
     `,
     [primary, secondary]
   )
@@ -7144,6 +7171,10 @@ app.post('/api/account/link/complete', async (req, res) => {
       res.status(500).json({ error: 'link_source_missing' })
       return
     }
+    const sourceExternalUserId = await resolveIdentityExternalUserId(client, {
+      internalUserId: sourceUserId,
+      platform: challenge.sourcePlatform,
+    })
 
     const sessionProfile = normalizeSessionProfilePayload({
       firstName,
@@ -7184,6 +7215,18 @@ app.post('/api/account/link/complete', async (req, res) => {
       externalUserId,
       isPrimary: true,
     })
+    if (sourceExternalUserId) {
+      await ensureIdentityBinding(client, {
+        internalUserId: activeUserId,
+        platform: challenge.sourcePlatform,
+        externalUserId: sourceExternalUserId,
+        isPrimary: true,
+      })
+    } else {
+      logAccountLinkDebug('link-complete-source-identity-missing', {
+        sourcePlatform: challenge.sourcePlatform,
+      })
+    }
 
     await client.query(
       `
@@ -7215,6 +7258,7 @@ app.post('/api/account/link/complete', async (req, res) => {
       merged,
       sourcePlatform: challenge.sourcePlatform,
       targetPlatform: challenge.targetPlatform,
+      sourceIdentityRestored: Boolean(sourceExternalUserId),
     })
     res.json({
       ok: true,
