@@ -1,4 +1,4 @@
-import { existsSync, renameSync } from 'node:fs'
+import { existsSync, renameSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
@@ -84,6 +84,12 @@ const runNpmInstallWithFallback = (cwd) => {
     cwd
   )
   ensureSuccess(second, `npm install retry (${cwd})`)
+  try {
+    rmSync(backupPath, { recursive: true, force: true })
+    console.log(`[deps-safe-update] ENOTEMPTY fallback: removed backup ${backupPath}`)
+  } catch (error) {
+    console.warn(`[deps-safe-update] failed to remove backup ${backupPath}:`, error)
+  }
 }
 
 const runSafeUpdate = (cwd, label) => {

@@ -46,6 +46,27 @@ const readParam = (key: string) => {
   return search.get(key) ?? hash.get(key) ?? ''
 }
 
+const collectVkLaunchParams = () => {
+  const search = new URLSearchParams(window.location.search)
+  const hash = getHashParams()
+  const params = new Map<string, string>()
+  const includeEntry = (key: string, rawValue: string) => {
+    const normalizedKey = key.trim()
+    const normalizedValue = rawValue.trim()
+    if (!normalizedKey || !normalizedValue) return
+    if (
+      normalizedKey.startsWith('vk_') ||
+      normalizedKey === 'sign' ||
+      normalizedKey === 'vk_sign'
+    ) {
+      params.set(normalizedKey, normalizedValue)
+    }
+  }
+  search.forEach((value, key) => includeEntry(key, value))
+  hash.forEach((value, key) => includeEntry(key, value))
+  return Object.fromEntries(params.entries())
+}
+
 const parseVkUserId = (value: string) => {
   const normalized = value.trim()
   if (!VK_APP_USER_ID_REGEX.test(normalized)) return null
@@ -131,6 +152,7 @@ const impactStyleMap: Record<'light' | 'medium' | 'heavy' | 'rigid' | 'soft', 'l
 
 const setupVkShim = async () => {
   window.__vkBridgeCleanup?.()
+  window.__vkLaunchParams = collectVkLaunchParams()
 
   try {
     await bridge.send('VKWebAppInit')
@@ -282,4 +304,14 @@ export const setupMiniAppBridge = async () => {
   if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) return
 
   await setupVkShim()
+}
+
+export const getVkLaunchParamsForAuth = () => {
+  if (typeof window === 'undefined') return {}
+  if (window.__vkLaunchParams && typeof window.__vkLaunchParams === 'object') {
+    return { ...window.__vkLaunchParams }
+  }
+  const collected = collectVkLaunchParams()
+  window.__vkLaunchParams = collected
+  return { ...collected }
 }

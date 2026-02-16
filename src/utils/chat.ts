@@ -1,11 +1,11 @@
-export const buildChatStreamUrl = (apiBase: string, userId: string) => {
+export const buildChatStreamUrl = (apiBase: string, sessionToken: string) => {
   const normalizedBase = apiBase.trim().replace(/\/$/, '')
-  const normalizedUserId = userId.trim()
-  if (!normalizedBase || !normalizedUserId) return ''
+  const normalizedSessionToken = sessionToken.trim()
+  if (!normalizedBase || !normalizedSessionToken) return ''
   const wsBase = normalizedBase.replace(/^http/i, (match) =>
     match.toLowerCase() === 'https' ? 'wss' : 'ws'
   )
-  return `${wsBase}/api/chats/stream?userId=${encodeURIComponent(
-    normalizedUserId
+  return `${wsBase}/api/chats/stream?sessionToken=${encodeURIComponent(
+    normalizedSessionToken
   )}`
 }

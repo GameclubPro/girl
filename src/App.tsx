@@ -15,12 +15,14 @@ import { NavPreloadContext } from './contexts/NavPreloadContext'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
 import { getMiniAppHost } from './platform/miniAppHost'
+import { getVkLaunchParamsForAuth } from './platform/miniAppBridge'
 import type {
   AccountIdentitiesResponse,
   AccountLinkCompleteResponse,
   AccountLinkStartResponse,
   City,
   District,
+  PlatformAuthPayload,
   ProProfileSection,
   Role,
   SessionBootstrapResponse,
@@ -41,10 +43,16 @@ import {
   toggleFavorite,
   type FavoriteMaster,
 } from './utils/favorites'
+import { installApiFetchInterceptor } from './utils/apiClient'
 import { prefetchJson, resetDataCache } from './utils/dataCache'
 import { resetChatCache } from './utils/chatCache'
 import { resetProCabinetDataCache } from './hooks/useProCabinetData'
 import { resetProAnalyticsCache } from './hooks/useProAnalyticsData'
+import {
+  clearSessionAuth,
+  getSessionAuth,
+  setSessionAuth,
+} from './utils/sessionAuth'
 import { markNavEnd, markNavStart, markScreenMount, markScreenPaint } from './utils/perf'
 import type { ShowcaseMedia } from './screens/ClientShowcaseScreen'
 import { StartScreen } from './screens/StartScreen'
@@ -243,6 +251,26 @@ const resolveVkLaunchUserId = () => {
   const rawValue = (searchParams.get('vk_user_id') ?? hashParams.get('vk_user_id') ?? '').trim()
   if (!VK_USER_ID_REGEX.test(rawValue)) return ''
   return rawValue
+}
+
+const resolvePlatformAuthPayload = (
+  host: 'telegram' | 'vk' | 'web'
+): PlatformAuthPayload | null => {
+  if (host === 'telegram') {
+    const initData = (window.Telegram?.WebApp?.initData ?? '').trim()
+    if (!initData) return null
+    return { type: 'telegram', initData }
+  }
+  if (host === 'vk') {
+    const launchParams = getVkLaunchParamsForAuth()
+    const sign = (launchParams.vk_sign ?? launchParams.sign ?? '').trim()
+    return {
+      type: 'vk',
+      launchParams,
+      ...(sign ? { sign } : {}),
+    }
+  }
+  return null
 }
 
 const saveStoredLinkToken = (token: string) => {
@@ -902,6 +930,14 @@ function App() {
         typeof successPayload.userId === 'string' && successPayload.userId.trim()
           ? successPayload.userId.trim()
           : userId
+      if (typeof successPayload.sessionToken === 'string' && successPayload.sessionToken.trim()) {
+        setSessionAuth(
+          successPayload.sessionToken,
+          typeof successPayload.sessionExpiresAt === 'string'
+            ? successPayload.sessionExpiresAt
+            : null
+        )
+      }
       const nextRole = parseRole(successPayload.roleState?.role) ?? role
       const selectedOnce = Boolean(successPayload.roleState?.selectedOnce && nextRole)
       setUserId(nextUserId)
@@ -923,6 +959,7 @@ function App() {
     async (launchIntent: LinkResultIntent) => {
       const currentTelegramUser = getTelegramUser() ?? telegramUser
       const platformUserId = resolveCurrentPlatformUserId()
+      const platformAuth = resolvePlatformAuthPayload(miniAppHost)
       const controller = new AbortController()
       const timeoutId = window.setTimeout(() => {
         controller.abort()
@@ -942,6 +979,7 @@ function App() {
             languageCode: currentTelegramUser?.language_code ?? null,
             photoUrl: currentTelegramUser?.photo_url ?? null,
             startParam: JSON.stringify(launchIntent),
+            platformAuth,
           }),
         })
         if (!response.ok) {
@@ -952,6 +990,12 @@ function App() {
           typeof payload?.userId === 'string' && payload.userId.trim()
             ? payload.userId.trim()
             : resolveFallbackSessionUserId()
+        if (typeof payload?.sessionToken === 'string' && payload.sessionToken.trim()) {
+          setSessionAuth(
+            payload.sessionToken,
+            typeof payload?.sessionExpiresAt === 'string' ? payload.sessionExpiresAt : null
+          )
+        }
         const nextRole = parseRole(payload?.roleState?.role) ?? role
         const selectedOnce = Boolean(payload?.roleState?.selectedOnce && nextRole)
         setUserId(nextUserId)
@@ -1220,6 +1264,10 @@ function App() {
   }, [prefetchViewData])
 
   useEffect(() => {
+    installApiFetchInterceptor(apiBase)
+  }, [apiBase])
+
+  useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
 
@@ -1230,6 +1278,7 @@ function App() {
         const launchIntent = resolveLaunchIntent()
         const currentTelegramUser = getTelegramUser() ?? telegramUser
         const platformUserId = resolveCurrentPlatformUserId()
+        const platformAuth = resolvePlatformAuthPayload(miniAppHost)
         const response = await fetch(`${apiBase}/api/session/bootstrap`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1243,6 +1292,7 @@ function App() {
             languageCode: currentTelegramUser?.language_code ?? null,
             photoUrl: currentTelegramUser?.photo_url ?? null,
             startParam: launchIntent.type === 'none' ? null : JSON.stringify(launchIntent),
+            platformAuth,
           }),
         })
 
@@ -1257,6 +1307,17 @@ function App() {
           typeof payload?.userId === 'string' && payload.userId.trim()
             ? payload.userId.trim()
             : resolveFallbackSessionUserId()
+        if (typeof payload?.sessionToken === 'string' && payload.sessionToken.trim()) {
+          setSessionAuth(
+            payload.sessionToken,
+            typeof payload?.sessionExpiresAt === 'string' ? payload.sessionExpiresAt : null
+          )
+        } else {
+          const existingSession = getSessionAuth()
+          if (!existingSession) {
+            clearSessionAuth()
+          }
+        }
 
         if (cancelled) return
         setUserId(nextUserId)
@@ -1265,7 +1326,8 @@ function App() {
         setIsSupportAgent(Boolean(payload?.isSupportAgent))
       } catch (error) {
         if (cancelled) return
-        const fallbackUserId = resolveFallbackSessionUserId()
+        clearSessionAuth()
+        const fallbackUserId = miniAppHost === 'web' ? resolveFallbackSessionUserId() : ''
         setUserId(fallbackUserId)
         setIsRoleSelectedOnce(false)
         applyAccountIdentities(null)
@@ -1429,6 +1491,7 @@ function App() {
         }
         const currentTelegramUser = getTelegramUser() ?? telegramUser
         const platformUserId = resolveCurrentPlatformUserId()
+        const platformAuth = resolvePlatformAuthPayload(miniAppHost)
         if (!platformUserId) {
           logAccountLinkDebug('link-complete-wait-platform-user-id', {
             host: miniAppHost,
@@ -1452,6 +1515,7 @@ function App() {
               token: launchIntent.token,
               host: miniAppHost,
               platformUserId,
+              platformAuth,
               firstName: currentTelegramUser?.first_name ?? null,
               lastName: currentTelegramUser?.last_name ?? null,
               username: currentTelegramUser?.username ?? null,
@@ -1498,6 +1562,18 @@ function App() {
                   ? 'Не удалось получить VK ID. Откройте Mini App внутри ВКонтакте и повторите.'
                   : 'Не удалось получить Telegram ID. Откройте Mini App внутри Telegram и повторите.'
               )
+              navigate('start', { reset: true })
+              return
+            }
+            if (errorCode === 'platform_auth_invalid' || errorCode === 'auth_required') {
+              window.alert(
+                'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.'
+              )
+              navigate('start', { reset: true })
+              return
+            }
+            if (errorCode === 'host_invalid') {
+              window.alert('Запуск вне Mini App-контекста. Откройте приложение внутри Telegram/ВКонтакте.')
               navigate('start', { reset: true })
               return
             }
@@ -2286,6 +2362,7 @@ function App() {
       if (!response.ok) {
         throw new Error('Logout failed')
       }
+      clearSessionAuth()
 
       setRole('client')
       setIsRoleSelectedOnce(false)
@@ -2325,6 +2402,7 @@ function App() {
     }
     setIsAccountLinkPending(true)
     try {
+      const platformAuth = resolvePlatformAuthPayload(miniAppHost)
       const response = await fetch(`${apiBase}/api/account/link/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2332,6 +2410,9 @@ function App() {
           userId,
           sourcePlatform: miniAppHost === 'vk' ? 'vk' : 'telegram',
           targetPlatform: accountLinkTargetPlatform,
+          host: miniAppHost,
+          platformUserId,
+          platformAuth,
         }),
       })
 
@@ -2349,6 +2430,16 @@ function App() {
             : apiError.code
         if (errorCode === 'source_platform_not_linked') {
           window.alert('Платформа не подтвердила ваш ID в этой сессии. Откройте Mini App внутри Telegram/ВКонтакте и повторите.')
+          return
+        }
+        if (errorCode === 'platform_auth_invalid' || errorCode === 'auth_required') {
+          window.alert(
+            'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.'
+          )
+          return
+        }
+        if (errorCode === 'host_invalid') {
+          window.alert('Запуск вне Mini App-контекста. Откройте приложение внутри Telegram/ВКонтакте.')
           return
         }
         if (errorCode === 'session_user_invalid') {

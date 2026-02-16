@@ -1,4 +1,5 @@
 import { buildChatStreamUrl } from './chat'
+import { getSessionToken } from './sessionAuth'
 
 export type ChatStreamStatus =
   | 'idle'
@@ -65,8 +66,13 @@ const scheduleReconnect = (state: StreamState) => {
 
 const connectStream = (state: StreamState) => {
   if (state.socket || state.listeners.size === 0) return
-  const url = buildChatStreamUrl(state.apiBase, state.userId)
-  if (!url) return
+  const sessionToken = getSessionToken()
+  const url = buildChatStreamUrl(state.apiBase, sessionToken)
+  if (!url) {
+    updateStatus(state, 'offline')
+    scheduleReconnect(state)
+    return
+  }
   updateStatus(state, state.reconnectAttempt > 0 ? 'reconnecting' : 'connecting')
   const socket = new WebSocket(url)
   state.socket = socket

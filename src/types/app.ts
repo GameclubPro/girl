@@ -48,6 +48,17 @@ export type NextAction = {
 
 export type Role = 'client' | 'pro'
 
+export type PlatformAuthPayload =
+  | {
+      type: 'telegram'
+      initData: string
+    }
+  | {
+      type: 'vk'
+      launchParams: Record<string, string>
+      sign?: string
+    }
+
 export type AccountIdentitiesResponse = {
   userId?: string
   telegramLinked: boolean
@@ -58,6 +69,8 @@ export type AccountIdentitiesResponse = {
 
 export type SessionBootstrapResponse = {
   userId: string
+  sessionToken?: string
+  sessionExpiresAt?: string | null
   roleState: {
     role?: Role | null
     selectedOnce?: boolean
@@ -84,6 +97,8 @@ export type AccountLinkCompleteResponse = {
   merged?: boolean
   userId: string
   sourceReturnUrl?: string
+  sessionToken?: string
+  sessionExpiresAt?: string | null
   roleState: {
     role?: Role | null
     selectedOnce?: boolean

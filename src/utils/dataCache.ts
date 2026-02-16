@@ -1,3 +1,5 @@
+import { apiFetch } from './apiClient'
+
 type CacheEntry<T> = {
   value: T
   updatedAt: number
@@ -90,7 +92,14 @@ export const writeCache = <T>(key: string, value: T, options?: CacheOptions) => 
 
 export const fetchJsonCached = async <T>(
   url: string,
-  options?: CacheOptions & { cacheKey?: string; signal?: AbortSignal }
+  options?: CacheOptions & {
+    cacheKey?: string
+    signal?: AbortSignal
+    headers?: HeadersInit
+    timeoutMs?: number
+    retry?: number
+    noAuth?: boolean
+  }
 ) => {
   const cacheKey = options?.cacheKey ?? url
   const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS
@@ -103,7 +112,15 @@ export const fetchJsonCached = async <T>(
     const data = await inflightPromise
     return { data, fromCache: false }
   }
-  const promise = fetch(url, { signal: options?.signal })
+  const promise = apiFetch(
+    url,
+    { signal: options?.signal, headers: options?.headers },
+    {
+      timeoutMs: options?.timeoutMs,
+      retry: options?.retry,
+      noAuth: options?.noAuth,
+    }
+  )
     .then((response) => {
       if (!response.ok) {
         throw new Error(`Fetch failed: ${response.status}`)

@@ -88,6 +88,7 @@ declare global {
       }
       start_param?: string
     }
+    initData?: string
     safeAreaInset?: TelegramInsets
     contentSafeAreaInset?: TelegramInsets
     onEvent?: (eventType: string, callback: (...args: unknown[]) => void) => void

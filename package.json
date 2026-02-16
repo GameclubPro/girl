@@ -9,7 +9,7 @@
     "dev": "vite",
     "api": "node server/index.js",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint src server scripts",
     "preview": "vite preview",
     "screenshot:miniapp": "node scripts/miniapp-screenshot.mjs",
     "screenshot:miniapp:matrix": "node scripts/miniapp-screenshot-suite.mjs",

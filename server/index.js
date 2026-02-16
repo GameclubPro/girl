@@ -4,7 +4,7 @@ import express from 'express'
 import compression from 'compression'
 import { WebSocketServer } from 'ws'
 import { Pool } from 'pg'
-import { randomUUID, createHash } from 'crypto'
+import { randomUUID, randomBytes, createHash, createHmac, timingSafeEqual } from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -125,6 +125,31 @@ const SUPPORT_AGENT_IDS = Array.from(
 )
 const SUPPORT_AGENT_ID_SET = new Set(SUPPORT_AGENT_IDS)
 const LINK_TOKEN_TTL_MS = 10 * 60 * 1000
+const SESSION_TOKEN_TTL_MS = Math.max(
+  5 * 60 * 1000,
+  Number.parseInt(process.env.SESSION_TOKEN_TTL_MS ?? `${24 * 60 * 60 * 1000}`, 10) ||
+    24 * 60 * 60 * 1000
+)
+const parseEnvBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return fallback
+  }
+  const normalized = String(value).trim().toLowerCase()
+  return (
+    normalized === '1' ||
+    normalized === 'true' ||
+    normalized === 'yes' ||
+    normalized === 'on'
+  )
+}
+const isProduction = String(process.env.NODE_ENV ?? '').trim().toLowerCase() === 'production'
+const AUTH_STRICT = parseEnvBoolean(process.env.AUTH_STRICT, false)
+const AUTH_LOG_ONLY = parseEnvBoolean(process.env.AUTH_LOG_ONLY, true)
+const ALLOW_LOCAL_DEV_SESSION = parseEnvBoolean(
+  process.env.ALLOW_LOCAL_DEV_SESSION,
+  !isProduction
+)
+const VK_APP_SECRET = normalizeText(process.env.VK_APP_SECRET)
 const VK_APP_URL = normalizeText(
   process.env.VITE_VK_APP_URL ?? process.env.VK_APP_URL ?? 'https://vk.com/app54453024'
 )
@@ -304,9 +329,10 @@ const normalizeIdentityPlatform = (value) => {
 
 const resolveIdentityPlatformByHost = (host) => {
   const normalized = normalizeText(host).toLowerCase()
-  if (!linkableHosts.has(normalized)) return 'telegram'
+  if (!linkableHosts.has(normalized)) return null
   if (normalized === 'vk') return 'vk'
-  return 'telegram'
+  if (normalized === 'telegram') return 'telegram'
+  return null
 }
 
 const normalizeExternalUserId = (value) => normalizeText(String(value ?? ''))
@@ -351,6 +377,252 @@ const getTokenDebugMeta = (token) => {
 const logAccountLinkDebug = (event, payload = {}) => {
   if (!accountLinkDebugEnabled) return
   console.info(`[account-link] ${event}`, payload)
+}
+
+const authDebugEnabled =
+  process.env.NODE_ENV !== 'production' ||
+  normalizeBooleanFlag(process.env.AUTH_DEBUG) ||
+  AUTH_LOG_ONLY ||
+  AUTH_STRICT
+
+const logAuthDebug = (event, payload = {}) => {
+  if (!authDebugEnabled) return
+  console.info(`[auth] ${event}`, payload)
+}
+
+const hashSessionToken = (token) => createHash('sha256').update(token).digest('hex')
+
+const buildSessionToken = () => randomBytes(32).toString('hex')
+
+const readUserIdFromRequest = (req) => {
+  const bodyUserId =
+    req && req.body && typeof req.body === 'object'
+      ? normalizeText(req.body.userId)
+      : ''
+  if (bodyUserId) return bodyUserId
+  const queryUserId =
+    req && req.query && typeof req.query === 'object'
+      ? normalizeText(req.query.userId)
+      : ''
+  return queryUserId
+}
+
+const parseBearerToken = (authorizationHeader) => {
+  const rawHeader = Array.isArray(authorizationHeader)
+    ? authorizationHeader[0]
+    : authorizationHeader
+  const raw = normalizeText(rawHeader)
+  if (!raw) return ''
+  const match = raw.match(/^Bearer\s+(.+)$/i)
+  if (!match) return ''
+  return normalizeText(match[1])
+}
+
+const timingSafeEqualHex = (leftHex, rightHex) => {
+  if (!leftHex || !rightHex) return false
+  try {
+    const left = Buffer.from(leftHex, 'hex')
+    const right = Buffer.from(rightHex, 'hex')
+    if (left.length !== right.length) return false
+    return timingSafeEqual(left, right)
+  } catch (_error) {
+    return false
+  }
+}
+
+const resolveSessionByToken = async (db, token, options = {}) => {
+  const normalizedToken = normalizeText(token)
+  if (!normalizedToken) return null
+  const tokenHash = hashSessionToken(normalizedToken)
+  const result = await db.query(
+    `
+      SELECT
+        id,
+        user_id AS "userId",
+        platform,
+        external_user_id AS "externalUserId",
+        expires_at AS "expiresAt",
+        revoked_at AS "revokedAt"
+      FROM user_sessions
+      WHERE token_hash = $1
+      LIMIT 1
+    `,
+    [tokenHash]
+  )
+  const row = result.rows[0] ?? null
+  if (!row || row.revokedAt || toEpochMs(row.expiresAt) <= Date.now()) {
+    return null
+  }
+  if (options.touch !== false) {
+    await db.query(
+      `
+        UPDATE user_sessions
+        SET last_seen_at = NOW()
+        WHERE id = $1
+      `,
+      [row.id]
+    )
+  }
+  return {
+    sessionId: row.id,
+    userId: normalizeText(row.userId),
+    platform: normalizeIdentityPlatform(row.platform),
+    externalUserId: normalizeExternalUserId(row.externalUserId),
+    tokenHash,
+  }
+}
+
+const resolveSessionFromAuthHeader = async (db, req) => {
+  const token = parseBearerToken(req.headers?.authorization)
+  if (!token) return null
+  return resolveSessionByToken(db, token)
+}
+
+const issueUserSession = async (db, { userId, platform, externalUserId }) => {
+  const normalizedUserId = normalizeText(userId)
+  const normalizedPlatform = normalizeText(platform).toLowerCase()
+  const normalizedExternalUserId = normalizeExternalUserId(externalUserId)
+  if (!normalizedUserId || !normalizedPlatform || !normalizedExternalUserId) {
+    return { sessionToken: '', sessionExpiresAt: null }
+  }
+  const sessionToken = buildSessionToken()
+  const tokenHash = hashSessionToken(sessionToken)
+  const expiresAt = new Date(Date.now() + SESSION_TOKEN_TTL_MS).toISOString()
+  await db.query(
+    `
+      UPDATE user_sessions
+      SET revoked_at = NOW()
+      WHERE user_id = $1
+        AND platform = $2
+        AND external_user_id = $3
+        AND revoked_at IS NULL
+    `,
+    [normalizedUserId, normalizedPlatform, normalizedExternalUserId]
+  )
+  await db.query(
+    `
+      INSERT INTO user_sessions (
+        token_hash,
+        user_id,
+        platform,
+        external_user_id,
+        issued_at,
+        expires_at,
+        last_seen_at
+      )
+      VALUES ($1, $2, $3, $4, NOW(), $5, NOW())
+    `,
+    [tokenHash, normalizedUserId, normalizedPlatform, normalizedExternalUserId, expiresAt]
+  )
+  return { sessionToken, sessionExpiresAt: expiresAt }
+}
+
+const normalizePlatformAuthPayload = (value) => {
+  if (!value || typeof value !== 'object') return null
+  const rawType = normalizeText(value.type).toLowerCase()
+  if (rawType === 'telegram') {
+    const initData = normalizeText(value.initData)
+    return {
+      type: 'telegram',
+      initData,
+    }
+  }
+  if (rawType === 'vk') {
+    const launchParams =
+      value.launchParams && typeof value.launchParams === 'object'
+        ? Object.entries(value.launchParams).reduce((acc, [key, raw]) => {
+            const normalizedKey = normalizeText(key)
+            if (!normalizedKey) return acc
+            const normalizedValue = normalizeText(raw)
+            if (!normalizedValue) return acc
+            acc[normalizedKey] = normalizedValue
+            return acc
+          }, {})
+        : {}
+    const sign = normalizeText(value.sign || value.vkSign || launchParams.sign || launchParams.vk_sign)
+    return {
+      type: 'vk',
+      launchParams,
+      sign,
+    }
+  }
+  return null
+}
+
+const verifyTelegramInitData = (initData) => {
+  const normalizedInitData = normalizeText(initData)
+  if (!normalizedInitData) return { ok: false, reason: 'telegram_init_data_missing' }
+  if (!telegramBotToken) return { ok: false, reason: 'telegram_bot_token_missing' }
+  const params = new URLSearchParams(normalizedInitData)
+  const hash = normalizeText(params.get('hash'))
+  if (!hash) return { ok: false, reason: 'telegram_hash_missing' }
+  const authDate = Number.parseInt(normalizeText(params.get('auth_date')), 10)
+  if (Number.isFinite(authDate) && authDate > 0) {
+    const ageSeconds = Math.floor(Date.now() / 1000) - authDate
+    if (ageSeconds > 86_400) {
+      return { ok: false, reason: 'telegram_auth_date_expired' }
+    }
+  }
+  const sorted = []
+  params.forEach((value, key) => {
+    if (key === 'hash') return
+    sorted.push(`${key}=${value}`)
+  })
+  sorted.sort()
+  const dataCheckString = sorted.join('\n')
+  const secret = createHmac('sha256', 'WebAppData').update(telegramBotToken).digest()
+  const expectedHash = createHmac('sha256', secret).update(dataCheckString).digest('hex')
+  return timingSafeEqualHex(expectedHash, hash)
+    ? { ok: true, reason: 'verified' }
+    : { ok: false, reason: 'telegram_hash_mismatch' }
+}
+
+const toBase64Url = (value) =>
+  value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+
+const verifyVkLaunchParams = ({ launchParams, sign }) => {
+  if (!VK_APP_SECRET) return { ok: false, reason: 'vk_app_secret_missing' }
+  const safeParams = launchParams && typeof launchParams === 'object' ? launchParams : {}
+  const signature = normalizeText(sign || safeParams.sign || safeParams.vk_sign)
+  if (!signature) return { ok: false, reason: 'vk_sign_missing' }
+  const canonical = Object.entries(safeParams)
+    .filter(([key, raw]) => key !== 'sign' && key !== 'vk_sign' && normalizeText(raw))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, raw]) => `${key}=${normalizeText(raw)}`)
+    .join('&')
+  if (!canonical) return { ok: false, reason: 'vk_launch_params_missing' }
+  const digestBase64 = createHmac('sha256', VK_APP_SECRET).update(canonical).digest('base64')
+  const digestBase64Url = toBase64Url(digestBase64)
+  const digestHex = createHmac('sha256', VK_APP_SECRET).update(canonical).digest('hex')
+  const verified =
+    timingSafeEqualHex(createHash('sha256').update(signature).digest('hex'), createHash('sha256').update(digestBase64Url).digest('hex')) ||
+    timingSafeEqualHex(createHash('sha256').update(signature).digest('hex'), createHash('sha256').update(digestHex).digest('hex'))
+  return verified ? { ok: true, reason: 'verified' } : { ok: false, reason: 'vk_sign_mismatch' }
+}
+
+const verifyPlatformAuth = ({ host, platformAuth }) => {
+  const normalizedHost = normalizeText(host).toLowerCase()
+  if (normalizedHost === 'web') {
+    return ALLOW_LOCAL_DEV_SESSION
+      ? { ok: true, reason: 'web_local_dev_allowed', platform: 'web' }
+      : { ok: false, reason: 'host_invalid', platform: null }
+  }
+  const resolvedPlatform = resolveIdentityPlatformByHost(host)
+  if (!resolvedPlatform) return { ok: false, reason: 'host_invalid', platform: null }
+  const normalizedAuth = normalizePlatformAuthPayload(platformAuth)
+  if (!normalizedAuth) return { ok: false, reason: 'platform_auth_missing', platform: resolvedPlatform }
+  if (normalizedAuth.type !== resolvedPlatform) {
+    return { ok: false, reason: 'platform_auth_type_mismatch', platform: resolvedPlatform }
+  }
+  if (normalizedAuth.type === 'telegram') {
+    const verified = verifyTelegramInitData(normalizedAuth.initData)
+    return { ...verified, platform: resolvedPlatform }
+  }
+  const verified = verifyVkLaunchParams({
+    launchParams: normalizedAuth.launchParams,
+    sign: normalizedAuth.sign,
+  })
+  return { ...verified, platform: resolvedPlatform }
 }
 
 const normalizeStoryCaption = (value) => {
@@ -1879,8 +2151,16 @@ const bootstrapSession = async ({
   username,
   languageCode,
   photoUrl,
+  authPlatform = null,
 }) => {
-  const platform = resolveIdentityPlatformByHost(host)
+  const normalizedAuthPlatform = normalizeText(authPlatform).toLowerCase()
+  const platform =
+    normalizeIdentityPlatform(normalizedAuthPlatform) ??
+    (normalizedAuthPlatform === 'web' ? 'web' : null) ??
+    resolveIdentityPlatformByHost(host)
+  if (!platform) {
+    throw new Error('host_invalid')
+  }
   const normalizedExternalUserId = normalizeExternalUserId(platformUserId)
   const fallbackUserId = 'local-dev'
   const profile = normalizeSessionProfilePayload({
@@ -1892,6 +2172,9 @@ const bootstrapSession = async ({
   })
 
   if (!normalizedExternalUserId) {
+    if (!ALLOW_LOCAL_DEV_SESSION) {
+      throw new Error('platform_user_id_required')
+    }
     await ensureUser(fallbackUserId)
     await upsertUserProfile(pool, {
       userId: fallbackUserId,
@@ -1911,6 +2194,11 @@ const bootstrapSession = async ({
     )
     const roleRow = roleResult.rows[0] ?? null
     const role = normalizeUserRole(roleRow?.role)
+    const session = await issueUserSession(pool, {
+      userId: fallbackUserId,
+      platform: 'web',
+      externalUserId: 'local-dev',
+    })
     return {
       userId: fallbackUserId,
       roleState: {
@@ -1926,12 +2214,17 @@ const bootstrapSession = async ({
         vkUserId: null,
       },
       isSupportAgent: false,
+      sessionToken: session.sessionToken,
+      sessionExpiresAt: session.sessionExpiresAt,
     }
   }
 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    if (!normalizeIdentityPlatform(platform)) {
+      throw new Error('host_invalid')
+    }
     const internalUserId = await resolveOrCreateCanonicalUserId(client, {
       platform,
       externalUserId: normalizedExternalUserId,
@@ -1965,6 +2258,11 @@ const bootstrapSession = async ({
     const role = normalizeUserRole(roleRow?.role)
     const identities = await loadAccountIdentities(client, internalUserId)
     const isSupportAgent = await isSupportAgentUser(client, internalUserId)
+    const session = await issueUserSession(client, {
+      userId: internalUserId,
+      platform,
+      externalUserId: normalizedExternalUserId,
+    })
     await client.query('COMMIT')
     return {
       userId: internalUserId,
@@ -1976,6 +2274,8 @@ const bootstrapSession = async ({
       },
       identities,
       isSupportAgent,
+      sessionToken: session.sessionToken,
+      sessionExpiresAt: session.sessionExpiresAt,
     }
   } catch (error) {
     await client.query('ROLLBACK')
@@ -5814,6 +6114,30 @@ const ensureSchema = async () => {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id BIGSERIAL PRIMARY KEY,
+      token_hash TEXT NOT NULL UNIQUE,
+      user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      platform TEXT NOT NULL,
+      external_user_id TEXT NOT NULL,
+      issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked_at TIMESTAMPTZ
+    );
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS user_sessions_user_exp_idx
+    ON user_sessions (user_id, expires_at DESC);
+  `)
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS user_sessions_platform_ext_exp_idx
+    ON user_sessions (platform, external_user_id, expires_at DESC);
+  `)
+
+  await pool.query(`
     INSERT INTO user_identities (
       internal_user_id,
       platform,
@@ -6921,6 +7245,63 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
 })
 
+app.use('/api', async (req, res, next) => {
+  const method = normalizeText(req.method).toUpperCase()
+  if (method !== 'POST' && method !== 'PATCH' && method !== 'DELETE' && method !== 'PUT') {
+    return next()
+  }
+  const whitelistPaths = new Set(['/health', '/session/bootstrap'])
+  if (whitelistPaths.has(req.path)) {
+    return next()
+  }
+
+  try {
+    const session = await resolveSessionFromAuthHeader(pool, req)
+    const requestUserId = readUserIdFromRequest(req)
+    const hasAuthHeader = Boolean(parseBearerToken(req.headers?.authorization))
+
+    if (!session) {
+      if (AUTH_LOG_ONLY || AUTH_STRICT) {
+        logAuthDebug('auth-missing-or-invalid', {
+          method,
+          path: req.path,
+          hasAuthHeader,
+          hasRequestUserId: Boolean(requestUserId),
+        })
+      }
+      if (AUTH_STRICT) {
+        res.status(401).json({ error: 'auth_required' })
+        return
+      }
+      return next()
+    }
+
+    req.authSession = session
+
+    if (requestUserId && requestUserId !== session.userId) {
+      logAuthDebug('auth-user-mismatch', {
+        method,
+        path: req.path,
+        requestUserId,
+        sessionUserId: session.userId,
+      })
+      if (AUTH_STRICT) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+    }
+
+    return next()
+  } catch (error) {
+    console.error('API auth middleware failed:', error)
+    if (AUTH_STRICT) {
+      res.status(500).json({ error: 'server_error' })
+      return
+    }
+    return next()
+  }
+})
+
 app.post('/api/session/bootstrap', async (req, res) => {
   const {
     host,
@@ -6930,7 +7311,45 @@ app.post('/api/session/bootstrap', async (req, res) => {
     username,
     languageCode,
     photoUrl,
+    platformAuth,
   } = req.body ?? {}
+  const normalizedHost = normalizeText(host).toLowerCase()
+  const normalizedPlatformUserId = normalizeExternalUserId(platformUserId)
+
+  if (
+    normalizedHost === 'web' &&
+    !normalizedPlatformUserId &&
+    !ALLOW_LOCAL_DEV_SESSION
+  ) {
+    logAuthDebug('bootstrap-platform-user-id-required', {
+      host: normalizedHost,
+      allowLocalDevSession: ALLOW_LOCAL_DEV_SESSION,
+    })
+    res.status(400).json({ error: 'platform_user_id_required' })
+    return
+  }
+
+  const authVerification = verifyPlatformAuth({ host, platformAuth })
+  if (!authVerification.platform) {
+    logAuthDebug('bootstrap-host-invalid', {
+      host: normalizeText(host).toLowerCase() || 'unknown',
+      reason: authVerification.reason,
+    })
+    res.status(400).json({ error: 'host_invalid' })
+    return
+  }
+  if (!authVerification.ok) {
+    logAuthDebug('bootstrap-platform-auth-invalid', {
+      host: normalizeText(host).toLowerCase() || 'unknown',
+      platform: authVerification.platform,
+      reason: authVerification.reason,
+      strict: AUTH_STRICT,
+    })
+    if (AUTH_STRICT) {
+      res.status(401).json({ error: 'platform_auth_invalid' })
+      return
+    }
+  }
 
   try {
     const payload = await bootstrapSession({
@@ -6941,10 +7360,20 @@ app.post('/api/session/bootstrap', async (req, res) => {
       username,
       languageCode,
       photoUrl,
+      authPlatform: authVerification.platform,
     })
     res.json(payload)
   } catch (error) {
     console.error('POST /api/session/bootstrap failed:', error)
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'platform_user_id_required') {
+      res.status(400).json({ error: 'platform_user_id_required' })
+      return
+    }
+    if (message === 'host_invalid') {
+      res.status(400).json({ error: 'host_invalid' })
+      return
+    }
     res.status(500).json({ error: 'server_error' })
   }
 })
@@ -6956,7 +7385,6 @@ app.get('/api/account/identities', async (req, res) => {
     return
   }
   try {
-    await ensureUser(normalizedUserId)
     const identities = await loadAccountIdentities(pool, normalizedUserId)
     res.json({ userId: normalizedUserId, ...identities })
   } catch (error) {
@@ -6966,10 +7394,18 @@ app.get('/api/account/identities', async (req, res) => {
 })
 
 app.post('/api/account/link/start', async (req, res) => {
-  const { userId, sourcePlatform, targetPlatform } = req.body ?? {}
+  const {
+    userId,
+    sourcePlatform,
+    targetPlatform,
+    host,
+    platformUserId,
+    platformAuth,
+  } = req.body ?? {}
   const normalizedUserId = normalizeText(userId)
   const normalizedSourcePlatform = normalizeIdentityPlatform(sourcePlatform)
   const normalizedTargetPlatform = normalizeIdentityPlatform(targetPlatform)
+  const normalizedPlatformUserId = normalizeExternalUserId(platformUserId)
 
   if (!normalizedUserId) {
     res.status(400).json({ error: 'userId_required' })
@@ -6983,6 +7419,33 @@ app.post('/api/account/link/start', async (req, res) => {
     res.status(400).json({ error: 'target_platform_invalid' })
     return
   }
+  if (AUTH_STRICT && !normalizedPlatformUserId) {
+    res.status(400).json({ error: 'platform_user_id_required' })
+    return
+  }
+
+  const authVerification = verifyPlatformAuth({ host, platformAuth })
+  if (AUTH_STRICT && !authVerification.ok) {
+    logAuthDebug('link-start-platform-auth-invalid', {
+      host: normalizeText(host).toLowerCase() || 'unknown',
+      reason: authVerification.reason,
+      hasPlatformUserId: Boolean(normalizedPlatformUserId),
+    })
+    const statusCode = authVerification.reason === 'host_invalid' ? 400 : 401
+    res.status(statusCode).json({
+      error: authVerification.reason === 'host_invalid' ? 'host_invalid' : 'platform_auth_invalid',
+    })
+    return
+  }
+  if (!authVerification.ok && AUTH_LOG_ONLY) {
+    logAuthDebug('link-start-platform-auth-invalid', {
+      host: normalizeText(host).toLowerCase() || 'unknown',
+      reason: authVerification.reason,
+      hasPlatformUserId: Boolean(normalizedPlatformUserId),
+      strict: AUTH_STRICT,
+    })
+  }
+
   if (
     normalizedSourcePlatform &&
     normalizedSourcePlatform === normalizedTargetPlatform
@@ -7112,6 +7575,7 @@ app.post('/api/account/link/complete', async (req, res) => {
     token,
     host,
     platformUserId,
+    platformAuth,
     firstName,
     lastName,
     username,
@@ -7122,6 +7586,7 @@ app.post('/api/account/link/complete', async (req, res) => {
   const normalizedToken = normalizeText(token)
   const targetPlatform = resolveIdentityPlatformByHost(host)
   const externalUserId = normalizeExternalUserId(platformUserId)
+  const authVerification = verifyPlatformAuth({ host, platformAuth })
   logAccountLinkDebug('link-complete-request', {
     host: normalizeText(host).toLowerCase() || 'unknown',
     targetPlatform,
@@ -7130,6 +7595,26 @@ app.post('/api/account/link/complete', async (req, res) => {
     ...getTokenDebugMeta(normalizedToken),
   })
 
+  if (!targetPlatform) {
+    logAccountLinkDebug('link-complete-failed', { errorCode: 'host_invalid' })
+    res.status(400).json({ error: 'host_invalid' })
+    return
+  }
+  if (!authVerification.ok) {
+    logAuthDebug('link-complete-platform-auth-invalid', {
+      host: normalizeText(host).toLowerCase() || 'unknown',
+      reason: authVerification.reason,
+      strict: AUTH_STRICT,
+      hasPlatformUserId: Boolean(externalUserId),
+    })
+    if (AUTH_STRICT) {
+      const statusCode = authVerification.reason === 'host_invalid' ? 400 : 401
+      res.status(statusCode).json({
+        error: authVerification.reason === 'host_invalid' ? 'host_invalid' : 'platform_auth_invalid',
+      })
+      return
+    }
+  }
   if (!normalizedUserId) {
     logAccountLinkDebug('link-complete-failed', { errorCode: 'userId_required' })
     res.status(400).json({ error: 'userId_required' })
@@ -7166,6 +7651,7 @@ app.post('/api/account/link/complete', async (req, res) => {
         FROM account_link_challenges
         WHERE token = $1
         LIMIT 1
+        FOR UPDATE
       `,
       [normalizedToken]
     )
@@ -7184,6 +7670,22 @@ app.post('/api/account/link/complete', async (req, res) => {
         requestTargetPlatform: targetPlatform,
       })
       res.status(409).json({ error: 'target_platform_mismatch' })
+      return
+    }
+    const consumeResult = await client.query(
+      `
+        UPDATE account_link_challenges
+        SET used_at = NOW()
+        WHERE token = $1
+          AND used_at IS NULL
+        RETURNING token
+      `,
+      [normalizedToken]
+    )
+    if (consumeResult.rowCount === 0) {
+      await client.query('ROLLBACK')
+      logAccountLinkDebug('link-complete-failed', { errorCode: 'token_invalid_or_used' })
+      res.status(409).json({ error: 'token_invalid_or_used' })
       return
     }
 
@@ -7279,15 +7781,29 @@ app.post('/api/account/link/complete', async (req, res) => {
         mirrorHash: false,
       })
     }
-
-    await client.query(
-      `
-        UPDATE account_link_challenges
-        SET used_at = NOW()
-        WHERE token = $1
-      `,
-      [normalizedToken]
-    )
+    let refreshedSessionToken = ''
+    let refreshedSessionExpiresAt = null
+    if (req.authSession?.sessionId) {
+      await client.query(
+        `
+          UPDATE user_sessions
+          SET user_id = $2,
+              platform = $3,
+              external_user_id = $4,
+              last_seen_at = NOW()
+          WHERE id = $1
+        `,
+        [req.authSession.sessionId, activeUserId, targetPlatform, externalUserId]
+      )
+    } else {
+      const issuedSession = await issueUserSession(client, {
+        userId: activeUserId,
+        platform: targetPlatform,
+        externalUserId,
+      })
+      refreshedSessionToken = issuedSession.sessionToken
+      refreshedSessionExpiresAt = issuedSession.sessionExpiresAt
+    }
 
     const roleResult = await client.query(
       `
@@ -7326,6 +7842,12 @@ app.post('/api/account/link/complete', async (req, res) => {
       identities,
       isSupportAgent,
       ...(sourceReturnUrl ? { sourceReturnUrl } : {}),
+      ...(refreshedSessionToken
+        ? {
+            sessionToken: refreshedSessionToken,
+            sessionExpiresAt: refreshedSessionExpiresAt,
+          }
+        : {}),
     })
   } catch (error) {
     await client.query('ROLLBACK')
@@ -7402,7 +7924,6 @@ app.get('/api/user/role-state', async (req, res) => {
   }
 
   try {
-    await ensureUser(normalizedUserId)
     const result = await pool.query(
       `
         SELECT
@@ -7528,6 +8049,20 @@ app.post('/api/user/logout', async (req, res) => {
 
   try {
     await ensureUser(normalizedUserId)
+    if (req.authSession?.sessionId) {
+      await pool.query(
+        `
+          UPDATE user_sessions
+          SET revoked_at = NOW(),
+              last_seen_at = NOW()
+          WHERE id = $1
+        `,
+        [req.authSession.sessionId]
+      )
+    } else if (AUTH_STRICT) {
+      res.status(401).json({ error: 'auth_required' })
+      return
+    }
     await pool.query(
       `
         UPDATE users
@@ -17575,41 +18110,50 @@ const start = async () => {
   })
   const wss = new WebSocketServer({ server, path: CHAT_STREAM_PATH })
   wss.on('connection', (ws, req) => {
-    try {
-      const baseUrl = `http://${req.headers.host ?? 'localhost'}`
-      const url = new URL(req.url ?? '', baseUrl)
-      const userId = normalizeText(url.searchParams.get('userId'))
-      if (!userId) {
-        ws.close(1008, 'userId_required')
-        return
-      }
-      ws.userId = userId
-      registerChatClient(userId, ws)
-      ws.send(JSON.stringify({ type: 'connected', userId }))
-
-      ws.on('message', async (payload) => {
-        try {
-          const text = payload.toString()
-          const parsed = JSON.parse(text)
-          if (parsed?.type !== 'typing') return
-          const chatId = parseOptionalInt(parsed.chatId)
-          const isTyping = Boolean(parsed.isTyping)
-          const actorId = normalizeText(ws.userId)
-          if (!chatId || !actorId) return
-          const access = await loadChatAccess(chatId, actorId)
-          if (!access) return
-          void notifyChatMembers(
-            chatId,
-            { type: 'typing', chatId, userId: actorId, isTyping },
-            actorId
-          )
-        } catch (error) {
-          console.error('Chat stream message failed:', error)
+    const init = async () => {
+      try {
+        const baseUrl = `http://${req.headers.host ?? 'localhost'}`
+        const url = new URL(req.url ?? '', baseUrl)
+        const sessionToken = normalizeText(url.searchParams.get('sessionToken'))
+        if (!sessionToken) {
+          ws.close(1008, 'unauthorized')
+          return
         }
-      })
-    } catch (error) {
-      ws.close(1011, 'server_error')
+        const session = await resolveSessionByToken(pool, sessionToken, { touch: true })
+        const userId = normalizeText(session?.userId)
+        if (!userId) {
+          ws.close(1008, 'unauthorized')
+          return
+        }
+        ws.userId = userId
+        registerChatClient(userId, ws)
+        ws.send(JSON.stringify({ type: 'connected', userId }))
+
+        ws.on('message', async (payload) => {
+          try {
+            const text = payload.toString()
+            const parsed = JSON.parse(text)
+            if (parsed?.type !== 'typing') return
+            const chatId = parseOptionalInt(parsed.chatId)
+            const isTyping = Boolean(parsed.isTyping)
+            const actorId = normalizeText(ws.userId)
+            if (!chatId || !actorId) return
+            const access = await loadChatAccess(chatId, actorId)
+            if (!access) return
+            void notifyChatMembers(
+              chatId,
+              { type: 'typing', chatId, userId: actorId, isTyping },
+              actorId
+            )
+          } catch (error) {
+            console.error('Chat stream message failed:', error)
+          }
+        })
+      } catch (error) {
+        ws.close(1011, 'server_error')
+      }
     }
+    void init()
   })
   void runRequestDispatchCycle()
   setInterval(() => {
