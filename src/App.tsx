@@ -179,7 +179,6 @@ const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replac
 const getTelegramUser = () => window.Telegram?.WebApp?.initDataUnsafe?.user
 const ACCOUNT_LINK_TOKEN_STORAGE_KEY = 'kiven-account-link-token-v1'
 const ACCOUNT_LINK_TOKEN_TTL_MS = 10 * 60 * 1000
-const LINK_RETURN_HANDOFF_TIMEOUT_MS = 2500
 const LINK_RESULT_BOOTSTRAP_TIMEOUT_MS = 12_000
 const accountLinkDebugEnabled =
   import.meta.env.DEV ||
@@ -897,57 +896,6 @@ function App() {
     []
   )
 
-  const attemptSourceReturn = useCallback(
-    async (url: string, sourcePlatform: LinkReturnSourcePlatform) => {
-      const normalizedUrl = url.trim()
-      if (!normalizedUrl) {
-        return { handoffConfirmed: false, openMethod: 'none' as LinkReturnOpenMethod }
-      }
-      return await new Promise<{ handoffConfirmed: boolean; openMethod: LinkReturnOpenMethod }>(
-        (resolve) => {
-          let timeoutId = 0
-          let settled = false
-          let openMethod: LinkReturnOpenMethod = 'none'
-          const cleanup = () => {
-            window.clearTimeout(timeoutId)
-            window.removeEventListener('pagehide', handlePageHide)
-            document.removeEventListener('visibilitychange', handleVisibilityChange)
-          }
-          const finish = (handoffConfirmed: boolean) => {
-            if (settled) return
-            settled = true
-            cleanup()
-            resolve({ handoffConfirmed, openMethod })
-          }
-          const handlePageHide = () => {
-            finish(true)
-          }
-          const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-              finish(true)
-            }
-          }
-
-          window.addEventListener('pagehide', handlePageHide, { once: true })
-          document.addEventListener('visibilitychange', handleVisibilityChange)
-          timeoutId = window.setTimeout(() => {
-            finish(false)
-          }, LINK_RETURN_HANDOFF_TIMEOUT_MS)
-
-          try {
-            openMethod = openSourceReturnUrl(normalizedUrl, sourcePlatform)
-            if (openMethod === 'none') {
-              finish(false)
-            }
-          } catch (_error) {
-            finish(false)
-          }
-        }
-      )
-    },
-    [openSourceReturnUrl]
-  )
-
   const applyLinkCompleteSuccessPayload = useCallback(
     (successPayload: AccountLinkCompleteResponse): { merged: boolean; nextView: View } => {
       const nextUserId =
@@ -1098,38 +1046,30 @@ function App() {
   const handleOpenSourceFromFallback = useCallback(() => {
     if (!linkReturnFallback || isManualSourceReturnPending) return
     setIsManualSourceReturnPending(true)
-    const runManualOpen = async () => {
-      logAccountLinkDebug('link-return-attempt', {
-        host: miniAppHost,
-        sourcePlatform: linkReturnFallback.sourcePlatform,
-        sourceReturnUrlLength: linkReturnFallback.sourceReturnUrl.length,
-        manual: true,
-      })
-      const result = await attemptSourceReturn(
-        linkReturnFallback.sourceReturnUrl,
-        linkReturnFallback.sourcePlatform
-      )
-      if (result.handoffConfirmed) {
-        logAccountLinkDebug('link-return-handoff-confirmed', {
+    const runManualOpen = () => {
+      try {
+        const openMethod = openSourceReturnUrl(
+          linkReturnFallback.sourceReturnUrl,
+          linkReturnFallback.sourcePlatform
+        )
+        logAccountLinkDebug('link-return-attempt-manual', {
           host: miniAppHost,
           sourcePlatform: linkReturnFallback.sourcePlatform,
-          openMethod: result.openMethod,
+          sourceReturnUrlLength: linkReturnFallback.sourceReturnUrl.length,
+          openMethod,
           manual: true,
         })
-      } else {
-        logAccountLinkDebug('link-return-handoff-timeout', {
-          host: miniAppHost,
-          sourcePlatform: linkReturnFallback.sourcePlatform,
-          openMethod: result.openMethod,
-          manual: true,
-          timeoutMs: LINK_RETURN_HANDOFF_TIMEOUT_MS,
-        })
-        window.alert('Не удалось автоматически открыть исходную Mini App. Попробуйте снова.')
+        if (openMethod === 'none') {
+          window.alert('Не удалось открыть исходную Mini App. Попробуйте снова.')
+        }
+      } catch (_error) {
+        window.alert('Не удалось открыть исходную Mini App. Попробуйте снова.')
+      } finally {
+        setIsManualSourceReturnPending(false)
       }
-      setIsManualSourceReturnPending(false)
     }
-    void runManualOpen()
-  }, [attemptSourceReturn, isManualSourceReturnPending, linkReturnFallback, miniAppHost])
+    runManualOpen()
+  }, [isManualSourceReturnPending, linkReturnFallback, miniAppHost, openSourceReturnUrl])
 
   const handleStayInCurrentMiniApp = useCallback(() => {
     if (!linkReturnFallback) return
@@ -1621,35 +1561,12 @@ function App() {
           if (sourceReturnUrl) {
             const sourcePlatform: LinkReturnSourcePlatform =
               miniAppHost === 'vk' ? 'telegram' : 'vk'
-            logAccountLinkDebug('link-return-attempt', {
+            logAccountLinkDebug('link-return-manual-required', {
               host: miniAppHost,
               source: launchIntent.source,
               sourcePlatform,
               merged: Boolean(successPayload.merged),
               sourceReturnUrlLength: sourceReturnUrl.length,
-              ...getTokenDebugMeta(launchIntent.token),
-            })
-            const handoff = await attemptSourceReturn(sourceReturnUrl, sourcePlatform)
-            if (handoff.handoffConfirmed) {
-              logAccountLinkDebug('link-return-handoff-confirmed', {
-                host: miniAppHost,
-                source: launchIntent.source,
-                sourcePlatform,
-                merged: Boolean(successPayload.merged),
-                sourceReturnUrlLength: sourceReturnUrl.length,
-                openMethod: handoff.openMethod,
-                ...getTokenDebugMeta(launchIntent.token),
-              })
-              return
-            }
-            logAccountLinkDebug('link-return-handoff-timeout', {
-              host: miniAppHost,
-              source: launchIntent.source,
-              sourcePlatform,
-              merged: Boolean(successPayload.merged),
-              sourceReturnUrlLength: sourceReturnUrl.length,
-              openMethod: handoff.openMethod,
-              timeoutMs: LINK_RETURN_HANDOFF_TIMEOUT_MS,
               ...getTokenDebugMeta(launchIntent.token),
             })
             resetPostLinkCaches()
@@ -1660,15 +1577,7 @@ function App() {
               merged: applied.merged,
               nextView: applied.nextView,
             })
-            logAccountLinkDebug('link-return-fallback-shown', {
-              host: miniAppHost,
-              source: launchIntent.source,
-              sourcePlatform,
-              merged: applied.merged,
-              sourceReturnUrlLength: sourceReturnUrl.length,
-              timeoutMs: LINK_RETURN_HANDOFF_TIMEOUT_MS,
-              ...getTokenDebugMeta(launchIntent.token),
-            })
+            window.alert(applied.merged ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
             return
           }
           const applied = applyLinkCompleteSuccessPayload(successPayload)
@@ -1742,7 +1651,6 @@ function App() {
   }, [
     apiBase,
     applyLinkCompleteSuccessPayload,
-    attemptSourceReturn,
     isRoleStateLoading,
     isSessionBootstrapping,
     launchIntentRevision,
@@ -2741,8 +2649,7 @@ function App() {
               {linkReturnFallback.merged ? 'Аккаунты объединены' : 'Аккаунт привязан'}
             </h2>
             <p className="link-flow-fallback__text">
-              Авто-переход не подтвердился. Вернитесь в {sourceLabel}, чтобы подтянуть свежую
-              сессию.
+              Нажмите кнопку, чтобы вернуться в {sourceLabel} и обновить сессию.
             </p>
             <div className="link-flow-fallback__actions">
               <button
