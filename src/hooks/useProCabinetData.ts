@@ -39,6 +39,10 @@ type CacheEntry = {
 
 const cache = new Map<string, CacheEntry>()
 
+export const resetProCabinetDataCache = () => {
+  cache.clear()
+}
+
 const buildKey = (apiBase: string, userId: string) =>
   `${apiBase.trim()}::${userId.trim()}`
 

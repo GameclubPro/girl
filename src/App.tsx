@@ -29,6 +29,7 @@ import type {
 import { isGeoFailure, requestPreciseLocation } from './utils/geo'
 import { parseApiError } from './utils/apiError'
 import {
+  parseAccountLinkResultStartParam,
   parseAccountLinkStartParam,
   parseBookingStartParam,
   parseChatStartParam,
@@ -40,7 +41,10 @@ import {
   toggleFavorite,
   type FavoriteMaster,
 } from './utils/favorites'
-import { prefetchJson } from './utils/dataCache'
+import { prefetchJson, resetDataCache } from './utils/dataCache'
+import { resetChatCache } from './utils/chatCache'
+import { resetProCabinetDataCache } from './hooks/useProCabinetData'
+import { resetProAnalyticsCache } from './hooks/useProAnalyticsData'
 import { markNavEnd, markNavStart, markScreenMount, markScreenPaint } from './utils/perf'
 import type { ShowcaseMedia } from './screens/ClientShowcaseScreen'
 import { StartScreen } from './screens/StartScreen'
@@ -182,6 +186,7 @@ const accountLinkDebugEnabled =
   )
 
 type LinkTokenSource = 'initData' | 'search' | 'hash' | 'session'
+type LinkResultStatus = 'linked' | 'merged'
 
 const getTokenDebugMeta = (token: string) => ({
   tokenPrefix: token ? token.slice(0, 6) : '',
@@ -199,6 +204,7 @@ const logAccountLinkDebug = (
 type LaunchIntent =
   | { type: 'none' }
   | { type: 'link'; token: string; source: LinkTokenSource }
+  | { type: 'link-result'; status: LinkResultStatus; nonce: string; source: LinkTokenSource }
   | { type: 'booking'; masterId: string }
   | { type: 'chat'; chatId: number }
   | { type: 'unsubscribe'; masterId: string }
@@ -312,6 +318,16 @@ const resolveLaunchIntent = (): LaunchIntent => {
   const searchParams = new URLSearchParams(window.location.search)
   const startCandidate = resolveDecodedStartCandidate()
   const decodedStart = startCandidate?.decodedStart ?? null
+
+  const parsedLinkResult = parseAccountLinkResultStartParam(decodedStart)
+  if (parsedLinkResult) {
+    return {
+      type: 'link-result',
+      status: parsedLinkResult.status,
+      nonce: parsedLinkResult.nonce,
+      source: startCandidate?.source ?? 'search',
+    }
+  }
 
   const parsedLinkToken = parseAccountLinkStartParam(decodedStart)
   if (parsedLinkToken) {
@@ -728,6 +744,7 @@ function App() {
   const proProfileBackHandlerRef = useRef<(() => boolean) | null>(null)
   const screenBackHandlerRef = useRef<(() => boolean) | null>(null)
   const deepLinkHandledRef = useRef(false)
+  const linkResultHandledNonceRef = useRef('')
   const warmupDoneRef = useRef(false)
   const [telegramUser] = useState(() => getTelegramUser())
   const resolveCurrentPlatformUserId = () => {
@@ -810,6 +827,15 @@ function App() {
       vkUserId:
         typeof payload.vkUserId === 'string' ? payload.vkUserId.trim() || null : null,
     })
+  }, [])
+
+  const resetPostLinkCaches = useCallback(() => {
+    resetDataCache()
+    resetChatCache()
+    resetProCabinetDataCache()
+    resetProAnalyticsCache()
+    setSupportChatId(null)
+    supportChatPromiseRef.current = null
   }, [])
 
   const updateRole = useCallback(
@@ -1083,9 +1109,89 @@ function App() {
   }, [preloadView, role, view])
 
   useEffect(() => {
+    const launchIntent = resolveLaunchIntent()
+
+    if (launchIntent.type === 'link-result') {
+      if (isSessionBootstrapping || isRoleStateLoading) return
+      if (linkResultHandledNonceRef.current === launchIntent.nonce) return
+      deepLinkHandledRef.current = true
+      linkResultHandledNonceRef.current = launchIntent.nonce
+      const runLinkResultRefresh = async () => {
+        logAccountLinkDebug('link-result-received', {
+          host: miniAppHost,
+          source: launchIntent.source,
+          status: launchIntent.status,
+          nonce: launchIntent.nonce,
+        })
+        resetPostLinkCaches()
+        setIsSessionBootstrapping(true)
+        setIsRoleStateLoading(true)
+        try {
+          const currentTelegramUser = getTelegramUser() ?? telegramUser
+          const platformUserId = resolveCurrentPlatformUserId()
+          const response = await fetch(`${apiBase}/api/session/bootstrap`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              host: miniAppHost,
+              platformUserId,
+              firstName: currentTelegramUser?.first_name ?? null,
+              lastName: currentTelegramUser?.last_name ?? null,
+              username: currentTelegramUser?.username ?? null,
+              languageCode: currentTelegramUser?.language_code ?? null,
+              photoUrl: currentTelegramUser?.photo_url ?? null,
+              startParam: JSON.stringify(launchIntent),
+            }),
+          })
+          if (!response.ok) {
+            throw new Error('Session bootstrap failed')
+          }
+          const payload = (await response.json().catch(() => null)) as
+            | SessionBootstrapResponse
+            | null
+          const nextUserId =
+            typeof payload?.userId === 'string' && payload.userId.trim()
+              ? payload.userId.trim()
+              : resolveFallbackSessionUserId()
+          const nextRole = parseRole(payload?.roleState?.role) ?? role
+          const selectedOnce = Boolean(payload?.roleState?.selectedOnce && nextRole)
+          setUserId(nextUserId)
+          applyRoleState(payload?.roleState ?? null)
+          applyAccountIdentities(payload?.identities ?? null)
+          setIsSupportAgent(Boolean(payload?.isSupportAgent))
+          logAccountLinkDebug('link-result-bootstrap-success', {
+            host: miniAppHost,
+            status: launchIntent.status,
+            nonce: launchIntent.nonce,
+          })
+          window.alert(launchIntent.status === 'merged' ? 'Аккаунты объединены.' : 'Аккаунт привязан.')
+          navigate(selectedOnce ? (nextRole === 'pro' ? 'pro-cabinet' : 'client') : 'start', {
+            reset: true,
+          })
+        } catch (_error) {
+          const fallbackUserId = resolveFallbackSessionUserId()
+          setUserId(fallbackUserId)
+          setIsRoleSelectedOnce(false)
+          applyAccountIdentities(null)
+          setIsSupportAgent(false)
+          logAccountLinkDebug('link-result-bootstrap-failed', {
+            host: miniAppHost,
+            status: launchIntent.status,
+            nonce: launchIntent.nonce,
+          })
+          window.alert('Не удалось обновить данные после привязки. Перезапустите Mini App.')
+          navigate('start', { reset: true })
+        } finally {
+          setIsRoleStateLoading(false)
+          setIsSessionBootstrapping(false)
+        }
+      }
+      void runLinkResultRefresh()
+      return
+    }
+
     if (isSessionBootstrapping || isRoleStateLoading) return
     if (deepLinkHandledRef.current) return
-    const launchIntent = resolveLaunchIntent()
 
     if (launchIntent.type === 'link') {
       const runLinkComplete = async () => {
@@ -1223,6 +1329,35 @@ function App() {
             merged: Boolean(successPayload.merged),
             ...getTokenDebugMeta(launchIntent.token),
           })
+          const sourceReturnUrl =
+            typeof successPayload.sourceReturnUrl === 'string'
+              ? successPayload.sourceReturnUrl.trim()
+              : ''
+          if (sourceReturnUrl) {
+            logAccountLinkDebug('link-return-open-source', {
+              host: miniAppHost,
+              source: launchIntent.source,
+              merged: Boolean(successPayload.merged),
+              sourceReturnUrlLength: sourceReturnUrl.length,
+              ...getTokenDebugMeta(launchIntent.token),
+            })
+            try {
+              const webApp = window.Telegram?.WebApp
+              if (webApp?.openLink) {
+                webApp.openLink(sourceReturnUrl)
+              } else {
+                window.location.assign(sourceReturnUrl)
+              }
+              return
+            } catch (_error) {
+              logAccountLinkDebug('link-return-open-source-failed', {
+                host: miniAppHost,
+                source: launchIntent.source,
+                sourceReturnUrlLength: sourceReturnUrl.length,
+                ...getTokenDebugMeta(launchIntent.token),
+              })
+            }
+          }
           const nextUserId =
             typeof successPayload.userId === 'string' && successPayload.userId.trim()
               ? successPayload.userId.trim()
@@ -1312,6 +1447,7 @@ function App() {
     isSessionBootstrapping,
     miniAppHost,
     navigate,
+    resetPostLinkCaches,
     role,
     telegramUser?.id,
     telegramUser?.first_name,

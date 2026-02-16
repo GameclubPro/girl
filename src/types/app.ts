@@ -83,6 +83,7 @@ export type AccountLinkCompleteResponse = {
   ok: boolean
   merged?: boolean
   userId: string
+  sourceReturnUrl?: string
   roleState: {
     role?: Role | null
     selectedOnce?: boolean

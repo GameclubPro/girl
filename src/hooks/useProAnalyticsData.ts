@@ -9,6 +9,10 @@ type CacheEntry = {
 const cache = new Map<string, CacheEntry>()
 const CACHE_TTL_MS = 5 * 60 * 1000
 
+export const resetProAnalyticsCache = () => {
+  cache.clear()
+}
+
 const buildKey = (apiBase: string, userId: string, range: AnalyticsRangeKey) =>
   `${apiBase.trim()}::${userId.trim()}::${range}`
 

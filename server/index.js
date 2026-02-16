@@ -7246,6 +7246,28 @@ app.post('/api/account/link/complete', async (req, res) => {
       })
     }
 
+    const linkResultStatus = merged ? 'merged' : 'linked'
+    const linkResultStartParam = `linked_${linkResultStatus}_${Date.now()}`
+    const sourceReturnUrl =
+      challenge.sourcePlatform === 'telegram'
+        ? buildLinkTargetUrl(telegramMiniAppUrl, 'startapp', linkResultStartParam)
+        : challenge.sourcePlatform === 'vk'
+          ? buildLinkTargetUrl(VK_APP_URL, 'start', linkResultStartParam)
+          : ''
+    if (sourceReturnUrl) {
+      logAccountLinkDebug('link-complete-source-return-url-built', {
+        sourcePlatform: challenge.sourcePlatform,
+        status: linkResultStatus,
+        startParamPrefix: linkResultStartParam.slice(0, 20),
+        startParamLength: linkResultStartParam.length,
+      })
+    } else {
+      logAccountLinkDebug('link-complete-source-return-missing', {
+        sourcePlatform: challenge.sourcePlatform,
+        status: linkResultStatus,
+      })
+    }
+
     await client.query(
       `
         UPDATE account_link_challenges
@@ -7277,6 +7299,7 @@ app.post('/api/account/link/complete', async (req, res) => {
       sourcePlatform: challenge.sourcePlatform,
       targetPlatform: challenge.targetPlatform,
       sourceIdentityRestored: Boolean(sourceExternalUserId),
+      sourceReturnUrlReady: Boolean(sourceReturnUrl),
     })
     res.json({
       ok: true,
@@ -7290,6 +7313,7 @@ app.post('/api/account/link/complete', async (req, res) => {
       },
       identities,
       isSupportAgent,
+      ...(sourceReturnUrl ? { sourceReturnUrl } : {}),
     })
   } catch (error) {
     await client.query('ROLLBACK')

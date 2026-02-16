@@ -150,3 +150,25 @@ export const setCachedChatMessages = (
   chatMessagesCache.set(buildKey(apiBase, userId, chatId), entry)
   writeStorage(buildStorageKey('messages', apiBase, userId, chatId), entry)
 }
+
+export const resetChatCache = () => {
+  chatListCache.clear()
+  chatDetailCache.clear()
+  chatMessagesCache.clear()
+  if (typeof window === 'undefined') return
+  try {
+    const prefix = `${STORAGE_PREFIX}:`
+    const keysToRemove: string[] = []
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (key && key.startsWith(prefix)) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach((key) => {
+      window.localStorage.removeItem(key)
+    })
+  } catch (error) {
+    console.warn('Chat cache reset failed:', error)
+  }
+}
