@@ -1962,6 +1962,11 @@ function App() {
       window.alert('Не удалось определить пользователя. Перезапустите приложение.')
       return
     }
+    const platformUserId = resolveCurrentPlatformUserId()
+    if (miniAppHost === 'web' || !platformUserId) {
+      window.alert('Откройте Mini App внутри Telegram/ВКонтакте и повторите.')
+      return
+    }
     if (isAccountAlreadyLinked) {
       if (source === 'start' && isRoleSelectedOnce) {
         navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
@@ -1998,7 +2003,7 @@ function App() {
             ? payload.error
             : apiError.code
         if (errorCode === 'source_platform_not_linked') {
-          window.alert('Сначала войдите в текущий аккаунт на этой платформе, затем повторите.')
+          window.alert('Платформа не подтвердила ваш ID в этой сессии. Откройте Mini App внутри Telegram/ВКонтакте и повторите.')
           return
         }
         if (errorCode === 'session_user_invalid') {

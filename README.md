@@ -9,6 +9,22 @@
   - `VITE_VK_APP_URL` — ссылка вида `https://vk.com/app<APP_ID>`.
 - При запуске в VK `userId` формируется как `vk_<vk_user_id>`, чтобы не конфликтовать с Telegram ID в одной базе.
 
+## Account Link Runbook (TG/VK)
+Проверка инварианта после успешного `POST /api/account/link/complete`:
+- в `user_identities` должны быть 2 записи (`telegram` и `vk`) с одним `internal_user_id`.
+
+SQL-проверка:
+```sql
+SELECT platform, external_user_id, internal_user_id
+FROM user_identities
+WHERE (platform = 'telegram' AND external_user_id = '<TG_ID>')
+   OR (platform = 'vk' AND external_user_id = '<VK_ID>');
+```
+
+Ожидаемый результат:
+- обе строки возвращены;
+- `internal_user_id` одинаковый у обеих строк.
+
 ## Быстрый старт
 ```bash
 npm install
