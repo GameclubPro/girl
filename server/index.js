@@ -7004,18 +7004,36 @@ app.post('/api/account/link/start', async (req, res) => {
       return
     }
 
-    const source =
-      normalizedSourcePlatform ??
-      (normalizedTargetPlatform === 'vk'
-        ? identities.telegramLinked
-          ? 'telegram'
-          : 'vk'
-        : identities.vkLinked
-          ? 'vk'
-          : 'telegram')
-    const sourceLinked =
-      source === 'telegram' ? identities.telegramLinked : identities.vkLinked
+    const oppositePlatform =
+      normalizedTargetPlatform === 'telegram' ? 'vk' : 'telegram'
+    const isPlatformLinked = (platform) =>
+      platform === 'telegram' ? identities.telegramLinked : identities.vkLinked
+    let source = normalizedSourcePlatform
+
+    if (
+      !source ||
+      source === normalizedTargetPlatform ||
+      !isPlatformLinked(source)
+    ) {
+      source = oppositePlatform
+    }
+
+    if (
+      (!source || source === normalizedTargetPlatform || !isPlatformLinked(source)) &&
+      identities.telegramLinked !== identities.vkLinked
+    ) {
+      source = identities.telegramLinked ? 'telegram' : 'vk'
+    }
+
+    const sourceLinked = source ? isPlatformLinked(source) : false
     if (!sourceLinked || source === normalizedTargetPlatform) {
+      logAccountLinkDebug('link-start-source-missing', {
+        requestedSourcePlatform: normalizedSourcePlatform,
+        targetPlatform: normalizedTargetPlatform,
+        sourceResolved: source || null,
+        telegramLinked: identities.telegramLinked,
+        vkLinked: identities.vkLinked,
+      })
       res.status(409).json({
         error: 'source_platform_not_linked',
         userId: normalizedUserId,
