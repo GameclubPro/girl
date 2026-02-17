@@ -91,6 +91,7 @@ const stopProcessGracefully = async (child) => {
 const args = parseArgs(process.argv.slice(2))
 const session = args.get('session') ?? 'smoke-pro-cabinet'
 const userId = args.get('userId') ?? '5510721194'
+const hosts = args.get('hosts') ?? 'telegram,vk'
 const parallel = toInt(args.get('parallel'), 2, 1, 8)
 const maxMeanDelta = toFloat(args.get('maxMeanDelta'), 0.8, 0, 100)
 const maxScreenDelta = toFloat(args.get('maxScreenDelta'), 2.5, 0, 100)
@@ -109,6 +110,8 @@ const cliArgs = [
   session,
   '--userId',
   userId,
+  '--hosts',
+  hosts,
   '--parallel',
   String(parallel),
   '--failOnDelta',

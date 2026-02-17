@@ -1,0 +1,146 @@
+body.vk-emulator-mode {
+  min-height: 100dvh;
+  background: #d9dde6;
+}
+
+body.vk-emulator-mode #root {
+  --vk-emulator-top-offset: calc(
+    var(--vk-emulator-status-height, 20px) + var(--vk-emulator-topbar-height, 44px)
+  );
+  position: relative;
+  width: min(var(--vk-emulator-width, 393px), 100vw);
+  min-height: calc(100dvh - var(--vk-emulator-top-offset));
+  margin: var(--vk-emulator-top-offset) auto 0;
+  overflow: hidden;
+  background: #f5f7fb;
+  box-shadow: 0 0 0 1px rgba(16, 23, 40, 0.12), 0 22px 48px rgba(16, 23, 40, 0.28);
+}
+
+.vk-emulator-overlay {
+  position: fixed;
+  inset: 0 auto 0 50%;
+  width: min(var(--vk-emulator-width, 393px), 100vw);
+  height: 100dvh;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 1290;
+  display: flex;
+  flex-direction: column;
+}
+
+.vk-emulator-status {
+  height: var(--vk-emulator-status-height, 20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.vk-emulator-status-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.vk-emulator-status-cell,
+.vk-emulator-status-wifi {
+  width: 12px;
+  height: 10px;
+  display: inline-block;
+  opacity: 0.9;
+}
+
+.vk-emulator-status-cell {
+  background:
+    linear-gradient(to top, currentColor 2px, transparent 2px) 0 100% / 2px 10px no-repeat,
+    linear-gradient(to top, currentColor 4px, transparent 4px) 4px 100% / 2px 10px no-repeat,
+    linear-gradient(to top, currentColor 6px, transparent 6px) 8px 100% / 2px 10px no-repeat;
+}
+
+.vk-emulator-status-wifi {
+  border: 2px solid currentColor;
+  border-top: none;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  transform: translateY(1px);
+}
+
+.vk-emulator-status-battery {
+  position: relative;
+  width: 22px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+}
+
+.vk-emulator-status-battery::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 2px;
+  width: 2px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 0 2px 2px 0;
+}
+
+.vk-emulator-status-battery > span {
+  position: absolute;
+  left: 1.5px;
+  top: 1.5px;
+  width: 14px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 1.5px;
+}
+
+.vk-emulator-topbar {
+  height: var(--vk-emulator-topbar-height, 44px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 14px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.vk-emulator-title,
+.vk-emulator-subtitle {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vk-emulator-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.vk-emulator-subtitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+@media (max-width: 430px) {
+  body.vk-emulator-mode #root {
+    width: 100vw;
+    box-shadow: none;
+  }
+
+  .vk-emulator-overlay {
+    left: 0;
+    width: 100vw;
+    transform: none;
+  }
+}

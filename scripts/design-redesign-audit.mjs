@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { chromium, devices } from 'playwright'
+import { applyHostProfileDefaults, normalizeHost } from './miniapp-host-profile.mjs'
 import { applyRuntimeLibs, launchChromium } from './playwright-launch.mjs'
 
 const parseArgs = (tokens) => {
@@ -31,9 +32,15 @@ const args = parseArgs(process.argv.slice(2))
 const width = Number.parseInt(args.get('width') ?? '390', 10)
 const height = Number.parseInt(args.get('height') ?? '844', 10)
 const userId = args.get('userId') ?? '100001'
-const url =
-  args.get('url') ??
-  `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}&tgPlatform=ios&tgTheme=light&tgExpanded=1&tgFullscreen=1&tgTopInset=47&tgBottomInset=34&tgContentTopInset=47&tgContentBottomInset=34`
+const host = normalizeHost(args.get('host'), 'telegram')
+const urlBase = args.get('url') ?? args.get('urlBase') ?? 'http://127.0.0.1:5173/'
+const url = applyHostProfileDefaults({
+  url: urlBase,
+  host,
+  userId,
+  width,
+  height,
+})
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '')
 const outDir = resolve(args.get('outDir') ?? `.logs/design-redesign-${stamp}`)
 applyRuntimeLibs(args.get('runtimeLibs'))
@@ -45,7 +52,7 @@ const launch = await launchChromium(chromium, {
   browserExecutable: args.get('browserExecutable'),
 })
 const browser = launch.browser
-console.log(`[design-redesign-audit] launch=${launch.launchLabel}`)
+console.log(`[design-redesign-audit] launch=${launch.launchLabel} host=${host}`)
 
 try {
   const context = await browser.newContext({

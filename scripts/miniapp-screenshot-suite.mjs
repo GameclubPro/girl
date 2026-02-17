@@ -28,6 +28,8 @@ const parseArgs = (tokens) => {
 
 const args = parseArgs(process.argv.slice(2))
 const url = args.get('url')
+const host = args.get('host')
+const userId = args.get('userId')
 const wait = args.get('wait')
 const selector = args.get('selector')
 const fullPage = args.get('fullPage')
@@ -47,6 +49,8 @@ for (const width of widths) {
   const cliArgs = ['scripts/miniapp-screenshot.mjs', '--width', String(width), '--out', output]
 
   if (url) cliArgs.push('--url', url)
+  if (host) cliArgs.push('--host', host)
+  if (userId) cliArgs.push('--userId', userId)
   if (wait) cliArgs.push('--wait', wait)
   if (selector) cliArgs.push('--selector', selector)
   if (fullPage) cliArgs.push('--fullPage', fullPage)

@@ -10,6 +10,11 @@ type LaunchParams = {
   vkPlatform: string
 }
 
+type ResolvedInsets = {
+  safeAreaInset: TelegramInsets
+  contentSafeAreaInset: TelegramInsets
+}
+
 const VK_APP_USER_ID_REGEX = /^\d+$/
 
 type VkLaunchParamsPayload = {
@@ -26,12 +31,43 @@ const toInsets = (value?: Partial<Insets> | null): TelegramInsets => ({
   left: Number.isFinite(Number(value?.left)) ? Number(value?.left) : 0,
 })
 
-const applySafeAreaVars = (insets: TelegramInsets) => {
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value))
+
+const mergeInsets = (base: TelegramInsets, overrides: Partial<Insets>) => ({
+  top: Number.isFinite(Number(overrides.top)) ? Number(overrides.top) : base.top,
+  right: Number.isFinite(Number(overrides.right)) ? Number(overrides.right) : base.right,
+  bottom: Number.isFinite(Number(overrides.bottom))
+    ? Number(overrides.bottom)
+    : base.bottom,
+  left: Number.isFinite(Number(overrides.left)) ? Number(overrides.left) : base.left,
+})
+
+const hasInsetsOverride = (insets: Partial<Insets>) =>
+  Number.isFinite(Number(insets.top)) ||
+  Number.isFinite(Number(insets.right)) ||
+  Number.isFinite(Number(insets.bottom)) ||
+  Number.isFinite(Number(insets.left))
+
+const applySafeAreaVars = (
+  safeAreaInset: TelegramInsets,
+  contentSafeAreaInset: TelegramInsets
+) => {
   const root = document.documentElement
-  root.style.setProperty('--tg-safe-top-js', `${insets.top}px`)
-  root.style.setProperty('--tg-content-safe-top-js', `${insets.top}px`)
-  root.style.setProperty('--tg-safe-bottom-js', `${insets.bottom}px`)
-  root.style.setProperty('--tg-content-safe-bottom-js', `${insets.bottom}px`)
+  root.style.setProperty('--host-safe-top-js', `${safeAreaInset.top}px`)
+  root.style.setProperty('--host-safe-bottom-js', `${safeAreaInset.bottom}px`)
+  root.style.setProperty('--host-content-safe-top-js', `${contentSafeAreaInset.top}px`)
+  root.style.setProperty(
+    '--host-content-safe-bottom-js',
+    `${contentSafeAreaInset.bottom}px`
+  )
+  root.style.setProperty('--tg-safe-top-js', `${safeAreaInset.top}px`)
+  root.style.setProperty('--tg-safe-bottom-js', `${safeAreaInset.bottom}px`)
+  root.style.setProperty('--tg-content-safe-top-js', `${contentSafeAreaInset.top}px`)
+  root.style.setProperty(
+    '--tg-content-safe-bottom-js',
+    `${contentSafeAreaInset.bottom}px`
+  )
 }
 
 const getHashParams = () => {
@@ -45,6 +81,21 @@ const readParam = (key: string) => {
   const hash = getHashParams()
   return search.get(key) ?? hash.get(key) ?? ''
 }
+
+const readInsetOverride = (key: string, min: number, max: number) => {
+  const raw = readParam(key).trim()
+  if (!raw) return undefined
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed)) return undefined
+  return clamp(parsed, min, max)
+}
+
+const readInsetOverrides = (prefix: 'vk' | 'vkContent'): Partial<Insets> => ({
+  top: readInsetOverride(`${prefix}TopInset`, 0, 96),
+  right: readInsetOverride(`${prefix}RightInset`, 0, 32),
+  bottom: readInsetOverride(`${prefix}BottomInset`, 0, 96),
+  left: readInsetOverride(`${prefix}LeftInset`, 0, 32),
+})
 
 const collectVkLaunchParams = () => {
   const search = new URLSearchParams(window.location.search)
@@ -113,16 +164,30 @@ const resolveUserInfo = async () => {
   }
 }
 
-const resolveInsets = async () => {
+const resolveInsets = async (): Promise<ResolvedInsets> => {
+  const safeOverrides = readInsetOverrides('vk')
+  const contentOverrides = readInsetOverrides('vkContent')
+  const baseInsets = toInsets()
+
   try {
     const config = await bridge.send('VKWebAppGetConfig')
     const payload = config as ParentConfigData
-    if ('insets' in payload && payload.insets) {
-      return toInsets(payload.insets)
-    }
-    return toInsets()
+    const bridgeInsets = 'insets' in payload && payload.insets ? toInsets(payload.insets) : baseInsets
+    const safeAreaInset = hasInsetsOverride(safeOverrides)
+      ? mergeInsets(bridgeInsets, safeOverrides)
+      : bridgeInsets
+    const contentSafeAreaInset = hasInsetsOverride(contentOverrides)
+      ? mergeInsets(safeAreaInset, contentOverrides)
+      : safeAreaInset
+    return { safeAreaInset, contentSafeAreaInset }
   } catch (_error) {
-    return toInsets()
+    const safeAreaInset = hasInsetsOverride(safeOverrides)
+      ? mergeInsets(baseInsets, safeOverrides)
+      : baseInsets
+    const contentSafeAreaInset = hasInsetsOverride(contentOverrides)
+      ? mergeInsets(safeAreaInset, contentOverrides)
+      : safeAreaInset
+    return { safeAreaInset, contentSafeAreaInset }
   }
 }
 
@@ -170,8 +235,9 @@ const setupVkShim = async () => {
     readParam('startapp').trim() ||
     readParam('start').trim() ||
     undefined
-  let safeAreaInset = initialInsets
-  applySafeAreaVars(safeAreaInset)
+  let safeAreaInset = initialInsets.safeAreaInset
+  let contentSafeAreaInset = initialInsets.contentSafeAreaInset
+  applySafeAreaVars(safeAreaInset, contentSafeAreaInset)
 
   const listeners = new Map<string, Set<EventCallback>>()
   const emit = (eventType: string) => {
@@ -215,7 +281,7 @@ const setupVkShim = async () => {
       ...(startParam ? { start_param: startParam } : {}),
     },
     safeAreaInset,
-    contentSafeAreaInset: safeAreaInset,
+    contentSafeAreaInset,
     HapticFeedback: {
       impactOccurred: (style) => {
         void bridge
@@ -260,9 +326,10 @@ const setupVkShim = async () => {
   ) => {
     if (event.detail.type === 'VKWebAppUpdateInsets') {
       safeAreaInset = toInsets((event.detail.data as { insets?: Insets }).insets)
+      contentSafeAreaInset = safeAreaInset
       webApp.safeAreaInset = safeAreaInset
-      webApp.contentSafeAreaInset = safeAreaInset
-      applySafeAreaVars(safeAreaInset)
+      webApp.contentSafeAreaInset = contentSafeAreaInset
+      applySafeAreaVars(safeAreaInset, contentSafeAreaInset)
       emit('safeAreaChanged')
       emit('contentSafeAreaChanged')
       emit('viewportChanged')
@@ -272,9 +339,10 @@ const setupVkShim = async () => {
       const data = event.detail.data as ParentConfigData
       if ('insets' in data && data.insets) {
         safeAreaInset = toInsets(data.insets)
+        contentSafeAreaInset = safeAreaInset
         webApp.safeAreaInset = safeAreaInset
-        webApp.contentSafeAreaInset = safeAreaInset
-        applySafeAreaVars(safeAreaInset)
+        webApp.contentSafeAreaInset = contentSafeAreaInset
+        applySafeAreaVars(safeAreaInset, contentSafeAreaInset)
         emit('safeAreaChanged')
         emit('contentSafeAreaChanged')
         emit('viewportChanged')

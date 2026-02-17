@@ -28,6 +28,7 @@ const parseArgs = (tokens) => {
 
 const args = parseArgs(process.argv.slice(2))
 const url = args.get('url')
+const host = args.get('host')
 const wait = args.get('wait')
 const userId = args.get('userId')
 const apiBase = args.get('apiBase')
@@ -50,6 +51,7 @@ for (const width of [360, 390, 430]) {
     output,
   ]
   if (url) cliArgs.push('--url', url)
+  if (host) cliArgs.push('--host', host)
   if (wait) cliArgs.push('--wait', wait)
   if (userId) cliArgs.push('--userId', userId)
   if (apiBase) cliArgs.push('--apiBase', apiBase)

@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { chromium, devices } from 'playwright'
+import { applyHostProfileDefaults, normalizeHost } from './miniapp-host-profile.mjs'
 import { applyRuntimeLibs, launchChromium } from './playwright-launch.mjs'
 
 const parseArgs = (tokens) => {
@@ -38,14 +39,20 @@ const toNumber = (value, fallback, min, max) => {
 const args = parseArgs(process.argv.slice(2))
 const userId = args.get('userId') ?? '100001'
 const apiBase = args.get('apiBase') ?? 'https://third.play-team.online'
-const url =
-  args.get('url') ??
-  `http://127.0.0.1:5173/?tgEmu=1&tgUserId=${encodeURIComponent(userId)}&tgPlatform=ios&tgTheme=light&tgExpanded=1&tgFullscreen=1&tgTopInset=47&tgBottomInset=34&tgContentTopInset=47&tgContentBottomInset=34`
+const host = normalizeHost(args.get('host'), 'telegram')
 const output = resolve(
   args.get('out') ?? `.logs/deposit-sheet-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
 )
 const width = toNumber(args.get('width'), 390, 320, 430)
 const height = toNumber(args.get('height'), 844, 640, 2000)
+const urlBase = args.get('url') ?? args.get('urlBase') ?? 'http://127.0.0.1:5173/'
+const url = applyHostProfileDefaults({
+  url: urlBase,
+  host,
+  userId,
+  width,
+  height,
+})
 const waitMs = toNumber(args.get('wait'), 1100, 0, 30000)
 const runtimeLibsDir = args.get('runtimeLibs')
 
@@ -109,7 +116,7 @@ const launch = await launchChromium(chromium, {
   browserExecutable: args.get('browserExecutable'),
 })
 const browser = launch.browser
-console.log(`[deposit-sheet-autoshot] launch=${launch.launchLabel}`)
+console.log(`[deposit-sheet-autoshot] launch=${launch.launchLabel} host=${host}`)
 try {
   const context = await browser.newContext({
     ...devices['iPhone 14 Pro'],

@@ -2,6 +2,10 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:
 import { spawn } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import sharp from 'sharp'
+import {
+  buildHostProfileUrl,
+  parseHostsCsv,
+} from './miniapp-host-profile.mjs'
 
 const parseArgs = (tokens) => {
   const values = new Map()
@@ -92,10 +96,20 @@ const listPngFiles = (dir) => {
     .sort()
 }
 
-const ensureParam = (searchParams, key, value) => {
-  if (!searchParams.has(key) || !searchParams.get(key)) {
-    searchParams.set(key, value)
+const resolveHostSizeDir = (baseDir, host, sizeKey) => {
+  const primary = join(baseDir, host, sizeKey)
+  if (existsSync(primary)) {
+    return { path: primary, usedLegacy: false }
   }
+
+  if (host === 'telegram') {
+    const legacy = join(baseDir, sizeKey)
+    if (existsSync(legacy)) {
+      return { path: legacy, usedLegacy: true }
+    }
+  }
+
+  return { path: primary, usedLegacy: false }
 }
 
 const args = parseArgs(process.argv.slice(2))
@@ -118,6 +132,7 @@ const failOnDelta = toBoolean(args.get('failOnDelta'), false)
 const maxMeanDelta = toFloat(args.get('maxMeanDelta'), 0.8, 0, 100)
 const maxScreenDelta = toFloat(args.get('maxScreenDelta'), 2.5, 0, 100)
 const matrix = parseMatrix(args.get('matrix') ?? '360x780,390x844,430x932')
+const hosts = parseHostsCsv(args.get('hosts') ?? 'telegram,vk', ['telegram', 'vk'])
 
 if (!['capture', 'compare', 'workflow'].includes(mode)) {
   console.error(`Unsupported mode: ${mode}. Use capture | compare | workflow.`)
@@ -128,27 +143,14 @@ if (!['baseline', 'after'].includes(stage)) {
   process.exit(1)
 }
 
-const buildAuditUrl = ({ width, height }) => {
-  const url = new URL(urlBase)
-  const { searchParams } = url
-  ensureParam(searchParams, 'tgEmu', '1')
-  ensureParam(searchParams, 'tgTheme', 'light')
-  ensureParam(searchParams, 'tgPlatform', 'ios')
-  ensureParam(searchParams, 'tgExpanded', '1')
-  ensureParam(searchParams, 'tgFullscreen', '1')
-  ensureParam(searchParams, 'tgTopInset', '47')
-  ensureParam(searchParams, 'tgBottomInset', '34')
-  ensureParam(searchParams, 'tgLeftInset', '0')
-  ensureParam(searchParams, 'tgRightInset', '0')
-  ensureParam(searchParams, 'tgContentTopInset', '47')
-  ensureParam(searchParams, 'tgContentBottomInset', '34')
-  ensureParam(searchParams, 'tgContentLeftInset', '0')
-  ensureParam(searchParams, 'tgContentRightInset', '0')
-  searchParams.set('tgUserId', userId)
-  searchParams.set('tgWidth', String(width))
-  searchParams.set('tgHeight', String(height))
-  return url.toString()
-}
+const buildAuditUrl = ({ host, width, height }) =>
+  buildHostProfileUrl({
+    urlBase,
+    host,
+    userId,
+    width,
+    height,
+  })
 
 const runNodeScript = (cliArgs) =>
   new Promise((resolveRun, rejectRun) => {
@@ -189,17 +191,26 @@ const runCapture = async (targetDir, stageName) => {
   }
   mkdirSync(targetDir, { recursive: true })
 
+  const captureItems = hosts.flatMap((host) =>
+    matrix.map((size) => ({
+      host,
+      ...size,
+    }))
+  )
+
   const startedAt = new Date().toISOString()
-  const shots = await runWithConcurrency(matrix, parallel, async (size, index) => {
-    const outDir = join(targetDir, size.key)
+  const shots = await runWithConcurrency(captureItems, parallel, async (item, index) => {
+    const outDir = join(targetDir, item.host, item.key)
     mkdirSync(outDir, { recursive: true })
-    const url = buildAuditUrl(size)
+    const url = buildAuditUrl(item)
     const cliArgs = [
       'scripts/design-redesign-audit.mjs',
+      '--host',
+      item.host,
       '--width',
-      String(size.width),
+      String(item.width),
       '--height',
-      String(size.height),
+      String(item.height),
       '--url',
       url,
       '--outDir',
@@ -213,14 +224,15 @@ const runCapture = async (targetDir, stageName) => {
     }
 
     console.log(
-      `[visual-capture ${stageName}] ${index + 1}/${matrix.length} ${size.key} (parallel=${parallel})`
+      `[visual-capture ${stageName}] ${index + 1}/${captureItems.length} host=${item.host} size=${item.key} (parallel=${parallel})`
     )
     await runNodeScript(cliArgs)
 
     return {
-      size: size.key,
-      width: size.width,
-      height: size.height,
+      host: item.host,
+      size: item.key,
+      width: item.width,
+      height: item.height,
       url,
       outDir,
       screenshots: listPngFiles(outDir),
@@ -234,6 +246,7 @@ const runCapture = async (targetDir, stageName) => {
     rootDir,
     startedAt,
     finishedAt: new Date().toISOString(),
+    hosts,
     matrix: matrix.map((size) => ({ ...size })),
     shots,
   }
@@ -305,9 +318,7 @@ const compareTwoScreens = async (baselinePath, afterPath, comparePath) => {
     diffPixels,
     totalPixels,
     deltaPercent: Number(((diffPixels / totalPixels) * 100).toFixed(3)),
-    meanChannelDelta: Number(
-      (channelDeltaSum / (totalPixels * 4)).toFixed(3)
-    ),
+    meanChannelDelta: Number((channelDeltaSum / (totalPixels * 4)).toFixed(3)),
   }
 }
 
@@ -316,6 +327,7 @@ const buildCompareMarkdown = (summary) => {
   lines.push('# Visual Audit Summary')
   lines.push('')
   lines.push(`- Session: \`${summary.session}\``)
+  lines.push(`- Hosts: \`${summary.hosts.join(', ')}\``)
   lines.push(`- Baseline: \`${summary.baselineDir}\``)
   lines.push(`- After: \`${summary.afterDir}\``)
   lines.push(`- Report: \`${summary.reportDir}\``)
@@ -336,29 +348,36 @@ const buildCompareMarkdown = (summary) => {
   }
   lines.push('')
 
-  summary.bySize.forEach((sizeBlock) => {
-    lines.push(`## ${sizeBlock.size}`)
+  for (const hostBlock of summary.byHost) {
+    lines.push(`## Host: ${hostBlock.host}`)
     lines.push('')
-    if (sizeBlock.notes.length > 0) {
-      sizeBlock.notes.forEach((note) => lines.push(`- ${note}`))
+    lines.push(`- Compared pairs: **${hostBlock.totalCompared}**`)
+    lines.push(`- Mean visual delta: **${hostBlock.meanDeltaPercent.toFixed(3)}%**`)
+    lines.push(`- Max single-screen delta: **${hostBlock.maxScreenDeltaObserved.toFixed(3)}%**`)
+    lines.push('')
+
+    hostBlock.bySize.forEach((sizeBlock) => {
+      lines.push(`### ${sizeBlock.size}`)
       lines.push('')
-    }
-    if (sizeBlock.rows.length === 0) {
-      lines.push('- Нет общих скриншотов для сравнения.')
+      if (sizeBlock.notes.length > 0) {
+        sizeBlock.notes.forEach((note) => lines.push(`- ${note}`))
+        lines.push('')
+      }
+      if (sizeBlock.rows.length === 0) {
+        lines.push('- Нет общих скриншотов для сравнения.')
+        lines.push('')
+        return
+      }
+      lines.push('| Screen | Delta % | Mean channel delta | Status | Compare |')
+      lines.push('| --- | ---: | ---: | --- | --- |')
+      sizeBlock.rows.forEach((row) => {
+        lines.push(
+          `| \`${row.screen}\` | ${row.deltaPercent.toFixed(3)} | ${row.meanChannelDelta.toFixed(3)} | ${row.status} | \`${row.comparePath}\` |`
+        )
+      })
       lines.push('')
-      return
-    }
-    lines.push('| Screen | Delta % | Mean channel delta | Status | Compare |')
-    lines.push('| --- | ---: | ---: | --- | --- |')
-    sizeBlock.rows.forEach((row) => {
-      lines.push(
-        `| \`${row.screen}\` | ${row.deltaPercent.toFixed(3)} | ${row.meanChannelDelta.toFixed(
-          3
-        )} | ${row.status} | \`${row.comparePath}\` |`
-      )
     })
-    lines.push('')
-  })
+  }
 
   return `${lines.join('\n')}\n`
 }
@@ -369,70 +388,101 @@ const runCompare = async () => {
   }
   mkdirSync(reportDir, { recursive: true })
 
-  const bySize = []
+  const byHost = []
   let compared = 0
   let deltaSum = 0
   let maxScreenDeltaObserved = 0
 
-  for (const size of matrix) {
-    const baselineSizeDir = join(baselineDir, size.key)
-    const afterSizeDir = join(afterDir, size.key)
-    const notes = []
-    const rows = []
-    const baselineFiles = listPngFiles(baselineSizeDir)
-    const afterFiles = listPngFiles(afterSizeDir)
+  for (const host of hosts) {
+    const hostBySize = []
+    let hostCompared = 0
+    let hostDeltaSum = 0
+    let hostMaxScreenDeltaObserved = 0
 
-    if (!existsSync(baselineSizeDir)) {
-      notes.push(`Нет baseline-директории: \`${baselineSizeDir}\``)
-    }
-    if (!existsSync(afterSizeDir)) {
-      notes.push(`Нет after-директории: \`${afterSizeDir}\``)
-    }
+    for (const size of matrix) {
+      const baselineRef = resolveHostSizeDir(baselineDir, host, size.key)
+      const afterRef = resolveHostSizeDir(afterDir, host, size.key)
+      const baselineSizeDir = baselineRef.path
+      const afterSizeDir = afterRef.path
+      const notes = []
+      const rows = []
 
-    const afterSet = new Set(afterFiles)
-    const baselineSet = new Set(baselineFiles)
-    const common = baselineFiles.filter((name) => afterSet.has(name))
-    const missingAfter = baselineFiles.filter((name) => !afterSet.has(name))
-    const missingBaseline = afterFiles.filter((name) => !baselineSet.has(name))
-
-    if (missingAfter.length > 0) {
-      notes.push(`Нет в after: ${missingAfter.join(', ')}`)
-    }
-    if (missingBaseline.length > 0) {
-      notes.push(`Нет в baseline: ${missingBaseline.join(', ')}`)
-    }
-
-    for (const file of common) {
-      const baselinePath = join(baselineSizeDir, file)
-      const afterPath = join(afterSizeDir, file)
-      const comparePath = join(reportDir, size.key, file.replace(/\.png$/i, '.compare.png'))
-      const metrics = await compareTwoScreens(baselinePath, afterPath, comparePath)
-      const status =
-        metrics.deltaPercent <= 0.1
-          ? 'stable'
-          : metrics.deltaPercent <= 1
-            ? 'minor'
-            : metrics.deltaPercent <= 5
-              ? 'changed'
-              : 'major'
-
-      compared += 1
-      deltaSum += metrics.deltaPercent
-      if (metrics.deltaPercent > maxScreenDeltaObserved) {
-        maxScreenDeltaObserved = metrics.deltaPercent
+      if (baselineRef.usedLegacy) {
+        notes.push(`Использован legacy baseline путь: \`${baselineSizeDir}\``)
       }
-      rows.push({
-        screen: file,
-        comparePath,
-        ...metrics,
-        status,
+      if (afterRef.usedLegacy) {
+        notes.push(`Использован legacy after путь: \`${afterSizeDir}\``)
+      }
+      if (!existsSync(baselineSizeDir)) {
+        notes.push(`Нет baseline-директории: \`${baselineSizeDir}\``)
+      }
+      if (!existsSync(afterSizeDir)) {
+        notes.push(`Нет after-директории: \`${afterSizeDir}\``)
+      }
+
+      const baselineFiles = listPngFiles(baselineSizeDir)
+      const afterFiles = listPngFiles(afterSizeDir)
+
+      const afterSet = new Set(afterFiles)
+      const baselineSet = new Set(baselineFiles)
+      const common = baselineFiles.filter((name) => afterSet.has(name))
+      const missingAfter = baselineFiles.filter((name) => !afterSet.has(name))
+      const missingBaseline = afterFiles.filter((name) => !baselineSet.has(name))
+
+      if (missingAfter.length > 0) {
+        notes.push(`Нет в after: ${missingAfter.join(', ')}`)
+      }
+      if (missingBaseline.length > 0) {
+        notes.push(`Нет в baseline: ${missingBaseline.join(', ')}`)
+      }
+
+      for (const file of common) {
+        const baselinePath = join(baselineSizeDir, file)
+        const afterPath = join(afterSizeDir, file)
+        const comparePath = join(reportDir, host, size.key, file.replace(/\.png$/i, '.compare.png'))
+        const metrics = await compareTwoScreens(baselinePath, afterPath, comparePath)
+        const status =
+          metrics.deltaPercent <= 0.1
+            ? 'stable'
+            : metrics.deltaPercent <= 1
+              ? 'minor'
+              : metrics.deltaPercent <= 5
+                ? 'changed'
+                : 'major'
+
+        compared += 1
+        hostCompared += 1
+        deltaSum += metrics.deltaPercent
+        hostDeltaSum += metrics.deltaPercent
+
+        if (metrics.deltaPercent > maxScreenDeltaObserved) {
+          maxScreenDeltaObserved = metrics.deltaPercent
+        }
+        if (metrics.deltaPercent > hostMaxScreenDeltaObserved) {
+          hostMaxScreenDeltaObserved = metrics.deltaPercent
+        }
+
+        rows.push({
+          screen: file,
+          comparePath,
+          ...metrics,
+          status,
+        })
+      }
+
+      hostBySize.push({
+        size: size.key,
+        notes,
+        rows,
       })
     }
 
-    bySize.push({
-      size: size.key,
-      notes,
-      rows,
+    byHost.push({
+      host,
+      totalCompared: hostCompared,
+      meanDeltaPercent: hostCompared > 0 ? hostDeltaSum / hostCompared : 0,
+      maxScreenDeltaObserved: hostMaxScreenDeltaObserved,
+      bySize: hostBySize,
     })
   }
 
@@ -456,6 +506,7 @@ const runCompare = async () => {
   const summary = {
     mode: 'compare',
     session,
+    hosts,
     baselineDir,
     afterDir,
     reportDir,
@@ -472,14 +523,10 @@ const runCompare = async () => {
       failed: gateReasons.length > 0,
       reasons: gateReasons,
     },
-    bySize,
+    byHost,
   }
 
-  writeFileSync(
-    join(reportDir, 'summary.json'),
-    `${JSON.stringify(summary, null, 2)}\n`,
-    'utf8'
-  )
+  writeFileSync(join(reportDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8')
   writeFileSync(join(reportDir, 'SUMMARY.md'), buildCompareMarkdown(summary), 'utf8')
 
   console.log(`Compare report saved: ${reportDir}`)

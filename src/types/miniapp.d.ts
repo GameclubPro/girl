@@ -4,6 +4,7 @@ declare global {
   interface Window {
     __miniAppHost?: 'telegram' | 'vk' | 'web'
     __vkBridgeCleanup?: () => void
+    __vkEmulatorCleanup?: () => void
     __vkLaunchParams?: Record<string, string>
   }
 }

@@ -1,4 +1,4 @@
-# KIVEN GIRL — Telegram Mini App (Fullscreen)
+# KIVEN GIRL — Telegram + VK Mini App (Fullscreen)
 
 ## Multi-platform запуск (Telegram + VK)
 - Приложение автоматически определяет хост по launch params:
@@ -70,17 +70,27 @@ npm run agent:health
 npm run agent:autopilot
 ```
 
-## Fullscreen эмуляция Telegram Mini App
-Все скриншот-скрипты уже используют параметры fullscreen и safe-area:
-- `tgFullscreen=1`
-- `tgTopInset=47`
-- `tgBottomInset=34`
-- `tgContentTopInset=47`
-- `tgContentBottomInset=34`
+## Fullscreen эмуляция Telegram/VK Mini App
+Скриншот-скрипты поддерживают оба хоста:
+- `--host telegram` (по умолчанию для одиночных скриншотов);
+- `--host vk` для VK-профиля;
+- visual-аудит поддерживает multi-host через `--hosts telegram,vk` (default).
+
+VK dev-эмулятор включается только в DEV и только при `vkEmu=1`.
+Поддерживаемые query параметры VK эмулятора:
+- `vkEmu`, `vkPlatform=ios|android`, `vkWidth`, `vkHeight`;
+- `vkTitle`, `vkSubtitle`;
+- `vkTopInset`, `vkBottomInset`, `vkLeftInset`, `vkRightInset`;
+- `vkContentTopInset`, `vkContentBottomInset`, `vkContentLeftInset`, `vkContentRightInset`.
 
 Основной скрипт:
 ```bash
 npm run screenshot:design-redesign -- --width 390 --height 844
+```
+
+VK-вариант:
+```bash
+npm run screenshot:design-redesign -- --host vk --width 390 --height 844
 ```
 
 ## Visual Audit Pipeline
@@ -91,15 +101,15 @@ npm run visual:setup
 
 Полный цикл:
 ```bash
-npm run visual:capture:baseline -- --session pro-cabinet --userId 5510721194
+npm run visual:capture:baseline -- --session pro-cabinet --userId 5510721194 --hosts telegram,vk
 # ...внести изменения...
-npm run visual:capture:after -- --session pro-cabinet --userId 5510721194
-npm run visual:compare -- --session pro-cabinet
+npm run visual:capture:after -- --session pro-cabinet --userId 5510721194 --hosts telegram,vk
+npm run visual:compare -- --session pro-cabinet --hosts telegram,vk
 ```
 
 One-shot:
 ```bash
-npm run visual:workflow -- --session smoke-pro --userId 5510721194
+npm run visual:workflow -- --session smoke-pro --userId 5510721194 --hosts telegram,vk
 ```
 
 Smoke workflow для быстрых проверок:
@@ -107,15 +117,22 @@ Smoke workflow для быстрых проверок:
 npm run visual:workflow:smoke
 ```
 
+Только VK:
+```bash
+npm run visual:workflow -- --session smoke-vk --userId 5510721194 --hosts vk
+```
+
 Жесткий visual gate (пороговый контроль):
 ```bash
 npm run visual:gate
 ```
+- по умолчанию проверяет оба хоста: `telegram,vk`;
 - default thresholds: `mean <= 0.8%`, `max-screen <= 2.5%`.
 - при превышении порога команда возвращает `exit 1`.
 
 Дополнительно:
 - `visual:workflow`, `visual:capture:*`, `visual:compare` поддерживают `--parallel` (default `2`) для ускоренного capture.
+- `visual:capture:*`, `visual:workflow`, `visual:compare`, `visual:gate` поддерживают `--hosts` (`telegram`, `vk`).
 - `visual:compare` поддерживает `--failOnDelta 1 --maxMeanDelta <n> --maxScreenDelta <n>`.
 
 Очистка логов:
@@ -165,6 +182,10 @@ npm run screenshot:design-redesign -- --browserExecutable /usr/bin/google-chrome
 - `visual:capture:baseline`
 - `visual:capture:after`
 - `visual:workflow`
+
+Host-параметры:
+- `screenshot:miniapp`, `screenshot:miniapp:matrix`, `screenshot:booking-item*`, `screenshot:deposit-sheet*` поддерживают `--host telegram|vk`.
+- `visual:*` и `visual:gate` поддерживают `--hosts telegram,vk`.
 
 ## Важно про sandbox-ошибки
 Если `visual:doctor` показывает `sandbox_host_linux.cc:41` или crashpad `Operation not permitted`, это проблема окружения запуска Chromium (seccomp/sandbox), а не проблема UI-кода или Telegram fullscreen-параметров.

@@ -135,8 +135,14 @@
   --metal-primary-shadow: 0 14px 24px rgba(var(--accent-rgb), 0.25),
     inset 0 1px 0 rgba(var(--paper-rgb), 0.35);
   --metal-primary-text: var(--paper);
+  --host-safe-top-js: 0px;
+  --host-safe-bottom-js: 0px;
+  --host-content-safe-top-js: 0px;
+  --host-content-safe-bottom-js: 0px;
   --safe-top: max(
     env(safe-area-inset-top, 0px),
+    var(--host-safe-top-js, 0px),
+    var(--host-content-safe-top-js, 0px),
     var(--tg-safe-area-inset-top, 0px),
     var(--tg-viewport-safe-area-inset-top, 0px),
     var(--tg-content-safe-area-inset-top, 0px),
@@ -146,6 +152,8 @@
   );
   --safe-bottom: max(
     env(safe-area-inset-bottom, 0px),
+    var(--host-safe-bottom-js, 0px),
+    var(--host-content-safe-bottom-js, 0px),
     var(--tg-safe-area-inset-bottom, 0px),
     var(--tg-viewport-safe-area-inset-bottom, 0px),
     var(--tg-content-safe-area-inset-bottom, 0px),

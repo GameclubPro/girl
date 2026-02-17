@@ -396,6 +396,7 @@ export const setupTelegramEmulator = () => {
     params.get('tgStart')?.trim() || params.get('startapp')?.trim() || undefined
   const title = params.get('tgTitle')?.trim() || document.title.trim() || 'Mini App'
   const subtitle = params.get('tgSubtitle')?.trim() || `@${username}`
+  const fixedStatusTime = params.get('tgFixedTime')?.trim() || ''
 
   titleElement.textContent = title
   subtitleElement.textContent = subtitle
@@ -444,8 +445,12 @@ export const setupTelegramEmulator = () => {
     statusTimeElement.textContent = `${hours}:${minutes}`
   }
 
-  updateStatusTime()
-  const statusTimer = window.setInterval(updateStatusTime, 30_000)
+  if (fixedStatusTime) {
+    statusTimeElement.textContent = fixedStatusTime
+  } else {
+    updateStatusTime()
+  }
+  const statusTimer = fixedStatusTime ? null : window.setInterval(updateStatusTime, 30_000)
 
   const mainButton: TelegramMainButton = {
     show: () => {
@@ -738,7 +743,9 @@ export const setupTelegramEmulator = () => {
 
   win.__tgEmulatorCleanup = () => {
     window.removeEventListener('resize', handleResize)
-    window.clearInterval(statusTimer)
+    if (statusTimer !== null) {
+      window.clearInterval(statusTimer)
+    }
     backButtonElement.removeEventListener('click', handleBackClick)
     mainButtonElement.removeEventListener('click', handleMainClick)
     overlay.remove()

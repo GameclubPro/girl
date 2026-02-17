@@ -27,7 +27,7 @@
     "visual:capture:after": "node scripts/miniapp-visual-audit.mjs --mode capture --stage after",
     "visual:compare": "node scripts/miniapp-visual-audit.mjs --mode compare",
     "visual:workflow": "node scripts/miniapp-visual-audit.mjs --mode workflow",
-    "visual:workflow:smoke": "npm run visual:workflow -- --session smoke-pro-cabinet --userId 5510721194 --parallel 2",
+    "visual:workflow:smoke": "npm run visual:workflow -- --session smoke-pro-cabinet --userId 5510721194 --hosts telegram,vk --parallel 2",
     "visual:gate": "node scripts/visual-gate.mjs --session smoke-pro-cabinet --userId 5510721194",
     "visual:cleanup": "node scripts/cleanup-visual-logs.mjs",
     "visual:doctor": "node scripts/visual-doctor.mjs",
@@ -65,7 +65,7 @@
     "playwright": "^1.58.1",
     "supertest": "^7.1.4",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4",
+    "typescript-eslint": "^8.56.0",
     "vite": "^7.2.4"
   }
 }
