@@ -509,14 +509,28 @@ const setupMaxShim = async () => {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  const requestMaxViewportExpansion = () => {
+    // Best-effort: different MAX builds can expose either requestFullscreen or expand.
+    window.WebApp?.requestFullscreen?.()
+    window.WebApp?.expand?.()
+  }
+
   const webApp: TelegramWebApp = {
-    ready: () => {},
-    expand: () => {},
+    ready: () => {
+      window.WebApp?.ready?.()
+    },
+    expand: () => {
+      requestMaxViewportExpansion()
+    },
     close: () => {
       window.WebApp?.close?.()
     },
-    requestFullscreen: () => {},
-    disableVerticalSwipes: () => {},
+    requestFullscreen: () => {
+      requestMaxViewportExpansion()
+    },
+    disableVerticalSwipes: () => {
+      window.WebApp?.disableVerticalSwipes?.()
+    },
     openLink: (url) => {
       openExternal(url)
     },
@@ -578,6 +592,15 @@ const setupMaxShim = async () => {
   window.Telegram = {
     ...(window.Telegram ?? {}),
     WebApp: webApp,
+  }
+
+  try {
+    webApp.ready()
+    webApp.expand()
+    webApp.requestFullscreen?.()
+    webApp.disableVerticalSwipes?.()
+  } catch (_error) {
+    // ignore: MAX runtime capabilities differ between client versions
   }
 }
 

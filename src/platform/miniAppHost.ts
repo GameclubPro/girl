@@ -45,9 +45,8 @@ export const detectMiniAppHost = (): MiniAppHost => {
   if (typeof window === 'undefined') return 'web'
   if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) return 'telegram'
   if (hasVkLaunchParams()) return 'vk'
-  if (window.WebApp?.InitData || window.WebApp?.initData || hasMaxLaunchParams()) {
-    return 'max'
-  }
+  if (window.WebApp && typeof window.WebApp === 'object') return 'max'
+  if (hasMaxLaunchParams()) return 'max'
   return 'web'
 }
 

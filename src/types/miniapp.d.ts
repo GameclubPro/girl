@@ -13,6 +13,10 @@ declare global {
       initData?: string
       platform?: string
       version?: string
+      ready?: () => void
+      expand?: () => void
+      requestFullscreen?: () => void
+      disableVerticalSwipes?: () => void
       close?: () => void
       openLink?: (url: string) => void
       haptics?: {

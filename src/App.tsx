@@ -894,6 +894,8 @@ function App() {
   const [linkResultRefreshIssue, setLinkResultRefreshIssue] =
     useState<LinkResultRefreshIssueState | null>(null)
   const [isLinkResultRetryPending, setIsLinkResultRetryPending] = useState(false)
+  const [sessionBootstrapError, setSessionBootstrapError] = useState<string | null>(null)
+  const [sessionBootstrapRevision, setSessionBootstrapRevision] = useState(0)
   const [notifications, setNotifications] = useState<NotifyEvent[]>([])
   const notificationTimeoutsRef = useRef<Map<string, number>>(new Map())
   const [telegramUser] = useState(() => getTelegramUser())
@@ -1294,6 +1296,12 @@ function App() {
     runManualOpen()
   }, [isManualSourceReturnPending, linkReturnFallback, miniAppHost, openSourceReturnUrl])
 
+  const handleRetrySessionBootstrap = useCallback(() => {
+    if (isSessionBootstrapping || isRoleStateLoading) return
+    setSessionBootstrapError(null)
+    setSessionBootstrapRevision((current) => current + 1)
+  }, [isRoleStateLoading, isSessionBootstrapping])
+
   const handleStayInCurrentMiniApp = useCallback(() => {
     if (!linkReturnFallback) return
     const nextView = linkReturnFallback.nextView
@@ -1451,6 +1459,7 @@ function App() {
     const controller = new AbortController()
 
     const bootstrap = async () => {
+      setSessionBootstrapError(null)
       setIsSessionBootstrapping(true)
       setIsRoleStateLoading(true)
       try {
@@ -1476,7 +1485,8 @@ function App() {
         })
 
         if (!response.ok) {
-          throw new Error('Session bootstrap failed')
+          const apiError = await parseApiError(response, 'session_bootstrap_failed')
+          throw new Error(apiError.code)
         }
 
         const payload = (await response.json().catch(() => null)) as
@@ -1511,6 +1521,16 @@ function App() {
         setIsSupportAgent(Boolean(payload?.isSupportAgent))
       } catch (error) {
         if (cancelled) return
+        const errorCode =
+          error instanceof Error && error.message.trim()
+            ? error.message.trim()
+            : 'session_bootstrap_failed'
+        setSessionBootstrapError(
+          resolveApiMessage(
+            errorCode,
+            'Не удалось запустить сессию. Перезапустите Mini App и попробуйте снова.'
+          )
+        )
         clearSessionAuth()
         const fallbackUserId = miniAppHost === 'web' ? resolveFallbackSessionUserId() : ''
         setUserId(fallbackUserId)
@@ -1536,6 +1556,7 @@ function App() {
     applyAccountIdentities,
     applyRoleState,
     miniAppHost,
+    sessionBootstrapRevision,
     telegramUser?.id,
     telegramUser?.first_name,
     telegramUser?.last_name,
@@ -2131,6 +2152,15 @@ function App() {
       console.warn('Telegram WebApp disable swipes failed:', error)
     }
   }, [view])
+
+  useEffect(() => {
+    const root = document.documentElement
+    // MAX already reserves header space in host UI, so extra Telegram offset wastes viewport.
+    root.style.setProperty('--tg-top-offset', miniAppHost === 'max' ? '0px' : '12px')
+    return () => {
+      root.style.setProperty('--tg-top-offset', '12px')
+    }
+  }, [miniAppHost])
 
   useEffect(() => {
     if (view !== 'address') return
@@ -3652,6 +3682,30 @@ function App() {
           )
         }
       />
+    )
+  }
+
+  if (!isSessionBootstrapping && !isRoleStateLoading && sessionBootstrapError) {
+    return renderScreen(
+      'start',
+      <div className="screen screen--start">
+        <main className="content link-flow-fallback">
+          <section className="link-flow-fallback__card">
+            <p className="link-flow-fallback__eyebrow">Ошибка запуска</p>
+            <h2 className="link-flow-fallback__title">Не удалось открыть мини-приложение</h2>
+            <p className="link-flow-fallback__text">{sessionBootstrapError}</p>
+            <div className="link-flow-fallback__actions">
+              <button
+                type="button"
+                className="link-flow-fallback__button is-primary"
+                onClick={handleRetrySessionBootstrap}
+              >
+                Повторить
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
     )
   }
 
