@@ -1,9 +1,15 @@
-export type MiniAppHost = 'telegram' | 'vk' | 'web'
+export type MiniAppHost = 'telegram' | 'vk' | 'max' | 'web'
 
 const VK_PARAM_PREFIX = 'vk_'
+const MAX_PARAM_KEYS = new Set([
+  'webappdata',
+  'webappversion',
+  'webappplatform',
+  'maxemu',
+])
 
 const isMiniAppHost = (value: unknown): value is MiniAppHost =>
-  value === 'telegram' || value === 'vk' || value === 'web'
+  value === 'telegram' || value === 'vk' || value === 'max' || value === 'web'
 
 const getHashParams = () => {
   const rawHash = window.location.hash.replace(/^#\/?/, '')
@@ -23,10 +29,25 @@ const hasVkLaunchParams = () => {
   return hasVkSearch || hasVkHash
 }
 
+const hasMaxLaunchParams = () => {
+  const searchParams = new URLSearchParams(window.location.search)
+  const hashParams = getHashParams()
+  const hasMaxSearch = [...searchParams.keys()].some((key) =>
+    MAX_PARAM_KEYS.has(key.toLowerCase())
+  )
+  const hasMaxHash = [...hashParams.keys()].some((key) =>
+    MAX_PARAM_KEYS.has(key.toLowerCase())
+  )
+  return hasMaxSearch || hasMaxHash
+}
+
 export const detectMiniAppHost = (): MiniAppHost => {
   if (typeof window === 'undefined') return 'web'
   if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) return 'telegram'
   if (hasVkLaunchParams()) return 'vk'
+  if (window.WebApp?.InitData || window.WebApp?.initData || hasMaxLaunchParams()) {
+    return 'max'
+  }
   return 'web'
 }
 
@@ -51,4 +72,3 @@ export const getMiniAppHost = (): MiniAppHost => {
   setMiniAppHost(detected)
   return detected
 }
-

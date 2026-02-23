@@ -5373,7 +5373,7 @@ export const ProProfileScreen = ({
                   <span className="pro-profile-settings-content">
                     <span className="pro-profile-settings-label">{accountLinkLabel}</span>
                     <span className="pro-profile-settings-hint">
-                      {accountLinkHint || 'Свяжите аккаунты Telegram и ВКонтакте.'}
+                      {accountLinkHint || 'Свяжите аккаунты в других Mini App.'}
                     </span>
                   </span>
                   <span className="pro-profile-settings-tail">

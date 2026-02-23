@@ -47,6 +47,7 @@ export type NextAction = {
 }
 
 export type Role = 'client' | 'pro'
+export type IdentityPlatform = 'telegram' | 'vk' | 'max'
 
 export type PlatformAuthPayload =
   | {
@@ -58,19 +59,26 @@ export type PlatformAuthPayload =
       launchParams: Record<string, string>
       sign?: string
     }
+  | {
+      type: 'max'
+      initData: string
+    }
 
 export type AccountIdentitiesResponse = {
   userId?: string
   telegramLinked: boolean
   vkLinked: boolean
+  maxLinked: boolean
   telegramUserId?: string | null
   vkUserId?: string | null
+  maxUserId?: string | null
 }
 
 export type SessionBootstrapResponse = {
   userId: string
   sessionToken?: string
   sessionExpiresAt?: string | null
+  authUnverified?: boolean
   roleState: {
     role?: Role | null
     selectedOnce?: boolean
@@ -85,7 +93,7 @@ export type AccountLinkStartResponse = {
   ok: boolean
   alreadyLinked?: boolean
   token?: string
-  targetPlatform?: 'telegram' | 'vk'
+  targetPlatform?: IdentityPlatform
   targetUrl?: string
   expiresAt?: string
   identities?: AccountIdentitiesResponse
@@ -99,6 +107,9 @@ export type AccountLinkCompleteResponse = {
   sourceReturnUrl?: string
   sessionToken?: string
   sessionExpiresAt?: string | null
+  sourcePlatform?: IdentityPlatform
+  targetPlatform?: IdentityPlatform
+  authUnverified?: boolean
   roleState: {
     role?: Role | null
     selectedOnce?: boolean

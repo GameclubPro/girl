@@ -27,7 +27,7 @@
     "visual:capture:after": "node scripts/miniapp-visual-audit.mjs --mode capture --stage after",
     "visual:compare": "node scripts/miniapp-visual-audit.mjs --mode compare",
     "visual:workflow": "node scripts/miniapp-visual-audit.mjs --mode workflow",
-    "visual:workflow:smoke": "npm run visual:workflow -- --session smoke-pro-cabinet --userId 5510721194 --hosts telegram,vk --parallel 2",
+    "visual:workflow:smoke": "npm run visual:workflow -- --session smoke-pro-cabinet --userId 5510721194 --hosts telegram,vk,max --parallel 2",
     "visual:gate": "node scripts/visual-gate.mjs --session smoke-pro-cabinet --userId 5510721194",
     "visual:cleanup": "node scripts/cleanup-visual-logs.mjs",
     "visual:doctor": "node scripts/visual-doctor.mjs",
@@ -53,12 +53,12 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@eslint/js": "^9.39.3",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9.39.1",
+    "eslint": "^9.39.3",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",

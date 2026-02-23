@@ -132,7 +132,11 @@ const failOnDelta = toBoolean(args.get('failOnDelta'), false)
 const maxMeanDelta = toFloat(args.get('maxMeanDelta'), 0.8, 0, 100)
 const maxScreenDelta = toFloat(args.get('maxScreenDelta'), 2.5, 0, 100)
 const matrix = parseMatrix(args.get('matrix') ?? '360x780,390x844,430x932')
-const hosts = parseHostsCsv(args.get('hosts') ?? 'telegram,vk', ['telegram', 'vk'])
+const hosts = parseHostsCsv(args.get('hosts') ?? 'telegram,vk,max', [
+  'telegram',
+  'vk',
+  'max',
+])
 
 if (!['capture', 'compare', 'workflow'].includes(mode)) {
   console.error(`Unsupported mode: ${mode}. Use capture | compare | workflow.`)

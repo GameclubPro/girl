@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { after, test } from 'node:test'
 import dotenv from 'dotenv'
 import supertest from 'supertest'
@@ -43,9 +43,12 @@ if (!hasDbConfig) {
   process.env.ALLOW_LOCAL_DEV_SESSION = '0'
   process.env.BOT_TOKEN = (process.env.BOT_TOKEN ?? '').trim() || 'test-bot-token'
   process.env.VK_APP_SECRET = (process.env.VK_APP_SECRET ?? '').trim() || 'test-vk-secret'
+  process.env.MAX_BOT_TOKEN = (process.env.MAX_BOT_TOKEN ?? '').trim() || 'test-max-bot-token'
+  process.env.MAX_SOFT_AUTH_ENABLED = (process.env.MAX_SOFT_AUTH_ENABLED ?? '').trim() || '0'
 
   const telegramBotToken = process.env.BOT_TOKEN
   const vkAppSecret = process.env.VK_APP_SECRET
+  const getMaxBotToken = () => (process.env.MAX_BOT_TOKEN ?? '').trim()
 
   let runtime = null
   let api = null
@@ -101,6 +104,38 @@ if (!hasDbConfig) {
     }
   }
 
+  const buildMaxAuthPayload = (maxUserId, options = {}) => {
+    const authDate = String(Math.floor(Date.now() / 1000))
+    const user = JSON.stringify({
+      id: Number(maxUserId),
+      first_name: 'Test',
+      username: `m${maxUserId}`,
+    })
+    const params = [
+      ['auth_date', authDate],
+      ['query_id', `m_${maxUserId}`],
+      ['user', user],
+    ]
+    const dataCheckString = params
+      .map(([key, value]) => `${key}=${value}`)
+      .sort((left, right) => left.localeCompare(right))
+      .join('\n')
+    const maxBotToken = getMaxBotToken()
+    const secret = createHash('sha256').update(maxBotToken).digest()
+    const hash = createHmac('sha256', secret).update(dataCheckString).digest('hex')
+    const search = new URLSearchParams(params)
+    if (!options.omitHash) {
+      const invalidHash = hash.endsWith('0')
+        ? `${hash.slice(0, -1)}1`
+        : `${hash.slice(0, -1)}0`
+      search.set('hash', options.invalidHash ? invalidHash : hash)
+    }
+    return {
+      type: 'max',
+      initData: search.toString(),
+    }
+  }
+
   const ensureRuntime = async () => {
     if (runtime || runtimeInitError) return
     try {
@@ -138,7 +173,14 @@ if (!hasDbConfig) {
             type: 'telegram',
             initData: buildTelegramInitData(platformUserId),
           }
-        : buildVkAuthPayload(platformUserId)
+        : host === 'vk'
+          ? buildVkAuthPayload(platformUserId)
+          : host === 'max'
+            ? buildMaxAuthPayload(platformUserId)
+            : null
+    if (!platformAuth) {
+      throw new Error(`Unsupported host in bootstrap: ${host}`)
+    }
     const response = await api.post('/api/session/bootstrap').send({
       host,
       platformUserId: String(platformUserId),
@@ -176,6 +218,61 @@ if (!hasDbConfig) {
       })
       assert.equal(response.status, 400)
       assert.equal(response.body?.error, 'platform_user_id_required')
+    }))
+
+  test('strict: host=max с валидным initData проходит bootstrap', async (context) =>
+    withIntegration(context, async () => {
+      process.env.MAX_SOFT_AUTH_ENABLED = '0'
+      process.env.MAX_BOT_TOKEN = getMaxBotToken() || 'test-max-bot-token'
+
+      const maxUserId = uniqueId('4410')
+      const response = await api.post('/api/session/bootstrap').send({
+        host: 'max',
+        platformUserId: maxUserId,
+        firstName: 'Max',
+        platformAuth: buildMaxAuthPayload(maxUserId),
+      })
+      assert.equal(response.status, 200, JSON.stringify(response.body))
+      assert.equal(typeof response.body?.userId, 'string')
+      assert.notEqual(Boolean(response.body?.authUnverified), true)
+    }))
+
+  test('strict: host=max с невалидным hash отклоняется', async (context) =>
+    withIntegration(context, async () => {
+      process.env.MAX_SOFT_AUTH_ENABLED = '0'
+      process.env.MAX_BOT_TOKEN = getMaxBotToken() || 'test-max-bot-token'
+
+      const maxUserId = uniqueId('4420')
+      const response = await api.post('/api/session/bootstrap').send({
+        host: 'max',
+        platformUserId: maxUserId,
+        firstName: 'Max',
+        platformAuth: buildMaxAuthPayload(maxUserId, { invalidHash: true }),
+      })
+      assert.equal(response.status, 401)
+      assert.equal(response.body?.error, 'platform_auth_invalid')
+    }))
+
+  test('soft-auth: host=max проходит без MAX_BOT_TOKEN с authUnverified=true', async (context) =>
+    withIntegration(context, async () => {
+      const originalToken = process.env.MAX_BOT_TOKEN
+      const originalSoft = process.env.MAX_SOFT_AUTH_ENABLED
+      process.env.MAX_BOT_TOKEN = ''
+      process.env.MAX_SOFT_AUTH_ENABLED = '1'
+      try {
+        const maxUserId = uniqueId('4430')
+        const response = await api.post('/api/session/bootstrap').send({
+          host: 'max',
+          platformUserId: maxUserId,
+          firstName: 'Soft',
+          platformAuth: buildMaxAuthPayload(maxUserId, { invalidHash: true }),
+        })
+        assert.equal(response.status, 200, JSON.stringify(response.body))
+        assert.equal(response.body?.authUnverified, true)
+      } finally {
+        process.env.MAX_BOT_TOKEN = originalToken ?? ''
+        process.env.MAX_SOFT_AUTH_ENABLED = originalSoft ?? '0'
+      }
     }))
 
   test('strict: mutation с чужим userId отклоняется (403)', async (context) =>
@@ -348,5 +445,158 @@ if (!hasDbConfig) {
       assert.equal(tgRebootstrap.status, 200)
       assert.equal(vkRebootstrap.status, 200)
       assert.equal(tgRebootstrap.body?.userId, vkRebootstrap.body?.userId)
+    }))
+
+  test('link: TG->MAX и VK->MAX объединяют все 3 платформы в один internal_user_id', async (context) =>
+    withIntegration(context, async () => {
+      process.env.MAX_SOFT_AUTH_ENABLED = '0'
+      process.env.MAX_BOT_TOKEN = getMaxBotToken() || 'test-max-bot-token'
+
+      const tgExt = uniqueId('7711')
+      const vkExt = uniqueId('7712')
+      const maxExt = uniqueId('7713')
+      const tg = await bootstrap({ host: 'telegram', platformUserId: tgExt })
+      const vk = await bootstrap({ host: 'vk', platformUserId: vkExt })
+      const mx = await bootstrap({ host: 'max', platformUserId: maxExt })
+
+      const tgToMax = await api
+        .post('/api/account/link/start')
+        .set(authHeader(tg.sessionToken))
+        .send({
+          userId: tg.userId,
+          sourcePlatform: 'telegram',
+          targetPlatform: 'max',
+          host: 'telegram',
+          platformUserId: tg.platformUserId,
+          platformAuth: tg.platformAuth,
+        })
+      assert.equal(tgToMax.status, 200, JSON.stringify(tgToMax.body))
+      const tgToMaxToken = String(tgToMax.body?.token ?? '')
+      assert.equal(tgToMaxToken.length > 0, true)
+
+      const completeTgToMax = await api
+        .post('/api/account/link/complete')
+        .set(authHeader(mx.sessionToken))
+        .send({
+          userId: mx.userId,
+          token: tgToMaxToken,
+          host: 'max',
+          platformUserId: mx.platformUserId,
+          platformAuth: mx.platformAuth,
+        })
+      assert.equal(completeTgToMax.status, 200, JSON.stringify(completeTgToMax.body))
+      const mergedUserId = String(completeTgToMax.body?.userId ?? '')
+      assert.equal(Boolean(mergedUserId), true)
+
+      const vkToMax = await api
+        .post('/api/account/link/start')
+        .set(authHeader(vk.sessionToken))
+        .send({
+          userId: vk.userId,
+          sourcePlatform: 'vk',
+          targetPlatform: 'max',
+          host: 'vk',
+          platformUserId: vk.platformUserId,
+          platformAuth: vk.platformAuth,
+        })
+      assert.equal(vkToMax.status, 200, JSON.stringify(vkToMax.body))
+      const vkToMaxToken = String(vkToMax.body?.token ?? '')
+      assert.equal(vkToMaxToken.length > 0, true)
+
+      const completeVkToMax = await api
+        .post('/api/account/link/complete')
+        .set(authHeader(mx.sessionToken))
+        .send({
+          userId: mergedUserId,
+          token: vkToMaxToken,
+          host: 'max',
+          platformUserId: mx.platformUserId,
+          platformAuth: mx.platformAuth,
+        })
+      assert.equal(completeVkToMax.status, 200, JSON.stringify(completeVkToMax.body))
+      const unifiedUserId = String(completeVkToMax.body?.userId ?? '')
+      assert.equal(Boolean(unifiedUserId), true)
+
+      const tgRebootstrap = await api.post('/api/session/bootstrap').send({
+        host: 'telegram',
+        platformUserId: tgExt,
+        firstName: 'Test',
+        platformAuth: tg.platformAuth,
+      })
+      const vkRebootstrap = await api.post('/api/session/bootstrap').send({
+        host: 'vk',
+        platformUserId: vkExt,
+        firstName: 'Test',
+        platformAuth: vk.platformAuth,
+      })
+      const maxRebootstrap = await api.post('/api/session/bootstrap').send({
+        host: 'max',
+        platformUserId: maxExt,
+        firstName: 'Test',
+        platformAuth: mx.platformAuth,
+      })
+      assert.equal(tgRebootstrap.status, 200)
+      assert.equal(vkRebootstrap.status, 200)
+      assert.equal(maxRebootstrap.status, 200)
+      assert.equal(tgRebootstrap.body?.userId, vkRebootstrap.body?.userId)
+      assert.equal(tgRebootstrap.body?.userId, maxRebootstrap.body?.userId)
+      assert.equal(maxRebootstrap.body?.userId, unifiedUserId)
+    }))
+
+  test('link: MAX->TG после привязки дает единый internal_user_id', async (context) =>
+    withIntegration(context, async () => {
+      process.env.MAX_SOFT_AUTH_ENABLED = '0'
+      process.env.MAX_BOT_TOKEN = getMaxBotToken() || 'test-max-bot-token'
+
+      const maxExt = uniqueId('8811')
+      const tgExt = uniqueId('8812')
+      const mx = await bootstrap({ host: 'max', platformUserId: maxExt })
+      const tg = await bootstrap({ host: 'telegram', platformUserId: tgExt })
+
+      const startResponse = await api
+        .post('/api/account/link/start')
+        .set(authHeader(mx.sessionToken))
+        .send({
+          userId: mx.userId,
+          sourcePlatform: 'max',
+          targetPlatform: 'telegram',
+          host: 'max',
+          platformUserId: mx.platformUserId,
+          platformAuth: mx.platformAuth,
+        })
+      assert.equal(startResponse.status, 200, JSON.stringify(startResponse.body))
+      const token = String(startResponse.body?.token ?? '')
+      assert.equal(token.length > 0, true)
+
+      const completeResponse = await api
+        .post('/api/account/link/complete')
+        .set(authHeader(tg.sessionToken))
+        .send({
+          userId: tg.userId,
+          token,
+          host: 'telegram',
+          platformUserId: tg.platformUserId,
+          platformAuth: tg.platformAuth,
+        })
+      assert.equal(completeResponse.status, 200, JSON.stringify(completeResponse.body))
+      assert.equal(completeResponse.body?.ok, true)
+      assert.equal(completeResponse.body?.sourcePlatform, 'max')
+      assert.equal(completeResponse.body?.targetPlatform, 'telegram')
+
+      const maxRebootstrap = await api.post('/api/session/bootstrap').send({
+        host: 'max',
+        platformUserId: maxExt,
+        firstName: 'Test',
+        platformAuth: mx.platformAuth,
+      })
+      const tgRebootstrap = await api.post('/api/session/bootstrap').send({
+        host: 'telegram',
+        platformUserId: tgExt,
+        firstName: 'Test',
+        platformAuth: tg.platformAuth,
+      })
+      assert.equal(maxRebootstrap.status, 200)
+      assert.equal(tgRebootstrap.status, 200)
+      assert.equal(maxRebootstrap.body?.userId, tgRebootstrap.body?.userId)
     }))
 }

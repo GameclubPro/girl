@@ -19,13 +19,14 @@ import { NavPreloadContext } from './contexts/NavPreloadContext'
 import { categoryItems } from './data/clientData'
 import { isCityAvailable } from './data/cityAvailability'
 import { getMiniAppHost } from './platform/miniAppHost'
-import { getVkLaunchParamsForAuth } from './platform/miniAppBridge'
+import { getMaxInitDataForAuth, getVkLaunchParamsForAuth } from './platform/miniAppBridge'
 import type {
   AccountIdentitiesResponse,
   AccountLinkCompleteResponse,
   AccountLinkStartResponse,
   City,
   District,
+  IdentityPlatform,
   PlatformAuthPayload,
   ProProfileSection,
   Role,
@@ -200,13 +201,65 @@ const accountLinkDebugEnabled =
 
 type LinkTokenSource = 'initData' | 'search' | 'hash' | 'session'
 type LinkResultStatus = 'linked' | 'merged'
-type LinkReturnSourcePlatform = 'telegram' | 'vk'
+type LinkReturnSourcePlatform = IdentityPlatform
 type LinkReturnOpenMethod =
   | 'openTelegramLink'
   | 'openLink'
   | 'location.assign'
   | 'window.open'
   | 'none'
+
+type AccountLinkSource = 'start' | 'settings'
+
+type AccountLinkTargetMeta = {
+  platform: IdentityPlatform
+  title: string
+  envHint: string
+}
+
+const accountLinkTargetMeta: Record<IdentityPlatform, AccountLinkTargetMeta> = {
+  telegram: {
+    platform: 'telegram',
+    title: 'Telegram',
+    envHint: 'Добавьте VITE_TG_APP_URL',
+  },
+  vk: {
+    platform: 'vk',
+    title: 'ВКонтакте',
+    envHint: 'Добавьте VITE_VK_APP_URL',
+  },
+  max: {
+    platform: 'max',
+    title: 'MAX',
+    envHint: 'Добавьте VITE_MAX_APP_URL',
+  },
+}
+
+const identityPlatformOrder: IdentityPlatform[] = ['telegram', 'vk', 'max']
+
+const resolvePlatformLabel = (platform: IdentityPlatform) =>
+  accountLinkTargetMeta[platform].title
+
+const parseInitDataUserId = (initData: string) => {
+  const normalized = initData.trim()
+  if (!normalized) return ''
+  try {
+    const params = new URLSearchParams(normalized)
+    const userRaw = params.get('user')?.trim()
+    if (!userRaw) return ''
+    const parsed = JSON.parse(userRaw) as { id?: string | number } | null
+    const userIdRaw = parsed?.id
+    if (typeof userIdRaw === 'number' && Number.isFinite(userIdRaw) && userIdRaw > 0) {
+      return String(Math.trunc(userIdRaw))
+    }
+    if (typeof userIdRaw === 'string' && userIdRaw.trim()) {
+      return userIdRaw.trim()
+    }
+  } catch (_error) {
+    return ''
+  }
+  return ''
+}
 
 const isTelegramDeepLinkUrl = (url: string) =>
   /^tg:\/\//i.test(url) || /^https?:\/\/(?:t|telegram)\.me\//i.test(url)
@@ -258,7 +311,7 @@ const resolveVkLaunchUserId = () => {
 }
 
 const resolvePlatformAuthPayload = (
-  host: 'telegram' | 'vk' | 'web'
+  host: 'telegram' | 'vk' | 'max' | 'web'
 ): PlatformAuthPayload | null => {
   if (host === 'telegram') {
     const initData = (window.Telegram?.WebApp?.initData ?? '').trim()
@@ -273,6 +326,11 @@ const resolvePlatformAuthPayload = (
       launchParams,
       ...(sign ? { sign } : {}),
     }
+  }
+  if (host === 'max') {
+    const initData = getMaxInitDataForAuth().trim()
+    if (!initData) return null
+    return { type: 'max', initData }
   }
   return null
 }
@@ -637,24 +695,30 @@ const formatGeoError = (error: unknown) => {
 const parseRole = (value: unknown): Role | null =>
   value === 'client' || value === 'pro' ? value : null
 
+const parseIdentityPlatform = (value: unknown): IdentityPlatform | null =>
+  value === 'telegram' || value === 'vk' || value === 'max' ? value : null
+
 const emptyIdentities: AccountIdentitiesResponse = {
   telegramLinked: false,
   vkLinked: false,
+  maxLinked: false,
   telegramUserId: null,
   vkUserId: null,
+  maxUserId: null,
 }
 
 const API_MESSAGE_BY_CODE: Record<string, string> = {
   source_platform_not_linked:
-    'Платформа не подтвердила ваш ID в этой сессии. Откройте Mini App внутри Telegram/ВКонтакте и повторите.',
+    'Платформа не подтвердила ваш ID в этой сессии. Откройте Mini App внутри Telegram/VK/MAX и повторите.',
   platform_auth_invalid:
-    'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.',
+    'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/VK/MAX и повторите.',
   auth_required:
-    'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/ВКонтакте и повторите.',
+    'Сессия платформы не подтверждена. Перезапустите Mini App внутри Telegram/VK/MAX и повторите.',
   host_invalid:
-    'Запуск вне Mini App-контекста. Откройте приложение внутри Telegram/ВКонтакте.',
+    'Запуск вне Mini App-контекста. Откройте приложение внутри Telegram/VK/MAX.',
   session_user_invalid:
     'Сессия аккаунта не определена. Перезапустите Mini App внутри платформы и повторите.',
+  max_url_missing: 'Не задан VITE_MAX_APP_URL.',
 }
 
 const resolveApiMessage = (code: string, fallback: string) =>
@@ -729,6 +793,9 @@ function App() {
   const [isRoleSelectedOnce, setIsRoleSelectedOnce] = useState(false)
   const [isRoleSelectionPending, setIsRoleSelectionPending] = useState(false)
   const [isAccountLinkPending, setIsAccountLinkPending] = useState(false)
+  const [isAccountLinkSheetOpen, setIsAccountLinkSheetOpen] = useState(false)
+  const [accountLinkIntentSource, setAccountLinkIntentSource] =
+    useState<AccountLinkSource>('settings')
   const [accountIdentities, setAccountIdentities] =
     useState<AccountIdentitiesResponse>(emptyIdentities)
   const [isSupportAgent, setIsSupportAgent] = useState(false)
@@ -830,16 +897,31 @@ function App() {
   const [notifications, setNotifications] = useState<NotifyEvent[]>([])
   const notificationTimeoutsRef = useRef<Map<string, number>>(new Map())
   const [telegramUser] = useState(() => getTelegramUser())
+
+  const currentHostIdentityPlatform: IdentityPlatform | null =
+    miniAppHost === 'telegram'
+      ? 'telegram'
+      : miniAppHost === 'vk'
+        ? 'vk'
+        : miniAppHost === 'max'
+          ? 'max'
+          : null
+
   const resolveCurrentPlatformUserId = () => {
     const currentUser = getTelegramUser() ?? telegramUser
     if (currentUser?.id) return String(currentUser.id)
     if (miniAppHost === 'vk') return resolveVkLaunchUserId()
+    if (miniAppHost === 'max') {
+      return parseInitDataUserId(getMaxInitDataForAuth())
+    }
     return ''
   }
   const resolveFallbackSessionUserId = () => {
     const platformUserId = resolveCurrentPlatformUserId()
     if (!platformUserId) return 'local-dev'
-    return miniAppHost === 'vk' ? `vk_${platformUserId}` : platformUserId
+    if (miniAppHost === 'vk') return `vk_${platformUserId}`
+    if (miniAppHost === 'max') return `max_${platformUserId}`
+    return platformUserId
   }
 
   useEffect(() => {
@@ -868,41 +950,89 @@ function App() {
   const telegramAvatarUrl = telegramUser?.photo_url ?? null
   const tgAppUrl = (import.meta.env.VITE_TG_APP_URL ?? '').trim()
   const vkAppUrl = (import.meta.env.VITE_VK_APP_URL ?? '').trim()
-  const accountLinkTargetPlatform: 'telegram' | 'vk' =
-    miniAppHost === 'vk' ? 'telegram' : 'vk'
-  const startAccountCtaLabel =
-    accountLinkTargetPlatform === 'telegram'
-      ? 'У меня уже есть аккаунт в Telegram'
-      : 'У меня уже есть аккаунт ВКонтакте'
-  const accountLinkLabel =
-    accountLinkTargetPlatform === 'telegram'
-      ? 'Привязать Telegram'
-      : 'Привязать ВКонтакте'
-  const accountLinkMissingHint =
-    accountLinkTargetPlatform === 'telegram'
-      ? 'Добавьте VITE_TG_APP_URL'
-      : 'Добавьте VITE_VK_APP_URL'
+  const maxAppUrl = (import.meta.env.VITE_MAX_APP_URL ?? '').trim()
+  const platformAppUrlMap: Record<IdentityPlatform, string> = {
+    telegram: tgAppUrl,
+    vk: vkAppUrl,
+    max: maxAppUrl,
+  }
+  const isPlatformLinked = (platform: IdentityPlatform) => {
+    if (platform === 'telegram') return accountIdentities.telegramLinked
+    if (platform === 'vk') return accountIdentities.vkLinked
+    return accountIdentities.maxLinked
+  }
+  const linkedPlatformsCount = identityPlatformOrder.filter((platform) =>
+    isPlatformLinked(platform)
+  ).length
+  const accountLinkTargetCandidates = identityPlatformOrder.filter((platform) => {
+    if (currentHostIdentityPlatform && platform === currentHostIdentityPlatform) {
+      return false
+    }
+    return !isPlatformLinked(platform)
+  })
+  const availableAccountLinkTargets = accountLinkTargetCandidates.filter(
+    (platform) => Boolean(platformAppUrlMap[platform])
+  )
+  const missingAccountLinkTargets = accountLinkTargetCandidates.filter(
+    (platform) => !platformAppUrlMap[platform]
+  )
+  const accountLinkPrimaryTarget = availableAccountLinkTargets[0] ?? null
+  const hasAllAccountLinks = linkedPlatformsCount === identityPlatformOrder.length
   const accountLinkEnvMissing =
-    accountLinkTargetPlatform === 'telegram' ? !tgAppUrl : !vkAppUrl
-  const isAccountAlreadyLinked =
-    accountLinkTargetPlatform === 'telegram'
-      ? accountIdentities.telegramLinked
-      : accountIdentities.vkLinked
-  const accountLinkStatusLabel = isAccountAlreadyLinked ? 'Подключено' : 'Не подключено'
-  const accountLinkHint = accountLinkEnvMissing
-    ? accountLinkMissingHint
-    : isAccountAlreadyLinked
-      ? 'Платформа уже привязана.'
-      : ''
+    availableAccountLinkTargets.length === 0 && accountLinkTargetCandidates.length > 0
+  const accountLinkMissingHint = missingAccountLinkTargets
+    .map((platform) => accountLinkTargetMeta[platform].envHint)
+    .join(' · ')
+  const accountLinkStatusLabel = hasAllAccountLinks
+    ? 'Подключено'
+    : `${linkedPlatformsCount}/${identityPlatformOrder.length} подключено`
+  const accountLinkHint = hasAllAccountLinks
+    ? 'Telegram, ВКонтакте и MAX уже связаны.'
+    : accountLinkEnvMissing
+      ? accountLinkMissingHint
+      : availableAccountLinkTargets.length > 1
+        ? 'Выберите платформу в нижнем меню.'
+        : accountLinkPrimaryTarget
+          ? `Можно подключить ${resolvePlatformLabel(accountLinkPrimaryTarget)}.`
+          : ''
+  const startAccountCtaLabel = hasAllAccountLinks
+    ? 'Все аккаунты уже привязаны'
+    : availableAccountLinkTargets.length > 1
+      ? 'У меня уже есть аккаунт в другом приложении'
+      : accountLinkPrimaryTarget
+        ? `У меня уже есть аккаунт в ${resolvePlatformLabel(accountLinkPrimaryTarget)}`
+        : 'Связать аккаунты'
+  const accountLinkLabel = hasAllAccountLinks
+    ? 'Все платформы подключены'
+    : availableAccountLinkTargets.length > 1
+      ? 'Привязать другую платформу'
+      : accountLinkPrimaryTarget
+        ? `Привязать ${resolvePlatformLabel(accountLinkPrimaryTarget)}`
+        : 'Привязать аккаунт'
   const startAccountCtaHint = accountLinkEnvMissing ? accountLinkMissingHint : ''
   const isAccountLinkActionDisabled =
     !userId ||
     isAccountLinkPending ||
     isRoleSelectionPending ||
-    isAccountAlreadyLinked ||
+    hasAllAccountLinks ||
     accountLinkEnvMissing
   const isStartAccountCtaDisabled =
-    !userId || isAccountLinkPending || isRoleSelectionPending || accountLinkEnvMissing
+    !userId ||
+    isAccountLinkPending ||
+    isRoleSelectionPending ||
+    hasAllAccountLinks ||
+    accountLinkEnvMissing
+
+  useEffect(() => {
+    if (!isAccountLinkSheetOpen) return
+    if (isAccountLinkPending || availableAccountLinkTargets.length <= 1) {
+      setIsAccountLinkSheetOpen(false)
+    }
+  }, [
+    availableAccountLinkTargets.length,
+    isAccountLinkPending,
+    isAccountLinkSheetOpen,
+  ])
 
   const applyRoleState = useCallback((payload: UserRoleStateResponse | null) => {
     const nextRole = parseRole(payload?.role)
@@ -921,12 +1051,15 @@ function App() {
     setAccountIdentities({
       telegramLinked: Boolean(payload.telegramLinked),
       vkLinked: Boolean(payload.vkLinked),
+      maxLinked: Boolean(payload.maxLinked),
       telegramUserId:
         typeof payload.telegramUserId === 'string'
           ? payload.telegramUserId.trim() || null
           : null,
       vkUserId:
         typeof payload.vkUserId === 'string' ? payload.vkUserId.trim() || null : null,
+      maxUserId:
+        typeof payload.maxUserId === 'string' ? payload.maxUserId.trim() || null : null,
     })
   }, [])
 
@@ -1026,6 +1159,12 @@ function App() {
           throw new Error('Session bootstrap failed')
         }
         const payload = (await response.json().catch(() => null)) as SessionBootstrapResponse | null
+        if (payload?.authUnverified) {
+          logAccountLinkDebug('bootstrap-auth-unverified', {
+            host: miniAppHost,
+            context: 'link-result-refresh',
+          })
+        }
         const nextUserId =
           typeof payload?.userId === 'string' && payload.userId.trim()
             ? payload.userId.trim()
@@ -1343,6 +1482,12 @@ function App() {
         const payload = (await response.json().catch(() => null)) as
           | SessionBootstrapResponse
           | null
+        if (payload?.authUnverified) {
+          logAccountLinkDebug('bootstrap-auth-unverified', {
+            host: miniAppHost,
+            context: 'session-bootstrap',
+          })
+        }
         const nextUserId =
           typeof payload?.userId === 'string' && payload.userId.trim()
             ? payload.userId.trim()
@@ -1597,10 +1742,14 @@ function App() {
               return
             }
             if (errorCode === 'platform_user_id_required') {
-              notify(
+              const platformLabel =
                 miniAppHost === 'vk'
-                  ? 'Не удалось получить VK ID. Откройте Mini App внутри ВКонтакте и повторите.'
-                  : 'Не удалось получить Telegram ID. Откройте Mini App внутри Telegram и повторите.'
+                  ? 'VK'
+                  : miniAppHost === 'max'
+                    ? 'MAX'
+                    : 'Telegram'
+              notify(
+                `Не удалось получить ${platformLabel} ID. Откройте Mini App внутри платформы и повторите.`
               )
               navigate('start', { reset: true })
               return
@@ -1663,6 +1812,9 @@ function App() {
             host: miniAppHost,
             source: launchIntent.source,
             merged: Boolean(successPayload.merged),
+            sourcePlatform: successPayload.sourcePlatform ?? null,
+            targetPlatform: successPayload.targetPlatform ?? null,
+            authUnverified: Boolean(successPayload.authUnverified),
             ...getTokenDebugMeta(launchIntent.token),
           })
           setLinkReturnFallback(null)
@@ -1671,8 +1823,13 @@ function App() {
               ? successPayload.sourceReturnUrl.trim()
               : ''
           if (sourceReturnUrl) {
-            const sourcePlatform: LinkReturnSourcePlatform =
-              miniAppHost === 'vk' ? 'telegram' : 'vk'
+            const sourcePlatform =
+              parseIdentityPlatform(successPayload.sourcePlatform) ??
+              (miniAppHost === 'vk'
+                ? 'telegram'
+                : miniAppHost === 'telegram'
+                  ? 'vk'
+                  : 'telegram')
             logAccountLinkDebug('link-return-manual-required', {
               host: miniAppHost,
               source: launchIntent.source,
@@ -2422,141 +2579,213 @@ function App() {
     }
   }, [apiBase, navigate, userId])
 
-  const handleStartAccountLink = useCallback(async (source: 'start' | 'settings' = 'settings') => {
-    if (!userId) {
-      notify('Не удалось определить пользователя. Перезапустите приложение.')
-      return
-    }
-    const platformUserId = resolveCurrentPlatformUserId()
-    if (miniAppHost === 'web' || !platformUserId) {
-      notify('Откройте Mini App внутри Telegram/ВКонтакте и повторите.')
-      return
-    }
-    if (isAccountAlreadyLinked) {
-      if (source === 'start' && isRoleSelectedOnce) {
-        navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
+  const startAccountLinkForTarget = useCallback(
+    async (targetPlatform: IdentityPlatform, source: AccountLinkSource) => {
+      if (!userId) {
+        notify('Не удалось определить пользователя. Перезапустите приложение.')
         return
       }
-      notify('Аккаунт уже привязан.')
-      return
-    }
-    if (isAccountLinkPending || isRoleSelectionPending || accountLinkEnvMissing) {
-      return
-    }
-    setIsAccountLinkPending(true)
-    try {
-      const platformAuth = resolvePlatformAuthPayload(miniAppHost)
-      const response = await fetch(`${apiBase}/api/account/link/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          sourcePlatform: miniAppHost === 'vk' ? 'vk' : 'telegram',
-          targetPlatform: accountLinkTargetPlatform,
-          host: miniAppHost,
-          platformUserId,
-          platformAuth,
-        }),
-      })
+      if (isAccountLinkPending || isRoleSelectionPending) {
+        return
+      }
+      if (!availableAccountLinkTargets.includes(targetPlatform)) {
+        if (hasAllAccountLinks) {
+          if (source === 'start' && isRoleSelectedOnce) {
+            navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
+            return
+          }
+          notify('Все платформы уже привязаны.')
+          return
+        }
+        if (!platformAppUrlMap[targetPlatform]) {
+          notify(accountLinkTargetMeta[targetPlatform].envHint)
+          return
+        }
+        notify('Эта платформа недоступна для привязки в текущей сессии.')
+        return
+      }
 
-      if (!response.ok) {
-        const apiError = await parseApiError(response, 'link_start_failed')
-        const payload = apiError.payload as
+      const platformUserId = resolveCurrentPlatformUserId()
+      if (miniAppHost === 'web' || !platformUserId) {
+        notify('Откройте Mini App внутри Telegram/VK/MAX и повторите.')
+        return
+      }
+
+      setIsAccountLinkSheetOpen(false)
+      setIsAccountLinkPending(true)
+      try {
+        const platformAuth = resolvePlatformAuthPayload(miniAppHost)
+        const response = await fetch(`${apiBase}/api/account/link/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            sourcePlatform: currentHostIdentityPlatform,
+            targetPlatform,
+            host: miniAppHost,
+            platformUserId,
+            platformAuth,
+          }),
+        })
+
+        if (!response.ok) {
+          const apiError = await parseApiError(response, 'link_start_failed')
+          const payload = apiError.payload as
+            | { error?: string; identities?: AccountIdentitiesResponse }
+            | null
+          if (payload && typeof payload === 'object' && 'identities' in payload) {
+            applyAccountIdentities(payload.identities ?? null)
+          }
+          const errorCode =
+            payload && typeof payload === 'object' && 'error' in payload
+              ? payload.error
+              : apiError.code
+          if (errorCode === 'source_platform_not_linked') {
+            notify(resolveApiMessage(errorCode, 'Платформа не подтвердила ваш ID в этой сессии.'))
+            return
+          }
+          if (errorCode === 'platform_auth_invalid' || errorCode === 'auth_required') {
+            notify(resolveApiMessage(errorCode, 'Сессия платформы не подтверждена.'))
+            return
+          }
+          if (errorCode === 'host_invalid') {
+            notify(resolveApiMessage(errorCode, 'Запуск вне Mini App-контекста.'))
+            return
+          }
+          if (errorCode === 'session_user_invalid') {
+            notify(resolveApiMessage(errorCode, 'Сессия аккаунта не определена.'))
+            return
+          }
+          if (errorCode === 'tg_url_missing' || errorCode === 'vk_url_missing' || errorCode === 'max_url_missing') {
+            notify(resolveApiMessage(errorCode, 'Не настроен URL Mini App целевой платформы.'))
+            return
+          }
+          const statusLabel = apiError.status > 0 ? `HTTP ${apiError.status}` : 'network'
+          if (apiError.status >= 500 || apiError.code.startsWith('http_')) {
+            notify(`Проблема API (${statusLabel}, code: ${apiError.code}). ${apiError.message}`)
+            return
+          }
+          notify(
+            `Не удалось начать привязку аккаунта (${errorCode ?? apiError.code}). ${apiError.message}`
+          )
+          return
+        }
+
+        const payload = (await response.json().catch(() => null)) as
+          | AccountLinkStartResponse
           | { error?: string; identities?: AccountIdentitiesResponse }
           | null
+
         if (payload && typeof payload === 'object' && 'identities' in payload) {
           applyAccountIdentities(payload.identities ?? null)
         }
-        const errorCode =
-          payload && typeof payload === 'object' && 'error' in payload
-            ? payload.error
-            : apiError.code
-        if (errorCode === 'source_platform_not_linked') {
-          notify(resolveApiMessage(errorCode, 'Платформа не подтвердила ваш ID в этой сессии.'))
+
+        const alreadyLinked = Boolean(
+          payload &&
+            typeof payload === 'object' &&
+            'alreadyLinked' in payload &&
+            payload.alreadyLinked
+        )
+        if (alreadyLinked) {
+          if (source === 'start' && isRoleSelectedOnce) {
+            navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
+            return
+          }
+          notify('Аккаунт уже привязан.')
           return
         }
-        if (errorCode === 'platform_auth_invalid' || errorCode === 'auth_required') {
-          notify(resolveApiMessage(errorCode, 'Сессия платформы не подтверждена.'))
-          return
+
+        const targetUrl =
+          payload && typeof payload === 'object' && 'targetUrl' in payload
+            ? payload.targetUrl?.trim() ?? ''
+            : ''
+        if (!targetUrl) {
+          throw new Error('link_target_missing')
         }
-        if (errorCode === 'host_invalid') {
-          notify(resolveApiMessage(errorCode, 'Запуск вне Mini App-контекста.'))
-          return
+
+        const webApp = window.Telegram?.WebApp
+        if (webApp?.openLink) {
+          webApp.openLink(targetUrl)
+        } else {
+          window.open(targetUrl, '_blank', 'noopener,noreferrer')
         }
-        if (errorCode === 'session_user_invalid') {
-          notify(resolveApiMessage(errorCode, 'Сессия аккаунта не определена.'))
-          return
-        }
-        if (errorCode === 'tg_url_missing') {
-          notify('Не задан VITE_TG_APP_URL.')
-          return
-        }
-        if (errorCode === 'vk_url_missing') {
-          notify('Не задан VITE_VK_APP_URL.')
-          return
-        }
-        const statusLabel = apiError.status > 0 ? `HTTP ${apiError.status}` : 'network'
-        if (apiError.status >= 500 || apiError.code.startsWith('http_')) {
-          notify(`Проблема API (${statusLabel}, code: ${apiError.code}). ${apiError.message}`)
-          return
-        }
-        notify(`Не удалось начать привязку аккаунта (${errorCode ?? apiError.code}). ${apiError.message}`)
+      } catch (_error) {
+        notify('Не удалось начать привязку аккаунта. Попробуйте еще раз.')
+      } finally {
+        setIsAccountLinkPending(false)
+      }
+    },
+    [
+      apiBase,
+      applyAccountIdentities,
+      availableAccountLinkTargets,
+      currentHostIdentityPlatform,
+      hasAllAccountLinks,
+      isAccountLinkPending,
+      isRoleSelectedOnce,
+      isRoleSelectionPending,
+      miniAppHost,
+      navigate,
+      platformAppUrlMap,
+      role,
+      userId,
+    ]
+  )
+
+  const handleStartAccountLink = useCallback(
+    (source: AccountLinkSource = 'settings') => {
+      if (!userId) {
+        notify('Не удалось определить пользователя. Перезапустите приложение.')
         return
       }
-
-      const payload = (await response.json().catch(() => null)) as
-        | AccountLinkStartResponse
-        | { error?: string; identities?: AccountIdentitiesResponse }
-        | null
-
-      if (payload && typeof payload === 'object' && 'identities' in payload) {
-        applyAccountIdentities(payload.identities ?? null)
+      if (isAccountLinkPending || isRoleSelectionPending) {
+        return
       }
-
-      const alreadyLinked =
-        Boolean(payload && typeof payload === 'object' && 'alreadyLinked' in payload && payload.alreadyLinked)
-      if (alreadyLinked) {
+      if (hasAllAccountLinks) {
         if (source === 'start' && isRoleSelectedOnce) {
           navigate(role === 'pro' ? 'pro-cabinet' : 'client', { reset: true, replace: true })
           return
         }
-        notify('Аккаунт уже привязан.')
+        notify('Все платформы уже привязаны.')
         return
       }
-
-      const targetUrl =
-        payload && typeof payload === 'object' && 'targetUrl' in payload
-          ? payload.targetUrl?.trim() ?? ''
-          : ''
-      if (!targetUrl) {
-        throw new Error('link_target_missing')
+      if (accountLinkEnvMissing) {
+        notify(accountLinkMissingHint || 'Не настроены URL Mini App для привязки.')
+        return
       }
-
-      const webApp = window.Telegram?.WebApp
-      if (webApp?.openLink) {
-        webApp.openLink(targetUrl)
-      } else {
-        window.open(targetUrl, '_blank', 'noopener,noreferrer')
+      if (availableAccountLinkTargets.length > 1) {
+        setAccountLinkIntentSource(source)
+        setIsAccountLinkSheetOpen(true)
+        return
       }
-    } catch (error) {
-      notify('Не удалось начать привязку аккаунта. Попробуйте еще раз.')
-    } finally {
-      setIsAccountLinkPending(false)
-    }
-  }, [
-    accountLinkEnvMissing,
-    accountLinkTargetPlatform,
-    apiBase,
-    applyAccountIdentities,
-    isAccountAlreadyLinked,
-    isAccountLinkPending,
-    isRoleSelectedOnce,
-    isRoleSelectionPending,
-    miniAppHost,
-    navigate,
-    role,
-    userId,
-  ])
+      const targetPlatform = availableAccountLinkTargets[0]
+      if (!targetPlatform) {
+        notify('Нет доступной платформы для привязки.')
+        return
+      }
+      void startAccountLinkForTarget(targetPlatform, source)
+    },
+    [
+      accountLinkEnvMissing,
+      accountLinkMissingHint,
+      availableAccountLinkTargets,
+      hasAllAccountLinks,
+      isAccountLinkPending,
+      isRoleSelectedOnce,
+      isRoleSelectionPending,
+      navigate,
+      role,
+      startAccountLinkForTarget,
+      userId,
+    ]
+  )
+
+  const handleAccountLinkTargetSelect = useCallback(
+    (targetPlatform: IdentityPlatform) => {
+      void startAccountLinkForTarget(targetPlatform, accountLinkIntentSource)
+    },
+    [accountLinkIntentSource, startAccountLinkForTarget]
+  )
 
   const openChatList = useCallback(() => {
     setSelectedChatId(null)
@@ -2735,6 +2964,52 @@ function App() {
                 ))}
               </div>
             ) : null}
+            {isAccountLinkSheetOpen ? (
+              <div
+                className="account-link-sheet-overlay"
+                role="presentation"
+                onClick={() => setIsAccountLinkSheetOpen(false)}
+              >
+                <div
+                  className="account-link-sheet"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="account-link-sheet-title"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <span className="account-link-sheet-handle" aria-hidden="true" />
+                  <p className="account-link-sheet-kicker">Единый аккаунт</p>
+                  <h3 className="account-link-sheet-title" id="account-link-sheet-title">
+                    Куда привязать профиль?
+                  </h3>
+                  <p className="account-link-sheet-subtitle">
+                    Откроем Mini App выбранной платформы и передадим код привязки.
+                  </p>
+                  <div className="account-link-sheet-actions">
+                    {availableAccountLinkTargets.map((platform) => (
+                      <button
+                        key={platform}
+                        className="account-link-sheet-action"
+                        type="button"
+                        onClick={() => handleAccountLinkTargetSelect(platform)}
+                        disabled={isAccountLinkPending}
+                      >
+                        <span>{resolvePlatformLabel(platform)}</span>
+                        <span className="account-link-sheet-action-tail">Открыть</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="account-link-sheet-cancel"
+                    type="button"
+                    onClick={() => setIsAccountLinkSheetOpen(false)}
+                    disabled={isAccountLinkPending}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </>
         </ScreenPerfMarker>
       </Suspense>
@@ -2778,8 +3053,7 @@ function App() {
   }
 
   if (linkReturnFallback) {
-    const sourceLabel =
-      linkReturnFallback.sourcePlatform === 'telegram' ? 'Telegram Mini App' : 'ВКонтакте Mini App'
+    const sourceLabel = `${resolvePlatformLabel(linkReturnFallback.sourcePlatform)} Mini App`
     return renderScreen(
       'start',
       <div className="screen screen--start">

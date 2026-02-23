@@ -24,6 +24,14 @@ type VkLaunchParamsPayload = {
   vk_platform?: string | null
 }
 
+type MaxLaunchParamsPayload = {
+  WebAppData?: string | null
+  WebAppVersion?: string | null
+  WebAppPlatform?: string | null
+  startapp?: string | null
+  start?: string | null
+}
+
 const toInsets = (value?: Partial<Insets> | null): TelegramInsets => ({
   top: Number.isFinite(Number(value?.top)) ? Number(value?.top) : 0,
   right: Number.isFinite(Number(value?.right)) ? Number(value?.right) : 0,
@@ -116,6 +124,91 @@ const collectVkLaunchParams = () => {
   search.forEach((value, key) => includeEntry(key, value))
   hash.forEach((value, key) => includeEntry(key, value))
   return Object.fromEntries(params.entries())
+}
+
+const collectMaxLaunchParams = () => {
+  const search = new URLSearchParams(window.location.search)
+  const hash = getHashParams()
+  const params = new Map<string, string>()
+  const includeEntry = (key: string, rawValue: string) => {
+    const normalizedKey = key.trim()
+    const normalizedValue = rawValue.trim()
+    if (!normalizedKey || !normalizedValue) return
+    const lowerKey = normalizedKey.toLowerCase()
+    if (
+      lowerKey === 'webappdata' ||
+      lowerKey === 'webappversion' ||
+      lowerKey === 'webappplatform' ||
+      lowerKey === 'startapp' ||
+      lowerKey === 'start' ||
+      lowerKey.startsWith('max_')
+    ) {
+      const canonicalKey =
+        lowerKey === 'webappdata'
+          ? 'WebAppData'
+          : lowerKey === 'webappversion'
+            ? 'WebAppVersion'
+            : lowerKey === 'webappplatform'
+              ? 'WebAppPlatform'
+              : normalizedKey
+      params.set(canonicalKey, normalizedValue)
+    }
+  }
+  search.forEach((value, key) => includeEntry(key, value))
+  hash.forEach((value, key) => includeEntry(key, value))
+  return Object.fromEntries(params.entries())
+}
+
+const decodeInitDataString = (value: string) => {
+  const normalized = value.trim()
+  if (!normalized) return ''
+  if (normalized.includes('=') && normalized.includes('&')) {
+    return normalized
+  }
+  try {
+    const decoded = decodeURIComponent(normalized)
+    return decoded.trim()
+  } catch (_error) {
+    return normalized
+  }
+}
+
+const parseMaxInitDataUser = (initData: string) => {
+  const normalized = decodeInitDataString(initData)
+  if (!normalized) return undefined
+  const params = new URLSearchParams(normalized)
+  const userRaw = params.get('user')?.trim()
+  if (!userRaw) return undefined
+  try {
+    const parsed = JSON.parse(userRaw) as {
+      id?: number | string
+      first_name?: string
+      last_name?: string
+      username?: string
+      language_code?: string
+      photo_url?: string
+    }
+    const id = Number(parsed?.id)
+    if (!Number.isFinite(id) || id <= 0) return undefined
+    return {
+      id,
+      first_name: parsed.first_name,
+      last_name: parsed.last_name,
+      username: parsed.username,
+      language_code: parsed.language_code,
+      photo_url: parsed.photo_url,
+    }
+  } catch (_error) {
+    return undefined
+  }
+}
+
+const resolveMaxInitData = () => {
+  const webApp = window.WebApp
+  const launchParams = collectMaxLaunchParams() as MaxLaunchParamsPayload
+  const initData =
+    (webApp?.initData ?? webApp?.InitData ?? launchParams.WebAppData ?? '').trim()
+  return decodeInitDataString(initData)
 }
 
 const parseVkUserId = (value: string) => {
@@ -364,14 +457,142 @@ const setupVkShim = async () => {
   }
 }
 
+const setupMaxShim = async () => {
+  window.__maxBridgeCleanup?.()
+  window.__maxLaunchParams = collectMaxLaunchParams()
+
+  const launchParams = window.__maxLaunchParams as MaxLaunchParamsPayload
+  const initData = resolveMaxInitData()
+  const decodedParams = new URLSearchParams(initData)
+  const telegramUser = parseMaxInitDataUser(initData)
+  const startParam =
+    decodedParams.get('start_param')?.trim() ||
+    launchParams.startapp?.trim() ||
+    launchParams.start?.trim() ||
+    readParam('startapp').trim() ||
+    readParam('start').trim() ||
+    undefined
+  const safeAreaInset = {
+    top: readInsetOverride('maxTopInset', 0, 96) ?? 0,
+    right: readInsetOverride('maxRightInset', 0, 32) ?? 0,
+    bottom: readInsetOverride('maxBottomInset', 0, 96) ?? 0,
+    left: readInsetOverride('maxLeftInset', 0, 32) ?? 0,
+  }
+  const contentSafeAreaInset = {
+    top: readInsetOverride('maxContentTopInset', 0, 96) ?? safeAreaInset.top,
+    right:
+      readInsetOverride('maxContentRightInset', 0, 32) ?? safeAreaInset.right,
+    bottom:
+      readInsetOverride('maxContentBottomInset', 0, 96) ?? safeAreaInset.bottom,
+    left: readInsetOverride('maxContentLeftInset', 0, 32) ?? safeAreaInset.left,
+  }
+  applySafeAreaVars(safeAreaInset, contentSafeAreaInset)
+
+  const listeners = new Map<string, Set<EventCallback>>()
+  const emit = (eventType: string) => {
+    const callbacks = listeners.get(eventType)
+    if (!callbacks) return
+    callbacks.forEach((callback) => {
+      try {
+        callback()
+      } catch (error) {
+        console.error('MiniApp MAX shim callback failed:', error)
+      }
+    })
+  }
+
+  const openExternal = (url: string) => {
+    if (window.WebApp?.openLink) {
+      window.WebApp.openLink(url)
+      return
+    }
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const webApp: TelegramWebApp = {
+    ready: () => {},
+    expand: () => {},
+    close: () => {
+      window.WebApp?.close?.()
+    },
+    requestFullscreen: () => {},
+    disableVerticalSwipes: () => {},
+    openLink: (url) => {
+      openExternal(url)
+    },
+    openTelegramLink: (url) => {
+      openExternal(url)
+    },
+    platform:
+      launchParams.WebAppPlatform?.trim() ||
+      window.WebApp?.platform ||
+      'max',
+    colorScheme: 'light',
+    isExpanded: true,
+    isFullscreen: true,
+    initData,
+    initDataUnsafe: {
+      ...(telegramUser ? { user: telegramUser } : {}),
+      ...(startParam ? { start_param: startParam } : {}),
+    },
+    safeAreaInset,
+    contentSafeAreaInset,
+    HapticFeedback: {
+      impactOccurred: (style) => {
+        window.WebApp?.haptics?.impactOccurred?.(style)
+      },
+      notificationOccurred: (style) => {
+        window.WebApp?.haptics?.notificationOccurred?.(style)
+      },
+      selectionChanged: () => {
+        window.WebApp?.haptics?.selectionChanged?.()
+      },
+    },
+    onEvent: (eventType, callback) => {
+      const bucket = listeners.get(eventType)
+      if (bucket) {
+        bucket.add(callback)
+      } else {
+        listeners.set(eventType, new Set([callback]))
+      }
+    },
+    offEvent: (eventType, callback) => {
+      const bucket = listeners.get(eventType)
+      if (!bucket) return
+      bucket.delete(callback)
+      if (bucket.size === 0) {
+        listeners.delete(eventType)
+      }
+    },
+  }
+
+  const handleResize = () => {
+    emit('viewportChanged')
+  }
+  window.addEventListener('resize', handleResize)
+
+  window.__maxBridgeCleanup = () => {
+    window.removeEventListener('resize', handleResize)
+  }
+
+  window.Telegram = {
+    ...(window.Telegram ?? {}),
+    WebApp: webApp,
+  }
+}
+
 export const setupMiniAppBridge = async () => {
   const host = detectMiniAppHost()
   setMiniAppHost(host)
 
-  if (host !== 'vk') return
-  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) return
-
-  await setupVkShim()
+  if (host === 'vk') {
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) return
+    await setupVkShim()
+    return
+  }
+  if (host === 'max') {
+    await setupMaxShim()
+  }
 }
 
 export const getVkLaunchParamsForAuth = () => {
@@ -382,4 +603,9 @@ export const getVkLaunchParamsForAuth = () => {
   const collected = collectVkLaunchParams()
   window.__vkLaunchParams = collected
   return { ...collected }
+}
+
+export const getMaxInitDataForAuth = () => {
+  if (typeof window === 'undefined') return ''
+  return resolveMaxInitData()
 }

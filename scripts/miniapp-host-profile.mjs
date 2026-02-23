@@ -1,4 +1,4 @@
-const SUPPORTED_HOSTS = new Set(['telegram', 'vk'])
+const SUPPORTED_HOSTS = new Set(['telegram', 'vk', 'max'])
 
 const ensureParam = (searchParams, key, value) => {
   if (!searchParams.has(key) || !searchParams.get(key)) {
@@ -19,7 +19,7 @@ export const normalizeHost = (value, fallback = 'telegram') => {
   return fallback
 }
 
-export const parseHostsCsv = (value, fallback = ['telegram', 'vk']) => {
+export const parseHostsCsv = (value, fallback = ['telegram', 'vk', 'max']) => {
   const chunks = String(value ?? '')
     .split(',')
     .map((item) => normalizeHost(item, ''))
@@ -65,6 +65,32 @@ export const applyHostProfileDefaults = ({
     }
     if (normalizedHeight !== null) {
       ensureParam(searchParams, 'vkHeight', String(normalizedHeight))
+    }
+    return parsed.toString()
+  }
+
+  if (targetHost === 'max') {
+    ensureParam(searchParams, 'tgEmu', '0')
+    ensureParam(searchParams, 'vkEmu', '0')
+    ensureParam(searchParams, 'maxEmu', '1')
+    ensureParam(searchParams, 'maxUserId', normalizedUserId)
+    ensureParam(searchParams, 'maxPlatform', 'ios')
+    ensureParam(searchParams, 'WebAppPlatform', 'mobile_ios')
+    ensureParam(searchParams, 'WebAppVersion', '1.0')
+    ensureParam(searchParams, 'maxFixedTime', '09:41')
+    ensureParam(searchParams, 'maxTopInset', '47')
+    ensureParam(searchParams, 'maxBottomInset', '34')
+    ensureParam(searchParams, 'maxLeftInset', '0')
+    ensureParam(searchParams, 'maxRightInset', '0')
+    ensureParam(searchParams, 'maxContentTopInset', '47')
+    ensureParam(searchParams, 'maxContentBottomInset', '34')
+    ensureParam(searchParams, 'maxContentLeftInset', '0')
+    ensureParam(searchParams, 'maxContentRightInset', '0')
+    if (normalizedWidth !== null) {
+      ensureParam(searchParams, 'maxWidth', String(normalizedWidth))
+    }
+    if (normalizedHeight !== null) {
+      ensureParam(searchParams, 'maxHeight', String(normalizedHeight))
     }
     return parsed.toString()
   }

@@ -153,8 +153,12 @@ const VK_APP_SECRET = normalizeText(process.env.VK_APP_SECRET)
 const VK_APP_URL = normalizeText(
   process.env.VITE_VK_APP_URL ?? process.env.VK_APP_URL ?? 'https://vk.com/app54453024'
 )
-const identityPlatforms = new Set(['telegram', 'vk'])
-const linkableHosts = new Set(['telegram', 'vk', 'web'])
+const MAX_APP_URL = normalizeText(process.env.VITE_MAX_APP_URL ?? process.env.MAX_APP_URL)
+const resolveMaxBotToken = () => normalizeText(process.env.MAX_BOT_TOKEN)
+const isMaxSoftAuthEnabled = () => parseEnvBoolean(process.env.MAX_SOFT_AUTH_ENABLED, false)
+const identityPlatformOrder = ['telegram', 'vk', 'max']
+const identityPlatforms = new Set(identityPlatformOrder)
+const linkableHosts = new Set(['telegram', 'vk', 'max', 'web'])
 const SUPPORT_CONTEXT_ID = 1
 const SUPPORT_WELCOME_MESSAGE =
   'Здравствуйте! Это поддержка KIVEN. Опишите ситуацию, добавьте номер заявки/записи (если есть) и приложите фото или скриншот.'
@@ -332,17 +336,27 @@ const resolveIdentityPlatformByHost = (host) => {
   if (!linkableHosts.has(normalized)) return null
   if (normalized === 'vk') return 'vk'
   if (normalized === 'telegram') return 'telegram'
+  if (normalized === 'max') return 'max'
   return null
 }
 
 const normalizeExternalUserId = (value) => normalizeText(String(value ?? ''))
 
 const buildLegacyUserId = (platform, externalUserId) =>
-  platform === 'vk' ? `vk_${externalUserId}` : externalUserId
+  platform === 'vk'
+    ? `vk_${externalUserId}`
+    : platform === 'max'
+      ? `max_${externalUserId}`
+      : externalUserId
 
 const parseLegacyIdentity = (userId) => {
   const normalized = normalizeText(userId)
   if (!normalized) return null
+  if (normalized.startsWith('max_')) {
+    const externalUserId = normalizeText(normalized.slice(4))
+    if (!externalUserId) return null
+    return { platform: 'max', externalUserId }
+  }
   if (normalized.startsWith('vk_')) {
     const externalUserId = normalizeText(normalized.slice(3))
     if (!externalUserId) return null
@@ -546,11 +560,41 @@ const normalizePlatformAuthPayload = (value) => {
       sign,
     }
   }
+  if (rawType === 'max') {
+    const initData = normalizeText(value.initData)
+    return {
+      type: 'max',
+      initData,
+    }
+  }
   return null
 }
 
+const normalizeInitDataString = (value) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return ''
+  if (normalized.includes('=') || normalized.includes('&')) {
+    return normalized
+  }
+  try {
+    return decodeURIComponent(normalized)
+  } catch (_error) {
+    return normalized
+  }
+}
+
+const buildInitDataCheckString = (params) => {
+  const sorted = []
+  params.forEach((value, key) => {
+    if (key === 'hash') return
+    sorted.push(`${key}=${value}`)
+  })
+  sorted.sort()
+  return sorted.join('\n')
+}
+
 const verifyTelegramInitData = (initData) => {
-  const normalizedInitData = normalizeText(initData)
+  const normalizedInitData = normalizeInitDataString(initData)
   if (!normalizedInitData) return { ok: false, reason: 'telegram_init_data_missing' }
   if (!telegramBotToken) return { ok: false, reason: 'telegram_bot_token_missing' }
   const params = new URLSearchParams(normalizedInitData)
@@ -563,18 +607,39 @@ const verifyTelegramInitData = (initData) => {
       return { ok: false, reason: 'telegram_auth_date_expired' }
     }
   }
-  const sorted = []
-  params.forEach((value, key) => {
-    if (key === 'hash') return
-    sorted.push(`${key}=${value}`)
-  })
-  sorted.sort()
-  const dataCheckString = sorted.join('\n')
+  const dataCheckString = buildInitDataCheckString(params)
   const secret = createHmac('sha256', 'WebAppData').update(telegramBotToken).digest()
   const expectedHash = createHmac('sha256', secret).update(dataCheckString).digest('hex')
   return timingSafeEqualHex(expectedHash, hash)
     ? { ok: true, reason: 'verified' }
     : { ok: false, reason: 'telegram_hash_mismatch' }
+}
+
+const verifyMaxInitData = (initData) => {
+  const normalizedInitData = normalizeInitDataString(initData)
+  if (!normalizedInitData) return { ok: false, reason: 'max_init_data_missing' }
+  const maxBotToken = resolveMaxBotToken()
+  if (!maxBotToken) return { ok: false, reason: 'max_bot_token_missing' }
+
+  const params = new URLSearchParams(normalizedInitData)
+  const hash = normalizeText(params.get('hash'))
+  if (!hash) return { ok: false, reason: 'max_hash_missing' }
+
+  const authDate = Number.parseInt(normalizeText(params.get('auth_date')), 10)
+  if (Number.isFinite(authDate) && authDate > 0) {
+    const ageSeconds = Math.floor(Date.now() / 1000) - authDate
+    if (ageSeconds > 86_400) {
+      return { ok: false, reason: 'max_auth_date_expired' }
+    }
+  }
+
+  const dataCheckString = buildInitDataCheckString(params)
+  const secret = createHash('sha256').update(maxBotToken).digest()
+  const expectedHash = createHmac('sha256', secret).update(dataCheckString).digest('hex')
+
+  return timingSafeEqualHex(expectedHash, hash)
+    ? { ok: true, reason: 'verified' }
+    : { ok: false, reason: 'max_hash_mismatch' }
 }
 
 const toBase64Url = (value) =>
@@ -604,25 +669,67 @@ const verifyPlatformAuth = ({ host, platformAuth }) => {
   const normalizedHost = normalizeText(host).toLowerCase()
   if (normalizedHost === 'web') {
     return ALLOW_LOCAL_DEV_SESSION
-      ? { ok: true, reason: 'web_local_dev_allowed', platform: 'web' }
-      : { ok: false, reason: 'host_invalid', platform: null }
+      ? { ok: true, reason: 'web_local_dev_allowed', platform: 'web', authUnverified: false }
+      : { ok: false, reason: 'host_invalid', platform: null, authUnverified: false }
   }
   const resolvedPlatform = resolveIdentityPlatformByHost(host)
-  if (!resolvedPlatform) return { ok: false, reason: 'host_invalid', platform: null }
+  if (!resolvedPlatform) {
+    return { ok: false, reason: 'host_invalid', platform: null, authUnverified: false }
+  }
   const normalizedAuth = normalizePlatformAuthPayload(platformAuth)
-  if (!normalizedAuth) return { ok: false, reason: 'platform_auth_missing', platform: resolvedPlatform }
+  if (!normalizedAuth) {
+    if (resolvedPlatform === 'max' && isMaxSoftAuthEnabled()) {
+      logAuthDebug('max-soft-auth-enabled', {
+        host: normalizedHost || 'unknown',
+        reason: 'platform_auth_missing',
+      })
+      return {
+        ok: true,
+        reason: 'max_soft_auth_platform_auth_missing',
+        platform: resolvedPlatform,
+        authUnverified: true,
+      }
+    }
+    return {
+      ok: false,
+      reason: 'platform_auth_missing',
+      platform: resolvedPlatform,
+      authUnverified: false,
+    }
+  }
   if (normalizedAuth.type !== resolvedPlatform) {
-    return { ok: false, reason: 'platform_auth_type_mismatch', platform: resolvedPlatform }
+    return {
+      ok: false,
+      reason: 'platform_auth_type_mismatch',
+      platform: resolvedPlatform,
+      authUnverified: false,
+    }
   }
   if (normalizedAuth.type === 'telegram') {
     const verified = verifyTelegramInitData(normalizedAuth.initData)
-    return { ...verified, platform: resolvedPlatform }
+    return { ...verified, platform: resolvedPlatform, authUnverified: false }
+  }
+  if (normalizedAuth.type === 'max') {
+    const verified = verifyMaxInitData(normalizedAuth.initData)
+    if (!verified.ok && isMaxSoftAuthEnabled()) {
+      logAuthDebug('max-soft-auth-enabled', {
+        host: normalizedHost || 'unknown',
+        reason: verified.reason,
+      })
+      return {
+        ok: true,
+        reason: `max_soft_auth_${verified.reason}`,
+        platform: resolvedPlatform,
+        authUnverified: true,
+      }
+    }
+    return { ...verified, platform: resolvedPlatform, authUnverified: false }
   }
   const verified = verifyVkLaunchParams({
     launchParams: normalizedAuth.launchParams,
     sign: normalizedAuth.sign,
   })
-  return { ...verified, platform: resolvedPlatform }
+  return { ...verified, platform: resolvedPlatform, authUnverified: false }
 }
 
 const normalizeStoryCaption = (value) => {
@@ -1998,8 +2105,10 @@ const loadAccountIdentities = async (db, userId) => {
   const identities = {
     telegramLinked: false,
     vkLinked: false,
+    maxLinked: false,
     telegramUserId: null,
     vkUserId: null,
+    maxUserId: null,
   }
   result.rows.forEach((row) => {
     if (row.platform === 'telegram') {
@@ -2009,6 +2118,10 @@ const loadAccountIdentities = async (db, userId) => {
     if (row.platform === 'vk') {
       identities.vkLinked = true
       identities.vkUserId = normalizeText(row.externalUserId) || null
+    }
+    if (row.platform === 'max') {
+      identities.maxLinked = true
+      identities.maxUserId = normalizeText(row.externalUserId) || null
     }
   })
   return identities
@@ -2210,8 +2323,10 @@ const bootstrapSession = async ({
       identities: {
         telegramLinked: false,
         vkLinked: false,
+        maxLinked: false,
         telegramUserId: null,
         vkUserId: null,
+        maxUserId: null,
       },
       isSupportAgent: false,
       sessionToken: session.sessionToken,
@@ -6049,7 +6164,7 @@ const ensureSchema = async () => {
     CREATE TABLE IF NOT EXISTS user_identities (
       id BIGSERIAL PRIMARY KEY,
       internal_user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-      platform TEXT NOT NULL CHECK (platform IN ('telegram', 'vk')),
+      platform TEXT NOT NULL CHECK (platform IN ('telegram', 'vk', 'max')),
       external_user_id TEXT NOT NULL,
       is_primary BOOLEAN NOT NULL DEFAULT FALSE,
       linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -6057,6 +6172,30 @@ const ensureSchema = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    DO $$
+    DECLARE
+      constraint_name TEXT;
+    BEGIN
+      FOR constraint_name IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        WHERE t.relname = 'user_identities'
+          AND c.contype = 'c'
+          AND pg_get_constraintdef(c.oid) ILIKE '%platform%'
+      LOOP
+        EXECUTE format('ALTER TABLE user_identities DROP CONSTRAINT %I', constraint_name);
+      END LOOP;
+    END$$;
+  `)
+
+  await pool.query(`
+    ALTER TABLE user_identities
+    ADD CONSTRAINT user_identities_platform_check
+    CHECK (platform IN ('telegram', 'vk', 'max'));
   `)
 
   await pool.query(`
@@ -6078,12 +6217,45 @@ const ensureSchema = async () => {
     CREATE TABLE IF NOT EXISTS account_link_challenges (
       token TEXT PRIMARY KEY,
       source_internal_user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-      source_platform TEXT NOT NULL CHECK (source_platform IN ('telegram', 'vk')),
-      target_platform TEXT NOT NULL CHECK (target_platform IN ('telegram', 'vk')),
+      source_platform TEXT NOT NULL CHECK (source_platform IN ('telegram', 'vk', 'max')),
+      target_platform TEXT NOT NULL CHECK (target_platform IN ('telegram', 'vk', 'max')),
       expires_at TIMESTAMPTZ NOT NULL,
       used_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `)
+
+  await pool.query(`
+    DO $$
+    DECLARE
+      constraint_name TEXT;
+    BEGIN
+      FOR constraint_name IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        WHERE t.relname = 'account_link_challenges'
+          AND c.contype = 'c'
+          AND (
+            pg_get_constraintdef(c.oid) ILIKE '%source_platform%'
+            OR pg_get_constraintdef(c.oid) ILIKE '%target_platform%'
+          )
+      LOOP
+        EXECUTE format('ALTER TABLE account_link_challenges DROP CONSTRAINT %I', constraint_name);
+      END LOOP;
+    END$$;
+  `)
+
+  await pool.query(`
+    ALTER TABLE account_link_challenges
+    ADD CONSTRAINT account_link_challenges_source_platform_check
+    CHECK (source_platform IN ('telegram', 'vk', 'max'));
+  `)
+
+  await pool.query(`
+    ALTER TABLE account_link_challenges
+    ADD CONSTRAINT account_link_challenges_target_platform_check
+    CHECK (target_platform IN ('telegram', 'vk', 'max'));
   `)
 
   await pool.query(`
@@ -6150,8 +6322,16 @@ const ensureSchema = async () => {
     )
     SELECT
       u.user_id,
-      CASE WHEN u.user_id LIKE 'vk_%' THEN 'vk' ELSE 'telegram' END,
-      CASE WHEN u.user_id LIKE 'vk_%' THEN SUBSTRING(u.user_id FROM 4) ELSE u.user_id END,
+      CASE
+        WHEN u.user_id LIKE 'vk_%' THEN 'vk'
+        WHEN u.user_id LIKE 'max_%' THEN 'max'
+        ELSE 'telegram'
+      END,
+      CASE
+        WHEN u.user_id LIKE 'vk_%' THEN SUBSTRING(u.user_id FROM 4)
+        WHEN u.user_id LIKE 'max_%' THEN SUBSTRING(u.user_id FROM 5)
+        ELSE u.user_id
+      END,
       TRUE,
       COALESCE(u.created_at, NOW()),
       COALESCE(u.updated_at, NOW()),
@@ -7345,7 +7525,7 @@ app.post('/api/session/bootstrap', async (req, res) => {
       reason: authVerification.reason,
       strict: AUTH_STRICT,
     })
-    if (AUTH_STRICT) {
+    if (AUTH_STRICT || authVerification.platform === 'max') {
       res.status(401).json({ error: 'platform_auth_invalid' })
       return
     }
@@ -7362,7 +7542,10 @@ app.post('/api/session/bootstrap', async (req, res) => {
       photoUrl,
       authPlatform: authVerification.platform,
     })
-    res.json(payload)
+    res.json({
+      ...payload,
+      ...(authVerification.authUnverified ? { authUnverified: true } : {}),
+    })
   } catch (error) {
     console.error('POST /api/session/bootstrap failed:', error)
     const message = error instanceof Error ? error.message : ''
@@ -7425,7 +7608,7 @@ app.post('/api/account/link/start', async (req, res) => {
   }
 
   const authVerification = verifyPlatformAuth({ host, platformAuth })
-  if (AUTH_STRICT && !authVerification.ok) {
+  if (!authVerification.ok && (AUTH_STRICT || authVerification.platform === 'max')) {
     logAuthDebug('link-start-platform-auth-invalid', {
       host: normalizeText(host).toLowerCase() || 'unknown',
       reason: authVerification.reason,
@@ -7457,10 +7640,13 @@ app.post('/api/account/link/start', async (req, res) => {
   try {
     await ensureUser(normalizedUserId)
     const identities = await loadAccountIdentities(pool, normalizedUserId)
-    const alreadyLinked =
-      normalizedTargetPlatform === 'telegram'
-        ? identities.telegramLinked
-        : identities.vkLinked
+    const isPlatformLinked = (platform) => {
+      if (platform === 'telegram') return identities.telegramLinked
+      if (platform === 'vk') return identities.vkLinked
+      if (platform === 'max') return identities.maxLinked
+      return false
+    }
+    const alreadyLinked = isPlatformLinked(normalizedTargetPlatform)
     if (alreadyLinked) {
       res.json({
         ok: true,
@@ -7473,35 +7659,30 @@ app.post('/api/account/link/start', async (req, res) => {
       return
     }
 
-    const oppositePlatform =
-      normalizedTargetPlatform === 'telegram' ? 'vk' : 'telegram'
-    const isPlatformLinked = (platform) =>
-      platform === 'telegram' ? identities.telegramLinked : identities.vkLinked
-    let source = normalizedSourcePlatform
+    const sourceCandidates = [
+      normalizedSourcePlatform,
+      authVerification.platform,
+      ...identityPlatformOrder,
+    ].filter((platform, index, list) =>
+      normalizeIdentityPlatform(platform) && list.indexOf(platform) === index
+    )
+    const source =
+      sourceCandidates.find(
+        (platform) =>
+          platform &&
+          platform !== normalizedTargetPlatform &&
+          isPlatformLinked(platform)
+      ) ?? null
 
-    if (
-      !source ||
-      source === normalizedTargetPlatform ||
-      !isPlatformLinked(source)
-    ) {
-      source = oppositePlatform
-    }
-
-    if (
-      (!source || source === normalizedTargetPlatform || !isPlatformLinked(source)) &&
-      identities.telegramLinked !== identities.vkLinked
-    ) {
-      source = identities.telegramLinked ? 'telegram' : 'vk'
-    }
-
-    const sourceLinked = source ? isPlatformLinked(source) : false
-    if (!sourceLinked || source === normalizedTargetPlatform) {
+    if (!source || source === normalizedTargetPlatform) {
       logAccountLinkDebug('link-start-source-missing', {
         requestedSourcePlatform: normalizedSourcePlatform,
+        authPlatform: authVerification.platform,
         targetPlatform: normalizedTargetPlatform,
         sourceResolved: source || null,
         telegramLinked: identities.telegramLinked,
         vkLinked: identities.vkLinked,
+        maxLinked: identities.maxLinked,
       })
       res.status(409).json({
         error: 'source_platform_not_linked',
@@ -7516,15 +7697,22 @@ app.post('/api/account/link/start', async (req, res) => {
     const targetUrl =
       normalizedTargetPlatform === 'telegram'
         ? buildLinkTargetUrl(telegramMiniAppUrl, 'startapp', startParam)
-        : buildLinkTargetUrl(VK_APP_URL, 'start', startParam)
+        : normalizedTargetPlatform === 'vk'
+          ? buildLinkTargetUrl(VK_APP_URL, 'start', startParam)
+          : buildLinkTargetUrl(MAX_APP_URL, 'startapp', startParam)
 
     if (!targetUrl) {
       logAccountLinkDebug('link-start-target-missing', {
         sourcePlatform: source,
         targetPlatform: normalizedTargetPlatform,
       })
+      const envErrorByTarget = {
+        telegram: 'tg_url_missing',
+        vk: 'vk_url_missing',
+        max: 'max_url_missing',
+      }
       res.status(400).json({
-        error: normalizedTargetPlatform === 'telegram' ? 'tg_url_missing' : 'vk_url_missing',
+        error: envErrorByTarget[normalizedTargetPlatform] ?? 'target_url_missing',
       })
       return
     }
@@ -7607,7 +7795,7 @@ app.post('/api/account/link/complete', async (req, res) => {
       strict: AUTH_STRICT,
       hasPlatformUserId: Boolean(externalUserId),
     })
-    if (AUTH_STRICT) {
+    if (AUTH_STRICT || authVerification.platform === 'max') {
       const statusCode = authVerification.reason === 'host_invalid' ? 400 : 401
       res.status(statusCode).json({
         error: authVerification.reason === 'host_invalid' ? 'host_invalid' : 'platform_auth_invalid',
@@ -7765,7 +7953,11 @@ app.post('/api/account/link/complete', async (req, res) => {
           ? buildLinkTargetUrl(VK_APP_URL, 'start', linkResultStartParam, {
               mirrorHash: false,
             })
-          : ''
+          : challenge.sourcePlatform === 'max'
+            ? buildLinkTargetUrl(MAX_APP_URL, 'startapp', linkResultStartParam, {
+                mirrorHash: false,
+              })
+            : ''
     if (sourceReturnUrl) {
       logAccountLinkDebug('link-complete-source-return-url-built', {
         sourcePlatform: challenge.sourcePlatform,
@@ -7833,6 +8025,8 @@ app.post('/api/account/link/complete', async (req, res) => {
       ok: true,
       merged,
       userId: activeUserId,
+      sourcePlatform: challenge.sourcePlatform,
+      targetPlatform: challenge.targetPlatform,
       roleState: {
         role,
         selectedOnce: Boolean(role && roleRow?.roleSelectedAt),
@@ -7841,6 +8035,7 @@ app.post('/api/account/link/complete', async (req, res) => {
       },
       identities,
       isSupportAgent,
+      ...(authVerification.authUnverified ? { authUnverified: true } : {}),
       ...(sourceReturnUrl ? { sourceReturnUrl } : {}),
       ...(refreshedSessionToken
         ? {

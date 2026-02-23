@@ -1,0 +1,122 @@
+body.max-emulator-mode {
+  min-height: 100dvh;
+}
+
+body.max-emulator-mode #root {
+  --max-emulator-top-offset: calc(
+    var(--max-emulator-status-height, 20px) + var(--max-emulator-topbar-height, 44px)
+  );
+  width: min(var(--max-emulator-width, 393px), 100vw);
+  min-height: calc(100dvh - var(--max-emulator-top-offset));
+  margin: var(--max-emulator-top-offset) auto 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.max-emulator-overlay {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(var(--max-emulator-width, 393px), 100vw);
+  pointer-events: none;
+  z-index: 2000;
+  color: #ffffff;
+}
+
+.max-emulator-status {
+  height: var(--max-emulator-status-height, 20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: linear-gradient(180deg, #0a60ec 0%, #0359e5 100%);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.max-emulator-status-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.max-emulator-status-cell,
+.max-emulator-status-wifi {
+  display: inline-block;
+  width: 10px;
+  height: 8px;
+  border: 1.4px solid currentColor;
+  border-radius: 1.5px;
+}
+
+.max-emulator-status-wifi {
+  width: 10px;
+  height: 8px;
+  border-radius: 100% 100% 0 0;
+  border-bottom: none;
+}
+
+.max-emulator-status-battery {
+  width: 18px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  position: relative;
+}
+
+.max-emulator-status-battery::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 2px;
+  width: 2px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.max-emulator-status-battery > span {
+  display: block;
+  width: 11px;
+  height: 4px;
+  margin: 1px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.max-emulator-topbar {
+  height: var(--max-emulator-topbar-height, 44px);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #0a60ec 0%, #0359e5 100%);
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.max-emulator-title,
+.max-emulator-subtitle {
+  margin: 0;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.max-emulator-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.max-emulator-subtitle {
+  font-size: 10px;
+  opacity: 0.86;
+}
+
+@media (max-width: 430px) {
+  body.max-emulator-mode #root {
+    width: 100vw;
+  }
+
+  .max-emulator-overlay {
+    width: 100vw;
+  }
+}

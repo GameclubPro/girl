@@ -1,8 +1,8 @@
-# Account Link Runbook (TG/VK)
+# Account Link Runbook (TG/VK/MAX)
 
 ## Быстрая проверка инварианта после `link/complete`
 
-Подставьте реальные значения `telegram_external_user_id` и `vk_external_user_id`.
+Подставьте реальные значения `telegram_external_user_id`, `vk_external_user_id`, `max_external_user_id`.
 
 ```sql
 WITH tg AS (
@@ -14,14 +14,22 @@ vk AS (
   SELECT internal_user_id
   FROM user_identities
   WHERE platform = 'vk' AND external_user_id = :vk_external_user_id
+),
+mx AS (
+  SELECT internal_user_id
+  FROM user_identities
+  WHERE platform = 'max' AND external_user_id = :max_external_user_id
 )
 SELECT
   (SELECT internal_user_id FROM tg) AS telegram_internal_user_id,
   (SELECT internal_user_id FROM vk) AS vk_internal_user_id,
+  (SELECT internal_user_id FROM mx) AS max_internal_user_id,
   (
     (SELECT internal_user_id FROM tg) IS NOT NULL
     AND (SELECT internal_user_id FROM vk) IS NOT NULL
+    AND (SELECT internal_user_id FROM mx) IS NOT NULL
     AND (SELECT internal_user_id FROM tg) = (SELECT internal_user_id FROM vk)
+    AND (SELECT internal_user_id FROM tg) = (SELECT internal_user_id FROM mx)
   ) AS invariant_ok;
 ```
 
@@ -82,8 +90,8 @@ LIMIT 50;
 8. `forbidden`
 9. `platform_auth_invalid`
 10. Прогнать smoke вручную:
-11. bootstrap (TG/VK),
-12. link/start + link/complete (TG->VK и VK->TG),
+11. bootstrap (TG/VK/MAX),
+12. link/start + link/complete (TG->VK, TG->MAX, VK->MAX, MAX->TG),
 13. WS чат с валидной сессией.
 14. При аномалиях временно вернуть `AUTH_LOG_ONLY=1`, `AUTH_STRICT=0` и зафиксировать причину в инциденте.
 
@@ -109,7 +117,7 @@ LIMIT 50;
 
 ## Что делать при fail в strict-auth тестах
 
-1. Проверить доступность БД и переменные (`DATABASE_URL`, `BOT_TOKEN`, `VK_APP_SECRET`).
+1. Проверить доступность БД и переменные (`DATABASE_URL`, `BOT_TOKEN`, `VK_APP_SECRET`, `MAX_BOT_TOKEN`).
 2. Переподнять тестовую БД: `npm run test:db:down && npm run test:db:up`.
 3. Повторно прогнать только integration suite.
 4. Если падают сценарии `forbidden`/`auth_required`:

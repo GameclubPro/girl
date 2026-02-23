@@ -22,9 +22,11 @@
 1. `npm run test:db:up`
 2. `npm run test:integration`
 3. TG -> VK link smoke на реальных Mini App хостах.
-4. VK -> TG link smoke на реальных Mini App хостах.
-5. SQL-инвариант для `user_identities` (одинаковый `internal_user_id` у TG/VK пары).
-6. `npm run test:db:down`
+4. TG -> MAX link smoke на реальных Mini App хостах.
+5. VK -> MAX link smoke на реальных Mini App хостах.
+6. MAX -> TG link smoke на реальных Mini App хостах.
+7. SQL-инвариант для `user_identities` (одинаковый `internal_user_id` у TG/VK/MAX связки).
+8. `npm run test:db:down`
 
 ## Maintenance (non-blocking)
 
