@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash, createHmac } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 import { after, test } from 'node:test'
 import dotenv from 'dotenv'
 import supertest from 'supertest'
@@ -121,7 +121,7 @@ if (!hasDbConfig) {
       .sort((left, right) => left.localeCompare(right))
       .join('\n')
     const maxBotToken = getMaxBotToken()
-    const secret = createHash('sha256').update(maxBotToken).digest()
+    const secret = createHmac('sha256', 'WebAppData').update(maxBotToken).digest()
     const hash = createHmac('sha256', secret).update(dataCheckString).digest('hex')
     const search = new URLSearchParams(params)
     if (!options.omitHash) {

@@ -634,7 +634,8 @@ const verifyMaxInitData = (initData) => {
   }
 
   const dataCheckString = buildInitDataCheckString(params)
-  const secret = createHash('sha256').update(maxBotToken).digest()
+  // MAX follows Telegram WebApp signing: secret = HMAC_SHA256("WebAppData", bot_token)
+  const secret = createHmac('sha256', 'WebAppData').update(maxBotToken).digest()
   const expectedHash = createHmac('sha256', secret).update(dataCheckString).digest('hex')
 
   return timingSafeEqualHex(expectedHash, hash)
